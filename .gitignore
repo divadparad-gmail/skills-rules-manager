@@ -1,0 +1,12 @@
+out
+out-test
+dist
+node_modules
+.vscode-test
+*.vsix
+*.zip
+docs/
+.env
+.env.*
+.DS_Store
+Thumbs.db

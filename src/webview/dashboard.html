@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src {{cspSource}} 'unsafe-inline'; script-src 'nonce-{{nonce}}'; font-src {{cspSource}};">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="{{styleUri}}">
+  <title>Skills & Rules Manager - Dashboard</title>
+</head>
+<body>
+  <!-- Header Supérieur -->
+  <div class="header-container" style="margin-bottom: 8px;">
+    <div class="header-top">
+      <div class="app-title" style="font-size: 16px;">
+        <svg class="app-icon" style="width: 22px; height: 22px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="8" height="8" rx="2" />
+          <rect x="13" y="3" width="8" height="5" rx="1.5" />
+          <rect x="13" y="11" width="8" height="10" rx="2" />
+          <rect x="3" y="14" width="8" height="7" rx="1.5" />
+        </svg>
+        <span>Tableau de Bord : Skills & Rules Manager</span>
+        <span class="version-tag" title="Version de l'extension">{{version}}</span>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <div class="workspace-tool-pills" id="workspaceToolPillsDash">
+          <button type="button" class="tool-pill tool-pill-claude" id="pillWorkspaceClaudeDash" data-tool="claude-code" title="Basculer vers l'espace de travail Claude Code">CLAUDE</button>
+          <button type="button" class="tool-pill tool-pill-antigravity active" id="pillWorkspaceAntigravityDash" data-tool="antigravity" title="Basculer vers l'espace de travail Antigravity">ANTIGRAVITY</button>
+        </div>
+        <button id="btnRefresh" class="btn btn-secondary btn-sm" title="Actualiser tous les scanners">
+          <span>🔄 Recharger</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Grand Cadre : Budget Mémoire Contexte (Pleine Largeur) -->
+  <div class="token-gauge-container dashboard-gauge-full">
+    <div class="token-gauge-header">
+      <div class="token-gauge-title-wrap">
+        <span class="token-gauge-title" style="font-size: 13px;">
+          <span>⚡ Charge Fixe de Démarrage</span>
+        </span>
+        <span class="token-budget-target">(Budget conseillé &lt; 20 000 tokens)</span>
+        <span class="token-pill-context" id="tokenPillContext" title="Empreinte fixe rapportée à la fenêtre de session complète de 1 million de tokens">🌐 1.5% de la fenêtre 1M</span>
+        <span class="token-pill-duplicate" id="duplicateWarningPill" style="display: none;" title="Doublons actifs détectés entre Global et Local">⚠️ Doublon</span>
+      </div>
+      <div class="token-gauge-value" style="font-size: 12px;">
+        <span class="gauge-used-label">utilisé <span id="tokenUsedPercent" class="gauge-pct gauge-used-val">0%</span></span>
+        <span class="gauge-sep">|</span>
+        <span class="gauge-avail-label">disponible <span id="tokenAvailablePercent" class="gauge-pct gauge-avail-val">100%</span></span>
+      </div>
+    </div>
+
+    <!-- Grande Barre de progression segmentée -->
+    <div class="stacked-progress-track" style="height: 10px;">
+      <div id="barSoulGlobal" class="segment segment-soul-global" style="width: 0%;" title="Âme (global)"></div>
+      <div id="barSoulLocal" class="segment segment-soul-local" style="width: 0%;" title="Âme (local)"></div>
+      <div id="barRuleGlobal" class="segment segment-rule-global" style="width: 0%;" title="Rules (global)"></div>
+      <div id="barRuleLocal" class="segment segment-rule-local" style="width: 0%;" title="Rules (local)"></div>
+      <div id="barSkillGlobal" class="segment segment-skill-global" style="width: 0%;" title="Skills (global)"></div>
+      <div id="barSkillLocal" class="segment segment-skill-local" style="width: 0%;" title="Skills (local)"></div>
+      <div id="barMcpGlobal" class="segment segment-mcp-global" style="width: 0%;" title="MCP (global)"></div>
+      <div id="barMcpLocal" class="segment segment-mcp-local" style="width: 0%;" title="MCP (local)"></div>
+    </div>
+
+    <!-- Grille 3 Colonnes : GLOBAL vs LOCAL vs TOTAL -->
+    <div class="dashboard-budget-grid">
+      <!-- COLONNE GAUCHE : GLOBAL -->
+      <div class="budget-column">
+        <div class="budget-col-header">
+          <span>💻 GLOBAL (Machine)</span>
+        </div>
+
+        <!-- Ligne 0 : Âme (global) -->
+        <div id="rowSoulGlobal" class="budget-card-row has-tooltip">
+          <div class="budget-card-title">
+            <span class="symbol-icon symbol-soul-global">🧬</span>
+            <span id="titleSoulGlobal">Âme (global) (0)</span>
+          </div>
+          <span class="budget-card-stats" id="valSoulGlobal">0 tok (0%)</span>
+          <div class="tooltip-box" id="tooltipSoulGlobal">Chargement...</div>
+        </div>
+
+        <!-- Ligne 1 : Rules (global) -->
+        <div id="rowRuleGlobal" class="budget-card-row has-tooltip">
+          <div class="budget-card-title">
+            <span class="symbol-icon symbol-rule-global">●</span>
+            <span id="titleRuleGlobal">Rules (global) (0)</span>
+          </div>
+          <span class="budget-card-stats" id="valRuleGlobal">0 tok (0%)</span>
+          <div class="tooltip-box" id="tooltipRuleGlobal">Chargement...</div>
+        </div>
+
+        <!-- Ligne 2 : Skills (global) -->
+        <div id="rowSkillGlobal" class="budget-card-row has-tooltip">
+          <div class="budget-card-title">
+            <span class="symbol-icon symbol-skill-global">●</span>
+            <span id="titleSkillGlobal">Skills (global) (0)</span>
+          </div>
+          <span class="budget-card-stats" id="valSkillGlobal">0 tok (0%)</span>
+          <div class="tooltip-box" id="tooltipSkillGlobal">Chargement...</div>
+        </div>
+
+        <!-- Ligne 3 : MCP (global) -->
+        <div id="rowMcpGlobal" class="budget-card-row has-tooltip">
+          <div class="budget-card-title">
+            <span class="symbol-icon symbol-mcp-global">●</span>
+            <span id="titleMcpGlobal">MCP (global) (0)</span>
+          </div>
+          <span class="budget-card-stats" id="valMcpGlobal">0 tok (0%)</span>
+          <div class="tooltip-box" id="tooltipMcpGlobal">Chargement...</div>
+        </div>
+      </div>
+
+      <!-- COLONNE DROITE 1 : LOCAL -->
+      <div class="budget-column">
+        <div class="budget-col-header">
+          <span>📂 LOCAL (Projet Actuel)</span>
+        </div>
+
+        <!-- Ligne 0 : Âme (local) -->
+        <div id="rowSoulLocal" class="budget-card-row has-tooltip">
+          <div class="budget-card-title">
+            <span class="symbol-icon symbol-soul-local">🧬</span>
+            <span id="titleSoulLocal">Âme (local) (0)</span>
+          </div>
+          <span class="budget-card-stats" id="valSoulLocal">0 tok (0%)</span>
+          <div class="tooltip-box" id="tooltipSoulLocal">Chargement...</div>
+        </div>
+
+        <!-- Ligne 1 : Rules (local) -->
+        <div id="rowRuleLocal" class="budget-card-row has-tooltip">
+          <div class="budget-card-title">
+            <span class="symbol-icon symbol-rule-local">◆</span>
+            <span id="titleRuleLocal">Rules (local) (0)</span>
+          </div>
+          <span class="budget-card-stats" id="valRuleLocal">0 tok (0%)</span>
+          <div class="tooltip-box" id="tooltipRuleLocal">Chargement...</div>
+        </div>
+
+        <!-- Ligne 2 : Skills (local) -->
+        <div id="rowSkillLocal" class="budget-card-row has-tooltip">
+          <div class="budget-card-title">
+            <span class="symbol-icon symbol-skill-local">◆</span>
+            <span id="titleSkillLocal">Skills (local) (0)</span>
+          </div>
+          <span class="budget-card-stats" id="valSkillLocal">0 tok (0%)</span>
+          <div class="tooltip-box" id="tooltipSkillLocal">Chargement...</div>
+        </div>
+
+        <!-- Ligne 3 : MCP (local) -->
+        <div id="rowMcpLocal" class="budget-card-row has-tooltip">
+          <div class="budget-card-title">
+            <span class="symbol-icon symbol-mcp-local">◆</span>
+            <span id="titleMcpLocal">MCP (local) (0)</span>
+          </div>
+          <span class="budget-card-stats" id="valMcpLocal">0 tok (0%)</span>
+          <div class="tooltip-box" id="tooltipMcpLocal">Chargement...</div>
+        </div>
+      </div>
+
+      <!-- COLONNE DROITE 2 : TOTAL CONTEXTE -->
+      <div class="budget-column">
+        <div class="budget-col-header">
+          <span>📊 Total Contexte</span>
+        </div>
+
+        <!-- Ligne 0 : Total Âme -->
+        <div id="rowSoulTotal" class="budget-card-row has-tooltip">
+          <div class="budget-card-title">
+            <span class="symbol-icon symbol-soul-global">Σ</span>
+            <span id="titleSoulTotal">Âme (total) (0)</span>
+          </div>
+          <span class="budget-card-stats" id="valSoulTotal">0 tok (0%)</span>
+          <div class="tooltip-box" id="tooltipSoulTotal">Chargement...</div>
+        </div>
+
+        <!-- Ligne 1 : Total Rules -->
+        <div id="rowRuleTotal" class="budget-card-row has-tooltip">
+          <div class="budget-card-title">
+            <span class="symbol-icon symbol-rule-global">Σ</span>
+            <span id="titleRuleTotal">Rules (total) (0)</span>
+          </div>
+          <span class="budget-card-stats" id="valRuleTotal">0 tok (0%)</span>
+          <div class="tooltip-box" id="tooltipRuleTotal">Chargement...</div>
+        </div>
+
+        <!-- Ligne 2 : Total Skills -->
+        <div id="rowSkillTotal" class="budget-card-row has-tooltip">
+          <div class="budget-card-title">
+            <span class="symbol-icon symbol-skill-global">Σ</span>
+            <span id="titleSkillTotal">Skills (total) (0)</span>
+          </div>
+          <span class="budget-card-stats" id="valSkillTotal">0 tok (0%)</span>
+          <div class="tooltip-box" id="tooltipSkillTotal">Chargement...</div>
+        </div>
+
+        <!-- Ligne 3 : Total MCP -->
+        <div id="rowMcpTotal" class="budget-card-row has-tooltip">
+          <div class="budget-card-title">
+            <span class="symbol-icon symbol-mcp-global">Σ</span>
+            <span id="titleMcpTotal">MCP (total) (0)</span>
+          </div>
+          <span class="budget-card-stats" id="valMcpTotal">0 tok (0%)</span>
+          <div class="tooltip-box" id="tooltipMcpTotal">Chargement...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pied du Grand Cadre -->
+    <div class="budget-card-footer">
+      <div class="token-helper-note" style="border: none; padding: 0; margin: 0;">
+        <span>ℹ️ Base de calcul : 1 token ≈ 4 caractères Markdown</span>
+      </div>
+      <div id="tokenTotalSummary" style="font-family: monospace; font-weight: 600;">
+        Total utilisé : 0 / 20 000 tokens (0%)
+      </div>
+    </div>
+  </div>
+
+  <!-- Barre de Recherche & Filtres (Placée au-dessus des 3 colonnes) -->
+  <div class="fullwidth-toolbar">
+    <div class="search-box">
+      <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="11" cy="11" r="8"></circle>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+      </svg>
+      <input type="text" id="searchInput" class="search-input" placeholder="Rechercher par nom, tag, description...">
+      <button type="button" id="searchClearBtn" class="search-clear-btn" title="Effacer la recherche (Échap)" style="display: none;">✕</button>
+    </div>
+    <div class="filter-chips">
+      <button class="chip-btn active" data-filter="all">Tous</button>
+      <button class="chip-btn" data-filter="soul">🧬 Âme</button>
+      <button class="chip-btn" data-filter="skill">Skills</button>
+      <button class="chip-btn" data-filter="workflow">Workflows</button>
+      <button class="chip-btn" data-filter="rule">Règles</button>
+    </div>
+  </div>
+
+  <!-- Dashboard Grid (3 colonnes) -->
+  <div class="dashboard-grid">
+
+    <!-- COLONNE 1 : CATALOGUE NAS -->
+    <div id="columnNas" class="column-card">
+      <div class="column-header">
+        <div class="column-title-row">
+          <div class="column-title">
+            <span>🏛️ 1. CATALOGUE</span>
+          </div>
+          <span id="nasCountBadge" class="badge badge-nas">0 items</span>
+        </div>
+        <div id="nasPathLabel" class="column-path">\\Nas1\DD2\IA\Antigravity-Templates</div>
+      </div>
+
+      <div id="nasStatusBanner" class="status-banner status-warning" style="display: none; margin: 8px 10px 0 10px;">
+        ⚠️ NAS Hors Ligne
+      </div>
+
+      <div id="nasItemsList" class="column-body">
+        <div class="empty-state">
+          <div class="empty-state-icon">⏳</div>
+          <div>Chargement du catalogue NAS...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- COLONNE 2 : GLOBAL MACHINE -->
+    <div id="columnGlobal" class="column-card">
+      <div class="column-header">
+        <div class="column-title-row">
+          <div class="column-title">
+            <span>💻 2. GLOBAL (Machine)</span>
+          </div>
+          <span id="globalCountBadge" class="badge badge-antigravity">0 items</span>
+        </div>
+        <div id="globalPathLabel" class="column-path">~/.gemini/config/skills/</div>
+      </div>
+
+      <div class="column-actions" id="columnActionsGlobal">
+        <!-- Workflows (wf-*) -->
+        <div class="bulk-control" id="bulkWfGlobal" title="Workflows d'actions (wf-*) : cliquez pour basculer ON/OFF">
+          <div class="bulk-info" data-action="toggle" data-type="workflow" data-scope="global">
+            <span class="bulk-icon">⚡</span>
+            <span class="bulk-title">Workflows</span>
+            <span class="bulk-count" id="countWfGlobal">0/0</span>
+          </div>
+          <div class="bulk-switch">
+            <button class="bulk-toggle-btn btn-on" data-action="on" data-type="workflow" data-scope="global" title="Activer tous les workflows (wf-*)">ON</button>
+            <button class="bulk-toggle-btn btn-off" data-action="off" data-type="workflow" data-scope="global" title="Désactiver tous les workflows (wf-*) pour économiser des tokens">OFF</button>
+          </div>
+        </div>
+
+        <!-- Skills (skill-*) -->
+        <div class="bulk-control" id="bulkSkillGlobal" title="Compétences d'expertise (skill-*) : cliquez pour basculer ON/OFF">
+          <div class="bulk-info" data-action="toggle" data-type="skill" data-scope="global">
+            <span class="bulk-icon">🧠</span>
+            <span class="bulk-title">Skills</span>
+            <span class="bulk-count" id="countSkillGlobal">0/0</span>
+          </div>
+          <div class="bulk-switch">
+            <button class="bulk-toggle-btn btn-on" data-action="on" data-type="skill" data-scope="global" title="Activer tous les skills">ON</button>
+            <button class="bulk-toggle-btn btn-off" data-action="off" data-type="skill" data-scope="global" title="Désactiver tous les skills">OFF</button>
+          </div>
+        </div>
+
+        <!-- Règles (*.md) -->
+        <div class="bulk-control" id="bulkRuleGlobal" title="Règles globales (*.md) : cliquez pour basculer ON/OFF">
+          <div class="bulk-info" data-action="toggle" data-type="rule" data-scope="global">
+            <span class="bulk-icon">📋</span>
+            <span class="bulk-title">Règles</span>
+            <span class="bulk-count" id="countRuleGlobal">0/0</span>
+          </div>
+          <div class="bulk-switch">
+            <button class="bulk-toggle-btn btn-on" data-action="on" data-type="rule" data-scope="global" title="Activer toutes les règles globales">ON</button>
+            <button class="bulk-toggle-btn btn-off" data-action="off" data-type="rule" data-scope="global" title="Désactiver toutes les règles globales">OFF</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="globalItemsList" class="column-body">
+        <div class="empty-state">
+          <div class="empty-state-icon">⏳</div>
+          <div>Chargement des compétences globales...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- COLONNE 3 : LOCAL PROJET -->
+    <div id="columnLocal" class="column-card">
+      <div class="column-header">
+        <div class="column-title-row">
+          <div class="column-title">
+            <span>📂 3. LOCAL (Projet Actuel)</span>
+          </div>
+          <span id="localCountBadge" class="badge" style="background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 1px solid rgba(74, 222, 128, 0.3);">0 items</span>
+        </div>
+        <div id="localPathLabel" class="column-path">./.agents</div>
+      </div>
+
+      <div class="column-actions" id="columnActionsLocal">
+        <!-- Workflows (wf-*) -->
+        <div class="bulk-control" id="bulkWfLocal" title="Workflows d'actions du projet : cliquez pour basculer ON/OFF">
+          <div class="bulk-info" data-action="toggle" data-type="workflow" data-scope="local">
+            <span class="bulk-icon">⚡</span>
+            <span class="bulk-title">Workflows</span>
+            <span class="bulk-count" id="countWfLocal">0/0</span>
+          </div>
+          <div class="bulk-switch">
+            <button class="bulk-toggle-btn btn-on" data-action="on" data-type="workflow" data-scope="local" title="Activer tous les workflows locaux">ON</button>
+            <button class="bulk-toggle-btn btn-off" data-action="off" data-type="workflow" data-scope="local" title="Désactiver tous les workflows locaux">OFF</button>
+          </div>
+        </div>
+
+        <!-- Skills (skill-*) -->
+        <div class="bulk-control" id="bulkSkillLocal" title="Compétences du projet : cliquez pour basculer ON/OFF">
+          <div class="bulk-info" data-action="toggle" data-type="skill" data-scope="local">
+            <span class="bulk-icon">🧠</span>
+            <span class="bulk-title">Skills</span>
+            <span class="bulk-count" id="countSkillLocal">0/0</span>
+          </div>
+          <div class="bulk-switch">
+            <button class="bulk-toggle-btn btn-on" data-action="on" data-type="skill" data-scope="local" title="Activer tous les skills locaux">ON</button>
+            <button class="bulk-toggle-btn btn-off" data-action="off" data-type="skill" data-scope="local" title="Désactiver tous les skills locaux">OFF</button>
+          </div>
+        </div>
+
+        <!-- Règles (*.md) -->
+        <div class="bulk-control" id="bulkRuleLocal" title="Règles du projet : cliquez pour basculer ON/OFF">
+          <div class="bulk-info" data-action="toggle" data-type="rule" data-scope="local">
+            <span class="bulk-icon">📋</span>
+            <span class="bulk-title">Règles</span>
+            <span class="bulk-count" id="countRuleLocal">0/0</span>
+          </div>
+          <div class="bulk-switch">
+            <button class="bulk-toggle-btn btn-on" data-action="on" data-type="rule" data-scope="local" title="Activer toutes les règles locales">ON</button>
+            <button class="bulk-toggle-btn btn-off" data-action="off" data-type="rule" data-scope="local" title="Désactiver toutes les règles locales">OFF</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="localItemsList" class="column-body">
+        <div class="empty-state">
+          <div class="empty-state-icon">⏳</div>
+          <div>Chargement des règles et skills du projet...</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script nonce="{{nonce}}" src="{{scriptUri}}"></script>
+</body>
+</html>

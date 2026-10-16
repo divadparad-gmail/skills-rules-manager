@@ -1,0 +1,139 @@
+{
+  "name": "skills-rules-manager",
+  "displayName": "Skills & Rules Manager",
+  "description": "Gestionnaire visuel de compétences (skills, workflows) et règles pour Antigravity IDE et Claude Code (NAS, Global, Local).",
+  "version": "0.3.0",
+  "publisher": "antigravity",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/divadparad-gmail/skills-rules-manager"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "skills-rules-manager-sidebar",
+          "title": "Skills & Rules",
+          "icon": "media/icons/activity-bar-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "skills-rules-manager-sidebar": [
+        {
+          "type": "webview",
+          "id": "skillsRulesManagerView",
+          "name": "Skills & Rules"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "skillsRulesManager.openDashboard",
+        "title": "Ouvrir le Grand Dashboard",
+        "category": "Skills & Rules Manager",
+        "icon": "$(layout-sidebar-left-off)"
+      },
+      {
+        "command": "skillsRulesManager.openCheatSheet",
+        "title": "Ouvrir le Guide & Bonnes Pratiques IA (Cheat Sheet)",
+        "category": "Skills & Rules Manager",
+        "icon": "$(book)"
+      },
+      {
+        "command": "skillsRulesManager.refresh",
+        "title": "Actualiser les Skills et Règles",
+        "category": "Skills & Rules Manager",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "skillsRulesManager.disableAllWorkflows",
+        "title": "Désactiver tous les Workflows (wf-*)",
+        "category": "Skills & Rules Manager"
+      },
+      {
+        "command": "skillsRulesManager.enableAllSkills",
+        "title": "Activer tous les Skills",
+        "category": "Skills & Rules Manager"
+      },
+      {
+        "command": "skillsRulesManager.allowNasUncHost",
+        "title": "Autoriser l'hôte NAS (UNC) dans la sécurité VS Code",
+        "category": "Skills & Rules Manager"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "skillsRulesManager.openDashboard",
+          "when": "view == skillsRulesManagerView",
+          "group": "navigation@1"
+        },
+        {
+          "command": "skillsRulesManager.refresh",
+          "when": "view == skillsRulesManagerView",
+          "group": "navigation@2"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Skills & Rules Manager",
+      "properties": {
+        "skillsManager.nasPath": {
+          "type": "string",
+          "default": "\\\\Nas1\\DD2\\IA\\Antigravity-Templates",
+          "description": "Chemin UNC vers le catalogue maître NAS (skills, rules, workflows)"
+        },
+        "skillsManager.globalPath": {
+          "type": "string",
+          "default": "",
+          "description": "Chemin global de configuration Antigravity (laisser vide pour détection automatique : ~/.gemini/config)"
+        },
+        "skillsManager.claudeGlobalPath": {
+          "type": "string",
+          "default": "",
+          "description": "Chemin global de configuration Claude Code (laisser vide pour détection automatique : ~/.claude)"
+        },
+        "skillsManager.defaultProjectTool": {
+          "type": "string",
+          "enum": [
+            "auto-detect",
+            "antigravity",
+            "claude-code"
+          ],
+          "default": "auto-detect",
+          "description": "Méthode de détection de l'outil cible pour le projet local"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "type-check": "tsc --noEmit",
+    "test": "node -c src/webview/main.js && node -c src/webview/cheatsheet.js && tsc -p tsconfig.test.json && node --test out-test/test/**/*.test.js",
+    "test:deploy-antigravity": "node test/scenarios/scripts/runner.js antigravity",
+    "test:deploy-claude": "node test/scenarios/scripts/runner.js claude-code",
+    "test:deploy-all": "node test/scenarios/scripts/runner.js all",
+    "test:clean": "node test/scenarios/scripts/runner.js clean",
+    "package": "vsce package --no-git-tag-version"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^2.24.0",
+    "typescript": "^5.3.3"
+  }
+}

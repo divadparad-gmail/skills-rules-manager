@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "git-tools": {
+      "command": "node",
+      "args": ["git-server.js"]
+    },
+    "heavy-database-mcp": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-postgres"],
+      "env": {
+        "DATABASE_URL": "postgresql://user:pass@localhost:5432/mydb",
+        "EXTENDED_INSTRUCTIONS_PROMPT": "Instructions d'initialisation très volumineuses destinées à reproduire le dépassement du plafond technique de 2 048 caractères par outil dans l'écosystème Claude Code. Lorsque la spécification d'un outil ou ses descriptions dépassent cette limite stricte imposée par le runtime Anthropic Claude Code, une troncature silencieuse se produit, pouvant corrompre le schéma JSON attendu ou altérer le comportement des requêtes SQL complexes. Pour éviter ce phénomène, l'extension Skills & Rules Manager avertit l'utilisateur avec un badge '⚠️ MCP > 2 Ko' et l'invite à compacter ou découper ses outils MCP. Le système Claude Code tronque silencieusement à 2048 caractères tout bloc descriptif de schéma d'outil MCP. Cela entraîne des erreurs d'analyse syntaxique inexpliquées lors des appels d'outils automatisés. Répétition de sécurité pour atteindre le seuil critique : Le système Claude Code tronque silencieusement à 2048 caractères tout bloc descriptif de schéma d'outil MCP. Cela entraîne des erreurs d'analyse syntaxique inexpliquées lors des appels d'outils automatisés. Répétition supplémentaire : Le système Claude Code tronque silencieusement à 2048 caractères tout bloc descriptif de schéma d'outil MCP. Cela entraîne des erreurs d'analyse syntaxique inexpliquées lors des appels d'outils automatisés. Répétition finale pour certifier plus de 2200 caractères réels dans le payload JSON du serveur MCP."
+      }
+    }
+  }
+}

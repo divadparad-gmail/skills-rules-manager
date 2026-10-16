@@ -1,0 +1,8 @@
+---
+name: skill-claude-disabled
+description: Compétence Claude Code désactivée par suffixe.
+---
+
+# Compétence Claude Désactivée
+
+Fichier désactivé via `.disabled`.

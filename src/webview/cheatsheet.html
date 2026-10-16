@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'none'; style-src {{cspSource}} 'unsafe-inline'; script-src 'nonce-{{nonce}}'; font-src {{cspSource}};">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="{{styleUri}}">
+  <title>Guide & Bonnes Pratiques IA</title>
+</head>
+
+<body class="cheatsheet-body">
+  <div class="cheatsheet-container">
+
+    <!-- En-tête Supérieur -->
+    <div class="cheatsheet-header">
+      <div class="cheatsheet-header-left">
+        <span class="cheatsheet-icon">📚</span>
+        <div class="cheatsheet-title-group">
+          <div class="cheatsheet-title-row">
+            <h1 class="cheatsheet-title">Guide & Bonnes Pratiques IA</h1>
+            <span class="version-tag" title="Version de l'extension">{{version}}</span>
+          </div>
+          <span class="cheatsheet-subtitle">Cheat Sheet, Règles de Contexte, Cycle de Vie & Architecture</span>
+        </div>
+      </div>
+
+      <!-- Navigation par Onglets Environnement (Style Pilules Grand Dashboard) -->
+      <div class="workspace-tool-pills cheatsheet-tabs" id="cheatsheetToolPills">
+        <button type="button" class="tool-pill tool-pill-claude active" id="modalTabClaude" data-tab="claude" title="Afficher les bonnes pratiques Claude Code">
+          CLAUDE
+        </button>
+        <button type="button" class="tool-pill tool-pill-antigravity" id="modalTabAntigravity" data-tab="antigravity" title="Afficher les bonnes pratiques Antigravity">
+          ANTIGRAVITY
+        </button>
+      </div>
+    </div>
+
+    <!-- Corps du Guide -->
+    <div class="cheatsheet-content">
+
+      <!-- ===================================================================
+           CONTENU ONGLET 1 : CLAUDE CODE
+           =================================================================== -->
+      <div id="contentClaude" class="modal-tab-content">
+
+        <!-- 1. Limites de Tailles & Budget Contexte -->
+        <div class="cs-section">
+          <div class="cs-section-title">
+            <span>📏 1. Limites de Tailles & Budget Contexte</span>
+          </div>
+          <div class="cs-callout cs-callout-info">
+            <span>💡</span>
+            <div>
+              <strong>Budget Contexte Recommandé : 10 000 à 20 000 tokens de charge fixe totale.</strong> Même si Claude dispose d'une fenêtre de contexte de 1M tokens (ou 200k selon les modèles), la contrainte majeure n'est pas la taille de la fenêtre mais la <strong>dilution de l'attention</strong> : chaque règle permanente et chaque définition d'outil MCP concurrence votre contexte de travail réel à chaque tour.
+            </div>
+          </div>
+          <div class="cs-table-wrap">
+            <table class="cs-table">
+              <thead>
+                <tr>
+                  <th style="white-space: nowrap;">Composant</th>
+                  <th style="white-space: nowrap;">Fichier (global / local)</th>
+                  <th style="white-space: nowrap;">Taille Max &amp; Tokens</th>
+                  <th>Comportement</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>Âme</strong></td>
+                  <td style="white-space: nowrap;">
+                    <code>~/.claude/CLAUDE.md (global)</code><br>
+                    <code>/CLAUDE.md (local projet)</code>
+                  </td>
+                  <td style="white-space: nowrap;">
+                    <div>Recommandé &lt; 200 lignes</div>
+                    <div style="color: var(--muted-fg); font-size: 10px;">~1 500 – 3 000 tokens</div>
+                  </td>
+                  <td>Contenu entier injecté 1 fois au démarrage de session. Réinjecté (relu du disque) seulement après /compact. CLAUDE.md imbriqués en sous-dossier : chargés à la demande quand Claude touche ce sous-dossier.</td>
+                </tr>
+                <tr>
+                  <td><strong>Règles Sans Paths</strong></td>
+                  <td style="white-space: nowrap;">
+                    <code>~/.claude/rules/*.md (global)</code><br>
+                    <code>/.claude/rules/*.md (local projet)</code>
+                  </td>
+                  <td style="white-space: nowrap;">
+                    <div>Recommandé &lt; 200 lignes</div>
+                    <div style="color: var(--muted-fg); font-size: 10px;">~1 500 – 3 000 tokens</div>
+                  </td>
+                  <td>Contenu entier lu au démarrage, frontmatter supprimé — même priorité que CLAUDE.md, reste actif toute la session.</td>
+                </tr>
+                <tr>
+                  <td><strong>Règles Avec Paths</strong></td>
+                  <td style="white-space: nowrap;">
+                    <code>~/.claude/rules/*.md (global)</code><br>
+                    <code>/.claude/rules/*.md (local projet)</code>
+                  </td>
+                  <td style="white-space: nowrap;">
+                    <div>Recommandé &lt; 200 lignes</div>
+                    <div style="color: var(--muted-fg); font-size: 10px;">Conditionnel</div>
+                  </td>
+                  <td>Seul le frontmatter (paths) lu au démarrage. Contenu entier injecté uniquement quand Claude lit/écrit/édite un fichier correspondant au motif glob. Se recharge à la demande après /compact.</td>
+                </tr>
+                <tr>
+                  <td><strong>Skills sans paths</strong></td>
+                  <td style="white-space: nowrap;">
+                    <code>~/.claude/skills/&lt;nom&gt;/SKILL.md (global)</code><br>
+                    <code>/.claude/skills/&lt;nom&gt;/SKILL.md (local projet)</code>
+                  </td>
+                  <td style="white-space: nowrap;">
+                    <div>Recommandé &lt; 500 lignes</div>
+                    <div style="color: var(--muted-fg); font-size: 10px;">~3 750 – 7 500 tokens</div>
+                  </td>
+                  <td>Seuls name + description injectés au démarrage. Corps entier chargé à la demande si Claude juge la skill pertinente (ou invocation manuelle /nom).</td>
+                </tr>
+                <tr>
+                  <td><strong>Skills avec paths</strong></td>
+                  <td style="white-space: nowrap;">
+                    <code>~/.claude/skills/&lt;nom&gt;/SKILL.md (global)</code><br>
+                    <code>/.claude/skills/&lt;nom&gt;/SKILL.md (local projet)</code>
+                  </td>
+                  <td style="white-space: nowrap;">
+                    <div>Recommandé &lt; 500 lignes</div>
+                    <div style="color: var(--muted-fg); font-size: 10px;">~3 750 – 7 500 tokens</div>
+                  </td>
+                  <td>name + description + paths lus au démarrage. Corps entier chargé automatiquement dès qu'un fichier correspondant au motif est manipulé — sans attendre un jugement de pertinence.</td>
+                </tr>
+                <tr>
+                  <td><strong>Fichiers annexes de skill (resources/, examples/...)</strong></td>
+                  <td style="white-space: nowrap;">
+                    <code>Sous-dossier de la skill</code><br>
+                    <span style="color: var(--muted-fg); font-size: 10px;">(resources/, examples/...)</span>
+                  </td>
+                  <td style="white-space: nowrap;">
+                    <div>—</div>
+                  </td>
+                  <td>Jamais chargés automatiquement ; lus par Claude uniquement si le corps de SKILL.md les référence explicitement.</td>
+                </tr>
+                <tr>
+                  <td><strong>MCP — description d'outil / instructions serveur*</strong></td>
+                  <td style="white-space: nowrap;">
+                    <code>~/.claude.json (global)</code><br>
+                    <code>/.mcp.json (local projet)</code>
+                  </td>
+                  <td style="white-space: nowrap;">
+                    <div>2 048 caractères max / outil</div>
+                    <div style="color: var(--muted-fg); font-size: 10px;">Max ~500 tok / outil</div>
+                  </td>
+                  <td>Tronqué individuellement par outil et par instruction serveur. Seuls noms d'outils + instructions serveur injectés au démarrage (tool search) ; schéma/description complets chargés à la demande.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div style="font-size: 11px; color: var(--muted-fg); margin-top: 4px; line-height: 1.45;">
+            <em>ℹ️ Note MCP : La limite de 2 048 caractères ne s'applique pas au cumul global du serveur, mais
+              individuellement à <strong>chaque</strong> description d'outil et <strong>chaque</strong> bloc
+              d'instructions.</em>
+          </div>
+        </div>
+
+        <!-- 2. Injection session & stratégies d'activation -->
+        <div class="cs-section">
+          <div class="cs-section-title">
+            <span>⚡ 2. Injection de Session & Stratégies d'Activation</span>
+          </div>
+
+          <!-- Partie 2.A : CLAUDE.md -->
+          <div
+            style="background: rgba(0, 0, 0, 0.2); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 5px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px;">
+            <div
+              style="font-weight: 700; color: #f59e0b; display: flex; align-items: center; gap: 6px; font-size: 11.5px;">
+              <span>🧬 Partie 2.A : CLAUDE.md — L'Âme Fondamentale (Injection Unique & Imbrication)</span>
+            </div>
+            <div class="cs-callout cs-callout-warning" style="margin: 2px 0;">
+              <span>🔄</span>
+              <div>
+                <strong>Injection One-Shot :</strong> Le fichier <code>CLAUDE.md</code> racine est injecté <strong>une seule
+                  fois</strong> au démarrage initial de la session de chat. Il ne se réinjecte pas à chaque tour de
+                prompt.
+              </div>
+            </div>
+            <ul style="margin: 0; padding-left: 20px; line-height: 1.5; color: var(--fg-color); font-size: 11px;">
+              <li><strong>Rôle :</strong> Boussole directrice générale du projet, vision architecturale globale,
+                philosophie et lois fondamentales inviolables.</li>
+              <li><strong>Règle d'or :</strong> Maintenir impérativement sous les <strong>200 lignes</strong> (~1 500 à
+                3 000 tokens) pour préserver un socle invariant propre sans dégrader la fenêtre d'attention.</li>
+              <li><strong>Réinjection après <code>/compact</code> :</strong> Lors de la compression de mémoire via la commande <code>/compact</code>, <code>CLAUDE.md</code> est automatiquement relu directement depuis le disque et réinjecté à neuf.</li>
+              <li><strong>Fichiers <code>CLAUDE.md</code> imbriqués :</strong> Vous pouvez placer des fichiers <code>CLAUDE.md</code> dans des sous-dossiers spécifiques ; Claude Code les charge dynamiquement à la demande dès qu'il explore, lit ou édite des fichiers de ce sous-dossier.</li>
+            </ul>
+          </div>
+
+          <!-- Partie 2.B : Les Règles -->
+          <div
+            style="background: rgba(0, 0, 0, 0.2); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 5px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; margin-top: 4px;">
+            <div
+              style="font-weight: 700; color: #60a5fa; display: flex; align-items: center; gap: 6px; font-size: 11.5px;">
+              <span>📋 Partie 2.B : Les Règles (.claude/rules/*.md) — 2 Stratégies d'Activation</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 8px; line-height: 1.5; font-size: 11px;">
+              <div>
+                <strong>1. Sans <code>paths</code> (Règles Permanentes) :</strong>
+                <div style="color: var(--muted-fg); margin-top: 2px;">
+                  Lues en intégralité au démarrage de session et maintenues actives en permanence en mémoire. Leur frontmatter YAML est nettoyé au chargement et leur contenu partage le même niveau d'autorité immédiate que <code>CLAUDE.md</code> (reste actif toute la session).
+                  <br><em>Usage recommandé :</em> Règles globales obligatoires à chaque échange (langue française,
+                  conventions git, style de code, sécurité de base).
+                </div>
+              </div>
+              <div>
+                <strong>2. Avec <code>paths: [...]</code> (Règles Conditionnelles Spécialisées) :</strong>
+                <div style="color: var(--muted-fg); margin-top: 2px;">
+                  Seul le frontmatter (motifs glob <code>paths</code>) est lu au boot. Claude charge le contenu entier dynamiquement <em>uniquement</em> lorsqu'il lit, écrit ou édite des fichiers ciblés (ex: <code>paths: ["src/api/**/*.ts"]</code>).
+                  <br><em>Avantage clé :</em> N'occupe <strong>aucun token</strong> tant que la zone de code n'est pas
+                  touchée. Se recharge automatiquement à la demande même après un <code>/compact</code> !
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. Skills : Découverte en Deux Temps & Gestion des Paths -->
+        <div class="cs-section">
+          <div class="cs-section-title">
+            <span>🧠 3. Compétences (Skills) : Deux Modes de Déclenchement & Gestion des Chemins</span>
+          </div>
+          <div class="cs-callout cs-callout-success">
+            <span>🚀</span>
+            <div>
+              <strong>Économie massive de contexte :</strong> Deux stratégies pour charger au moment opportun !
+            </div>
+          </div>
+          <ul style="margin: 0; padding-left: 20px; line-height: 1.6; color: var(--fg-color); font-size: 11px;">
+            <li><strong>Au démarrage (Boot) :</strong> Seules les métadonnées de frontmatter (<code>name</code>, <code>description</code> et optionnellement <code>paths</code>) sont scannées pour indexation rapide. Coût minime : ~20 tokens par skill.</li>
+            <li><strong>Mode 1 — Skills sans <code>paths</code> (À la demande) :</strong> Le corps complet du fichier <code>SKILL.md</code> n'est chargé en mémoire que si Claude juge la compétence pertinente pour la tâche courante, ou sur invocation manuelle explicite de l'utilisateur (<code>/nom-du-skill</code>).</li>
+            <li><strong>Mode 2 — Skills avec <code>paths: [...]</code> (Auto-chargement ciblé) :</strong> Dès qu'un fichier correspondant aux motifs glob est manipulé (lecture, écriture, édition), le corps complet du skill est injecté automatiquement en contexte sans attendre d'évaluation de pertinence.</li>
+          </ul>
+
+          <!-- Encadré Règle d'or sur la notion du Path et Fichiers Annexes dans les Skills -->
+          <div
+            style="background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 5px; padding: 10px 12px; margin-top: 4px; display: flex; flex-direction: column; gap: 6px;">
+            <div
+              style="font-weight: 700; color: #4ade80; display: flex; align-items: center; gap: 6px; font-size: 11.5px;">
+              <span>📁 Chemins Physiques & Fichiers Annexes dans un Skill :</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 6px; font-size: 11px; line-height: 1.5;">
+              <div>
+                <strong>🎯 Frontmatter YAML (Déclenchement) :</strong>
+                <span style="color: var(--muted-fg);">Utilisez <code>paths: [...]</code> en frontmatter si vous souhaitez un déclenchement automatique sur motifs de fichiers précis (ex: <code>paths: ["**/*.prisma", "prisma/**"]</code>), ou conservez un frontmatter épuré (<code>name</code> + <code>description</code>) pour un déclenchement sémantique ou par commande slash <code>/nom</code>.</span>
+              </div>
+              <div>
+                <strong>📂 Fichiers Annexes (<code>resources/</code>, <code>examples/</code>, <code>scripts/</code>, <code>references/</code>) :</strong>
+                <span style="color: var(--muted-fg);">Placés dans le sous-dossier de la compétence, ces fichiers auxiliaires ne sont <strong>jamais chargés automatiquement au démarrage</strong>. Claude ne les lira que si le corps Markdown de votre <code>SKILL.md</code> les référence explicitement avec leur chemin relatif, lui donnant ainsi le mandat et la légitimité d'y accéder.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. Serveurs MCP : Troncature automatique -->
+        <div class="cs-section">
+          <div class="cs-section-title">
+            <span>🔌 4. Serveurs MCP & Troncature Automatique</span>
+          </div>
+          <div class="cs-callout cs-callout-warning">
+            <span>⚠️</span>
+            <div>
+              <strong>Limite stricte : 2 048 caractères par élément.</strong> Par défaut, Claude Code applique une
+              troncature automatique à <strong>CHAQUE description d'outil</strong> et <strong>CHAQUE instruction
+                individuelle</strong> des serveurs MCP.
+            </div>
+          </div>
+          <div
+            style="color: var(--muted-fg); line-height: 1.5; font-size: 11px; display: flex; flex-direction: column; gap: 6px;">
+            <div>
+              <strong>Impact concret :</strong> Si un serveur MCP expose 15 outils, ce n'est pas le total du serveur qui
+              est bridé, mais chaque outil individuel dont la description excède 2 048 caractères sera <strong>coupé net
+                sans avertissement</strong>. Cela ampute fréquemment la documentation des paramètres optionnels, les cas
+              limites ou les schémas d'exemples.
+            </div>
+            <div>
+              <strong>Recommandation :</strong> Rédigez des descriptions chirurgicales et concises (1 à 3 phrases
+              claires). Évitez les gros blocs JSON dans les descriptions et confiez la structure aux schémas de typage
+              compacts.
+            </div>
+          </div>
+        </div>
+
+        <!-- 5. Doublons Global vs Local & Économie de Contexte -->
+        <div class="cs-section">
+          <div class="cs-section-title">
+            <span>♊ 5. Doublons Global vs Local & Économie de Contexte</span>
+          </div>
+          <div class="cs-callout cs-callout-warning">
+            <span>⚠️</span>
+            <div>
+              <strong>Attention au gaspillage de tokens au boot :</strong> Si une même règle ou compétence existe à la fois dans votre configuration globale (<code>~/.claude/</code>) et dans votre projet local (<code>.claude/</code>), les deux sont lues et injectées au démarrage si elles restent toutes les deux activées !
+            </div>
+          </div>
+          <div style="color: var(--fg-color); line-height: 1.5; font-size: 11px; display: flex; flex-direction: column; gap: 6px;">
+            <div>
+              <strong>• Doublon 100% identique (<code>⚠️ Doublon actif</code>) :</strong> Vous injectez deux fois le même fichier pour rien. Cliquez sur le bouton <em>« Éteindre »</em> intégré à la carte pour désactiver la version globale et récupérer instantanément les tokens gaspillés.
+            </div>
+            <div>
+              <strong>• Surcharge locale (<code>⚡ Surcharge locale</code>) :</strong> Le fichier local a été adapté spécifiquement pour ce projet. La version globale continue pourtant de consommer du contexte inutilement et risque de créer des consignes contradictoires. Désactivez la copie globale pour ce profil.
+            </div>
+          </div>
+        </div>
+
+        <!-- 6. Exemples concrets -->
+        <div class="cs-section">
+          <div class="cs-section-title">
+            <span>💻 6. Exemples Concrets Prêts à l'Emploi</span>
+          </div>
+          <div style="font-size: 11px; font-weight: 600; color: var(--fg-color); margin-top: 2px;">
+            Exemple : Règle ciblée avec frontmatter <code>paths</code> (chargement conditionnel)
+          </div>
+          <div class="cs-code-box"><button type="button" class="btn-copy-code"
+              data-code="---&#10;paths:&#10;  - &quot;src/api/**/*.ts&quot;&#10;  - &quot;tests/api/**/*.test.ts&quot;&#10;---&#10;&#10;# Règles API Backend&#10;- Toujours valider les entrées avec Zod.&#10;- Renvoyer des codes d'erreur HTTP explicites.">Copier</button>---
+            paths:
+            - "src/api/**/*.ts"
+            - "tests/api/**/*.test.ts"
+            ---
+
+            # Règles API Backend
+            - Toujours valider les entrées avec Zod.
+            - Renvoyer des codes d'erreur HTTP explicites.</div>
+
+          <div style="font-size: 11px; font-weight: 600; color: var(--fg-color); margin-top: 10px;">
+            Exemple : Skill avec frontmatter épuré (sans paths) et chemins explicites dans le corps
+          </div>
+          <div class="cs-code-box"><button type="button" class="btn-copy-code"
+              data-code="---&#10;name: skill-database&#10;description: Expert PostgreSQL et migrations Prisma. S'active pour les schémas, requêtes et optimisations SQL.&#10;---&#10;&#10;# Expertise Base de Données&#10;&#10;## Ressources et Chemins Utiles&#10;- Schéma principal : inspecter `prisma/schema.prisma`&#10;- Scripts de migration : exécuter les outils dans `scripts/db/`&#10;- Runbooks et guides : consulter `docs/database/`&#10;&#10;## Bonnes Pratiques&#10;1. Toujours vérifier les index sur les colonnes filtrées.&#10;2. Encapsuler les mutations critiques dans des transactions.">Copier</button>---
+            name: skill-database
+            description: Expert PostgreSQL et migrations Prisma. S'active pour les schémas, requêtes et optimisations
+            SQL.
+            ---
+
+            # Expertise Base de Données
+
+            ## Ressources et Chemins Utiles
+            - Schéma principal : inspecter `prisma/schema.prisma`
+            - Scripts de migration : exécuter les outils dans `scripts/db/`
+            - Runbooks et guides : consulter `docs/database/`
+
+            ## Bonnes Pratiques
+            1. Toujours vérifier les index sur les colonnes filtrées.
+            2. Encapsuler les mutations critiques dans des transactions.</div>
+        </div>
+
+      </div>
+
+      <!-- ===================================================================
+           CONTENU ONGLET 2 : ANTIGRAVITY IDE (GEMINI)
+           =================================================================== -->
+      <div id="contentAntigravity" class="modal-tab-content" style="display: none;">
+
+        <!-- 1. Limites de Tailles & Budget Contexte -->
+        <div class="cs-section">
+          <div class="cs-section-title">
+            <span>📏 1. Limites de Tailles & Budget Contexte</span>
+          </div>
+          <div class="cs-callout cs-callout-info">
+            <span>💡</span>
+            <div>
+              <strong>Budget Contexte Recommandé : 15 000 à 20 000 tokens permanents.</strong> Même avec les fenêtres de 1 à 2 millions de tokens de Gemini, préserver une configuration permanente légère réduit la latence initiale (TTFT) et protège l'agent du phénomène <em>Lost in the Middle</em>.
+            </div>
+          </div>
+          <div class="cs-table-wrap">
+            <table class="cs-table">
+              <thead>
+                <tr>
+                  <th style="white-space: nowrap;">Composant</th>
+                  <th style="white-space: nowrap;">Fichier (global / local)</th>
+                  <th style="white-space: nowrap;">Taille Max &amp; Tokens</th>
+                  <th>Comportement</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>Âme</strong></td>
+                  <td style="white-space: nowrap;">
+                    <code>~/.gemini/GEMINI.md (global)</code><br>
+                    <code>/GEMINI.md ou /AGENTS.md (local projet)</code>
+                  </td>
+                  <td style="white-space: nowrap;">
+                    <div>Recommandé &lt; 200 lignes</div>
+                    <div style="color: var(--muted-fg); font-size: 10px;">~1 500 – 3 000 tokens</div>
+                  </td>
+                  <td>Contenu entier injecté à chaque tour de prompt. Préservé systématiquement lors des nettoyages / compressions de mémoire. Fichiers imbriqués en sous-dossier : chargés à la demande dès que l'agent touche ce sous-dossier.</td>
+                </tr>
+                <tr>
+                  <td><strong>Règles Permanentes</strong></td>
+                  <td style="white-space: nowrap;">
+                    <code>~/.gemini/config/rules/*.md (global)</code><br>
+                    <code>/.agents/rules/*.md (local projet)</code>
+                  </td>
+                  <td style="white-space: nowrap;">
+                    <div>Recommandé &lt; 200 lignes</div>
+                    <div style="color: var(--muted-fg); font-size: 10px;">Max 24 Ko (24 000 octets)</div>
+                  </td>
+                  <td>Contenu entier injecté au démarrage si le budget total permanent est &lt; 20 000 tokens. Si le total dépasse 20 000 tokens, Antigravity dégrade automatiquement les gros fichiers en simples pointeurs descriptifs (<code>- &lt;chemin&gt;: &lt;description&gt;</code>) pour éviter la saturation.</td>
+                </tr>
+                <tr>
+                  <td><strong>Règles Conditionnelles (avec Trigger)</strong></td>
+                  <td style="white-space: nowrap;">
+                    <code>/.agents/rules/*.md</code><br>
+                    <span style="color: var(--muted-fg); font-size: 10px;">(avec trigger: glob ou model_decision)</span>
+                  </td>
+                  <td style="white-space: nowrap;">
+                    <div>~20 tokens au boot</div>
+                    <div style="color: var(--muted-fg); font-size: 10px;">Taille complète à l'activation</div>
+                  </td>
+                  <td>Ne consomme que ~20 tokens au démarrage pour le routeur d'Antigravity. Le contenu complet n'est injecté dans le contexte que si les fichiers ciblés (directive <code>globs:</code>) sont manipulés ou si le modèle décide de l'activer.</td>
+                </tr>
+                <tr>
+                  <td><strong>Règles de Dossier (Imbriquées)</strong></td>
+                  <td style="white-space: nowrap;">
+                    <code>/sous-dossier/AGENTS.md</code><br>
+                    <code>/sous-dossier/GEMINI.md</code>
+                  </td>
+                  <td style="white-space: nowrap;">
+                    <div>Recommandé &lt; 200 lignes</div>
+                    <div style="color: var(--muted-fg); font-size: 10px;">Conditionnel</div>
+                  </td>
+                  <td>N'occupe aucun token au démarrage. Contenu injecté automatiquement uniquement quand l'agent explore ou modifie des fichiers de ce sous-dossier.</td>
+                </tr>
+                <tr>
+                  <td><strong>Skills Déclarés</strong></td>
+                  <td style="white-space: nowrap;">
+                    <code>~/.gemini/config/skills/&lt;nom&gt;/SKILL.md (global)</code><br>
+                    <code>/.agents/skills/&lt;nom&gt;/SKILL.md (local projet)</code>
+                  </td>
+                  <td style="white-space: nowrap;">
+                    <div>Recommandé &lt; 500 lignes</div>
+                    <div style="color: var(--muted-fg); font-size: 10px;">~3 750 – 7 500 tokens</div>
+                  </td>
+                  <td>Seuls le nom et la description sont injectés au démarrage (~20 à 50 tokens). Le corps n'est jamais chargé au boot : lu sur disque à la demande si l'agent juge la compétence utile, ou sur commande explicite (<code>/nom-du-skill</code>).</td>
+                </tr>
+                <tr>
+                  <td><strong>Fichiers Annexes de Skill</strong></td>
+                  <td style="white-space: nowrap;">
+                    <code>Sous-dossiers conventionnels</code><br>
+                    <span style="color: var(--muted-fg); font-size: 10px;">(scripts/, examples/, resources/, references/)</span>
+                  </td>
+                  <td style="white-space: nowrap;">
+                    <div>Taille libre</div>
+                    <div style="color: var(--muted-fg); font-size: 10px;">Fichiers autonomes</div>
+                  </td>
+                  <td>Jamais chargés au démarrage ; lus par l'agent uniquement si le corps du <code>SKILL.md</code> contient un lien explicite invitant à les consulter.</td>
+                </tr>
+                <tr>
+                  <td><strong>Serveurs MCP (Outils &amp; Connecteurs)</strong></td>
+                  <td style="white-space: nowrap;">
+                    <code>~/.gemini/config/mcp_config.json (global)</code><br>
+                    <code>/.agents/mcp_config.json (local projet)</code>
+                  </td>
+                  <td style="white-space: nowrap;">
+                    <div>Illimité</div>
+                    <div style="color: var(--muted-fg); font-size: 10px;">Pas de cap à 2 048 car.</div>
+                  </td>
+                  <td>Pas de coupure de description. Antigravity optimise automatiquement : les outils légers sont <strong>préchargés au démarrage</strong>, et <strong>les gros serveurs (GitHub, Coolify...) sont chargés sur disque à la demande</strong> sans saturer le prompt.</td>
+                </tr>
+                <tr>
+                  <td><strong>Plugins (Packs Tout-en-Un)</strong></td>
+                  <td style="white-space: nowrap;">
+                    <code>~/.gemini/config/plugins/&lt;nom&gt;/ (global)</code><br>
+                    <code>/.agents/plugins/&lt;nom&gt;/ (local projet)</code>
+                  </td>
+                  <td style="white-space: nowrap;">
+                    <div>Dossier kit autonome</div>
+                    <div style="color: var(--muted-fg); font-size: 10px;">(contient rules, skills, mcp)</div>
+                  </td>
+                  <td>Kit regroupant plusieurs règles, skills et MCP dans un dossier unique pour les partager facilement. <strong>Ses éléments internes sont chargés au démarrage avec un préfixe (ex: <code>nom-pack:skill</code>)</strong> pour éviter tout conflit avec vos propres fichiers.</td>
+                </tr>
+                <tr>
+                  <td><strong>Lifecycle Hooks</strong></td>
+                  <td style="white-space: nowrap;">
+                    <code>~/.gemini/config/hooks.json (global)</code><br>
+                    <code>/.agents/hooks.json (local projet)</code>
+                  </td>
+                  <td style="white-space: nowrap;">
+                    <div>JSON déclaratif</div>
+                    <div style="color: var(--muted-fg); font-size: 10px;">5 points de contrôle</div>
+                  </td>
+                  <td>Intercepte les actions en direct (<code>PreToolUse</code>, <code>PostToolUse</code>, <code>Stop</code>, etc.). Permet de bloquer des commandes sensibles ou d'exiger une confirmation utilisateur.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div style="font-size: 11px; color: var(--muted-fg); margin-top: 4px; line-height: 1.45;">
+            <em>ℹ️ Note MCP Antigravity : Contrairement à Claude Code qui tronque à 2 048 caractères, Antigravity conserve l'intégralité des descriptions et schémas d'outils grâce à son architecture hybride transparente (préchargement léger ou lecture à la demande).</em>
+          </div>
+        </div>
+
+        <!-- 2. Injection session & stratégies d'activation -->
+        <div class="cs-section">
+          <div class="cs-section-title">
+            <span>⚡ 2. Injection de Session & Stratégies d'Activation</span>
+          </div>
+
+          <!-- Partie 2.A : GEMINI.md / AGENTS.md -->
+          <div
+            style="background: rgba(0, 0, 0, 0.2); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 5px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px;">
+            <div
+              style="font-weight: 700; color: #f59e0b; display: flex; align-items: center; gap: 6px; font-size: 11.5px;">
+              <span>🧬 Partie 2.A : GEMINI.md & AGENTS.md — L'Âme Fondamentale (Injection Continue & Imbrication)</span>
+            </div>
+            <div class="cs-callout cs-callout-warning" style="margin: 2px 0;">
+              <span>🔄</span>
+              <div>
+                <strong>Injection Continue & Protection au Compactage :</strong> Contrairement à Claude Code (injection unique au boot), les règles de l'Âme sont réinjectées à chaque tour de prompt et sont systématiquement préservées lors des compressions de mémoire.
+              </div>
+            </div>
+            <ul style="margin: 0; padding-left: 20px; line-height: 1.5; color: var(--fg-color); font-size: 11px;">
+              <li><strong>Rôle :</strong> Lois inviolables, identité de l'agent, confinement et architecture maîtresse (N0 machine dans <code>~/.gemini/GEMINI.md</code>, N1 projet dans <code>GEMINI.md</code> ou <code>AGENTS.md</code>).</li>
+              <li><strong>Règle d'or :</strong> Maintenir impérativement sous les <strong>200 lignes</strong> (~1 500 à 3 000 tokens) pour préserver un socle net sans surcharger la mémoire initiale.</li>
+              <li><strong>Imbrication Hiérarchique (Directory Walking) :</strong> Dès que l'agent lit ou manipule un fichier dans un sous-dossier (ex: <code>src/backend/</code>), il remonte l'arborescence jusqu'à la racine du dépôt. Tout fichier <code>AGENTS.md</code> ou <code>GEMINI.md</code> intermédiaire est chargé dynamiquement pour ce périmètre.</li>
+              <li><strong>Format :</strong> Fichiers Markdown autonomes sans frontmatter YAML.</li>
+            </ul>
+          </div>
+
+          <!-- Partie 2.B : Les Règles -->
+          <div
+            style="background: rgba(0, 0, 0, 0.2); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 5px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; margin-top: 4px;">
+            <div
+              style="font-weight: 700; color: #60a5fa; display: flex; align-items: center; gap: 6px; font-size: 11.5px;">
+              <span>📋 Partie 2.B : Les Règles — Permanentes, Conditionnelles &amp; Dossiers Imbriqués</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 8px; line-height: 1.5; font-size: 11px;">
+              <div>
+                <strong>1. Règles Permanentes (Dossier <code>rules/</code> sans trigger) :</strong>
+                <div style="color: var(--muted-fg); margin-top: 2px;">
+                  Situées dans <code>.agents/rules/*.md</code> (local) ou <code>~/.gemini/config/rules/*.md</code> (global). Lues en intégralité au démarrage et actives en continu.
+                  <br>• <strong>Limite physique stricte :</strong> 24 000 octets max par fichier (au-delà, risque de troncature).
+                  <br>• <strong>Dégradation automatique :</strong> Si le budget permanent cumulé dépasse <strong>20 000 tokens</strong>, Antigravity transforme automatiquement les règles volumineuses en pointeurs descriptifs dans le prompt système pour protéger la mémoire.
+                  <br><em>Usage :</em> Lois transversales (langue, encodage, sécurité de base, style de code).
+                </div>
+              </div>
+              <div>
+                <strong>2. Règles Conditionnelles (Trigger / Globs) :</strong>
+                <div style="color: var(--muted-fg); margin-top: 2px;">
+                  Définies avec un frontmatter YAML déclencheur (<code>trigger: glob</code> avec <code>globs: "*.ts, *.tsx"</code> ou <code>trigger: model_decision</code>).
+                  <br>• <strong>Coût au démarrage :</strong> Seulement ~20 tokens (le routeur d'Antigravity enregistre le déclencheur).
+                  <br>• <strong>Activation :</strong> Le contenu complet n'est injecté que lorsque l'agent ouvre, lit ou édite les fichiers ciblés.
+                  <br><em>Attention :</em> Antigravity utilise <code>trigger: glob</code> et <code>globs:</code> (et non <code>paths:</code> qui est réservé à Claude Code).
+                </div>
+              </div>
+              <div>
+                <strong>3. Règles de Dossier Imbriquées (Fichiers <code>AGENTS.md</code> en sous-dossier) :</strong>
+                <div style="color: var(--muted-fg); margin-top: 2px;">
+                  En plaçant un fichier <code>AGENTS.md</code> dans un sous-dossier spécifique (ex: <code>src/api/AGENTS.md</code>), ces consignes ne consomment <strong>aucun token au démarrage</strong>. Elles s'activent automatiquement dès que l'agent manipule des fichiers situés dans cette zone.
+                  <br><em>Déduplication stricte :</em> Résolution par chemin absolu canonique (une règle n'est jamais injectée en double).
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. Skills : Découverte au Démarrage & Lecture à la Demande -->
+        <div class="cs-section">
+          <div class="cs-section-title">
+            <span>🧠 3. Compétences (Skills : SKILL.md) : Découverte au Démarrage & Lecture à la Demande</span>
+          </div>
+          <div class="cs-callout cs-callout-success">
+            <span>🚀</span>
+            <div>
+              <strong>Économie massive de mémoire :</strong> Seuls ~20 à 50 tokens sont consommés par skill au démarrage !
+            </div>
+          </div>
+          <ul style="margin: 0; padding-left: 20px; line-height: 1.6; color: var(--fg-color); font-size: 11px;">
+            <li><strong>Au démarrage (Boot) :</strong> Seuls le <code>name</code> et la <code>description</code> dans le frontmatter YAML sont scannés au boot. Le corps du fichier <code>SKILL.md</code> n'est <strong>jamais</strong> chargé par défaut.</li>
+            <li><strong>À l'exécution (À la demande) :</strong> L'agent lit le fichier complet avec son outil de lecture uniquement s'il juge la compétence pertinente pour la tâche en cours, ou lors d'une commande explicite de votre part (ex: <code>/wf-commit</code> ou <code>/skill-dev</code>).</li>
+            <li><strong>Pas de directive <code>paths:</code> en frontmatter :</strong> Contrairement à Claude Code, la spécification <code>SKILL.md</code> d'Antigravity repose exclusivement sur l'évaluation sémantique de sa description ou sur l'appel direct.</li>
+          </ul>
+
+          <!-- Encadré Fichiers Annexes dans les Skills -->
+          <div
+            style="background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 5px; padding: 10px 12px; margin-top: 4px; display: flex; flex-direction: column; gap: 6px;">
+            <div
+              style="font-weight: 700; color: #4ade80; display: flex; align-items: center; gap: 6px; font-size: 11.5px;">
+              <span>📁 Les 4 Sous-Dossiers Conventionnels d'un Skill Antigravity :</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 6px; font-size: 11px; line-height: 1.5;">
+              <div>
+                <strong>Structure d'un Skill complet :</strong>
+                <div style="font-family: monospace; font-size: 10.5px; color: var(--muted-fg); margin-top: 2px;">
+                  skills/&lt;nom&gt;/<br>
+                  ├── SKILL.md &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# Instructions maîtresses (seul fichier lu à l'activation)<br>
+                  ├── scripts/ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# Utilitaires exécutables (PowerShell, Bash, Node, Python)<br>
+                  ├── examples/ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# Snippets et implémentations de référence<br>
+                  ├── resources/ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# Gabarits de documents, assets, templates<br>
+                  └── references/ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# Manuels complets et documentations volumineuses
+                </div>
+              </div>
+              <div style="color: var(--muted-fg); margin-top: 2px;">
+                <strong>Comportement contextuel :</strong> Ces sous-dossiers ne sont <strong>jamais injectés au boot</strong>. L'agent ne consulte un fichier dans <code>references/</code> ou <code>scripts/</code> que si <code>SKILL.md</code> contient un lien Markdown explicite (ex: <code>[Guide CLI](references/guide.md)</code>), lui conférant un mandat précis.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. Serveurs MCP, Plugins & Lifecycle Hooks -->
+        <div class="cs-section">
+          <div class="cs-section-title">
+            <span>🔌 4. Serveurs MCP, Plugins (Kits) & Lifecycle Hooks</span>
+          </div>
+          <div class="cs-callout cs-callout-info">
+            <span>🛡️</span>
+            <div>
+              <strong>Exclusivités Antigravity :</strong> Aucun cap destructeur à 2 048 caractères, isolation par plugins et contrôle total du cycle de vie via des Hooks synchrones.
+            </div>
+          </div>
+          <div
+            style="color: var(--fg-color); line-height: 1.5; font-size: 11px; display: flex; flex-direction: column; gap: 8px;">
+            <div>
+              <strong>1. Serveurs MCP (Outils & Connecteurs) :</strong>
+              <div style="color: var(--muted-fg); margin-top: 2px;">
+                Antigravity élimine la troncature arbitraire à 2 048 caractères. Les outils légers sont préchargés au démarrage pour une réactivité maximale, tandis que les gros serveurs (GitHub, Google Drive, Coolify...) sont chargés sur disque à la demande via <code>call_mcp_tool</code>, préservant 100% de la documentation des arguments sans saturer le prompt.
+              </div>
+            </div>
+            <div>
+              <strong>2. Plugins (Packs Tout-en-Un) :</strong>
+              <div style="color: var(--muted-fg); margin-top: 2px;">
+                Regroupe des règles, skills et MCP dans un dossier unique (<code>plugins/&lt;nom&gt;/</code>). Très pratique pour installer ou partager un kit complet réutilisable sans mélanger ses fichiers avec vos règles de base. Chaque élément est préfixé automatiquement pour éviter tout conflit.
+              </div>
+            </div>
+            <div>
+              <strong>3. Lifecycle Hooks (<code>hooks.json</code>) :</strong>
+              <div style="color: var(--muted-fg); margin-top: 2px;">
+                Intercepte en direct l'agent à des moments clés de son cycle d'exécution :<br>
+                • <code>PreToolUse</code> : Bloquer une commande à risque, demander une confirmation ou réécrire les paramètres.<br>
+                • <code>PostToolUse</code> : Analyser des logs ou exécuter automatiquement un vérificateur.<br>
+                • <code>Stop</code> : Empêcher l'agent de s'arrêter si des vérifications ou des tâches de fond sont encore en cours.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 5. Hiérarchie 4 Niveaux & Confinement -->
+        <div class="cs-section">
+          <div class="cs-section-title">
+            <span>🏛️ 5. Architecture & Hiérarchie Globale (Niveaux 0 à 3) & Confinement</span>
+          </div>
+          <div class="cs-callout cs-callout-warning">
+            <span>📐</span>
+            <div>
+              <strong>Structure pyramidale stricte :</strong> Priorité d'exécution descendante pour éviter les conflits et respecter le confinement local.
+            </div>
+          </div>
+          <div class="cs-table-wrap">
+            <table class="cs-table">
+              <thead>
+                <tr>
+                  <th style="white-space: nowrap;">Niveau</th>
+                  <th style="white-space: nowrap;">Nom &amp; Rôle</th>
+                  <th style="white-space: nowrap;">Emplacement</th>
+                  <th>Priorité &amp; Règles</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td style="white-space: nowrap;"><strong>Niveau 0</strong></td>
+                  <td style="white-space: nowrap;"><strong>Cadre Général &amp; Inviolable</strong></td>
+                  <td style="white-space: nowrap;"><code>~/.gemini/GEMINI.md</code></td>
+                  <td>Lois fondamentales, comportement et sécurité. Prime sur toutes les instructions par défaut de l'IA.</td>
+                </tr>
+                <tr>
+                  <td style="white-space: nowrap;"><strong>Niveau 1</strong></td>
+                  <td style="white-space: nowrap;"><strong>Priorité Projet Local</strong></td>
+                  <td style="white-space: nowrap;"><code>&lt;projet&gt;/.agents/</code></td>
+                  <td>Cœur opérationnel de CE projet (skills, rules, mcp, docs). L'emporte sur les gabarits globaux.</td>
+                </tr>
+                <tr>
+                  <td style="white-space: nowrap;"><strong>Niveau 2</strong></td>
+                  <td style="white-space: nowrap;"><strong>Référence Globale PC</strong></td>
+                  <td style="white-space: nowrap;"><code>~/.gemini/config/</code></td>
+                  <td>Catalogue officiel de la machine (skills, mcp_config.json) chargé par défaut au démarrage.</td>
+                </tr>
+                <tr>
+                  <td style="white-space: nowrap;"><strong>Niveau 3</strong></td>
+                  <td style="white-space: nowrap;"><strong>Source Maître Réseau (NAS)</strong></td>
+                  <td style="white-space: nowrap;"><code>\\Nas1\DD2\IA\Antigravity-Templates\</code></td>
+                  <td>Coffre-fort central réseau. Non consulté sans ordre explicite de l'utilisateur.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <ul style="margin: 6px 0 0; padding-left: 20px; line-height: 1.5; color: var(--fg-color); font-size: 11px;">
+            <li><strong>Confinement Local :</strong> Priorité absolue au dossier <code>.agents/</code>. Interdiction d'accès autonome au NAS sans commande explicite (ex: <code>/wf-inject</code>).</li>
+            <li><strong>Intégrité lors des Migrations :</strong> Interdiction formelle de reformater, résumer ou altérer le texte d'origine. Conservation mot pour mot.</li>
+            <li><strong>Protocole d'Auto-Promotion :</strong> Dès qu'un élément est validé en local dans <code>.agents/</code>, synchronisation en cascade vers le PC (<code>~/.gemini/config/</code>) puis vers le NAS.</li>
+          </ul>
+        </div>
+
+        <!-- 6. Doublons Global vs Local & Décryptage des Alertes du Coach IA -->
+        <div class="cs-section">
+          <div class="cs-section-title">
+            <span>♊ 6. Doublons Global vs Local & Décryptage des Alertes du Coach IA</span>
+          </div>
+          <div class="cs-callout cs-callout-warning">
+            <span>🛡️</span>
+            <div>
+              <strong>Gouvernance du Contexte & Prévention des Conflits :</strong> Le gestionnaire analyse en temps réel votre configuration et calcule précisément les tokens gaspillés.
+            </div>
+          </div>
+          <div style="color: var(--fg-color); line-height: 1.5; font-size: 11px; display: flex; flex-direction: column; gap: 8px;">
+            <div>
+              <strong>1. Détection des Doublons (Global vs Local) :</strong>
+              <div style="color: var(--muted-fg); margin-top: 2px;">
+                Lorsqu'une règle ou une compétence de <code>~/.gemini/config/</code> est dupliquée dans <code>.agents/</code>, laisser les deux copies actives consomme deux fois votre budget de démarrage. Utilisez le bouton <em>« Éteindre »</em> du badge <code>⚠️ Doublon actif</code> pour supprimer instantanément cette redondance.
+              </div>
+            </div>
+            <div>
+              <strong>2. Les 5 Alertes du Coach IA Proactif :</strong>
+              <div style="color: var(--muted-fg); margin-top: 2px;">
+                • <strong style="color: #ef4444;">⚠️ &gt; 24 Ko :</strong> Le fichier dépasse la limite physique absolue d'Antigravity (24 000 octets). Risque de troncature silencieuse.<br>
+                • <strong style="color: #f59e0b;">⚠️ &gt; 200 li. :</strong> Règle ou Âme trop longue. Risque de dilution de l'attention (<em>Lost in the Middle</em>). Scindez en sous-règles conditionnelles.<br>
+                • <strong style="color: #f59e0b;">⚠️ &gt; 500 li. :</strong> Skill volumineux. Déplacez la documentation détaillée dans <code>references/</code> et les scripts dans <code>scripts/</code>.<br>
+                • <strong style="color: #ef4444;">⚠️ MCP &gt; 2 Ko :</strong> Dépassement du cap de 2 048 car. par outil sous Claude Code.<br>
+                • <strong style="color: #f59e0b;">⚠️ Sans description :</strong> L'IA ne dispose d'aucun indice sémantique pour savoir quand invoquer cette ressource.
+              </div>
+            </div>
+            <div>
+              <strong>3. Sécurité d'Intégrité & Corbeille 🗑️ :</strong>
+              <div style="color: var(--muted-fg); margin-top: 2px;">
+                La suppression locale est rigoureusement bloquée si un fichier a été modifié manuellement et diffère du Catalogue NAS (Source Maître), protégeant ainsi votre travail contre toute perte accidentelle. Seuls les fichiers 100% synchronisés ou issus du <code>🧪 Test Scénario</code> peuvent être supprimés.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 7. Exemples concrets -->
+        <div class="cs-section">
+          <div class="cs-section-title">
+            <span>💻 7. Exemples Concrets Prêts à l'Emploi</span>
+          </div>
+
+          <div style="font-size: 11px; font-weight: 600; color: var(--fg-color); margin-top: 2px;">
+            Exemple 1 : Skill Antigravity canonique avec frontmatter minimal et fichiers annexes
+          </div>
+          <div class="cs-code-box"><button type="button" class="btn-copy-code"
+              data-code="---&#10;name: skill-database&#10;description: Expert PostgreSQL et migrations Prisma. S'active pour les schémas, requêtes et optimisations SQL.&#10;---&#10;&#10;# Expertise Base de Données&#10;&#10;## Documentation Complète &amp; Scripts&#10;- Consulter le guide d'optimisation dans [guide](references/guide-optimisation.md).&#10;- Exécuter les scripts de maintenance dans `scripts/db-check.ps1`.&#10;&#10;## Règles d'Exécution&#10;1. Toujours vérifier les index sur les colonnes filtrées.&#10;2. Encapsuler les mutations critiques dans des transactions.">Copier</button>---
+name: skill-database
+description: Expert PostgreSQL et migrations Prisma. S'active pour les schémas, requêtes et optimisations SQL.
+---
+
+# Expertise Base de Données
+
+## Documentation Complète & Scripts
+- Consulter le guide d'optimisation dans [guide](references/guide-optimisation.md).
+- Exécuter les scripts de maintenance dans `scripts/db-check.ps1`.
+
+## Règles d'Exécution
+1. Toujours vérifier les index sur les colonnes filtrées.
+2. Encapsuler les mutations critiques dans des transactions.</div>
+
+          <div style="font-size: 11px; font-weight: 600; color: var(--fg-color); margin-top: 10px;">
+            Exemple 2 : Règle permanente standard (.agents/rules/securite-api.md)
+          </div>
+          <div class="cs-code-box"><button type="button" class="btn-copy-code"
+              data-code="# Sécurité Applicative API&#10;- Toujours valider les payloads entrants avec Zod ou un schéma d'encadrement strict.&#10;- Ne jamais logger de jetons JWT, clés API ou mots de passe en clair.&#10;- Utiliser des requêtes préparées pour toute interaction avec la base de données.">Copier</button># Sécurité Applicative API
+- Toujours valider les payloads entrants avec Zod ou un schéma d'encadrement strict.
+- Ne jamais logger de jetons JWT, clés API ou mots de passe en clair.
+- Utiliser des requêtes préparées pour toute interaction avec la base de données.</div>
+
+          <div style="font-size: 11px; font-weight: 600; color: var(--fg-color); margin-top: 10px;">
+            Exemple 3 : Lifecycle Hook dans hooks.json pour intercepter et sécuriser run_command
+          </div>
+          <div class="cs-code-box"><button type="button" class="btn-copy-code"
+              data-code="{&#10;  &quot;hooks&quot;: [&#10;    {&#10;      &quot;event&quot;: &quot;PreToolUse&quot;,&#10;      &quot;matcher&quot;: {&#10;        &quot;tool&quot;: &quot;run_command&quot;,&#10;        &quot;commandMatches&quot;: &quot;(rm -rf|git push --force|Drop-Database)&quot;&#10;      },&#10;      &quot;action&quot;: {&#10;        &quot;decision&quot;: &quot;force_ask&quot;,&#10;        &quot;message&quot;: &quot;Commande à haut risque détectée. Confirmation requise.&quot;&#10;      }&#10;    }&#10;  ]&#10;}">Copier</button>{
+  "hooks": [
+    {
+      "event": "PreToolUse",
+      "matcher": {
+        "tool": "run_command",
+        "commandMatches": "(rm -rf|git push --force|Drop-Database)"
+      },
+      "action": {
+        "decision": "force_ask",
+        "message": "Commande à haut risque détectée. Confirmation requise."
+      }
+    }
+  ]
+}</div>
+
+          <div style="font-size: 11px; font-weight: 600; color: var(--fg-color); margin-top: 10px;">
+            Exemple 4 : Règle conditionnelle Antigravity (.agents/rules/regles-frontend.md)
+          </div>
+          <div class="cs-code-box"><button type="button" class="btn-copy-code"
+              data-code="---&#10;description: Normes de composants React et CSS modulaire pour le frontend.&#10;trigger: glob&#10;globs: &quot;src/components/**/*.{tsx,jsx}, src/styles/**/*.css&quot;&#10;---&#10;&#10;# Normes Composants Frontend&#10;- Utiliser des composants fonctionnels avec typage TypeScript explicite des Props.&#10;- Aucun style en ligne : toujours utiliser des classes CSS préexistantes ou des modules.&#10;- Gérer systématiquement les états d'erreur et de chargement.">Copier</button>---
+description: Normes de composants React et CSS modulaire pour le frontend.
+trigger: glob
+globs: "src/components/**/*.{tsx,jsx}, src/styles/**/*.css"
+---
+
+# Normes Composants Frontend
+- Utiliser des composants fonctionnels avec typage TypeScript explicite des Props.
+- Aucun style en ligne : toujours utiliser des classes CSS préexistantes ou des modules.
+- Gérer systématiquement les états d'erreur et de chargement.</div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- Pied de Page -->
+    <div class="cheatsheet-footer">
+      <div class="modal-footer-note">
+        <span>ℹ️ Base de calcul : 1 token ≈ 4 caractères Markdown • Économiser le contexte préserve la pertinence de
+          l'IA.</span>
+      </div>
+    </div>
+
+  </div>
+
+  <script nonce="{{nonce}}" src="{{scriptUri}}"></script>
+</body>
+
+</html>

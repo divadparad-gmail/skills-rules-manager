@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src {{cspSource}} 'unsafe-inline'; script-src 'nonce-{{nonce}}'; font-src {{cspSource}};">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="{{styleUri}}">
+  <title>Skills & Rules Manager</title>
+</head>
+<body>
+  <div class="header-container">
+    <div class="header-top">
+      <div class="app-title">
+        <svg class="app-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="8" height="8" rx="2" />
+          <rect x="13" y="3" width="8" height="5" rx="1.5" />
+          <rect x="13" y="11" width="8" height="10" rx="2" />
+          <rect x="3" y="14" width="8" height="7" rx="1.5" />
+        </svg>
+        <span>Skills & Rules</span>
+        <span class="version-tag" title="Version de l'extension">{{version}}</span>
+      </div>
+      <button id="btnRefresh" class="btn btn-secondary btn-sm" title="Actualiser l'état">🔄</button>
+    </div>
+
+    <div class="header-badges">
+      <div class="workspace-tool-pills" id="workspaceToolPillsSidebar">
+        <button type="button" class="tool-pill tool-pill-claude" id="pillWorkspaceClaudeSidebar" data-tool="claude-code" title="Basculer vers l'espace de travail Claude Code">CLAUDE</button>
+        <button type="button" class="tool-pill tool-pill-antigravity active" id="pillWorkspaceAntigravitySidebar" data-tool="antigravity" title="Basculer vers l'espace de travail Antigravity">ANTIGRAVITY</button>
+      </div>
+    </div>
+
+    <!-- Jauge de Tokens Multi-segments (Style Antigravity) -->
+    <div class="token-gauge-container">
+      <div class="token-gauge-header">
+        <div class="token-gauge-title-wrap">
+          <span class="token-gauge-title">
+            <span>⚡ Charge Démarrage</span>
+          </span>
+          <span class="token-budget-target">(&lt; 20k)</span>
+          <span class="token-pill-context" id="tokenPillContextSide" title="Empreinte fixe rapportée à la fenêtre de session de 1 million de tokens">🌐 1.5% de 1M</span>
+          <span class="token-pill-duplicate" id="duplicateWarningPillSide" style="display: none;" title="Doublons actifs détectés entre Global et Local">⚠️ Doublon</span>
+        </div>
+        <div class="token-gauge-value" style="font-size: 10px;">
+          <span class="gauge-used-label"><span id="tokenUsedPercentSide" class="gauge-pct gauge-used-val">0%</span></span>
+          <span class="gauge-sep">|</span>
+          <span class="gauge-avail-label"><span id="tokenAvailablePercentSide" class="gauge-pct gauge-avail-val">100%</span> dispo</span>
+        </div>
+      </div>
+
+      <!-- Barre de progression segmentée -->
+      <div class="stacked-progress-track">
+        <div id="barSoulGlobal" class="segment segment-soul-global" style="width: 0%;" title="Âme (global)"></div>
+        <div id="barSoulLocal" class="segment segment-soul-local" style="width: 0%;" title="Âme (local)"></div>
+        <div id="barRuleGlobal" class="segment segment-rule-global" style="width: 0%;" title="Rules (global)"></div>
+        <div id="barRuleLocal" class="segment segment-rule-local" style="width: 0%;" title="Rules (local)"></div>
+        <div id="barSkillGlobal" class="segment segment-skill-global" style="width: 0%;" title="Skills (global)"></div>
+        <div id="barSkillLocal" class="segment segment-skill-local" style="width: 0%;" title="Skills (local)"></div>
+        <div id="barMcpGlobal" class="segment segment-mcp-global" style="width: 0%;" title="MCP (global)"></div>
+        <div id="barMcpLocal" class="segment segment-mcp-local" style="width: 0%;" title="MCP (local)"></div>
+      </div>
+
+      <!-- Légende détaillée avec symboles ● (Global) et ◆ (Local) -->
+      <div class="token-breakdown-list" id="tokenBreakdownList">
+
+        <!-- Âme (global) (🧬) -->
+        <div id="rowSoulGlobal" class="breakdown-row has-tooltip">
+          <div class="breakdown-label-wrap">
+            <span class="symbol-icon symbol-soul-global">🧬</span>
+            <span class="breakdown-title" id="titleSoulGlobal">Âme (global) (0)</span>
+          </div>
+          <span class="breakdown-values" id="valSoulGlobal">0 tok (0%)</span>
+          <div class="tooltip-box" id="tooltipSoulGlobal">Chargement...</div>
+        </div>
+
+        <!-- Âme (local) (🧬) -->
+        <div id="rowSoulLocal" class="breakdown-row has-tooltip">
+          <div class="breakdown-label-wrap">
+            <span class="symbol-icon symbol-soul-local">🧬</span>
+            <span class="breakdown-title" id="titleSoulLocal">Âme (local) (0)</span>
+          </div>
+          <span class="breakdown-values" id="valSoulLocal">0 tok (0%)</span>
+          <div class="tooltip-box" id="tooltipSoulLocal">Chargement...</div>
+        </div>
+
+        <!-- Rules (global) (●) -->
+        <div id="rowRuleGlobal" class="breakdown-row has-tooltip">
+          <div class="breakdown-label-wrap">
+            <span class="symbol-icon symbol-rule-global">●</span>
+            <span class="breakdown-title" id="titleRuleGlobal">Rules (global) (0)</span>
+          </div>
+          <span class="breakdown-values" id="valRuleGlobal">0 tok (0%)</span>
+          <div class="tooltip-box" id="tooltipRuleGlobal">Chargement...</div>
+        </div>
+
+        <!-- Rules (local) (◆) -->
+        <div id="rowRuleLocal" class="breakdown-row has-tooltip">
+          <div class="breakdown-label-wrap">
+            <span class="symbol-icon symbol-rule-local">◆</span>
+            <span class="breakdown-title" id="titleRuleLocal">Rules (local) (0)</span>
+          </div>
+          <span class="breakdown-values" id="valRuleLocal">0 tok (0%)</span>
+          <div class="tooltip-box" id="tooltipRuleLocal">Chargement...</div>
+        </div>
+
+        <!-- Skills (global) (●) -->
+        <div id="rowSkillGlobal" class="breakdown-row has-tooltip">
+          <div class="breakdown-label-wrap">
+            <span class="symbol-icon symbol-skill-global">●</span>
+            <span class="breakdown-title" id="titleSkillGlobal">Skills (global) (0)</span>
+          </div>
+          <span class="breakdown-values" id="valSkillGlobal">0 tok (0%)</span>
+          <div class="tooltip-box" id="tooltipSkillGlobal">Chargement...</div>
+        </div>
+
+        <!-- Skills (local) (◆) -->
+        <div id="rowSkillLocal" class="breakdown-row has-tooltip">
+          <div class="breakdown-label-wrap">
+            <span class="symbol-icon symbol-skill-local">◆</span>
+            <span class="breakdown-title" id="titleSkillLocal">Skills (local) (0)</span>
+          </div>
+          <span class="breakdown-values" id="valSkillLocal">0 tok (0%)</span>
+          <div class="tooltip-box" id="tooltipSkillLocal">Chargement...</div>
+        </div>
+
+        <!-- MCP (global) (●) -->
+        <div id="rowMcpGlobal" class="breakdown-row has-tooltip">
+          <div class="breakdown-label-wrap">
+            <span class="symbol-icon symbol-mcp-global">●</span>
+            <span class="breakdown-title" id="titleMcpGlobal">MCP (global) (0)</span>
+          </div>
+          <span class="breakdown-values" id="valMcpGlobal">0 tok (0%)</span>
+          <div class="tooltip-box" id="tooltipMcpGlobal">Chargement...</div>
+        </div>
+
+        <!-- MCP (local) (◆) -->
+        <div id="rowMcpLocal" class="breakdown-row has-tooltip">
+          <div class="breakdown-label-wrap">
+            <span class="symbol-icon symbol-mcp-local">◆</span>
+            <span class="breakdown-title" id="titleMcpLocal">MCP (local) (0)</span>
+          </div>
+          <span class="breakdown-values" id="valMcpLocal">0 tok (0%)</span>
+          <div class="tooltip-box" id="tooltipMcpLocal">Chargement...</div>
+        </div>
+
+      </div>
+
+      <!-- Note permanente sur le ratio token/caractères -->
+      <div class="token-helper-note">
+        <span>ℹ️</span>
+        <span>1 token ≈ 4 caractères Markdown</span>
+      </div>
+    </div>
+
+    <!-- Bouton Toggle Grand Dashboard -->
+    <button id="btnToggleDashboard" class="btn btn-cta">
+      <span>🗂️ Ouvrir le Grand Dashboard</span>
+    </button>
+
+    <!-- Section Paramétrage du Répertoire Catalogue (NAS) -->
+    <div class="nas-config-card">
+      <div class="nas-config-header">
+        <div class="nas-config-title">
+          <span>🏛️ Catalogue</span>
+        </div>
+        <span id="sidebarNasStatusBadge" class="badge-nas-indicator status-online">● En ligne</span>
+      </div>
+      <div id="sidebarNasPathText" class="nas-config-path" title="Chemin actuel du catalogue source">
+        \\Nas1\DD2\IA\Antigravity-Templates
+      </div>
+      <div class="nas-config-actions">
+        <button id="btnBrowseNasPath" class="btn btn-secondary btn-xs" title="Parcourir les dossiers pour sélectionner le catalogue">
+          📁 Parcourir...
+        </button>
+        <button id="btnEditNasPath" class="btn btn-secondary btn-xs" title="Modifier manuellement le chemin UNC ou local">
+          ✏️ Modifier...
+        </button>
+      </div>
+    </div>
+
+    <!-- Section Guide & Bonnes Pratiques IA (Cheat Sheet) -->
+    <div class="cheat-sheet-card" id="cheatSheetCard">
+      <div class="cheat-sheet-header">
+        <div class="cheat-sheet-title">
+          <span class="cheat-sheet-icon">💡</span>
+          <span>Guide & Bonnes Pratiques IA</span>
+        </div>
+        <div class="cheat-sheet-pills" id="cheatSheetPills">
+          <button type="button" class="cs-pill cs-pill-claude" id="pillClaude" data-tab="claude" title="Afficher les bonnes pratiques Claude Code">Claude Code</button>
+          <button type="button" class="cs-pill cs-pill-antigravity" id="pillAntigravity" data-tab="antigravity" title="Afficher les bonnes pratiques Antigravity">Antigravity</button>
+        </div>
+      </div>
+      <div class="cheat-sheet-summary" id="cheatSheetSummary">
+        <!-- Rendu dynamique selon l'outil actif ou sélectionné -->
+      </div>
+      <button id="btnOpenCheatSheet" class="btn btn-secondary btn-cheat-sheet btn-open-cheatsheet" title="Ouvrir ou fermer le guide complet dans un onglet à droite">
+        <span>📖 Ouvrir le Guide Complet</span>
+      </button>
+    </div>
+
+    <!-- Section Banc d'Essai & Scénarios de Test -->
+    <div class="test-scenarios-card" id="testScenariosCard">
+      <div class="test-card-header">
+        <div class="test-card-title">
+          <span class="test-card-icon">🧪</span>
+          <span>Banc d'Essai (Scénarios)</span>
+        </div>
+        <span class="badge badge-test">Lab</span>
+      </div>
+      <div class="test-card-desc">
+        Injectez en 1 clic des configurations réelles pour tester le calcul des jauges, badges et règles :
+      </div>
+      <div class="test-btn-grid">
+        <button type="button" id="btnDeployAntigravity" class="btn btn-secondary btn-test-action" title="Nettoie et déploie les fixtures Antigravity">
+          <span>🌌 Antigravity</span>
+        </button>
+        <button type="button" id="btnDeployClaude" class="btn btn-secondary btn-test-action" title="Nettoie et déploie les fixtures Claude Code">
+          <span>🤖 Claude Code</span>
+        </button>
+        <button type="button" id="btnDeployAll" class="btn btn-secondary btn-test-action" title="Déploie Antigravity + Claude Code + injection du doublon test Global/Local">
+          <span>⚡ Tous</span>
+        </button>
+        <button type="button" id="btnCleanScenarios" class="btn btn-secondary btn-test-clean" title="Nettoie les configurations de test locales (.agents, .claude...) et retire le doublon du profil global">
+          <span>🧹 Vider</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script nonce="{{nonce}}" src="{{scriptUri}}"></script>
+</body>
+</html>

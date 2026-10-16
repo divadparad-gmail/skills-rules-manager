@@ -1,0 +1,11 @@
+# Standardisation des fins de ligne (LF Linux universel)
+* text=auto eol=lf
+
+# Binaires
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.vsix binary
+*.zip binary
