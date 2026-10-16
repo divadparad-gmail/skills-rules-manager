@@ -138,15 +138,9 @@ export class NasScanner {
       // Stockée exclusivement dans backup_cerveau_ia\.gemini (ou .claude)
       const targetSoulFile = targetTool === 'claude-code' ? 'CLAUDE.md' : 'GEMINI.md';
       const soulSubDir = targetTool === 'claude-code' ? '.claude' : '.gemini';
-      const soulCandidates: string[] = [
-        path.join(path.dirname(nasPath), 'backup_cerveau_ia', soulSubDir, targetSoulFile),
-        targetTool === 'claude-code'
-          ? '\\\\Nas1\\DD2\\IA\\backup_cerveau_ia\\.claude\\CLAUDE.md'
-          : '\\\\Nas1\\DD2\\IA\\backup_cerveau_ia\\.gemini\\GEMINI.md',
-      ];
+      const soulCandidate = path.join(path.dirname(nasPath), 'backup_cerveau_ia', soulSubDir, targetSoulFile);
 
-      for (const soulCandidate of soulCandidates) {
-        if (fs.existsSync(soulCandidate) && fs.statSync(soulCandidate).isFile()) {
+      if (fs.existsSync(soulCandidate) && fs.statSync(soulCandidate).isFile()) {
           try {
             const rawContent = await fs.promises.readFile(soulCandidate, 'utf8');
             const fileCharCount = rawContent.length;
@@ -176,12 +170,10 @@ export class NasScanner {
                 warningSizeExceeded: isWarningSize,
               },
             });
-            break; // Premier trouvé l'emporte
           } catch {
             // Lecture fallback
           }
         }
-      }
 
       // 1. Scan des Skills et Workflows
       const skillsDir = path.join(nasPath, 'skills');

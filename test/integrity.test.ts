@@ -492,7 +492,7 @@ describe('Suite de Tests : Intégrité & Synchronisation NAS vs Local', () => {
     const { NasScanner } = await import('../src/services/NasScanner');
     assert.strictEqual(NasScanner.getUncHost('\\\\Nas1\\DD2\\IA\\Templates'), 'nas1');
     assert.strictEqual(NasScanner.getUncHost('//NAS1/share/folder'), 'nas1');
-    assert.strictEqual(NasScanner.getUncHost('C:\\Users\\David'), null);
+    assert.strictEqual(NasScanner.getUncHost('C:\\Users\\LocalUser'), null);
   });
 
   test('18. Guide & Bonnes Pratiques IA (v0.3.0) : intégrité des templates et composants webview', () => {
