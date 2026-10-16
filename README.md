@@ -46,6 +46,12 @@ Lorsqu'on orchestre des agents IA modernes (Google Antigravity, Claude Code), l'
 | ![Sidebar](media/screenshots/sidebar.png) | ![Cheat Sheet](media/screenshots/cheatsheet.png) |
 | *Accès direct, badges d'état et bascules groupées.* | *Tableaux de bord des règles d'or et synthèse Antigravity vs Claude.* |
 
+<br/>
+
+### ⚠️ Détection Intelligente des Doublons (Global vs Local)
+![Détection des Doublons](media/screenshots/duplicates.png)
+*Détection en temps réel des règles et compétences actives en double, calcul précis des tokens gaspillés (+85 tok) et bouton d'action rapide pour éteindre la surcharge en 1 clic.*
+
 </div>
 
 ---
@@ -62,7 +68,12 @@ Lorsqu'on orchestre des agents IA modernes (Google Antigravity, Claude Code), l'
 - Synchronisation automatique avec `~/.gemini/config/skills.json` (`exclude: [...]`).
 - Bascule en 1 clic pour désactiver tous les workflows d'action (`wf-*`) pendant les sessions de développement standard.
 
-### 3. Coach IA & Alertes de Surcharge
+### 3. Détection des Doublons & Élimination du Gaspillage (DuplicateService)
+- ⚠️ **Alerte Doublon Actif** : Détecte instantanément si une règle ou un skill est actif simultanément au niveau **Global (Machine)** et **Local (Projet)**.
+- 📉 **Calcul Précis des Tokens Gaspillés** : Affiche le surcoût mémoire exact injecté en double au démarrage (ex: `⚠️ Doublon actif (+85 tok)`).
+- ⚡ **Extinction en 1 Clic** : Bouton d'action directe `Éteindre` sur la carte pour désactiver immédiatement la surcharge sans quitter la vue.
+
+### 4. Coach IA & Alertes de Surcharge
 - ⚠️ **Règles > 200 lignes** : alerte sur le risque de dilution d'attention du modèle.
 - ⚠️ **Skills > 500 lignes** : recommandation de découpage modulaire vers `references/` ou `scripts/`.
 - ⚠️ **Poids physique > 24 Ko** : signalement préventif de saturation de tokens.

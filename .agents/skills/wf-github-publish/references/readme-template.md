@@ -50,6 +50,12 @@ Ce modèle sert de référence pour générer un `README.md` attrayant, structur
 | ![Sidebar](media/screenshots/sidebar.png) | ![Cheat Sheet](media/screenshots/cheatsheet.png) |
 | *Accès rapide, statut de synchronisation et bascules groupées.* | *Comparatif Antigravity vs Claude Code et règles d'or.* |
 
+<br/>
+
+### ⚠️ Détection Intelligente des Doublons (Global vs Local)
+![Détection des Doublons](media/screenshots/duplicates.png)
+*Identification en temps réel des surcharges et calcul des tokens gaspillés.*
+
 </div>
 
 ---
