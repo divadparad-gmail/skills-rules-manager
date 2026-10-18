@@ -5,6 +5,12 @@ import { CheatSheetPanel } from './providers/CheatSheetPanel';
 import { StateManager } from './services/StateManager';
 import { WorkspaceDetector } from './services/WorkspaceDetector';
 import { NasScanner } from './services/NasScanner';
+import { warmupTokenizer } from './utils/tokenizer';
+
+export const WATCHER_PATTERNS = {
+  configFolders: '**/{.agents,.agent,.claude}/**',
+  soulFiles: '**/{CLAUDE.md,GEMINI.md,AGENTS.md}',
+};
 
 export function activate(context: vscode.ExtensionContext): void {
   // 1. Enregistrement du WebviewViewProvider pour l'Activity Bar
@@ -69,14 +75,26 @@ export function activate(context: vscode.ExtensionContext): void {
     })
   );
 
-  // 6. Surveillance des modifications de fichiers dans le projet actif
-  const localWatcher = vscode.workspace.createFileSystemWatcher('**/{.agents,.agent,.claude,CLAUDE.md,GEMINI.md}/**');
-  localWatcher.onDidChange(() => StateManager.loadFullState(true));
-  localWatcher.onDidCreate(() => StateManager.loadFullState(true));
-  localWatcher.onDidDelete(() => StateManager.loadFullState(true));
-  context.subscriptions.push(localWatcher);
+  // 6. Surveillance des modifications de fichiers dans le projet actif avec debounce (~350 ms)
+  // Deux watchers distincts pour couvrir à la fois les dossiers et les fichiers âme isolés
+  const configWatcher = vscode.workspace.createFileSystemWatcher(WATCHER_PATTERNS.configFolders);
+  configWatcher.onDidChange(() => StateManager.requestDebouncedReload(350));
+  configWatcher.onDidCreate(() => StateManager.requestDebouncedReload(350));
+  configWatcher.onDidDelete(() => StateManager.requestDebouncedReload(350));
+  context.subscriptions.push(configWatcher);
 
-  // 7. Préchargement en arrière-plan
+  const soulWatcher = vscode.workspace.createFileSystemWatcher(WATCHER_PATTERNS.soulFiles);
+  soulWatcher.onDidChange(() => StateManager.requestDebouncedReload(350));
+  soulWatcher.onDidCreate(() => StateManager.requestDebouncedReload(350));
+  soulWatcher.onDidDelete(() => StateManager.requestDebouncedReload(350));
+  context.subscriptions.push(soulWatcher);
+
+  // 7. Préchauffage discret du tokenizer en arrière-plan
+  setTimeout(() => {
+    warmupTokenizer();
+  }, 100);
+
+  // 8. Préchargement initial en arrière-plan
   StateManager.loadFullState(true).catch(() => {
     // Échec silencieux au démarrage si réseau NAS indisponible
   });

@@ -1,0 +1,230 @@
+---
+name: wf-github-publish
+description: "Action : Publication et mise à jour officielle d'un projet sur GitHub (Diagnostic santé, Showroom visuel, README vitrine, Détection automatique Cas A Inaugural / Cas B Versioning & Release, Packaging binaire et push). S'active UNIQUEMENT sur saisie explicite de /wf-github-publish par l'utilisateur. Interdiction stricte au modèle de charger ou d'exécuter ce workflow de sa propre initiative."
+---
+
+# 🚀 Publication & Mise à Jour Officielle sur GitHub (/wf-github-publish)
+
+Ce workflow d'action transforme un projet local (extension VS Code, application, bibliothèque ou outil IA) en une **vitrine GitHub professionnelle, attractive et immédiatement distribuable**, qu'il s'agisse d'un **tout nouveau projet (Cas A — Publication Inaugurale)** ou d'une **nouvelle version d'un projet existant (Cas B — Mise à Jour & Nouvelle Release)**.
+
+Il garantit le respect de trois piliers fondamentaux :
+1. **Zéro Régression** : Validation stricte des tests unitaires (`npm test`) et de la compilation sans erreur.
+2. **Showroom Visuel & README Haute Fidélité** : Badges dynamiques, captures d'écran soignées et documentation d'installation limpide.
+3. **Packaging & Distribution Automatisée** : Attachement direct des packages binaires (`.vsix`, archives) aux releases officielles GitHub avec liens de téléchargement directs.
+
+---
+
+## 🛡️ Garde-Fous Inflexibles (Guardrails)
+
+- **Déclenchement Explicite Strict** : Ce workflow s'active **UNIQUEMENT** sur saisie utilisateur de `/wf-github-publish`. Interdiction formelle à l'Agent de l'exécuter de sa propre initiative.
+- **Sécurité des Données & Zéro Secret** : Ne jamais pousser de secrets, clés d'API, variables d'environnement (`.env`, `.env.*`) ou données personnelles. L'audit du `.gitignore` est obligatoire avant tout commit.
+- **Détection Automatique du Mode (Évite l'erreur `gh repo create`)** : Le workflow inspecte l'état Git et le remote `origin`. Si le dépôt existe déjà, il bascule nativement en **Cas B (Mise à Jour)** sans jamais tenter une recréation destructive ou en échec.
+- **Validation Interactive Obligatoire** :
+  - *Cas A* : Confirmer le nom du dépôt, sa visibilité (`--public` ou `--private`) et sa description.
+  - *Cas B* : Confirmer la version cible (ex: `v0.3.8`), la synthèse des nouveautés et les notes de release.
+- **Règle de Confinement N0/N1/N2/N3** : Toute modification apportée à ce workflow dans `.agents/skills/wf-github-publish/` est automatiquement synchronisée avec le catalogue global machine (`~/.gemini/config/skills/`) et le coffre-fort NAS maître (`\\Nas1\DD2\IA\Antigravity-Templates\skills\`).
+
+---
+
+## 📋 Déroulement Chronologique
+
+```mermaid
+graph TD
+    A["Étape 1 : Diagnostic & Contrôle de Santé<br/>(Tests npm, Build, Audit .gitignore, Package)"] --> B["Étape 2 : Galerie Visuelle & README Vitrine<br/>(Captures media/, Badges Shields.io, Version)"]
+    B --> C{"Étape 3 : Détection du Mode<br/>(Repo distant origin existe déjà ?)"}
+    C -- "Non (.git absent ou pas d'origin)" --> D1["Étape 4A : Cas A - Publication Inaugurale<br/>(git init, gh repo create, push initial, release vX.Y.Z)"]
+    C -- "Oui (origin configuré & actif)" --> D2["Étape 4B : Cas B - Mise à Jour & Release<br/>(Vérif version, commit conventionnel, push main, nouvelle release)"]
+    D1 --> E["Étape 5 : Synthèse Finale & Liens Partageables<br/>(URLs Commit, Release et Téléchargement binaire)"]
+    D2 --> E
+```
+
+---
+
+### Étape 1 : Diagnostic & Contrôle de Santé Préalable
+
+Avant toute opération Git ou réseau, valider la stabilité, la qualité et la propreté du projet local :
+
+1. **Exécution des tests unitaires** :
+   ```bash
+   npm test
+   ```
+   > ⚠️ **En cas d'échec d'un seul test : ARRÊT IMMÉDIAT**. Ne jamais publier un code instable ou régressif.
+
+2. **Compilation du projet** :
+   ```bash
+   npm run compile
+   ```
+
+3. **Détection de la Version & Génération du Package Distribuable** :
+   - Lire la version déclarée dans le manifeste (ex: champ `"version"` de `package.json`).
+   - Vérifier la présence du package distribuable à la racine (ex: `.vsix` pour une extension VS Code).
+   - Générer ou rafraîchir le package binaire pour qu'il contienne exactement le code compilé :
+     ```bash
+     npm run package
+     ```
+   - Confirmer l'existence du fichier binaire résultant (ex: `mon-projet-X.Y.Z.vsix`).
+
+4. **Audit de propreté `.gitignore`** :
+   - Vérifier que `.gitignore` exclut rigoureusement :
+     - Les dépendances : `node_modules/`
+     - Les dossiers de build : `out/`, `out-test/`, `dist/`
+     - Les caches et temporaires : `.vscode-test/`, `.DS_Store`, `Thumbs.db`
+     - Les secrets et configurations locales : `.env`, `.env.*`, `*.pem`, `*.key`
+     - Les archives de travail non distribuées dans Git : `*.zip` (si applicable)
+
+---
+
+### Étape 2 : Galerie Visuelle & README Vitrine
+
+1. **Contrôle des Visuels du Showroom** :
+   - Les captures d'écran doivent résider dans `media/screenshots/` (ex: `dashboard.png`, `sidebar.png`, `cheatsheet.png`, `duplicates.png`).
+   - Pour les extensions VS Code, l'Agent peut exécuter le script de prévisualisation :
+     ```bash
+     node .agents/skills/wf-github-publish/scripts/capture-webviews.js
+     ```
+   - S'assurer que les chemins référencés dans le `README.md` pointent vers des fichiers réels.
+
+2. **Mise à Jour du `README.md` Vitrine** :
+   - Consulter la structure de référence [readme-template.md](references/readme-template.md).
+   - **Badges Shields.io** : S'assurer que le tag de version (`vX.Y.Z`), les badges d'environnement (ex: VS Code `^1.85.0`, TypeScript) et la licence sont cohérents.
+   - **Liens d'Installation** : Mettre à jour les URLs de téléchargement pointant vers la version active.
+
+---
+
+### Étape 3 : Détection Automatique du Mode (Cas A vs Cas B)
+
+Avant toute commande de publication, l'Agent inspecte l'environnement Git pour déterminer la trajectoire appropriée :
+
+1. **Inspection locale** :
+   ```bash
+   git rev-parse --is-inside-work-tree
+   git remote -v
+   ```
+
+2. **Inspection distante (si `origin` existe)** :
+   ```bash
+   gh repo view --json name,isPrivate,url
+   ```
+
+3. **Matrice de Décision** :
+   - **Cas A — Publication Inaugurale** :
+     - Le dossier `.git` n'existe pas, **OU**
+     - Aucun remote `origin` n'est configuré, **OU**
+     - Le dépôt distant n'existe pas encore sur GitHub (code retour erreur de `gh repo view`).
+   - **Cas B — Mise à Jour de Version & Nouvelle Release** :
+     - Le dossier `.git` est présent, **ET**
+     - Le remote `origin` pointe sur le dépôt distant officiel, **ET**
+     - Le dépôt distant répond avec succès à `gh repo view`.
+
+---
+
+### Étape 4A : Flux Cas A — Publication Inaugurale (Nouveau Projet)
+
+Ce flux s'applique lorsqu'un projet n'a jamais été publié sur GitHub.
+
+1. **Initialisation Git locale** :
+   ```bash
+   git init
+   git branch -M main
+   ```
+
+2. **Purge du Sas Temporaire (`docs/`)** :
+   - Vérifier le contenu de `docs/`. Conserver la documentation pérenne.
+   - Supprimer ou archiver les brouillons d'étapes de travail non pérennes.
+
+3. **Validation Interactive OBLIGATOIRE avec l'Utilisateur** :
+   - Présenter les paramètres cibles et demander validation explicite :
+     - **Nom du Dépôt** : (ex: `skills-rules-manager`)
+     - **Visibilité** : `--public` ou `--private`
+     - **Description** : Synthèse percutante du projet
+     - **Package à attacher** : Chemin du `.vsix` ou du binaire
+
+4. **Création du Dépôt Distant (`gh repo create`)** :
+   ```bash
+   gh repo create <repo-name> --public --source=. --remote=origin --description "<description>"
+   ```
+   *(Remplacer `--public` par `--private` selon le choix validé)*
+
+5. **Commit Inaugural Atomique** :
+   ```bash
+   git add .
+   git commit -m "feat: initial release vX.Y.Z of [Project Name]"
+   ```
+
+6. **Premier Push vers la Branche Principale** :
+   ```bash
+   git push -u origin main
+   ```
+
+7. **Publication de la Release Inaugurale avec Binaire** :
+   ```bash
+   gh release create vX.Y.Z <chemin-du-binaire.vsix> --title "[Nom du Projet] vX.Y.Z" --notes "<Notes de version détaillées>"
+   ```
+
+---
+
+### Étape 4B : Flux Cas B — Mise à Jour de Version & Nouvelle Release (Projet Existant)
+
+Ce flux s'applique lorsque le dépôt GitHub existe déjà et qu'une nouvelle version (ex: bugfix, feature, patch) doit être livrée.
+
+> 🚫 **Interdiction formelle dans ce mode** : Ne JAMAIS exécuter `git init` ou `gh repo create`.
+
+1. **Contrôle d'Unicité du Tag de Version** :
+   - Récupérer la version cible déclarée dans le projet (ex: `0.3.8` depuis `package.json`).
+   - Vérifier la liste des releases existantes pour éviter toute collision :
+     ```bash
+     gh release list --limit 5
+     ```
+   - Si le tag `vX.Y.Z` existe déjà : avertir l'utilisateur pour convenir d'un bump de version (patch/minor) ou d'une révision.
+
+2. **Revue des Modifications Non Validées** :
+   ```bash
+   git status -s
+   ```
+   - Vérifier que seuls les fichiers attendus (code source, `package.json`, `package-lock.json`, documentation, etc.) sont modifiés.
+
+3. **Validation Interactive avec l'Utilisateur** :
+   - Confirmer avec l'utilisateur :
+     - Le tag de version cible (ex: `v0.3.8`).
+     - Le résumé synthétique des ajouts / correctifs.
+     - Les notes de version officielles qui accompagneront la release GitHub.
+
+4. **Indexation & Commit Conventionnel de Version** :
+   ```bash
+   git add .
+   git commit -m "feat: release vX.Y.Z - <synthèse percutante des changements>"
+   ```
+   - Afficher l'empreinte du commit créé :
+     ```bash
+     git log -1 --oneline
+     ```
+
+5. **Push des Commits vers la Branche Principale** :
+   ```bash
+   git push origin main
+   ```
+
+6. **Publication de la Nouvelle Release GitHub avec Pièce Jointe Distribuable** :
+   ```bash
+   gh release create vX.Y.Z <fichier-package.vsix> --title "[Nom du Projet] vX.Y.Z" --notes "<Notes de version détaillées>"
+   ```
+   > 💡 *Astuce* : L'option `--latest` peut être ajoutée pour expliciter le statut de version stable par défaut.
+
+---
+
+### Étape 5 : Synthèse Finale & Liens Partageables
+
+À l'issue de la publication (Cas A ou Cas B), fournir systématiquement à l'utilisateur un récapitulatif clair contenant l'ensemble des liens directs :
+
+- 🔗 **Dépôt GitHub** : `https://github.com/<owner>/<repo>`
+- 📝 **Dernier Commit** : `https://github.com/<owner>/<repo>/commit/<commit-hash>`
+- 📦 **Release Officielle** : `https://github.com/<owner>/<repo>/releases/tag/vX.Y.Z`
+- ⬇️ **Téléchargement Direct du Package** : `https://github.com/<owner>/<repo>/releases/download/vX.Y.Z/<nom-du-fichier.vsix>`
+
+---
+
+## 📚 Ressources Annexes du Skill
+
+- [Guide Mémo GitHub CLI (Commandes, Cas A vs Cas B, Diagnostics)](references/gh-cli-guide.md)
+- [Modèle de README.md Vitrine Haute Performance](references/readme-template.md)
+- [Script de Contrôle et Prévisualisation Webviews](scripts/capture-webviews.js)

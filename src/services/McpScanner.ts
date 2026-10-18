@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { TokenCategoryStat, WorkspaceContext } from '../types';
 import { getEffectiveGlobalAntigravityPath, getUserHome } from '../utils/paths';
+import { countTokens, countTokensForFile } from '../utils/tokenizer';
 
 let vscodeModule: any = null;
 try {
@@ -59,6 +60,7 @@ export class McpScanner {
     }
 
     try {
+      const stat = await fs.promises.stat(claudeJsonPath);
       const rawContent = await fs.promises.readFile(claudeJsonPath, 'utf8');
       const data = JSON.parse(rawContent) as { mcpServers?: Record<string, unknown> };
       const servers = data.mcpServers || {};
@@ -67,7 +69,7 @@ export class McpScanner {
 
       const serversJson = JSON.stringify(servers, null, 2);
       const charCount = serversJson.length;
-      const tokenCount = Math.ceil(charCount / 4);
+      const tokenCount = countTokensForFile(claudeJsonPath, stat.size, stat.mtimeMs, serversJson);
 
       let warningCount = 0;
       for (const srvVal of Object.values(servers)) {
@@ -104,6 +106,7 @@ export class McpScanner {
     const claudeJsonPath = path.join(userHome, '.claude.json');
     if (fs.existsSync(claudeJsonPath)) {
       try {
+        const stat = await fs.promises.stat(claudeJsonPath);
         const rawContent = await fs.promises.readFile(claudeJsonPath, 'utf8');
         const data = JSON.parse(rawContent) as {
           projects?: Record<string, { mcpServers?: Record<string, unknown> }>;
@@ -126,7 +129,7 @@ export class McpScanner {
           const activeCount = serverKeys.length;
           const serversJson = JSON.stringify(projectMcp, null, 2);
           const charCount = serversJson.length;
-          const tokenCount = Math.ceil(charCount / 4);
+          const tokenCount = countTokensForFile(`${claudeJsonPath}:${normalizedWs}`, stat.size, stat.mtimeMs, serversJson);
 
           let warningCount = 0;
           for (const srvVal of Object.values(projectMcp)) {
@@ -166,6 +169,7 @@ export class McpScanner {
     }
 
     try {
+      const stat = await fs.promises.stat(filePath);
       const rawContent = await fs.promises.readFile(filePath, 'utf8');
       const data = JSON.parse(rawContent) as { mcpServers?: Record<string, unknown> };
       const servers = data.mcpServers || {};
@@ -174,8 +178,8 @@ export class McpScanner {
 
       // Décompte réel des caractères de configuration
       const charCount = rawContent.length;
-      // Formule standard : 1 token ≈ 4 caractères
-      const tokenCount = Math.ceil(charCount / 4);
+      // Tokenisation réelle du fichier de configuration MCP
+      const tokenCount = countTokensForFile(filePath, stat.size, stat.mtimeMs, rawContent);
 
       let warningCount = 0;
       if (isClaude) {

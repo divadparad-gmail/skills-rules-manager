@@ -1,12 +1,12 @@
 # Guide des Commandes GitHub CLI (`gh`) pour `wf-github-publish`
 
-Ce guide récapitule les commandes essentielles utilisées par le workflow pour inspecter, créer et publier des dépôts et des releases avec GitHub CLI.
+Ce guide récapitule les commandes essentielles utilisées par le workflow `/wf-github-publish` pour inspecter, diagnostiquer, créer et publier des dépôts et des releases avec GitHub CLI.
 
 ---
 
-## 1. Vérification de l'Authentification
+## 1. Vérification de l'Authentification & Scopes
 
-Avant toute opération distante, vérifier que le CLI GitHub est authentifié avec les scopes requis (`repo`, `workflow`) :
+Avant toute opération distante, vérifier que le CLI GitHub est authentifié avec les permissions requises (`repo`, `workflow`) :
 
 ```bash
 gh auth status
@@ -17,29 +17,53 @@ Pour récupérer le login actif en JSON :
 gh api user --jq .login
 ```
 
-Si non connecté ou token expiré :
+Si non connecté ou en cas de jeton invalide / expiré :
 ```bash
 gh auth login
+# Ou pour rafraîchir les scopes nécessaires :
+gh auth refresh -s repo
 ```
 
 ---
 
-## 2. Vérification de l'Existence d'un Dépôt
+## 2. Diagnostic Automatique du Mode (Cas A vs Cas B)
 
-Pour savoir si le dépôt distant existe déjà pour l'utilisateur courant :
+Le workflow inspecte systématiquement le dépôt avant d'agir :
 
+### 2.1 Inspection de la configuration locale
 ```bash
+# Vérifier si le dossier courant est un repo Git
+git rev-parse --is-inside-work-tree
+
+# Vérifier la présence et l'URL du remote origin
+git remote get-url origin
+```
+
+### 2.2 Inspection du dépôt distant sur GitHub
+```bash
+# Vérifier si le dépôt existe sur le compte GitHub
 gh repo view <username>/<repo-name> --json name,isPrivate,url
 ```
+- **Si le dépôt existe** : La commande retourne l'objet JSON. Le workflow s'oriente vers le **Cas B (Mise à Jour)**.
+- **Si le dépôt n'existe pas** : La commande retourne une erreur (code 1). Le champ est libre pour le **Cas A (Publication Inaugurale)**.
 
-Si le dépôt n'existe pas, la commande retourne une erreur (code 1), indiquant que le champ est libre pour la création.
+### 2.3 Inspection des releases existantes
+```bash
+gh release list --limit 5
+```
+Permet d'identifier le dernier tag publié et d'éviter toute collision de version.
 
 ---
 
-## 3. Création du Dépôt Distant (`gh repo create`)
+## 3. Cas A : Publication Inaugurale (Nouveau Projet)
 
-Créer un dépôt distant depuis le répertoire local courant et associer le remote `origin` :
+### 3.1 Initialisation Git & Branche Principale
+```bash
+git init
+git branch -M main
+```
 
+### 3.2 Création du Dépôt Distant (`gh repo create`)
 ```bash
 # Pour un dépôt public :
 gh repo create <repo-name> --public --source=. --remote=origin --description "<description>"
@@ -48,46 +72,83 @@ gh repo create <repo-name> --public --source=. --remote=origin --description "<d
 gh repo create <repo-name> --private --source=. --remote=origin --description "<description>"
 ```
 
-### Options clés :
+#### Options clés :
 - `--source=.` : Utilise le répertoire courant comme source du dépôt.
 - `--remote=origin` : Configure automatiquement `origin` dans la configuration Git locale.
-- `--push` : (Optionnel) Pousse immédiatement la branche courante. *Recommandé d'effectuer le push explicitement via `git push -u origin main` pour un contrôle précis.*
-- `--description "..."` : Définit la description officielle du dépôt sur GitHub.
+- `--description "..."` : Définit la description officielle du projet sur GitHub.
 
----
-
-## 4. Push de la Branche Principale
-
-Une fois le remote configuré :
-
+### 3.3 Commit Inaugural & Premier Push
 ```bash
+git add .
+git commit -m "feat: initial release vX.Y.Z of [Nom du Projet]"
 git push -u origin main
 ```
 
----
-
-## 5. Création d'une GitHub Release Officielle (`gh release create`)
-
-Pour publier une release avec attachement direct d'un package binaire distribuable (ex: fichier `.vsix` ou archive `.zip`) :
-
+### 3.4 Release Inaugurale avec Binaire
 ```bash
-gh release create <tag> <fichier-binaire> --title "<Titre de la Release>" --notes "<Notes de version>"
+gh release create vX.Y.Z <fichier-binaire> --title "[Nom du Projet] vX.Y.Z" --notes "<Notes de version inaugurales>"
 ```
-
-### Exemple concret (Extension VS Code v0.3.0) :
-```bash
-gh release create v0.3.0 skills-rules-manager-0.3.0.vsix --title "Skills & Rules Manager v0.3.0" --notes "Release officielle : support universel des profils utilisateurs, monitoring précis des tokens, détection des doublons et synchronisation résiliente NAS."
-```
-
-### Options avancées :
-- `--latest` : Marque explicitement cette release comme étant la dernière version stable (défaut sur le tag le plus récent).
-- `--prerelease` : Marque la version comme pré-version (beta/RC).
-- `--generate-notes` : Génère automatiquement les notes de release basées sur les commits et pull requests.
 
 ---
 
-## 6. Bonnes Pratiques & Sécurité
+## 4. Cas B : Mise à Jour de Version & Nouvelle Release (Projet Existant)
 
-1. **Ne jamais committer de secrets** : S'assurer que `.env`, `node_modules/`, tokens ou fichiers sensibles sont déclarés dans `.gitignore`.
-2. **Tag Git immuable** : La création d'une release via `gh release create vX.Y.Z` crée automatiquement le tag Git correspondant sur la branche distante s'il n'existe pas encore.
-3. **Téléchargement direct** : Les fichiers attachés à la release sont accessibles publiquement via l'URL `https://github.com/<owner>/<repo>/releases/download/<tag>/<nom-du-fichier>`.
+> ⚠️ **Règle absolue** : Ne jamais relancer `git init` ou `gh repo create` sur un projet déjà initialisé avec un remote `origin` actif.
+
+### 4.1 Vérification de l'État de Travail
+```bash
+git status -s
+```
+
+### 4.2 Commit Conventionnel de Version
+```bash
+git add .
+git commit -m "feat: release vX.Y.Z - <synthèse des ajouts et correctifs>"
+git log -1 --oneline
+```
+
+### 4.3 Push des Changements sur `main`
+```bash
+git push origin main
+```
+
+### 4.4 Création de la Nouvelle Release avec Binaire
+```bash
+gh release create vX.Y.Z <fichier-binaire> --title "[Nom du Projet] vX.Y.Z" --notes "<Notes de version détaillées>" --latest
+```
+
+### 4.5 Commandes Utiles de Gestion des Releases
+```bash
+# Voir les détails de la dernière release :
+gh release view vX.Y.Z
+
+# Télécharger le binaire d'une release :
+gh release download vX.Y.Z -p "*.vsix"
+
+# Ajouter ou remplacer un asset sur une release existante :
+gh release upload vX.Y.Z <nouveau-fichier-binaire> --clobber
+
+# Modifier le titre ou les notes d'une release existante :
+gh release edit vX.Y.Z --title "[Nom] vX.Y.Z" --notes "<Nouvelles notes>"
+```
+
+---
+
+## 5. Résolution des Erreurs Fréquentes
+
+| Erreur Constatée | Cause | Solution Workflow |
+| :--- | :--- | :--- |
+| `GraphQL: Name already exists on this account` | Tentative d'exécution de `gh repo create` sur un dépôt déjà existant. | **Bascule Cas B** : Ne pas appeler `gh repo create`. Utiliser directement `git push origin main` et `gh release create`. |
+| `release tag vX.Y.Z already exists` | Le tag existe déjà sur GitHub. | Incrémenter la version dans `package.json`, recompiler/packager et créer la release sous le nouveau tag. |
+| `error: failed to push some refs to '...'` | Des commits distants ne sont pas présents localement. | Exécuter `git pull --rebase origin main` avant de retenter `git push`. |
+| `missing required scope 'repo'` | Le jeton d'authentification GitHub CLI n'a pas les droits nécessaires. | Exécuter `gh auth refresh -s repo` pour accorder les permissions de dépôt. |
+
+---
+
+## 6. Synthèse des URLs Standardisées
+
+À chaque publication, GitHub génère les URLs suivantes :
+- **Dépôt** : `https://github.com/<owner>/<repo>`
+- **Commit** : `https://github.com/<owner>/<repo>/commit/<commit-hash>`
+- **Page de la Release** : `https://github.com/<owner>/<repo>/releases/tag/vX.Y.Z`
+- **Lien Direct de Téléchargement du Package** : `https://github.com/<owner>/<repo>/releases/download/vX.Y.Z/<nom-fichier-binaire>`

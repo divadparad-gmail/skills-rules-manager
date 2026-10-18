@@ -15,6 +15,8 @@ import { DuplicateService } from './DuplicateService';
 import { DashboardPanel } from '../providers/DashboardPanel';
 import { CheatSheetPanel } from '../providers/CheatSheetPanel';
 import { getUserHome } from '../utils/paths';
+import { resetTokenizerMetrics, getTokenizerMetrics } from '../utils/tokenizer';
+import { debounce } from '../utils/debounce';
 
 export class StateManager {
   private static cachedState: ManagerFullState | null = null;
@@ -37,6 +39,8 @@ export class StateManager {
   }
 
   public static toggleDashboard(extensionUri: vscode.Uri): void {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { DashboardPanel } = require('../providers/DashboardPanel');
     if (this._isDashboardOpen) {
       DashboardPanel.close();
     } else {
@@ -59,6 +63,8 @@ export class StateManager {
   }
 
   public static toggleCheatSheet(extensionUri: vscode.Uri, defaultTool?: import('../types').TargetTool): void {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { CheatSheetPanel } = require('../providers/CheatSheetPanel');
     if (this._isCheatSheetOpen || CheatSheetPanel.currentPanel) {
       CheatSheetPanel.close();
     } else {
@@ -75,10 +81,102 @@ export class StateManager {
     };
   }
 
+  private static debouncedReloadHandler: ReturnType<typeof debounce> | null = null;
+  private static outputChannel: vscode.OutputChannel | null = null;
+  public static lastTimingLog: string | null = null;
+  private static timingHistory: string[] = [];
+  private static _debugTimingOverride: boolean | null = null;
+
+  public static setDebugTimingForTesting(enabled: boolean | null): void {
+    this._debugTimingOverride = enabled;
+  }
+
+  public static isDebugTimingActive(): boolean {
+    if (this._debugTimingOverride !== null) {
+      return this._debugTimingOverride;
+    }
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const vscodeModule = require('vscode');
+      const config = vscodeModule?.workspace?.getConfiguration?.('skillsManager');
+      return config?.get?.('debugTiming', false) ?? false;
+    } catch {
+      return false;
+    }
+  }
+
+  public static async setDebugTiming(enabled: boolean): Promise<void> {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const vscodeModule = require('vscode');
+      const config = vscodeModule?.workspace?.getConfiguration?.('skillsManager');
+      if (config && typeof config.update === 'function') {
+        await config.update('debugTiming', enabled, vscodeModule.ConfigurationTarget?.Global ?? 1);
+      } else {
+        this._debugTimingOverride = enabled;
+      }
+    } catch {
+      this._debugTimingOverride = enabled;
+    }
+    await this.loadFullState(true);
+  }
+
+  public static clearTimingLogs(): void {
+    this.timingHistory = [];
+    this.lastTimingLog = null;
+    if (this.cachedState) {
+      this.cachedState.timingHistory = [];
+      this.cachedState.lastTimingLog = null;
+      this.broadcastState(this.cachedState);
+    }
+  }
+
+  public static getTimingHistory(): string[] {
+    return [...this.timingHistory];
+  }
+
+  public static requestDebouncedReload(delayMs = 350): void {
+    if (!this.debouncedReloadHandler) {
+      this.debouncedReloadHandler = debounce(() => {
+        this.loadFullState(true).catch(() => {});
+      }, delayMs);
+    }
+    this.debouncedReloadHandler();
+  }
+
+  private static logTiming(message: string): void {
+    this.lastTimingLog = message;
+    this.timingHistory.push(message);
+    if (this.timingHistory.length > 30) {
+      this.timingHistory.shift();
+    }
+
+    try {
+      const isDebugTiming = this.isDebugTimingActive();
+      if (!isDebugTiming) {
+        return;
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const vscodeModule = require('vscode');
+      if (vscodeModule && vscodeModule.window && typeof vscodeModule.window.createOutputChannel === 'function') {
+        if (!this.outputChannel) {
+          this.outputChannel = vscodeModule.window.createOutputChannel('Skills & Rules Manager');
+        }
+        this.outputChannel?.appendLine(message);
+      }
+    } catch {
+      // Ignorer silencieusement
+    }
+  }
+
   public static async loadFullState(forceFresh = false): Promise<ManagerFullState> {
     if (!forceFresh && this.cachedState) {
       return this.cachedState;
     }
+
+    resetTokenizerMetrics();
+    const scanStartTime = performance.now();
 
     const workspace = WorkspaceDetector.detectWorkspace();
 
@@ -158,8 +256,18 @@ export class StateManager {
       userHome: getUserHome(),
     };
 
+    const scanTotalMs = Math.round(performance.now() - scanStartTime);
+    const timingMetrics = getTokenizerMetrics();
+    const timingLogMessage = `Scan terminé en ${scanTotalMs} ms — ${timingMetrics.totalFiles} fichiers, ${timingMetrics.encodedCount} encodés, ${timingMetrics.cachedCount} servis du cache, encodage cumulé ${timingMetrics.cumulativeEncodingTimeMs} ms.`;
+    this.logTiming(timingLogMessage);
+
+    state.isDebugTiming = this.isDebugTimingActive();
+    state.lastTimingLog = this.lastTimingLog;
+    state.timingHistory = [...this.timingHistory];
+
     this.cachedState = state;
     this.broadcastState(state);
+
     return state;
   }
 
@@ -189,12 +297,18 @@ export class StateManager {
   ): Promise<{ success: boolean; newState: boolean; error?: string }> {
     const result = await ToggleManager.toggle(itemPath, targetState, type, scope, id);
 
+    let vscodeModule: any = null;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      vscodeModule = require('vscode');
+    } catch {}
+
     if (result.success) {
-      vscode.window.showInformationMessage(
+      vscodeModule?.window?.showInformationMessage?.(
         `${type.toUpperCase()} "${id}" : ${targetState ? 'activé' : 'désactivé'} avec succès.`
       );
     } else {
-      vscode.window.showErrorMessage(
+      vscodeModule?.window?.showErrorMessage?.(
         `Erreur lors du basculement de "${id}" : ${result.error || 'inconnue'}`
       );
     }
@@ -327,6 +441,49 @@ export class StateManager {
     }
   }
 
+  /**
+   * Ouvre la vue de comparaison côte-à-côte native de VS Code pour un doublon Global vs Local.
+   * Pour une règle ou une âme (fichier unique) : compare les deux fichiers.
+   * Pour un skill ou un workflow (dossier) : compare les deux SKILL.md (ou SKILL.md.disabled).
+   */
+  public static async compareDuplicate(globalPath: string, localPath: string, title?: string): Promise<void> {
+    try {
+      const resolveTargetUri = async (targetPath: string): Promise<vscode.Uri> => {
+        const uri = vscode.Uri.file(targetPath);
+        try {
+          const stat = await vscode.workspace.fs.stat(uri);
+          if (stat.type === vscode.FileType.Directory) {
+            const skillMd = vscode.Uri.joinPath(uri, 'SKILL.md');
+            const skillMdDisabled = vscode.Uri.joinPath(uri, 'SKILL.md.disabled');
+            try {
+              await vscode.workspace.fs.stat(skillMd);
+              return skillMd;
+            } catch {
+              try {
+                await vscode.workspace.fs.stat(skillMdDisabled);
+                return skillMdDisabled;
+              } catch {
+                return skillMd;
+              }
+            }
+          }
+        } catch {
+          // Si stat échoue, renvoyer l'uri direct
+        }
+        return uri;
+      };
+
+      const uriGlobal = await resolveTargetUri(globalPath);
+      const uriLocal = await resolveTargetUri(localPath);
+      const baseName = path.basename(globalPath);
+      const diffTitle = title || `${baseName} (Global ↔ Local)`;
+
+      await vscode.commands.executeCommand('vscode.diff', uriGlobal, uriLocal, diffTitle);
+    } catch (err) {
+      vscode.window.showErrorMessage(`Impossible d'ouvrir la comparaison diff : ${err}`);
+    }
+  }
+
   public static async openInExplorer(targetPath: string): Promise<void> {
     try {
       if (!targetPath) return;
@@ -354,18 +511,7 @@ export class StateManager {
         return;
       }
 
-      const stat = await fs.promises.stat(targetPath);
-      if (process.platform === 'win32') {
-        const { exec } = require('child_process');
-        const normalized = path.normalize(targetPath);
-        if (stat.isDirectory()) {
-          exec(`explorer "${normalized}"`);
-        } else {
-          exec(`explorer /select,"${normalized}"`);
-        }
-      } else {
-        await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(targetPath));
-      }
+      await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(targetPath));
     } catch (err) {
       vscode.window.showErrorMessage(`Impossible d'ouvrir l'explorateur : ${err}`);
     }

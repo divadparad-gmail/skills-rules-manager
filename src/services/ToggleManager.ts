@@ -85,8 +85,7 @@ export class ToggleManager {
     targetState: boolean
   ): Promise<{ success: boolean; newState: boolean }> {
     const isCurrentlyDisabledFile = filePath.endsWith('.disabled');
-    const basePath = isCurrentlyDisabledFile ? filePath.replace(/\.disabled$/, '') : filePath;
-    const activePath = basePath.endsWith('.md') ? basePath : `${basePath}.md`;
+    const activePath = isCurrentlyDisabledFile ? filePath.slice(0, -9) : filePath;
     const disabledPath = `${activePath}.disabled`;
 
     if (targetState) {

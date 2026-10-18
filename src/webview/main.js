@@ -1,33 +1,81 @@
 // Contrôleur client Webview pour Skills & Rules Manager
 (function () {
-  const vscode = acquireVsCodeApi();
+  const vscode = {
+    postMessage: (msg) => {
+      if (typeof acquireVsCodeApi === 'function' && !vscode._api) {
+        vscode._api = acquireVsCodeApi();
+      }
+      if (vscode._api) {
+        vscode._api.postMessage(msg);
+      } else if (typeof global !== 'undefined' && global.vscode && typeof global.vscode.postMessage === 'function') {
+        global.vscode.postMessage(msg);
+      }
+    },
+    _api: typeof acquireVsCodeApi === 'function' ? acquireVsCodeApi() : null,
+  };
 
   let currentState = null;
   let currentFilter = 'all';
   let searchQuery = '';
+  let showDuplicatesOnly = false;
   let selectedMiniCheatSheetTool = null; // 'claude-code' | 'antigravity' | null (null = suit l'IDE)
 
-  // Éléments DOM
-  const searchInput = document.getElementById('searchInput');
-  const filterChips = document.querySelectorAll('.chip-btn');
-  const btnRefresh = document.getElementById('btnRefresh');
-  const btnToggleDashboard = document.getElementById('btnToggleDashboard') || document.getElementById('btnOpenDashboard');
-
-  const searchClearBtn = document.getElementById('searchClearBtn');
+  // Éléments DOM (initialisés si dans un environnement de navigateur)
+  let searchInput = null;
+  let filterChips = [];
+  let btnRefresh = null;
+  let btnToggleDashboard = null;
+  let searchClearBtn = null;
 
   function updateSearchInputState() {
     if (searchInput) {
-      if (searchInput.value && searchInput.value.trim().length > 0) {
-        searchInput.classList.add('has-query');
+      if (showDuplicatesOnly) {
+        searchInput.placeholder = '🔥 Filtre doublons actif (cliquez ✕ pour tout afficher)';
+        searchInput.classList.add('filter-duplicates-active');
         if (searchClearBtn) searchClearBtn.style.display = 'flex';
       } else {
-        searchInput.classList.remove('has-query');
-        if (searchClearBtn) searchClearBtn.style.display = 'none';
+        searchInput.placeholder = 'Rechercher par nom, tag, description...';
+        searchInput.classList.remove('filter-duplicates-active');
+        if (searchInput.value && searchInput.value.trim().length > 0) {
+          searchInput.classList.add('has-query');
+          if (searchClearBtn) searchClearBtn.style.display = 'flex';
+        } else {
+          searchInput.classList.remove('has-query');
+          if (searchClearBtn) searchClearBtn.style.display = 'none';
+        }
       }
     }
   }
 
-  // Initialisation des écouteurs
+  function toggleDuplicateFilter(forceState) {
+    showDuplicatesOnly = typeof forceState === 'boolean' ? forceState : !showDuplicatesOnly;
+    if (showDuplicatesOnly) {
+      if (searchInput) {
+        searchInput.value = '';
+      }
+      searchQuery = '';
+      currentFilter = 'all';
+      (filterChips || []).forEach((c) => {
+        if (c.getAttribute && c.getAttribute('data-filter') === 'all') {
+          c.classList.add('active');
+        } else if (c.classList) {
+          c.classList.remove('active');
+        }
+      });
+    }
+    updateSearchInputState();
+    if (typeof document !== 'undefined') {
+      renderCurrentView();
+    }
+  }
+
+  // Initialisation des écouteurs et liaison DOM (exécuté en environnement Webview)
+  if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+    searchInput = document.getElementById('searchInput');
+    filterChips = document.querySelectorAll('.chip-btn');
+    btnRefresh = document.getElementById('btnRefresh');
+    btnToggleDashboard = document.getElementById('btnToggleDashboard') || document.getElementById('btnOpenDashboard');
+    searchClearBtn = document.getElementById('searchClearBtn');
   if (searchInput) {
     searchInput.addEventListener('input', (e) => {
       searchQuery = e.target.value.toLowerCase().trim();
@@ -39,6 +87,7 @@
       if (e.key === 'Escape') {
         searchInput.value = '';
         searchQuery = '';
+        showDuplicatesOnly = false;
         updateSearchInputState();
         renderCurrentView();
       }
@@ -52,6 +101,7 @@
         searchInput.focus();
       }
       searchQuery = '';
+      showDuplicatesOnly = false;
       updateSearchInputState();
       renderCurrentView();
     });
@@ -62,6 +112,8 @@
       filterChips.forEach((c) => c.classList.remove('active'));
       chip.classList.add('active');
       currentFilter = chip.getAttribute('data-filter') || 'all';
+      showDuplicatesOnly = false;
+      updateSearchInputState();
       renderCurrentView();
     });
   });
@@ -229,6 +281,29 @@
     });
   }
 
+  // =========================================================================
+  // Contrôle Chronomètre & Diagnostic Anti-Lag (Banc d'Essai)
+  // =========================================================================
+  const btnToggleDebugTiming = document.getElementById('btnToggleDebugTiming');
+  if (btnToggleDebugTiming) {
+    btnToggleDebugTiming.addEventListener('click', () => {
+      const isCurrentlyOn = btnToggleDebugTiming.classList.contains('status-on');
+      vscode.postMessage({
+        type: 'toggleDebugTiming',
+        payload: { enabled: !isCurrentlyOn },
+      });
+    });
+  }
+
+  const btnClearTimingLogs = document.getElementById('btnClearTimingLogs');
+  if (btnClearTimingLogs) {
+    btnClearTimingLogs.addEventListener('click', () => {
+      vscode.postMessage({
+        type: 'clearTimingLogs',
+      });
+    });
+  }
+
   // Écoute des messages de l'extension
   window.addEventListener('message', (event) => {
     const message = event.data;
@@ -250,18 +325,61 @@
 
   // Notifier l'extension que la Webview est prête
   vscode.postMessage({ type: 'ready' });
+  }
 
   // Rendu de la vue (sidebar ou dashboard)
   function renderCurrentView() {
     if (!currentState) return;
 
     renderHeaderStats(currentState);
+    renderTimingConsole(currentState);
 
     const isDashboard = document.getElementById('columnNas') !== null;
     if (isDashboard) {
       renderDashboard(currentState);
     } else {
       renderSidebar(currentState);
+    }
+  }
+
+  function renderTimingConsole(state) {
+    const btnToggle = document.getElementById('btnToggleDebugTiming');
+    const toggleText = document.getElementById('timingToggleText');
+    const wrapper = document.getElementById('timingConsoleWrapper');
+    const output = document.getElementById('timingConsoleOutput');
+
+    if (!btnToggle || !wrapper || !output) return;
+
+    const isEnabled = !!state?.isDebugTiming;
+
+    if (isEnabled) {
+      btnToggle.className = 'timing-toggle-pill status-on';
+      if (toggleText) toggleText.textContent = 'ON';
+      wrapper.style.display = 'flex';
+
+      const history = state.timingHistory || (state.lastTimingLog ? [state.lastTimingLog] : []);
+      if (history.length === 0) {
+        output.innerHTML = '<span class="timing-empty">En attente d\'un scan...</span>';
+      } else {
+        output.innerHTML = history
+          .map((line) => {
+            const formatted = escapeHtml(line)
+              .replace(/(\d+\s*ms)/g, '<span class="timing-highlight-ms">$1</span>')
+              .replace(/(\d+\s*servis du cache)/g, '<span class="timing-highlight-cache">$1</span>')
+              .replace(/(\d+\s*encodés)/g, '<span class="timing-highlight-enc">$1</span>');
+            return `<span class="timing-line">&gt; ${formatted}</span>`;
+          })
+          .join('');
+
+        const body = document.getElementById('timingConsoleBody');
+        if (body) {
+          body.scrollTop = body.scrollHeight;
+        }
+      }
+    } else {
+      btnToggle.className = 'timing-toggle-pill status-off';
+      if (toggleText) toggleText.textContent = 'OFF';
+      wrapper.style.display = 'none';
     }
   }
 
@@ -429,11 +547,16 @@
       const dupPillDash = document.getElementById('duplicateWarningPill');
       const dupPillSide = document.getElementById('duplicateWarningPillSide');
 
+      if (!hasActiveDuplicates && showDuplicatesOnly) {
+        showDuplicatesOnly = false;
+        updateSearchInputState();
+      }
+
       const dupText = hasActiveDuplicates
         ? `🔥 ${dupStats.activeDuplicates} doublon${dupStats.activeDuplicates > 1 ? 's' : ''} actif${dupStats.activeDuplicates > 1 ? 's' : ''} (+${dupStats.totalWastedTokens.toLocaleString('fr-FR')} tok gaspillés)`
         : '';
       const dupTitle = hasActiveDuplicates
-        ? `⚠️ Alerte Redondance :\n${dupStats.activeDuplicates} ressource(s) activée(s) à la fois en Global et en Local.\nElles consomment ${dupStats.totalWastedTokens.toLocaleString('fr-FR')} tokens en double au démarrage.\nCliquez pour afficher le premier doublon concerné.`
+        ? `⚠️ Alerte Redondance :\n${dupStats.activeDuplicates} ressource(s) activée(s) à la fois en Global et en Local.\nElles consomment ${dupStats.totalWastedTokens.toLocaleString('fr-FR')} tokens en double au démarrage.\n${showDuplicatesOnly ? 'Cliquez pour désactiver le filtre et afficher toutes les ressources.' : 'Cliquez pour afficher uniquement les doublons actifs (toutes les paires).'}`
         : '';
 
       [dupPillDash, dupPillSide].forEach((pill) => {
@@ -442,19 +565,15 @@
             pill.style.display = 'inline-flex';
             pill.textContent = dupText;
             pill.title = dupTitle;
+            pill.classList.toggle('is-active', showDuplicatesOnly);
             pill.onclick = (e) => {
               e.stopPropagation();
-              const searchInput = document.getElementById('searchInput');
-              if (searchInput) {
-                const firstDup = (state.localResources || []).find((r) => r.metadata?.duplicateInfo?.bothEnabled);
-                if (firstDup) {
-                  searchInput.value = firstDup.name || firstDup.id;
-                  searchInput.dispatchEvent(new Event('input'));
-                }
-              }
+              toggleDuplicateFilter();
             };
           } else {
             pill.style.display = 'none';
+            pill.classList.remove('is-active');
+            pill.onclick = null;
           }
         }
       });
@@ -666,7 +785,7 @@
           `• Tokens au Boot : ${stat.tokenCount.toLocaleString()} tok (${stat.percentage}% du budget)\n` +
           `• Caractères : ${stat.charCount.toLocaleString()} caractères` +
           extraInfo +
-          `\nℹ️ 1 token ≈ 4 caractères Markdown` +
+          `\nℹ️ Estimation des tokens (BPE o200k / repli 1 tok ≈ 4 car.)` +
           warningNote;
       } else if (prefix === 'SoulGlobal') {
         tooltipEl.textContent = (isClaude
@@ -682,13 +801,13 @@
           `📊 Tokens au Boot : ${stat.tokenCount.toLocaleString()} tok (${stat.percentage}% du budget)\n` +
           `• Règles permanentes : ${stat.permanentCount || 0}\n` +
           `• Règles conditionnelles : ${stat.conditionalCount} (~20 tok au boot, +${stat.conditionalTokenCount?.toLocaleString()} tok à l'activation)\n` +
-          `ℹ️ 1 token ≈ 4 caractères Markdown` +
+          `ℹ️ Estimation des tokens (BPE o200k / repli 1 tok ≈ 4 car.)` +
           warningNote;
       } else {
         tooltipEl.textContent =
           `📁 Emplacement :\n${stat.directoryPath || 'Non défini'}\n\n` +
           `📊 Taille réelle : ${stat.charCount.toLocaleString()} caractères (${stat.tokenCount.toLocaleString()} tokens)\n` +
-          `ℹ️ 1 token ≈ 4 caractères Markdown` +
+          `ℹ️ Estimation des tokens (BPE o200k / repli 1 tok ≈ 4 car.)` +
           warningNote;
       }
     }
@@ -810,7 +929,7 @@
         const totalNas = (state.nasResources || []).length;
         const filteredNas = filterItems(state.nasResources);
         const sortedNas = sortItemsWithPinnedSoul(filteredNas);
-        const isFiltered = !!searchQuery || currentFilter !== 'all';
+        const isFiltered = !!searchQuery || currentFilter !== 'all' || showDuplicatesOnly;
 
         if (nasCountBadge) {
           nasCountBadge.textContent = isFiltered ? `${sortedNas.length} / ${totalNas} filtré` : `${totalNas} items`;
@@ -882,7 +1001,7 @@
       const totalGlobal = (state.globalResources || []).length;
       const filteredGlobal = filterItems(state.globalResources);
       const sortedGlobal = sortItemsWithPinnedSoul(filteredGlobal);
-      const isFiltered = !!searchQuery || currentFilter !== 'all';
+      const isFiltered = !!searchQuery || currentFilter !== 'all' || showDuplicatesOnly;
 
       if (globalCountEl) {
         globalCountEl.textContent = isFiltered ? `${sortedGlobal.length} / ${totalGlobal} filtré` : `${totalGlobal} items`;
@@ -967,7 +1086,7 @@
         const totalLocal = (state.localResources || []).length;
         const filteredLocal = filterItems(state.localResources);
         const sortedLocal = sortItemsWithPinnedSoul(filteredLocal);
-        const isFiltered = !!searchQuery || currentFilter !== 'all';
+        const isFiltered = !!searchQuery || currentFilter !== 'all' || showDuplicatesOnly;
 
         if (localCountEl) {
           localCountEl.textContent = isFiltered ? `${sortedLocal.length} / ${totalLocal} filtré` : `${totalLocal} items`;
@@ -1120,6 +1239,12 @@
   function filterItems(items) {
     if (!items) return [];
     return items.filter((item) => {
+      // Filtre exclusif des doublons actifs (toutes les paires actives, âme comprise)
+      if (showDuplicatesOnly) {
+        if (!item.metadata || !item.metadata.duplicateInfo || !item.metadata.duplicateInfo.bothEnabled) {
+          return false;
+        }
+      }
       // Filtre de type
       if (currentFilter !== 'all') {
         if (currentFilter === 'soul') {
@@ -1132,8 +1257,8 @@
       }
       // Filtre de recherche
       if (searchQuery) {
-        const matchId = item.id.toLowerCase().includes(searchQuery);
-        const matchName = item.name.toLowerCase().includes(searchQuery);
+        const matchId = (item.id || '').toLowerCase().includes(searchQuery);
+        const matchName = (item.name || '').toLowerCase().includes(searchQuery);
         const matchDesc = (item.description || '').toLowerCase().includes(searchQuery);
         return matchId || matchName || matchDesc;
       }
@@ -1141,10 +1266,138 @@
     });
   }
 
-  function createItemCard(item, isDetailed) {
+  /**
+   * Modèle de configuration du badge de doublon (Incrément 1 SPEC-DOUBLONS-UI-ET-COMPARAISON)
+   * Détermine la classe de couleur, le libellé sans (+tok), le popover (title) et le bouton d'extinction rapide.
+   */
+  function getDuplicateBadgeConfig(item) {
+    if (!item || !item.metadata || !item.metadata.duplicateInfo || !item.metadata.duplicateInfo.hasDuplicate) {
+      return null;
+    }
+    const dup = item.metadata.duplicateInfo;
+    const isSoul = item.type === 'soul' || !!(item.metadata && item.metadata.isSoul);
+
+    if (dup.bothEnabled) {
+      if (isSoul) {
+        if (dup.isIdentical) {
+          return {
+            active: true,
+            isSoul: true,
+            isIdentical: true,
+            colorClass: 'pill-duplicate-active',
+            label: '⚠️ Doublon actif',
+            title: 'Redondance inutile : la même Âme est injectée en double au démarrage. À corriger.',
+            hasQuickOff: false,
+          };
+        } else {
+          return {
+            active: true,
+            isSoul: true,
+            isIdentical: false,
+            colorClass: 'pill-override-active',
+            label: '⚡ Surchargé divergent',
+            title: 'Vérifiez que les règles locales ne répètent pas les règles globales et qu\'elles sont bien propres au projet.',
+            hasQuickOff: false,
+          };
+        }
+      } else {
+        if (dup.isIdentical) {
+          return {
+            active: true,
+            isSoul: false,
+            isIdentical: true,
+            colorClass: 'pill-duplicate-active',
+            label: '⚠️ Doublon actif',
+            title: 'Redondance inutile : les copies globale et locale sont identiques. Éteignez la globale pour récupérer les tokens.',
+            hasQuickOff: true,
+            quickOffLabel: 'Éteindre Global',
+          };
+        } else {
+          return {
+            active: true,
+            isSoul: false,
+            isIdentical: false,
+            colorClass: 'pill-duplicate-active',
+            label: '⚠️ Doublon divergent',
+            title: 'Les copies globale et locale diffèrent. Vérifiez laquelle garder.',
+            hasQuickOff: true,
+            quickOffLabel: 'Éteindre Global',
+          };
+        }
+      }
+    } else {
+      if (dup.isIdentical) {
+        return {
+          active: false,
+          isSoul,
+          isIdentical: true,
+          colorClass: 'pill-duplicate-inactive',
+          label: '♊ Doublon (inactif)',
+          title: `Cette ressource existe également en ${dup.duplicateScope} (contenu 100% identique, seul le chemin d'accès diffère), mais l'une des deux copies est désactivée (aucun token gaspillé au démarrage).`,
+          hasQuickOff: false,
+        };
+      } else {
+        return {
+          active: false,
+          isSoul,
+          isIdentical: false,
+          colorClass: 'pill-duplicate-inactive',
+          label: item.scope === 'local' ? '⚡ Surcharge locale (optimisée)' : '⚡ Surchargé en local (optimisé)',
+          title: 'Surcharge personnalisée pour ce projet. Le doublon est optimisé (pas de conflit de démarrage).',
+          hasQuickOff: false,
+        };
+      }
+    }
+  }
+
+  function createDuplicateBadge(item, doc) {
+    const targetDoc = doc || (typeof document !== 'undefined' ? document : null);
+    if (!targetDoc) return null;
+    const config = getDuplicateBadgeConfig(item);
+    if (!config) return null;
+
+    const dup = item.metadata && item.metadata.duplicateInfo;
+    const dupBadge = targetDoc.createElement('span');
+    dupBadge.className = `item-badge-pill ${config.colorClass}`;
+    dupBadge.title = config.title;
+
+    if (config.active) {
+      dupBadge.innerHTML = `<span>${config.label}</span>`;
+      if (config.hasQuickOff) {
+        const btnQuickOff = targetDoc.createElement('button');
+        btnQuickOff.className = 'btn-quick-off';
+        btnQuickOff.textContent = config.quickOffLabel || 'Éteindre Global';
+        const wastedTokStr = dup && dup.wastedTokens ? ` et économiser ${dup.wastedTokens.toLocaleString('fr-FR')} tokens` : '';
+        btnQuickOff.title = `Désactiver la copie globale pour ce doublon${wastedTokStr}`;
+        btnQuickOff.addEventListener('click', (e) => {
+          if (e && e.stopPropagation) e.stopPropagation();
+          vscode.postMessage({
+            type: 'toggle',
+            payload: {
+              id: item.id,
+              scope: item.scope === 'global' ? item.scope : ((dup && dup.duplicateScope) || 'global'),
+              targetState: false,
+              type: item.type,
+              path: item.scope === 'global' ? item.path : ((dup && dup.duplicatePath) || item.path),
+            },
+          });
+        });
+        dupBadge.appendChild(btnQuickOff);
+      }
+    } else {
+      dupBadge.textContent = config.label;
+    }
+
+    return dupBadge;
+  }
+
+  function createItemCard(item, isDetailed, doc) {
+    const targetDoc = doc || (typeof document !== 'undefined' ? document : null);
+    if (!targetDoc) return null;
+
     const isSoul = item.type === 'soul' || (item.metadata && item.metadata.isSoul);
 
-    const card = document.createElement('div');
+    const card = targetDoc.createElement('div');
     card.className = `resource-item ${item.enabled ? 'enabled' : 'disabled'} ${isSoul ? 'item-soul' : ''}`;
 
     const typeClass = isSoul
@@ -1163,21 +1416,21 @@
       : 'Skill';
 
     // Top Row
-    const topRow = document.createElement('div');
+    const topRow = targetDoc.createElement('div');
     topRow.className = 'item-top';
 
-    const titleWrap = document.createElement('div');
+    const titleWrap = targetDoc.createElement('div');
     titleWrap.className = 'item-title-wrap';
 
-    const idEl = document.createElement('div');
+    const idEl = targetDoc.createElement('div');
     idEl.className = 'item-id';
     idEl.title = item.name || item.id;
     idEl.textContent = item.name || item.id;
 
-    const badgesLine = document.createElement('div');
+    const badgesLine = targetDoc.createElement('div');
     badgesLine.className = 'item-badges-line';
 
-    const badgeEl = document.createElement('span');
+    const badgeEl = targetDoc.createElement('span');
     badgeEl.className = `item-type-badge ${typeClass}`;
     badgeEl.textContent = typeLabel;
     badgesLine.appendChild(badgeEl);
@@ -1192,7 +1445,7 @@
       )
     );
     if (isScenarioFixture) {
-      const fixtureBadge = document.createElement('span');
+      const fixtureBadge = targetDoc.createElement('span');
       fixtureBadge.className = 'item-badge-pill pill-fixture';
       fixtureBadge.textContent = '🧪 Test Scénario';
       fixtureBadge.title = 'Élément de test du Banc d\'Essai. Supprimable à tout moment sans risque.';
@@ -1200,7 +1453,7 @@
     }
 
     if (item.metadata && item.metadata.isConditional) {
-      const condBadge = document.createElement('span');
+      const condBadge = targetDoc.createElement('span');
       condBadge.className = 'item-badge-pill pill-cond';
       condBadge.textContent = '⚡ Conditionnel';
       condBadge.title = 'Règle conditionnelle : chargée uniquement sur trigger/glob (~20 tokens au boot pour le routeur)';
@@ -1209,7 +1462,7 @@
 
     // Avertissement dépassement taille physique (> 24 Ko sous Antigravity)
     if (item.metadata && item.metadata.warningSizeExceeded) {
-      const warnBadge = document.createElement('span');
+      const warnBadge = targetDoc.createElement('span');
       warnBadge.className = 'item-badge-pill pill-warn';
       warnBadge.textContent = '⚠️ > 24 Ko';
       warnBadge.title = 'Attention : ce fichier dépasse la limite physique de 24 000 octets d\'Antigravity ! Risque de troncature.';
@@ -1218,7 +1471,7 @@
 
     // Avertissement dépassement du nombre de lignes (> 200 pour Rules/Soul, > 500 pour Skills)
     if (item.metadata && item.metadata.warningLinesExceeded) {
-      const warnLinesBadge = document.createElement('span');
+      const warnLinesBadge = targetDoc.createElement('span');
       warnLinesBadge.className = 'item-badge-pill pill-warn-amber';
       if (item.type === 'skill' || item.type === 'workflow') {
         const lines = item.lineCount ? ` (${item.lineCount} li.)` : '';
@@ -1234,7 +1487,7 @@
 
     // Avertissement dépassement MCP (> 2 Ko sous Claude Code)
     if (item.metadata && item.metadata.warningMcpExceeded) {
-      const warnMcpBadge = document.createElement('span');
+      const warnMcpBadge = targetDoc.createElement('span');
       warnMcpBadge.className = 'item-badge-pill pill-warn';
       warnMcpBadge.textContent = '⚠️ MCP > 2 Ko';
       warnMcpBadge.title = 'Attention : dépasse le plafond de 2 048 caractères par outil sous Claude Code (risque de troncature silencieuse).';
@@ -1243,7 +1496,7 @@
 
     // Avertissement absence de description
     if (item.metadata && item.metadata.warningNoDescription) {
-      const warnNoDescBadge = document.createElement('span');
+      const warnNoDescBadge = targetDoc.createElement('span');
       warnNoDescBadge.className = 'item-badge-pill pill-warn-amber';
       warnNoDescBadge.textContent = '⚠️ Sans description';
       warnNoDescBadge.title = 'Attention : aucune description fournie. L\'IA aura des difficultés à identifier quand déclencher ou utiliser cette ressource.';
@@ -1251,7 +1504,7 @@
     }
 
     if (item.metadata && item.metadata.pluginName) {
-      const pluginBadge = document.createElement('span');
+      const pluginBadge = targetDoc.createElement('span');
       pluginBadge.className = 'item-badge-pill pill-plugin';
       pluginBadge.textContent = `🧩 ${item.metadata.pluginName}`;
       pluginBadge.title = `Ressource issue du plugin : ${item.metadata.pluginName}`;
@@ -1260,81 +1513,17 @@
 
     // Badge de Doublon (Global vs Local) avec bouton d'extinction rapide en 1 clic
     if (item.metadata && item.metadata.duplicateInfo && item.metadata.duplicateInfo.hasDuplicate) {
-      const dup = item.metadata.duplicateInfo;
-      const dupBadge = document.createElement('span');
-
-      if (dup.bothEnabled) {
-        if (dup.isIdentical) {
-          dupBadge.className = 'item-badge-pill pill-duplicate-active';
-          dupBadge.innerHTML = `<span>⚠️ Doublon actif (+${dup.wastedTokens.toLocaleString('fr-FR')} tok)</span>`;
-          dupBadge.title = `Attention : cette ressource est active à la fois en Global et en Local (${dup.wastedTokens.toLocaleString('fr-FR')} tokens injectés en double au démarrage).\nDésactivez ce switch pour économiser des tokens.`;
-
-          if (item.type !== 'soul') {
-            const btnQuickOff = document.createElement('button');
-            btnQuickOff.className = 'btn-quick-off';
-            btnQuickOff.textContent = 'Éteindre';
-            btnQuickOff.title = `Désactiver immédiatement ce doublon pour économiser ${dup.wastedTokens.toLocaleString('fr-FR')} tokens`;
-            btnQuickOff.addEventListener('click', (e) => {
-              e.stopPropagation();
-              vscode.postMessage({
-                type: 'toggle',
-                payload: {
-                  id: item.id,
-                  scope: item.scope,
-                  targetState: false,
-                  type: item.type,
-                  path: item.path,
-                },
-              });
-            });
-            dupBadge.appendChild(btnQuickOff);
-          }
-        } else {
-          dupBadge.className = 'item-badge-pill pill-override-active';
-          const label = item.scope === 'local' ? `⚡ Surcharge locale (+${dup.wastedTokens.toLocaleString('fr-FR')} tok)` : `⚡ Surchargé en local (+${dup.wastedTokens.toLocaleString('fr-FR')} tok)`;
-          dupBadge.innerHTML = `<span>${label}</span>`;
-          dupBadge.title = `Attention : le fichier local diffère du global mais les deux sont activés (+${dup.wastedTokens.toLocaleString('fr-FR')} tokens).\nDésactivez la version globale pour ce projet afin d'éviter les consignes contradictoires.`;
-
-          if (item.scope === 'global' && item.type !== 'soul') {
-            const btnQuickOff = document.createElement('button');
-            btnQuickOff.className = 'btn-quick-off';
-            btnQuickOff.textContent = 'Éteindre Global';
-            btnQuickOff.title = `Désactiver la version globale pour laisser la surcharge locale prioritaire et économiser ${dup.wastedTokens.toLocaleString('fr-FR')} tokens`;
-            btnQuickOff.addEventListener('click', (e) => {
-              e.stopPropagation();
-              vscode.postMessage({
-                type: 'toggle',
-                payload: {
-                  id: item.id,
-                  scope: item.scope,
-                  targetState: false,
-                  type: item.type,
-                  path: item.path,
-                },
-              });
-            });
-            dupBadge.appendChild(btnQuickOff);
-          }
-        }
-      } else {
-        dupBadge.className = 'item-badge-pill pill-duplicate-inactive';
-        if (dup.isIdentical) {
-          dupBadge.textContent = '♊ Doublon (inactif)';
-          dupBadge.title = `Cette ressource existe également en ${dup.duplicateScope}, mais l'une des deux copies est désactivée (aucun token gaspillé au démarrage).`;
-        } else {
-          dupBadge.textContent = item.scope === 'local' ? '⚡ Surcharge locale (optimisée)' : '⚡ Surchargé en local (optimisé)';
-          dupBadge.title = `Surcharge personnalisée pour ce projet. Le doublon est optimisé (pas de conflit de démarrage).`;
-        }
+      const dupBadge = createDuplicateBadge(item, targetDoc);
+      if (dupBadge) {
+        badgesLine.appendChild(dupBadge);
       }
-
-      badgesLine.appendChild(dupBadge);
     }
 
-    // Métrique Caractères + Tokens
+    // Métrique Caractères + Tokens (déjà calculés en amont par le tokenizer officiel)
     const charCount = typeof item.charCount === 'number' ? item.charCount : 0;
-    const tokenCount = typeof item.tokenCount === 'number' ? item.tokenCount : Math.ceil(charCount / 4);
+    const tokenCount = typeof item.tokenCount === 'number' ? item.tokenCount : 0;
 
-    const metricsEl = document.createElement('span');
+    const metricsEl = targetDoc.createElement('span');
     metricsEl.className = 'item-metrics-badge';
     const charStr = charCount.toLocaleString('fr-FR');
     const tokStr = tokenCount.toLocaleString('fr-FR');
@@ -1344,7 +1533,11 @@
       metricsEl.title = `Règle conditionnelle :\n• Coût au boot : ~20 tokens (routeur de déclenchement)\n• Poids complet si activé : ${charStr} car. (${tokStr} tokens)`;
     } else {
       metricsEl.innerHTML = `<span>${charStr} car.</span> <span class="tok-highlight">(${tokStr} tokens)</span>`;
-      metricsEl.title = `Taille réelle : ${charStr} caractères (${tokStr} tokens)\nFormule : 1 token ≈ 4 caractères Markdown`;
+      let metricsTitle = `Taille réelle : ${charStr} caractères (${tokStr} tokens)\nEstimation : BPE o200k (repli 1 token ≈ 4 car.)`;
+      if (item.metadata && item.metadata.duplicateInfo && item.metadata.duplicateInfo.isIdentical) {
+        metricsTitle += `\nContenu identique au doublon ${item.metadata.duplicateInfo.duplicateScope} (la légère différence de taille affichée provient du chemin de fichier).`;
+      }
+      metricsEl.title = metricsTitle;
     }
     badgesLine.appendChild(metricsEl);
 
@@ -1354,28 +1547,28 @@
 
     // Contrôles droits (Switch ON / OFF + Poubelle sécurisée OU Badge Always-On)
     if (item.scope !== 'nas') {
-      const rightControls = document.createElement('div');
+      const rightControls = targetDoc.createElement('div');
       rightControls.className = 'item-right-controls';
 
       if (isSoul) {
         // 3.A. Fichier marqué comme Verrouillé / Permanent (Always-On)
-        const lockedBadge = document.createElement('div');
+        const lockedBadge = targetDoc.createElement('div');
         lockedBadge.className = 'soul-locked-badge';
         lockedBadge.title = 'Fichier maître permanent et actif en continu (Always-On)';
         lockedBadge.innerHTML = '<span class="soul-locked-icon">🔒</span><span>Always-On</span>';
         rightControls.appendChild(lockedBadge);
       } else {
-        const switchLabel = document.createElement('label');
+        const switchLabel = targetDoc.createElement('label');
         switchLabel.className = 'switch-label';
 
-        const switchBox = document.createElement('div');
+        const switchBox = targetDoc.createElement('div');
         switchBox.className = 'switch';
 
-        const checkbox = document.createElement('input');
+        const checkbox = targetDoc.createElement('input');
         checkbox.type = 'checkbox';
         checkbox.checked = item.enabled;
 
-        const slider = document.createElement('span');
+        const slider = targetDoc.createElement('span');
         slider.className = 'slider';
 
         checkbox.addEventListener('change', (e) => {
@@ -1405,7 +1598,7 @@
       }
 
       // Bouton Poubelle sécurisé 🗑️ (applicable à tout élément Local et Global, y compris l'Âme)
-      const btnTrash = document.createElement('button');
+      const btnTrash = targetDoc.createElement('button');
       btnTrash.className = 'btn-trash';
       btnTrash.innerHTML = '🗑️';
 
@@ -1449,7 +1642,7 @@
 
     // Description
     if (item.description) {
-      const descEl = document.createElement('div');
+      const descEl = targetDoc.createElement('div');
       descEl.className = 'item-description';
       descEl.textContent = item.description;
       descEl.title = item.description;
@@ -1457,15 +1650,15 @@
     }
 
     // Footer actions
-    const footer = document.createElement('div');
+    const footer = targetDoc.createElement('div');
     footer.className = 'item-footer';
 
-    const leftMeta = document.createElement('span');
+    const leftMeta = targetDoc.createElement('span');
     leftMeta.className = 'badge-tag';
     leftMeta.textContent = item.scope.toUpperCase();
     footer.appendChild(leftMeta);
 
-    const rightActions = document.createElement('div');
+    const rightActions = targetDoc.createElement('div');
     rightActions.style.display = 'flex';
     rightActions.style.gap = '4px';
 
@@ -1476,7 +1669,7 @@
       const isAlreadyInLocal = localList.some((r) => r.id === item.id);
       const isAlreadyInGlobal = globalList.some((r) => r.id === item.id);
 
-      const btnImportLocal = document.createElement('button');
+      const btnImportLocal = targetDoc.createElement('button');
       btnImportLocal.className = isAlreadyInLocal ? 'btn btn-secondary btn-sm btn-disabled' : 'btn btn-secondary btn-sm';
       btnImportLocal.disabled = isAlreadyInLocal;
       btnImportLocal.innerHTML = isAlreadyInLocal ? '✓ Local' : '+ Local';
@@ -1497,7 +1690,7 @@
       }
       rightActions.appendChild(btnImportLocal);
 
-      const btnImportGlobal = document.createElement('button');
+      const btnImportGlobal = targetDoc.createElement('button');
       btnImportGlobal.className = isAlreadyInGlobal ? 'btn btn-secondary btn-sm btn-disabled' : 'btn btn-secondary btn-sm';
       btnImportGlobal.disabled = isAlreadyInGlobal;
       btnImportGlobal.innerHTML = isAlreadyInGlobal ? '✓ Global' : '+ Global';
@@ -1522,7 +1715,7 @@
       const localList = (currentState && currentState.localResources) ? currentState.localResources : [];
       const isAlreadyInLocal = localList.some((r) => r.id === item.id);
 
-      const btnToLocal = document.createElement('button');
+      const btnToLocal = targetDoc.createElement('button');
       btnToLocal.className = isAlreadyInLocal ? 'btn btn-secondary btn-sm btn-disabled' : 'btn btn-secondary btn-sm';
       btnToLocal.disabled = isAlreadyInLocal;
       btnToLocal.innerHTML = isAlreadyInLocal ? '✓ Local' : '+ Local';
@@ -1544,8 +1737,21 @@
       rightActions.appendChild(btnToLocal);
     }
 
+    // Bouton Comparer (Incrément 2 : doublons divergents uniquement)
+    if (item.metadata && item.metadata.duplicateInfo && item.metadata.duplicateInfo.hasDuplicate && item.metadata.duplicateInfo.isIdentical === false) {
+      const btnCompare = targetDoc.createElement('button');
+      btnCompare.className = 'btn btn-secondary btn-sm btn-compare';
+      btnCompare.innerHTML = '⚖️ Comparer';
+      btnCompare.title = 'Comparer les copies globale et locale (résumé et diff côte à côte)';
+      btnCompare.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openCompareModal(item);
+      });
+      rightActions.appendChild(btnCompare);
+    }
+
     // Bouton ouvrir fichier
-    const btnOpenFile = document.createElement('button');
+    const btnOpenFile = targetDoc.createElement('button');
     btnOpenFile.className = 'btn btn-secondary btn-sm';
     btnOpenFile.innerHTML = '📄';
     btnOpenFile.title = 'Ouvrir le fichier dans l\'éditeur';
@@ -1564,6 +1770,373 @@
     return card;
   }
 
+  /**
+   * Calcule une recommandation heuristique pour un doublon divergent entre la copie locale et la copie globale.
+   * Analyse la correspondance au Catalogue maître NAS et intègre des signaux faibles (dates mtime, tailles).
+   * Formule une recommandation prudente (« probablement... »).
+   */
+  function computeDuplicateRecommendation(params) {
+    const p = params || {};
+    const localSync = p.localSyncStatus || 'local_only';
+    const globalSync = p.globalSyncStatus || 'local_only';
+
+    const localIsSynced = localSync === 'synced';
+    const globalIsSynced = globalSync === 'synced';
+    const nasOffline = localSync === 'nas_offline' || globalSync === 'nas_offline';
+
+    let type = 'both_diverged';
+    let recommendation = '';
+
+    if (localIsSynced && !globalIsSynced) {
+      type = 'local_maintained';
+      recommendation = 'Probablement la version locale à conserver (version maintenue) : la copie locale correspond au Catalogue maître NAS, tandis que la copie globale a divergé.';
+    } else if (globalIsSynced && !localIsSynced) {
+      type = 'local_override';
+      recommendation = 'Probablement une surcharge propre au projet (à garder ici) : la copie globale correspond au Catalogue maître NAS, tandis que la copie locale a été adaptée spécifiquement à ce projet.';
+    } else if (nasOffline) {
+      type = 'nas_offline';
+      recommendation = 'Catalogue NAS hors-ligne : impossible de vérifier la correspondance avec le Catalogue maître. Comparez le diff côte à côte et vérifiez les dates et tailles ci-dessous.';
+    } else {
+      type = 'both_diverged';
+      recommendation = 'Attention, divergence double : ni la copie locale ni la copie globale ne correspondent au Catalogue maître NAS. Les deux ont divergé du Catalogue, à vérifier manuellement.';
+    }
+
+    // Signaux faibles (date de modification et richesse/taille)
+    const signals = [];
+    let moreRecent = 'unknown';
+    const lMtime = typeof p.localMtimeMs === 'number' ? p.localMtimeMs : 0;
+    const gMtime = typeof p.globalMtimeMs === 'number' ? p.globalMtimeMs : 0;
+
+    if (lMtime > 0 && gMtime > 0) {
+      if (lMtime > gMtime) {
+        moreRecent = 'local';
+        const diffSec = Math.round((lMtime - gMtime) / 1000);
+        const diffStr = diffSec >= 3600
+          ? `${Math.round(diffSec / 3600)} h`
+          : diffSec >= 60
+          ? `${Math.round(diffSec / 60)} min`
+          : `${diffSec} s`;
+        signals.push(`Signal date : la copie locale est plus récente que la copie globale (+${diffStr}).`);
+      } else if (gMtime > lMtime) {
+        moreRecent = 'global';
+        const diffSec = Math.round((gMtime - lMtime) / 1000);
+        const diffStr = diffSec >= 3600
+          ? `${Math.round(diffSec / 3600)} h`
+          : diffSec >= 60
+          ? `${Math.round(diffSec / 60)} min`
+          : `${diffSec} s`;
+        signals.push(`Signal date : la copie globale est plus récente que la copie locale (+${diffStr}).`);
+      } else {
+        moreRecent = 'same';
+        signals.push('Signal date : les deux copies ont la même date de modification.');
+      }
+    }
+
+    let moreDetailed = 'unknown';
+    const lChar = typeof p.localCharCount === 'number' ? p.localCharCount : 0;
+    const gChar = typeof p.globalCharCount === 'number' ? p.globalCharCount : 0;
+    const lTok = typeof p.localTokenCount === 'number' ? p.localTokenCount : 0;
+    const gTok = typeof p.globalTokenCount === 'number' ? p.globalTokenCount : 0;
+
+    if (lChar > 0 && gChar > 0) {
+      if (lChar > gChar) {
+        moreDetailed = 'local';
+        const deltaChar = lChar - gChar;
+        const deltaTok = Math.max(0, lTok - gTok);
+        signals.push(`Signal taille : la copie locale est plus volumineuse / détaillée (+${deltaChar.toLocaleString('fr-FR')} car., +${deltaTok.toLocaleString('fr-FR')} tokens).`);
+      } else if (gChar > lChar) {
+        moreDetailed = 'global';
+        const deltaChar = gChar - lChar;
+        const deltaTok = Math.max(0, gTok - lTok);
+        signals.push(`Signal taille : la copie globale est plus volumineuse / détaillée (+${deltaChar.toLocaleString('fr-FR')} car., +${deltaTok.toLocaleString('fr-FR')} tokens).`);
+      } else {
+        moreDetailed = 'same';
+        signals.push('Signal taille : les deux copies ont exactement le même nombre de caractères.');
+      }
+    }
+
+    return {
+      type,
+      recommendation,
+      signals,
+      moreRecent,
+      moreDetailed,
+    };
+  }
+
+  function formatMtime(mtimeMs) {
+    if (!mtimeMs || mtimeMs <= 0) return 'Date inconnue';
+    try {
+      const d = new Date(mtimeMs);
+      return d.toLocaleDateString('fr-FR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      });
+    } catch {
+      return 'Date inconnue';
+    }
+  }
+
+  function formatSyncStatus(syncStatus) {
+    switch (syncStatus) {
+      case 'synced':
+        return '<span class="sync-status-badge sync-synced">✅ Conforme au NAS (Maître)</span>';
+      case 'modified':
+        return '<span class="sync-status-badge sync-modified">⚠️ Modifié par rapport au NAS</span>';
+      case 'local_only':
+        return '<span class="sync-status-badge sync-local">ℹ️ Absent du Catalogue NAS</span>';
+      case 'nas_offline':
+        return '<span class="sync-status-badge sync-offline">⚪ Catalogue NAS hors-ligne</span>';
+      default:
+        return '<span class="sync-status-badge">Inconnu</span>';
+    }
+  }
+
+  /**
+   * Ouvre la modale de résumé comparatif pour un doublon divergent (Incrément 2)
+   */
+  function openCompareModal(item, doc) {
+    const targetDoc = doc || (typeof document !== 'undefined' ? document : null);
+    if (!targetDoc) return;
+    if (!item || !item.metadata || !item.metadata.duplicateInfo) return;
+
+    const dup = item.metadata.duplicateInfo;
+
+    // Retrouver la copie globale et locale
+    let localItem = null;
+    let globalItem = null;
+
+    if (item.scope === 'local') {
+      localItem = item;
+      const gList = (currentState && currentState.globalResources) ? currentState.globalResources : [];
+      globalItem = gList.find((g) => g.path === dup.duplicatePath || g.id === item.id) || null;
+    } else {
+      globalItem = item;
+      const lList = (currentState && currentState.localResources) ? currentState.localResources : [];
+      localItem = lList.find((l) => l.path === dup.duplicatePath || l.id === item.id) || null;
+    }
+
+    const localPath = localItem ? localItem.path : (item.scope === 'local' ? item.path : dup.duplicatePath);
+    const globalPath = globalItem ? globalItem.path : (item.scope === 'global' ? item.path : dup.duplicatePath);
+
+    const localChar = (localItem && typeof localItem.charCount === 'number')
+      ? localItem.charCount
+      : (item.scope === 'local' ? (item.charCount || 0) : (dup.twinCharCount || 0));
+    const localTok = (localItem && typeof localItem.tokenCount === 'number')
+      ? localItem.tokenCount
+      : (item.scope === 'local' ? (item.tokenCount || 0) : (dup.twinTokenCount || 0));
+    const localMtime = (localItem && typeof localItem.mtimeMs === 'number')
+      ? localItem.mtimeMs
+      : (item.scope === 'local' ? (item.mtimeMs || 0) : (dup.twinMtimeMs || 0));
+    const localSync = (localItem && localItem.syncStatus)
+      ? localItem.syncStatus
+      : (item.scope === 'local' ? (item.syncStatus || 'local_only') : (dup.twinSyncStatus || 'local_only'));
+
+    const globalChar = (globalItem && typeof globalItem.charCount === 'number')
+      ? globalItem.charCount
+      : (item.scope === 'global' ? (item.charCount || 0) : (dup.twinCharCount || 0));
+    const globalTok = (globalItem && typeof globalItem.tokenCount === 'number')
+      ? globalItem.tokenCount
+      : (item.scope === 'global' ? (item.tokenCount || 0) : (dup.twinTokenCount || 0));
+    const globalMtime = (globalItem && typeof globalItem.mtimeMs === 'number')
+      ? globalItem.mtimeMs
+      : (item.scope === 'global' ? (item.mtimeMs || 0) : (dup.twinMtimeMs || 0));
+    const globalSync = (globalItem && globalItem.syncStatus)
+      ? globalItem.syncStatus
+      : (item.scope === 'global' ? (item.syncStatus || 'local_only') : (dup.twinSyncStatus || 'local_only'));
+
+    const deltaChar = Math.abs(localChar - globalChar);
+    const deltaTok = Math.abs(localTok - globalTok);
+
+    let charDiffLabel = '';
+    if (localChar > globalChar) {
+      charDiffLabel = `Local plus détaillé : +${deltaChar.toLocaleString('fr-FR')} car. (+${deltaTok.toLocaleString('fr-FR')} tokens)`;
+    } else if (globalChar > localChar) {
+      charDiffLabel = `Global plus détaillé : +${deltaChar.toLocaleString('fr-FR')} car. (+${deltaTok.toLocaleString('fr-FR')} tokens)`;
+    } else {
+      charDiffLabel = `Tailles identiques (${localChar.toLocaleString('fr-FR')} car.)`;
+    }
+
+    const reco = computeDuplicateRecommendation({
+      localSyncStatus: localSync,
+      globalSyncStatus: globalSync,
+      localMtimeMs: localMtime,
+      globalMtimeMs: globalMtime,
+      localCharCount: localChar,
+      globalCharCount: globalChar,
+      localTokenCount: localTok,
+      globalTokenCount: globalTok,
+    });
+
+    // Supprimer une modale existante si présente
+    const existing = targetDoc.getElementById('compareModalOverlay');
+    if (existing && existing.parentNode) {
+      existing.parentNode.removeChild(existing);
+    }
+
+    const overlay = targetDoc.createElement('div');
+    overlay.id = 'compareModalOverlay';
+    overlay.className = 'compare-modal-overlay';
+
+    const modal = targetDoc.createElement('div');
+    modal.className = 'compare-modal';
+
+    // Header
+    const header = targetDoc.createElement('div');
+    header.className = 'compare-modal-header';
+
+    const titleEl = targetDoc.createElement('div');
+    titleEl.className = 'compare-modal-title';
+    titleEl.innerHTML = `<span>⚖️ Comparaison Doublon :</span> <strong>${escapeHtml(item.name || item.id)}</strong>`;
+
+    const closeBtn = targetDoc.createElement('button');
+    closeBtn.className = 'compare-modal-close';
+    closeBtn.innerHTML = '&times;';
+    closeBtn.title = 'Fermer (Échap)';
+    closeBtn.addEventListener('click', () => {
+      if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+    });
+
+    header.appendChild(titleEl);
+    header.appendChild(closeBtn);
+    modal.appendChild(header);
+
+    // Body
+    const body = targetDoc.createElement('div');
+    body.className = 'compare-modal-body';
+
+    // Grille 2 colonnes : Global vs Local
+    const grid = targetDoc.createElement('div');
+    grid.className = 'compare-grid';
+
+    const localIsRecent = reco.moreRecent === 'local';
+    const globalIsRecent = reco.moreRecent === 'global';
+
+    grid.innerHTML = `
+      <div class="compare-col compare-col-global">
+        <div class="compare-col-header">
+          <span class="compare-scope-tag tag-global">🌐 Configuration Globale</span>
+          ${globalIsRecent ? '<span class="badge-recent">🕒 Plus récent</span>' : ''}
+        </div>
+        <div class="compare-metric-row">
+          <span class="compare-metric-label">Taille :</span>
+          <span class="compare-metric-value">${globalChar.toLocaleString('fr-FR')} car. <span class="tok-highlight">(${globalTok.toLocaleString('fr-FR')} tokens)</span></span>
+        </div>
+        <div class="compare-metric-row">
+          <span class="compare-metric-label">Modification :</span>
+          <span class="compare-metric-value">${formatMtime(globalMtime)}</span>
+        </div>
+        <div class="compare-metric-row">
+          <span class="compare-metric-label">Statut NAS :</span>
+          <span class="compare-metric-value">${formatSyncStatus(globalSync)}</span>
+        </div>
+        <div class="compare-path-box" title="${escapeHtml(globalPath)}">${escapeHtml(globalPath)}</div>
+      </div>
+
+      <div class="compare-col compare-col-local">
+        <div class="compare-col-header">
+          <span class="compare-scope-tag tag-local">💻 Projet Local</span>
+          ${localIsRecent ? '<span class="badge-recent">🕒 Plus récent</span>' : ''}
+        </div>
+        <div class="compare-metric-row">
+          <span class="compare-metric-label">Taille :</span>
+          <span class="compare-metric-value">${localChar.toLocaleString('fr-FR')} car. <span class="tok-highlight">(${localTok.toLocaleString('fr-FR')} tokens)</span></span>
+        </div>
+        <div class="compare-metric-row">
+          <span class="compare-metric-label">Modification :</span>
+          <span class="compare-metric-value">${formatMtime(localMtime)}</span>
+        </div>
+        <div class="compare-metric-row">
+          <span class="compare-metric-label">Statut NAS :</span>
+          <span class="compare-metric-value">${formatSyncStatus(localSync)}</span>
+        </div>
+        <div class="compare-path-box" title="${escapeHtml(localPath)}">${escapeHtml(localPath)}</div>
+      </div>
+    `;
+
+    // Écart de taille
+    const diffBar = targetDoc.createElement('div');
+    diffBar.className = 'compare-diff-summary';
+    diffBar.innerHTML = `<strong>Écart :</strong> <span>${escapeHtml(charDiffLabel)}</span>`;
+
+    // Boîte de Recommandation Heuristique
+    const recoBox = targetDoc.createElement('div');
+    recoBox.className = `compare-reco-box reco-${reco.type}`;
+    let signalsHtml = '';
+    if (reco.signals && reco.signals.length > 0) {
+      signalsHtml = `<ul class="compare-signals-list">${reco.signals.map((s) => `<li>${escapeHtml(s)}</li>`).join('')}</ul>`;
+    }
+    recoBox.innerHTML = `
+      <div class="compare-reco-header">
+        <span class="reco-icon">💡</span>
+        <strong>Recommandation heuristique (hors-ligne) :</strong>
+      </div>
+      <div class="compare-reco-text">${escapeHtml(reco.recommendation)}</div>
+      ${signalsHtml}
+    `;
+
+    body.appendChild(grid);
+    body.appendChild(diffBar);
+    body.appendChild(recoBox);
+    modal.appendChild(body);
+
+    // Footer
+    const footer = targetDoc.createElement('div');
+    footer.className = 'compare-modal-footer';
+
+    const btnDiff = targetDoc.createElement('button');
+    btnDiff.className = 'btn btn-primary btn-diff-native';
+    btnDiff.innerHTML = '↔️ Diff natif VS Code';
+    btnDiff.title = 'Ouvrir les deux versions côte à côte dans l\'éditeur diff de VS Code';
+    btnDiff.addEventListener('click', () => {
+      vscode.postMessage({
+        type: 'compareDuplicate',
+        payload: {
+          globalPath,
+          localPath,
+          title: `${item.name || item.id} (Global ↔ Local)`,
+        },
+      });
+    });
+
+    const btnClose = targetDoc.createElement('button');
+    btnClose.className = 'btn btn-secondary';
+    btnClose.textContent = 'Fermer';
+    btnClose.addEventListener('click', () => {
+      if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+    });
+
+    footer.appendChild(btnClose);
+    footer.appendChild(btnDiff);
+    modal.appendChild(footer);
+
+    overlay.appendChild(modal);
+
+    // Clic sur l'overlay pour fermer
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) {
+        if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+      }
+    });
+
+    // Touche Échap
+    const keyHandler = (e) => {
+      if (e.key === 'Escape') {
+        if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+        targetDoc.removeEventListener('keydown', keyHandler);
+      }
+    };
+    targetDoc.addEventListener('keydown', keyHandler);
+
+    if (targetDoc.body) {
+      targetDoc.body.appendChild(overlay);
+    }
+  }
+
   function escapeHtml(str) {
     if (!str) return '';
     return str
@@ -1572,5 +2145,24 @@
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#039;');
+  }
+
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = {
+      filterItems,
+      sortItemsWithPinnedSoul,
+      toggleDuplicateFilter,
+      getDuplicateBadgeConfig,
+      createDuplicateBadge,
+      computeDuplicateRecommendation,
+      openCompareModal,
+      createItemCard,
+      setFilterState: (state) => {
+        if ('showDuplicatesOnly' in state) showDuplicatesOnly = state.showDuplicatesOnly;
+        if ('currentFilter' in state) currentFilter = state.currentFilter;
+        if ('searchQuery' in state) searchQuery = state.searchQuery;
+      },
+      getFilterState: () => ({ showDuplicatesOnly, currentFilter, searchQuery }),
+    };
   }
 })();

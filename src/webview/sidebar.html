@@ -148,7 +148,7 @@
       <!-- Note permanente sur le ratio token/caractères -->
       <div class="token-helper-note">
         <span>ℹ️</span>
-        <span>1 token ≈ 4 caractères Markdown</span>
+        <span>Estimation des tokens (BPE o200k / repli 1 tok ≈ 4 car.)</span>
       </div>
     </div>
 
@@ -223,6 +223,33 @@
         <button type="button" id="btnCleanScenarios" class="btn btn-secondary btn-test-clean" title="Nettoie les configurations de test locales (.agents, .claude...) et retire le doublon du profil global">
           <span>🧹 Vider</span>
         </button>
+      </div>
+
+      <!-- Séparateur et Contrôle Chrono Anti-Lag -->
+      <div class="test-card-divider"></div>
+
+      <div class="timing-control-row">
+        <div class="timing-label-wrap">
+          <span class="timing-icon">⏱️</span>
+          <span class="timing-title">Chrono & Diagnostic</span>
+        </div>
+        <button type="button" id="btnToggleDebugTiming" class="timing-toggle-pill status-off" title="Activer ou désactiver la mesure de performance et le journal de scan">
+          <span class="timing-toggle-indicator"></span>
+          <span class="timing-toggle-text" id="timingToggleText">OFF</span>
+        </button>
+      </div>
+
+      <!-- Mini-Terminal de Scan Output (masqué par défaut si OFF) -->
+      <div class="timing-console-wrapper" id="timingConsoleWrapper" style="display: none;">
+        <div class="timing-console-header">
+          <span class="timing-console-title">Journal de scan</span>
+          <button type="button" id="btnClearTimingLogs" class="btn-clear-timing" title="Effacer le journal">
+            🗑️
+          </button>
+        </div>
+        <div class="timing-console-body" id="timingConsoleBody">
+          <pre class="timing-console-output" id="timingConsoleOutput"><span class="timing-empty">En attente d'un scan...</span></pre>
+        </div>
       </div>
     </div>
   </div>

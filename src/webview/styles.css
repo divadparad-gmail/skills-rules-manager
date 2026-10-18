@@ -1434,8 +1434,6 @@ input:checked + .slider:before {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  direction: rtl;
-  text-align: left;
   cursor: pointer;
   transition: all 0.15s ease;
 }
@@ -2165,6 +2163,189 @@ input:checked + .slider:before {
   color: #ffffff;
 }
 
+/* Séparateur interne Banc d'Essai */
+.test-card-divider {
+  height: 1px;
+  background: var(--card-border);
+  margin: 8px 0 6px 0;
+  opacity: 0.6;
+}
+
+/* Ligne de contrôle du Chronomètre */
+.timing-control-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 2px;
+}
+
+.timing-label-wrap {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--fg-color);
+}
+
+.timing-icon {
+  font-size: 13px;
+}
+
+.timing-title {
+  letter-spacing: -0.1px;
+}
+
+/* Interrupteur Pilule ON / OFF */
+.timing-toggle-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid var(--card-border);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--muted-fg);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+}
+
+.timing-toggle-indicator {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #94a3b8;
+  transition: all 0.2s ease;
+}
+
+.timing-toggle-pill:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.timing-toggle-pill.status-on {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: rgba(16, 185, 129, 0.4);
+  color: #34d399;
+}
+
+.timing-toggle-pill.status-on .timing-toggle-indicator {
+  background: #10b981;
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.7);
+}
+
+.timing-toggle-pill.status-off {
+  background: rgba(148, 163, 184, 0.08);
+  border-color: rgba(148, 163, 184, 0.2);
+  color: #94a3b8;
+}
+
+.timing-toggle-pill.status-off .timing-toggle-indicator {
+  background: #64748b;
+}
+
+/* Conteneur du mini-terminal de scan */
+.timing-console-wrapper {
+  margin-top: 6px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: timingSlideDown 0.2s ease-out;
+}
+
+@keyframes timingSlideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.timing-console-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  font-size: 9.5px;
+  color: var(--muted-fg);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.btn-clear-timing {
+  background: transparent;
+  border: none;
+  color: var(--muted-fg);
+  cursor: pointer;
+  padding: 1px 4px;
+  font-size: 10px;
+  border-radius: 3px;
+  transition: all 0.15s ease;
+  line-height: 1;
+}
+
+.btn-clear-timing:hover {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.15);
+}
+
+.timing-console-body {
+  padding: 6px 8px;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.timing-console-output {
+  margin: 0;
+  font-family: var(--vscode-editor-font-family, 'Cascadia Code', Consolas, Monaco, monospace);
+  font-size: 10px;
+  line-height: 1.45;
+  color: #e2e8f0;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.timing-console-output .timing-line {
+  display: block;
+  padding: 2px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.timing-console-output .timing-line:last-child {
+  border-bottom: none;
+}
+
+.timing-console-output .timing-empty {
+  color: var(--muted-fg);
+  font-style: italic;
+}
+
+.timing-highlight-ms {
+  color: #38bdf8;
+  font-weight: 600;
+}
+
+.timing-highlight-cache {
+  color: #34d399;
+  font-weight: 600;
+}
+
+.timing-highlight-enc {
+  color: #fbbf24;
+}
+
 /* Badge Alerte Doublons Actifs dans le bandeau supérieur */
 .token-pill-duplicate {
   display: inline-flex;
@@ -2201,7 +2382,19 @@ input:checked + .slider:before {
   }
 }
 
-/* Badges Doublons sur les Cartes */
+.token-pill-duplicate.is-active {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.65) 0%, rgba(245, 158, 11, 0.65) 100%);
+  border-color: #f87171;
+  color: #ffffff;
+  box-shadow: 0 0 16px rgba(239, 68, 68, 0.65);
+}
+
+.search-input.filter-duplicates-active {
+  border-color: rgba(239, 68, 68, 0.55);
+  background-color: rgba(239, 68, 68, 0.08);
+}
+
+/* Badges Doublons sur les Cartes (Incrément 1 : rouge pour tous les doublons actifs, orangé réservé à l'Âme divergente) */
 .item-badge-pill.pill-duplicate-active {
   background: rgba(239, 68, 68, 0.18);
   border: 1px solid rgba(239, 68, 68, 0.5);
@@ -2212,6 +2405,7 @@ input:checked + .slider:before {
   gap: 4px;
 }
 
+/* Orangé : réservé exclusivement à l'Âme divergente ("Surchargé divergent") */
 .item-badge-pill.pill-override-active {
   background: rgba(245, 158, 11, 0.2);
   border: 1px solid rgba(245, 158, 11, 0.55);
@@ -2264,4 +2458,327 @@ input:checked + .slider:before {
   align-items: center;
   gap: 3px;
 }
+
+/* ----------------- Incrément 2 : Bouton Comparer & Modale Résumé Diff ----------------- */
+
+/* Bouton Comparer sur la carte */
+.btn-compare {
+  background: rgba(245, 158, 11, 0.15) !important;
+  border: 1px solid rgba(245, 158, 11, 0.45) !important;
+  color: #fbbf24 !important;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-compare:hover {
+  background: rgba(245, 158, 11, 0.3) !important;
+  border-color: #f59e0b !important;
+  color: #ffffff !important;
+  transform: translateY(-1px);
+}
+
+/* Overlay plein écran */
+.compare-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(4px);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: compareFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes compareFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Conteneur de la Modale */
+.compare-modal {
+  background: var(--card-bg, #252526);
+  border: 1px solid var(--card-border, rgba(255, 255, 255, 0.15));
+  border-radius: var(--radius-md, 8px);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.65);
+  width: min(1100px, 95vw);
+  max-width: 95vw;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: compareSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes compareSlideUp {
+  from {
+    transform: translateY(12px) scale(0.98);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* En-tête de la Modale */
+.compare-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--card-border, rgba(255, 255, 255, 0.1));
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.compare-modal-title {
+  font-size: 13px;
+  color: var(--fg-color, #cccccc);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.compare-modal-title strong {
+  color: var(--accent-color, #38bdf8);
+}
+
+.compare-modal-close {
+  background: transparent;
+  border: none;
+  color: var(--muted-fg, #8c8c8c);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm, 4px);
+  transition: all 0.15s ease;
+}
+
+.compare-modal-close:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Corps de la Modale */
+.compare-modal-body {
+  padding: 16px 20px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Grille 2 colonnes (Global vs Local) */
+.compare-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14px;
+  width: 100%;
+}
+
+@media (max-width: 600px) {
+  .compare-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.compare-col {
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--card-border, rgba(255, 255, 255, 0.08));
+  border-radius: var(--radius-md, 6px);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.compare-col-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  min-width: 0;
+}
+
+.compare-scope-tag {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.compare-scope-tag.tag-global {
+  color: #60a5fa;
+}
+
+.compare-scope-tag.tag-local {
+  color: #34d399;
+}
+
+.badge-recent {
+  background: rgba(52, 211, 153, 0.2);
+  border: 1px solid rgba(52, 211, 153, 0.5);
+  color: #6ee7b7;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.compare-metric-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 11px;
+  gap: 8px;
+  min-width: 0;
+}
+
+.compare-metric-label {
+  color: var(--muted-fg, #8c8c8c);
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.compare-metric-value {
+  color: var(--fg-color, #cccccc);
+  font-weight: 600;
+  text-align: right;
+  min-width: 0;
+  word-break: break-word;
+}
+
+.compare-path-box {
+  font-family: monospace;
+  font-size: 10px;
+  line-height: 1.45;
+  color: var(--muted-fg, #8c8c8c);
+  background: rgba(0, 0, 0, 0.25);
+  padding: 6px 8px;
+  border-radius: var(--radius-sm, 3px);
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+  user-select: text;
+}
+
+/* Résumé d'écart */
+.compare-diff-summary {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px dashed rgba(255, 255, 255, 0.15);
+  border-radius: var(--radius-sm, 4px);
+  padding: 8px 12px;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.compare-diff-summary strong {
+  color: var(--muted-fg, #8c8c8c);
+}
+
+.compare-diff-summary span {
+  color: #fcd34d;
+  font-weight: 600;
+}
+
+/* Boîte de recommandation heuristique */
+.compare-reco-box {
+  background: rgba(14, 99, 156, 0.12);
+  border: 1px solid rgba(14, 99, 156, 0.35);
+  border-radius: var(--radius-md, 6px);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.compare-reco-box.reco-local_maintained {
+  background: rgba(16, 185, 129, 0.1);
+  border-color: rgba(16, 185, 129, 0.35);
+}
+
+.compare-reco-box.reco-local_override {
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.4);
+}
+
+.compare-reco-box.reco-both_diverged {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.4);
+}
+
+.compare-reco-box.reco-nas_offline {
+  background: rgba(148, 163, 184, 0.1);
+  border-color: rgba(148, 163, 184, 0.3);
+}
+
+.compare-reco-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--fg-color, #ffffff);
+}
+
+.compare-reco-text {
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--fg-color, #e2e8f0);
+}
+
+.compare-signals-list {
+  margin-top: 4px;
+  padding-left: 18px;
+  font-size: 10.5px;
+  color: var(--muted-fg, #94a3b8);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Footer de la Modale */
+.compare-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--card-border, rgba(255, 255, 255, 0.1));
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.btn-diff-native {
+  background: var(--button-bg, #0e639c) !important;
+  color: var(--button-fg, #ffffff) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-diff-native:hover {
+  background: var(--button-hover, #1177bb) !important;
+  transform: translateY(-1px);
+}
+
 

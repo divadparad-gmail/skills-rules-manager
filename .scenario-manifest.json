@@ -1,6 +1,6 @@
 {
   "target": "all",
-  "deployedAt": "2026-10-15T21:35:59.445Z",
+  "deployedAt": "2026-10-17T12:41:59.260Z",
   "files": [
     ".agents/hooks.json",
     ".agents/mcp_config.json",

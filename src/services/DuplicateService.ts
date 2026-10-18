@@ -38,6 +38,8 @@ export class DuplicateService {
       isIdentical: boolean;
       bothEnabled: boolean;
       wastedTokens: number;
+      localMtime: number;
+      globalMtime: number;
     }> = [];
 
     for (const lItem of localResources) {
@@ -48,7 +50,9 @@ export class DuplicateService {
         totalDuplicates++;
         const bothEnabled = lItem.enabled && gItem.enabled;
         const isIdentical = this.checkIfIdentical(lItem, gItem);
-        const wastedTokens = bothEnabled ? Math.max(lItem.tokenCount || 0, gItem.tokenCount || 0) : 0;
+        const wastedTokens = bothEnabled ? (gItem.tokenCount || 0) : 0;
+        const localMtime = this.getMtimeMs(lItem);
+        const globalMtime = this.getMtimeMs(gItem);
 
         if (bothEnabled) {
           activeDuplicates++;
@@ -61,13 +65,15 @@ export class DuplicateService {
           isIdentical,
           bothEnabled,
           wastedTokens,
+          localMtime,
+          globalMtime,
         });
       }
     }
 
     // 2. Enrichissement des ressources locales
     const enrichedLocal = localResources.map((item) => {
-      const pair = duplicatePairs.find((p) => p.localItem.id === item.id);
+      const pair = duplicatePairs.find((p) => p.localItem === item || (p.localItem.id === item.id && p.localItem.type === item.type));
       if (pair) {
         const info: DuplicateInfo = {
           hasDuplicate: true,
@@ -77,9 +83,15 @@ export class DuplicateService {
           bothEnabled: pair.bothEnabled,
           isIdentical: pair.isIdentical,
           wastedTokens: pair.wastedTokens,
+          twinCharCount: pair.globalItem.charCount,
+          twinTokenCount: pair.globalItem.tokenCount,
+          twinLineCount: pair.globalItem.lineCount,
+          twinMtimeMs: pair.globalMtime,
+          twinSyncStatus: pair.globalItem.syncStatus,
         };
         return {
           ...item,
+          mtimeMs: item.mtimeMs ?? pair.localMtime,
           metadata: {
             ...item.metadata,
             duplicateInfo: info,
@@ -91,7 +103,7 @@ export class DuplicateService {
 
     // 3. Enrichissement des ressources globales
     const enrichedGlobal = globalResources.map((item) => {
-      const pair = duplicatePairs.find((p) => p.globalItem.id === item.id);
+      const pair = duplicatePairs.find((p) => p.globalItem === item || (p.globalItem.id === item.id && p.globalItem.type === item.type));
       if (pair) {
         const info: DuplicateInfo = {
           hasDuplicate: true,
@@ -101,9 +113,15 @@ export class DuplicateService {
           bothEnabled: pair.bothEnabled,
           isIdentical: pair.isIdentical,
           wastedTokens: pair.wastedTokens,
+          twinCharCount: pair.localItem.charCount,
+          twinTokenCount: pair.localItem.tokenCount,
+          twinLineCount: pair.localItem.lineCount,
+          twinMtimeMs: pair.localMtime,
+          twinSyncStatus: pair.localItem.syncStatus,
         };
         return {
           ...item,
+          mtimeMs: item.mtimeMs ?? pair.globalMtime,
           metadata: {
             ...item.metadata,
             duplicateInfo: info,
@@ -124,6 +142,40 @@ export class DuplicateService {
       enrichedLocal,
       stats,
     };
+  }
+
+  /**
+   * Récupère le timestamp de dernière modification (mtimeMs) d'une ressource ou de son fichier principal.
+   */
+  public static getMtimeMs(item: ResourceItem): number {
+    if (typeof item.mtimeMs === 'number' && item.mtimeMs > 0) {
+      return item.mtimeMs;
+    }
+    try {
+      if (item.isFolder) {
+        const skillFile = this.getSkillFile(item.path);
+        if (skillFile && fs.existsSync(skillFile)) {
+          return fs.statSync(skillFile).mtimeMs;
+        }
+      }
+      if (fs.existsSync(item.path)) {
+        return fs.statSync(item.path).mtimeMs;
+      }
+    } catch {
+      // Ignorer
+    }
+    return 0;
+  }
+
+  /**
+   * Résout le fichier principal d'un dossier de skill ou workflow (SKILL.md ou SKILL.md.disabled).
+   */
+  public static getSkillFile(dir: string): string | null {
+    const active = path.join(dir, 'SKILL.md');
+    if (fs.existsSync(active)) return active;
+    const disabled = path.join(dir, 'SKILL.md.disabled');
+    if (fs.existsSync(disabled)) return disabled;
+    return null;
   }
 
   /**
@@ -150,16 +202,8 @@ export class DuplicateService {
 
       if (localItem.isFolder && globalItem.isFolder) {
         // Pour les dossiers (skills), comparer le SKILL.md principal
-        const getSkillFile = (dir: string) => {
-          const active = path.join(dir, 'SKILL.md');
-          if (fs.existsSync(active)) return active;
-          const disabled = path.join(dir, 'SKILL.md.disabled');
-          if (fs.existsSync(disabled)) return disabled;
-          return null;
-        };
-
-        const localFile = getSkillFile(localItem.path);
-        const globalFile = getSkillFile(globalItem.path);
+        const localFile = this.getSkillFile(localItem.path);
+        const globalFile = this.getSkillFile(globalItem.path);
 
         if (!localFile || !globalFile) return false;
         const localContent = fs.readFileSync(localFile, 'utf8');

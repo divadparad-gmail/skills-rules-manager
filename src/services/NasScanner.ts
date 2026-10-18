@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { NasStatus, ResourceItem, ResourceType } from '../types';
 import { extractFrontmatter, extractMarkdownTitleAndSummary } from '../utils/frontmatter';
+import { countTokens, countTokensForFile } from '../utils/tokenizer';
 
 let vscodeModule: any = null;
 try {
@@ -87,21 +88,21 @@ export class NasScanner {
           }
         }
 
-        // Fallback synchrone rapide au cas où
-        if (fs.existsSync(cleanPath)) {
-          return { available: true };
-        }
         return { available: false, error: msg };
       }
     })();
 
+    let timerId: NodeJS.Timeout | undefined;
     const timeoutPromise = new Promise<{ available: boolean; error?: string }>((resolve) => {
-      setTimeout(() => resolve({ available: false, error: 'Délai d\'attente réseau dépassé (5s).' }), timeoutMs);
+      timerId = setTimeout(() => resolve({ available: false, error: 'Délai d\'attente réseau dépassé (5s).' }), timeoutMs);
     });
 
     try {
-      return await Promise.race([checkPromise, timeoutPromise]);
+      const res = await Promise.race([checkPromise, timeoutPromise]);
+      if (timerId) clearTimeout(timerId);
+      return res;
     } catch {
+      if (timerId) clearTimeout(timerId);
       return { available: false, error: 'Erreur inattendue lors de la vérification.' };
     }
   }
@@ -142,13 +143,14 @@ export class NasScanner {
 
       if (fs.existsSync(soulCandidate) && fs.statSync(soulCandidate).isFile()) {
           try {
+            const stat = await fs.promises.stat(soulCandidate);
             const rawContent = await fs.promises.readFile(soulCandidate, 'utf8');
             const fileCharCount = rawContent.length;
             const lineCount = rawContent.split(/\r\n|\r|\n/).length;
             const parsed = extractMarkdownTitleAndSummary(rawContent);
             const isWarningLines = lineCount > 200;
             const isWarningSize = fileCharCount > 24000;
-            const soulTokenCount = Math.ceil(fileCharCount / 4);
+            const soulTokenCount = countTokensForFile(soulCandidate, stat.size, stat.mtimeMs, rawContent);
 
             items.push({
               id: targetSoulFile,
@@ -197,8 +199,10 @@ export class NasScanner {
           let name = entry.name;
           let tags: string[] = [];
           let rawContent = '';
+          let fileStat: fs.Stats | null = null;
 
           try {
+            fileStat = await fs.promises.stat(activeFile);
             rawContent = await fs.promises.readFile(activeFile, 'utf8');
             const { metadata } = extractFrontmatter(rawContent);
             if (metadata.name && typeof metadata.name === 'string') {
@@ -224,7 +228,7 @@ export class NasScanner {
 
           const discoverySignature = `name: ${name}\ndescription: ${description}\npath: ${activeFile}\n`;
           const charCount = discoverySignature.length;
-          const tokenCount = Math.ceil(charCount / 4);
+          const tokenCount = countTokensForFile(activeFile, fileStat?.size, fileStat?.mtimeMs, discoverySignature);
 
           items.push({
             id: entry.name,
@@ -271,8 +275,10 @@ export class NasScanner {
           let summary = '';
           let fileCharCount = 0;
           let rawContent = '';
+          let fileStat: fs.Stats | null = null;
 
           try {
+            fileStat = await fs.promises.stat(filePath);
             rawContent = await fs.promises.readFile(filePath, 'utf8');
             fileCharCount = rawContent.length;
             const parsed = extractMarkdownTitleAndSummary(rawContent);
@@ -286,7 +292,7 @@ export class NasScanner {
           const isWarningLines = lineCount > 200;
           const isWarningSize = fileCharCount > 24000;
           const isWarningNoDesc = !summary || summary.trim().length === 0;
-          const ruleTokenCount = Math.ceil(fileCharCount / 4);
+          const ruleTokenCount = countTokensForFile(filePath, fileStat?.size, fileStat?.mtimeMs, rawContent);
 
           const newItem: ResourceItem = {
             id: cleanId,

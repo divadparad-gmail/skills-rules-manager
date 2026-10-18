@@ -6,6 +6,7 @@ import {
   extractMarkdownTitleAndSummary,
   isRuleConditional,
 } from '../utils/frontmatter';
+import { countTokens, countTokensForFile } from '../utils/tokenizer';
 import { ScenarioManager } from './ScenarioManager';
 
 export class LocalScanner {
@@ -72,8 +73,10 @@ export class LocalScanner {
               let name = entry.name;
               let tags: string[] = [];
               let rawSkillContent = '';
+              let fileStat: fs.Stats | null = null;
 
               try {
+                fileStat = await fs.promises.stat(activeFile);
                 rawSkillContent = await fs.promises.readFile(activeFile, 'utf8');
                 const { metadata } = extractFrontmatter(rawSkillContent);
                 if (metadata.name && typeof metadata.name === 'string') {
@@ -99,7 +102,7 @@ export class LocalScanner {
 
               const discoverySignature = `name: ${name}\ndescription: ${description}\npath: ${activeFile}\n`;
               const charCount = discoverySignature.length;
-              const tokenCount = Math.ceil(charCount / 4);
+              const tokenCount = countTokensForFile(activeFile, fileStat?.size, fileStat?.mtimeMs, discoverySignature);
 
               if (isEnabled) {
                 skillsCharTotal += charCount;
@@ -158,7 +161,9 @@ export class LocalScanner {
               let parsedMetadata: Record<string, unknown> = {};
 
               let rawContent = '';
+              let fileStat: fs.Stats | null = null;
               try {
+                fileStat = await fs.promises.stat(filePath);
                 rawContent = await fs.promises.readFile(filePath, 'utf8');
                 fileCharCount = rawContent.length;
                 const parsed = extractMarkdownTitleAndSummary(rawContent);
@@ -175,7 +180,7 @@ export class LocalScanner {
               const isWarningLines = lineCount > 200;
               const isWarningNoDesc = !summary || summary.trim().length === 0;
               const isRuleEnabled = isMd;
-              const ruleTokenCount = Math.ceil(fileCharCount / 4);
+              const ruleTokenCount = countTokensForFile(filePath, fileStat?.size, fileStat?.mtimeMs, rawContent);
 
               const newItem: ResourceItem = {
                 id: cleanId,
@@ -255,7 +260,9 @@ export class LocalScanner {
                     let desc = '';
                     let sName = sEntry.name;
                     let rawContent = '';
+                    let sStat: fs.Stats | null = null;
                     try {
+                      sStat = await fs.promises.stat(actFile);
                       rawContent = await fs.promises.readFile(actFile, 'utf8');
                       const { metadata } = extractFrontmatter(rawContent);
                       if (metadata.name && typeof metadata.name === 'string') sName = metadata.name;
@@ -271,7 +278,7 @@ export class LocalScanner {
 
                     const discoverySig = `name: ${sName}\ndescription: ${desc}\npath: ${actFile}\n`;
                     const cCount = discoverySig.length;
-                    const tCount = Math.ceil(cCount / 4);
+                    const tCount = countTokensForFile(actFile, sStat?.size, sStat?.mtimeMs, discoverySig);
                     if (isEn) skillsCharTotal += cCount;
 
                     items.push({
@@ -320,7 +327,9 @@ export class LocalScanner {
                     let fCount = 0;
                     let pFm: Record<string, unknown> = {};
                     let rawRuleContent = '';
+                    let rStat: fs.Stats | null = null;
                     try {
+                      rStat = await fs.promises.stat(rPath);
                       rawRuleContent = await fs.promises.readFile(rPath, 'utf8');
                       fCount = rawRuleContent.length;
                       const parsed = extractMarkdownTitleAndSummary(rawRuleContent);
@@ -337,7 +346,7 @@ export class LocalScanner {
                     const isWarnRuleLines = ruleLineCount > 200;
                     const isWarnRuleNoDesc = !rSummary || rSummary.trim().length === 0;
                     const isEn = isM;
-                    const tCount = Math.ceil(fCount / 4);
+                    const tCount = countTokensForFile(rPath, rStat?.size, rStat?.mtimeMs, rawRuleContent);
 
                     if (isEn) {
                       if (isCond) {
@@ -409,7 +418,9 @@ export class LocalScanner {
               let description = '';
               let name = entry.name;
               let rawSkillContent = '';
+              let sStat: fs.Stats | null = null;
               try {
+                sStat = await fs.promises.stat(activeFile);
                 rawSkillContent = await fs.promises.readFile(activeFile, 'utf8');
                 const { metadata } = extractFrontmatter(rawSkillContent);
                 if (metadata.name && typeof metadata.name === 'string') name = metadata.name;
@@ -424,7 +435,7 @@ export class LocalScanner {
 
               const discoverySignature = `name: ${name}\ndescription: ${description}\npath: ${activeFile}\n`;
               const charCount = discoverySignature.length;
-              const tokenCount = Math.ceil(charCount / 4);
+              const tokenCount = countTokensForFile(activeFile, sStat?.size, sStat?.mtimeMs, discoverySignature);
 
               if (isEnabled) {
                 skillsCharTotal += charCount;
@@ -479,8 +490,10 @@ export class LocalScanner {
               let fileCharCount = 0;
               let ruleMetadata: Record<string, any> = {};
               let rawRuleContent = '';
+              let rStat: fs.Stats | null = null;
 
               try {
+                rStat = await fs.promises.stat(filePath);
                 rawRuleContent = await fs.promises.readFile(filePath, 'utf8');
                 fileCharCount = rawRuleContent.length;
                 const { metadata } = extractFrontmatter(rawRuleContent);
@@ -497,7 +510,7 @@ export class LocalScanner {
               const isCond = isRuleConditional(ruleMetadata, 'claude-code');
               const isWarningLines = lineCount > 200;
               const isWarningNoDesc = !summary || summary.trim().length === 0;
-              const ruleTokenCount = Math.ceil(fileCharCount / 4);
+              const ruleTokenCount = countTokensForFile(filePath, rStat?.size, rStat?.mtimeMs, rawRuleContent);
 
               const newItem: ResourceItem = {
                 id: cleanId,
@@ -564,12 +577,13 @@ export class LocalScanner {
       const candidatePath = path.join(rootPath, candidate.file);
       if (fs.existsSync(candidatePath) && fs.statSync(candidatePath).isFile()) {
         try {
+          const stat = await fs.promises.stat(candidatePath);
           const rawContent = await fs.promises.readFile(candidatePath, 'utf8');
           const fileCharCount = rawContent.length;
           const lineCount = rawContent.split(/\r\n|\r|\n/).length;
           const { metadata: soulMetadata } = extractFrontmatter(rawContent);
           const parsed = extractMarkdownTitleAndSummary(rawContent);
-          const tokenCount = Math.ceil(fileCharCount / 4);
+          const tokenCount = countTokensForFile(candidatePath, stat.size, stat.mtimeMs, rawContent);
           const isWarningLines = lineCount > 200;
           const isWarningSize = candidate.tool === 'antigravity' && fileCharCount > 24000;
 
@@ -607,32 +621,47 @@ export class LocalScanner {
     const allRulesList = items.filter((i) => i.type === 'rule');
     const allSoulList = items.filter((i) => i.type === 'soul');
 
-    const activeSkillsCount = allSkillsList.filter((i) => i.enabled).length;
-    const skillsWarningCount = allSkillsList.filter((i) => i.enabled && (
+    const activeSkillsList = allSkillsList.filter((i) => i.enabled);
+    const activeSkillsCount = activeSkillsList.length;
+    const skillsWarningCount = activeSkillsList.filter((i) => (
       i.metadata?.warningSizeExceeded ||
       i.metadata?.warningLinesExceeded ||
       i.metadata?.warningMcpExceeded ||
       i.metadata?.warningNoDescription
     )).length;
-    const skillsTokenTotal = Math.ceil(skillsCharTotal / 4);
+    // Somme directe des tokens réels de chaque élément actif (concordance absolue avec les cartes)
+    const skillsTokenTotal = activeSkillsList.reduce((sum, i) => sum + (i.tokenCount || 0), 0);
 
-    const activeRulesCount = allRulesList.filter((i) => i.enabled).length;
-    const rulesWarningCount = allRulesList.filter((i) => i.enabled && (
+    const activeRulesList = allRulesList.filter((i) => i.enabled);
+    const activeRulesCount = activeRulesList.length;
+    const rulesWarningCount = activeRulesList.filter((i) => (
       i.metadata?.warningSizeExceeded ||
       i.metadata?.warningLinesExceeded ||
       i.metadata?.warningMcpExceeded ||
       i.metadata?.warningNoDescription
     )).length;
-    const rulesTokenTotal = Math.ceil(rulesCharTotal / 4);
 
-    const activeSoulCount = allSoulList.filter((i) => i.enabled).length;
-    const soulWarningCount = allSoulList.filter((i) => i.enabled && (
+    // Décompte cohérent des règles :
+    // - Règles permanentes : accumulation de leur tokenCount BPE réel
+    // - Règles conditionnelles : 20 tokens légers de routeur au boot
+    // - rulesConditionalTokenTotal : somme des tokens BPE réels des cartes conditionnelles
+    const activePermanentRules = activeRulesList.filter((i) => !i.metadata?.isConditional);
+    const activeConditionalRules = activeRulesList.filter((i) => i.metadata?.isConditional);
+    const permanentRulesTokens = activePermanentRules.reduce((sum, i) => sum + (i.tokenCount || 0), 0);
+    const conditionalRulesBootTokens = activeConditionalRules.length * 20;
+    const rulesTokenTotal = permanentRulesTokens + conditionalRulesBootTokens;
+    const rulesConditionalTokenTotal = activeConditionalRules.reduce((sum, i) => sum + (i.tokenCount || 0), 0);
+
+    const activeSoulList = allSoulList.filter((i) => i.enabled);
+    const activeSoulCount = activeSoulList.length;
+    const soulWarningCount = activeSoulList.filter((i) => (
       i.metadata?.warningSizeExceeded ||
       i.metadata?.warningLinesExceeded ||
       i.metadata?.warningMcpExceeded ||
       i.metadata?.warningNoDescription
     )).length;
-    const soulTokenTotal = Math.ceil(soulCharTotal / 4);
+    // Somme directe des tokens BPE de l'Âme active
+    const soulTokenTotal = activeSoulList.reduce((sum, i) => sum + (i.tokenCount || 0), 0);
 
     const skillsStat: TokenCategoryStat = {
       type: 'skill',
@@ -657,7 +686,7 @@ export class LocalScanner {
       totalCount: allRulesList.length,
       permanentCount: rulesPermanentCount,
       conditionalCount: rulesConditionalCount,
-      conditionalTokenCount: Math.ceil(rulesConditionalCharTotal / 4),
+      conditionalTokenCount: rulesConditionalTokenTotal,
       charCount: rulesCharTotal,
       tokenCount: rulesTokenTotal,
       warningCount: rulesWarningCount,

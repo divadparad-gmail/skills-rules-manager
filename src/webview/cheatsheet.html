@@ -215,6 +215,20 @@
                   touchée. Se recharge automatiquement à la demande même après un <code>/compact</code> !
                 </div>
               </div>
+
+              <!-- Note explicative sur le calcul du total de tokens des règles -->
+              <div class="cs-callout cs-callout-info" style="margin-top: 6px;">
+                <span>📊</span>
+                <div>
+                  <strong>Comment se calcule le total de tokens des règles (Claude Code) :</strong>
+                  <ul style="margin: 4px 0 0 0; padding-left: 18px; line-height: 1.5;">
+                    <li><strong>Règles permanentes (sans champ <code>paths</code>) :</strong> Comptées pour la totalité de leur contenu (estimation BPE o200k).</li>
+                    <li><strong>Règles conditionnelles (avec champ <code>paths</code>) :</strong> Ne comptent que pour <strong>≈ 20 tokens</strong> chacune dans le total affiché au démarrage. C'est leur coût réel au boot, limité aux métadonnées de déclenchement enregistrées par Claude Code. Leur coût complet en cas d'activation est affiché à part.</li>
+                    <li><strong>Conséquence sur la jauge :</strong> Additionner les tokens affichés sur les cartes des règles conditionnelles ne redonne pas le total des règles. C'est normal et voulu — le total reflète la consommation au démarrage, pas la consommation maximale si toutes les règles conditionnelles étaient déclenchées en même temps.</li>
+                    <li><strong>Skills et Âme :</strong> À l'inverse des règles, les totaux des compétences (skills) et de l'Âme (<code>CLAUDE.md</code>) correspondent exactement à la somme des cartes actives.</li>
+                  </ul>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -550,6 +564,20 @@
                 <div style="color: var(--muted-fg); margin-top: 2px;">
                   En plaçant un fichier <code>AGENTS.md</code> dans un sous-dossier spécifique (ex: <code>src/api/AGENTS.md</code>), ces consignes ne consomment <strong>aucun token au démarrage</strong>. Elles s'activent automatiquement dès que l'agent manipule des fichiers situés dans cette zone.
                   <br><em>Déduplication stricte :</em> Résolution par chemin absolu canonique (une règle n'est jamais injectée en double).
+                </div>
+              </div>
+
+              <!-- Note explicative sur le calcul du total de tokens des règles -->
+              <div class="cs-callout cs-callout-info" style="margin-top: 6px;">
+                <span>📊</span>
+                <div>
+                  <strong>Comment se calcule le total de tokens des règles (Antigravity) :</strong>
+                  <ul style="margin: 4px 0 0 0; padding-left: 18px; line-height: 1.5;">
+                    <li><strong>Règles permanentes :</strong> Comptées pour la totalité de leur contenu (estimation BPE o200k). Toute règle sans trigger conditionnel est permanente.</li>
+                    <li><strong>Règles conditionnelles (avec <code>trigger: glob</code>, <code>globs</code>, <code>model_decision</code>, <code>manual</code> ou champ <code>globs/glob</code>) :</strong> Ne comptent que pour <strong>≈ 20 tokens</strong> chacune dans le total affiché au démarrage. C'est leur coût réel au boot pour le routeur d'Antigravity (enregistrement du motif de déclenchement). Leur coût complet en cas d'activation est affiché à part (dans l'info-bulle et sur la carte).</li>
+                    <li><strong>Conséquence sur la jauge :</strong> Additionner les tokens affichés sur les cartes des règles conditionnelles ne redonne pas le total des règles. C'est normal et voulu — le total reflète la consommation au démarrage, pas la consommation maximale si toutes les règles conditionnelles étaient déclenchées en même temps.</li>
+                    <li><strong>Skills et Âme :</strong> À l'inverse des règles, les totaux des compétences (skills/workflows) et de l'Âme (<code>GEMINI.md</code> / <code>AGENTS.md</code>) correspondent exactement à la somme des cartes actives.</li>
+                  </ul>
                 </div>
               </div>
             </div>

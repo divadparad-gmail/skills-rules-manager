@@ -2,7 +2,7 @@
   "name": "skills-rules-manager",
   "displayName": "Skills & Rules Manager",
   "description": "Gestionnaire visuel de compétences (skills, workflows) et règles pour Antigravity IDE et Claude Code (NAS, Global, Local).",
-  "version": "0.3.0",
+  "version": "0.3.11",
   "publisher": "antigravity",
   "license": "MIT",
   "repository": {
@@ -114,6 +114,11 @@
           ],
           "default": "auto-detect",
           "description": "Méthode de détection de l'outil cible pour le projet local"
+        },
+        "skillsManager.debugTiming": {
+          "type": "boolean",
+          "default": false,
+          "description": "Active la mesure et le journal de performance des scans et de la tokenisation dans le canal de sortie 'Skills & Rules Manager'"
         }
       }
     }
@@ -136,5 +141,8 @@
     "@vscode/vsce": "^2.24.0",
     "puppeteer-core": "^25.14.0",
     "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "gpt-tokenizer": "^4.0.3"
   }
 }

@@ -17,17 +17,20 @@ export function extractFrontmatter(content: string): { metadata: ParsedMetadata;
   const metadata: ParsedMetadata = {};
   const trimmed = content.trimStart();
 
-  if (!trimmed.startsWith('---')) {
+  const startMatch = trimmed.match(/^---[ \t]*\r?\n/);
+  if (!startMatch) {
     return { metadata, body: content };
   }
 
-  const endMarkerIndex = trimmed.indexOf('\n---', 3);
-  if (endMarkerIndex === -1) {
+  const startIndex = startMatch[0].length;
+  const rest = trimmed.slice(startIndex);
+  const endMatch = rest.match(/\r?\n---[ \t]*(?:\r?\n|$)/);
+  if (!endMatch || endMatch.index === undefined) {
     return { metadata, body: content };
   }
 
-  const frontmatterRaw = trimmed.substring(3, endMarkerIndex).trim();
-  const body = trimmed.substring(endMarkerIndex + 4).trimStart();
+  const frontmatterRaw = rest.substring(0, endMatch.index).trim();
+  const body = rest.substring(endMatch.index + endMatch[0].length).trimStart();
 
   // Parsing ligne par ligne du YAML basique
   const lines = frontmatterRaw.split(/\r?\n/);

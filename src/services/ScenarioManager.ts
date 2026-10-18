@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { ResourceItem } from '../types';
 import { getEffectiveGlobalAntigravityPath } from '../utils/paths';
+import { extractFrontmatter } from '../utils/frontmatter';
 
 export type ScenarioTarget = 'antigravity' | 'claude-code' | 'all';
 
@@ -134,9 +135,38 @@ export class ScenarioManager {
   }
 
   /**
-   * Nettoie les fichiers et dossiers de configuration dans la racine du projet.
+   * Vérifie si un fichier à la racine est une fixture avérée de scénario.
+   */
+  private static async isRootFileFixture(
+    filePath: string,
+    scenarioFiles: Set<string>,
+    rootPath: string
+  ): Promise<boolean> {
+    if (!fs.existsSync(filePath)) return false;
+    const rel = path.relative(rootPath, filePath).replace(/\\/g, '/');
+    if (scenarioFiles.has(rel)) return true;
+    try {
+      const content = await fs.promises.readFile(filePath, 'utf8');
+      const { metadata } = extractFrontmatter(content);
+      if (
+        metadata?.isScenarioFixture === true ||
+        metadata?.isScenarioFixture === 'true' ||
+        metadata?.scenario_fixture === true ||
+        metadata?.scenario_fixture === 'true'
+      ) {
+        return true;
+      }
+    } catch {
+      // Ignorer
+    }
+    return false;
+  }
+
+  /**
+   * Nettoie les fichiers et dossiers de configuration appartenant au Banc d'Essai.
    * Si localItems est fourni, protège rigoureusement toutes les ressources non synchronisées (modifiées ou locales),
    * sauf si elles sont explicitement identifiées comme des fixtures du Banc d'Essai.
+   * Ne supprime JAMAIS récursivement les dossiers racines .agents ou .claude.
    */
   public static async clean(
     rootPath: string,
@@ -163,7 +193,7 @@ export class ScenarioManager {
         const isFixture = this.isScenarioFixture(rootPath, item, scenarioFiles);
 
         if (item.syncStatus === 'synced' || isFixture) {
-          // 100% identique au Catalogue NAS ou fichier de test de scénario : supprimable en toute sécurité
+          // Identique au Catalogue NAS ou fixture de scénario : supprimable
           try {
             if (fs.existsSync(item.path)) {
               if (item.isFolder) {
@@ -182,97 +212,81 @@ export class ScenarioManager {
           result.preservedNames.push(item.name || item.id);
         }
       }
-
-      // Si aucun élément n'a été préservé, on nettoie tous les résidus de scénarios
-      if (result.preservedCount === 0) {
-        if (target === 'antigravity' || target === 'all') {
-          const agentsDir = path.join(rootPath, '.agents');
-          if (fs.existsSync(agentsDir)) {
-            await fs.promises.rm(agentsDir, { recursive: true, force: true });
+    } else {
+      // Si aucun état de ressources n'est fourni, on ne supprime STRICTEMENT QUE les fichiers
+      // répertoriés dans le manifeste ou fixtures connues du banc d'essai
+      for (const relFile of scenarioFiles) {
+        if (target === 'antigravity') {
+          if (!relFile.startsWith('.agents/') && !relFile.includes('GEMINI.md') && !relFile.includes('AGENTS.md')) {
+            continue;
           }
-          const geminiMd = path.join(rootPath, 'GEMINI.md');
-          if (fs.existsSync(geminiMd)) {
-            await fs.promises.rm(geminiMd, { force: true });
-          }
-          const agentsMd = path.join(rootPath, 'AGENTS.md');
-          if (fs.existsSync(agentsMd)) {
-            await fs.promises.rm(agentsMd, { force: true });
+        } else if (target === 'claude-code') {
+          if (!relFile.startsWith('.claude/') && !relFile.includes('CLAUDE.md') && !relFile.includes('.mcp.json')) {
+            continue;
           }
         }
-        if (target === 'claude-code' || target === 'all') {
-          const claudeDir = path.join(rootPath, '.claude');
-          if (fs.existsSync(claudeDir)) {
-            await fs.promises.rm(claudeDir, { recursive: true, force: true });
-          }
-          const claudeMd = path.join(rootPath, 'CLAUDE.md');
-          if (fs.existsSync(claudeMd)) {
-            await fs.promises.rm(claudeMd, { force: true });
-          }
-          const mcpJson = path.join(rootPath, '.mcp.json');
-          if (fs.existsSync(mcpJson)) {
-            await fs.promises.rm(mcpJson, { force: true });
+
+        const absPath = path.join(rootPath, relFile);
+        if (fs.existsSync(absPath)) {
+          try {
+            const stat = await fs.promises.stat(absPath);
+            if (stat.isFile()) {
+              await fs.promises.unlink(absPath);
+              result.deletedCount++;
+            }
+          } catch {
+            // Ignorer
           }
         }
-      } else {
-        // Nettoyer uniquement les sous-dossiers qui sont devenus vides
-        this.cleanEmptyDirectories(path.join(rootPath, '.agents'));
-        this.cleanEmptyDirectories(path.join(rootPath, '.claude'));
       }
+    }
 
-      // Nettoyage sécurisé du fichier de test doublon dans le profil global
-      if (target === 'all' || target === 'antigravity') {
-        await this.cleanGlobalTestDuplicateRule();
-      }
-
-      // Nettoyer le manifeste de scénario s'il existe
-      const manifestPath = path.join(rootPath, this.MANIFEST_FILE);
-      if (fs.existsSync(manifestPath)) {
+    // Nettoyage des fichiers racine uniquement s'ils sont des fixtures avérées
+    if (target === 'antigravity' || target === 'all') {
+      const geminiMd = path.join(rootPath, 'GEMINI.md');
+      if (await this.isRootFileFixture(geminiMd, scenarioFiles, rootPath)) {
         try {
-          await fs.promises.unlink(manifestPath);
+          await fs.promises.unlink(geminiMd);
+          result.deletedCount++;
         } catch {
           // Ignorer
         }
       }
-
-      return result;
-    }
-
-    // Repli de nettoyage intégral (quand aucun état de synchronisation n'est fourni)
-    if (target === 'antigravity' || target === 'all') {
-      const agentsDir = path.join(rootPath, '.agents');
-      if (fs.existsSync(agentsDir)) {
-        await fs.promises.rm(agentsDir, { recursive: true, force: true });
-        result.deletedCount++;
-      }
-      const geminiMd = path.join(rootPath, 'GEMINI.md');
-      if (fs.existsSync(geminiMd)) {
-        await fs.promises.rm(geminiMd, { force: true });
-        result.deletedCount++;
-      }
       const agentsMd = path.join(rootPath, 'AGENTS.md');
-      if (fs.existsSync(agentsMd)) {
-        await fs.promises.rm(agentsMd, { force: true });
-        result.deletedCount++;
+      if (await this.isRootFileFixture(agentsMd, scenarioFiles, rootPath)) {
+        try {
+          await fs.promises.unlink(agentsMd);
+          result.deletedCount++;
+        } catch {
+          // Ignorer
+        }
       }
     }
 
     if (target === 'claude-code' || target === 'all') {
-      const claudeDir = path.join(rootPath, '.claude');
-      if (fs.existsSync(claudeDir)) {
-        await fs.promises.rm(claudeDir, { recursive: true, force: true });
-        result.deletedCount++;
-      }
       const claudeMd = path.join(rootPath, 'CLAUDE.md');
-      if (fs.existsSync(claudeMd)) {
-        await fs.promises.rm(claudeMd, { force: true });
-        result.deletedCount++;
+      if (await this.isRootFileFixture(claudeMd, scenarioFiles, rootPath)) {
+        try {
+          await fs.promises.unlink(claudeMd);
+          result.deletedCount++;
+        } catch {
+          // Ignorer
+        }
       }
       const mcpJson = path.join(rootPath, '.mcp.json');
-      if (fs.existsSync(mcpJson)) {
-        await fs.promises.rm(mcpJson, { force: true });
-        result.deletedCount++;
+      if (await this.isRootFileFixture(mcpJson, scenarioFiles, rootPath)) {
+        try {
+          await fs.promises.unlink(mcpJson);
+          result.deletedCount++;
+        } catch {
+          // Ignorer
+        }
       }
     }
+
+    // Nettoyer uniquement les répertoires devenus entièrement vides (ne détruit jamais le travail utilisateur)
+    this.cleanEmptyDirectories(path.join(rootPath, '.agents'));
+    this.cleanEmptyDirectories(path.join(rootPath, '.claude'));
 
     // Nettoyage sécurisé du fichier de test doublon dans le profil global
     if (target === 'all' || target === 'antigravity') {
@@ -288,7 +302,6 @@ export class ScenarioManager {
         // Ignorer
       }
     }
-
     return result;
   }
 

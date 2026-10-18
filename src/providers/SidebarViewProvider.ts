@@ -132,6 +132,15 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
           break;
         }
 
+        case 'compareDuplicate': {
+          await StateManager.compareDuplicate(
+            message.payload.globalPath,
+            message.payload.localPath,
+            message.payload.title
+          );
+          break;
+        }
+
         case 'openInExplorer': {
           await StateManager.openInExplorer(message.payload.path);
           break;
@@ -187,16 +196,25 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
           const rootPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
           if (rootPath) {
             try {
+              const choice = await vscode.window.showWarningMessage(
+                "Êtes-vous sûr de vouloir réinitialiser les scénarios d'essai du Banc d'Essai ? Vos règles et compétences personnelles seront préservées.",
+                { modal: true },
+                'Nettoyer'
+              );
+              if (choice !== 'Nettoyer') {
+                break;
+              }
+
               const state = await StateManager.loadFullState(false);
               const result = await ScenarioManager.clean(rootPath, 'all', state.localResources);
 
               if (result.preservedCount > 0) {
                 vscode.window.showWarningMessage(
-                  `🧹 Nettoyage terminé : ${result.deletedCount} élément(s) synchronisé(s) supprimé(s).\n` +
-                  `🛡️ ${result.preservedCount} élément(s) non synchronisé(s) protégé(s) (${result.preservedNames.join(', ')}).`
+                  `🧹 Nettoyage terminé : ${result.deletedCount} élément(s) de test supprimé(s).\n` +
+                  `🛡️ ${result.preservedCount} élément(s) de projet protégé(s) (${result.preservedNames.join(', ')}).`
                 );
               } else {
-                vscode.window.showInformationMessage(`🧹 Espace de travail réinitialisé (${result.deletedCount} éléments supprimés).`);
+                vscode.window.showInformationMessage(`🧹 Espace de travail réinitialisé (${result.deletedCount} éléments de scénario supprimés).`);
               }
               await StateManager.loadFullState(true);
             } catch (err: unknown) {
@@ -244,6 +262,18 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
             vscode.window.showInformationMessage(`Catalogue Source mis à jour : ${newPath}`);
             await StateManager.loadFullState(true);
           }
+          break;
+        }
+
+        case 'toggleDebugTiming': {
+          const current = StateManager.isDebugTimingActive();
+          const target = message.payload?.enabled !== undefined ? message.payload.enabled : !current;
+          await StateManager.setDebugTiming(target);
+          break;
+        }
+
+        case 'clearTimingLogs': {
+          StateManager.clearTimingLogs();
           break;
         }
       }

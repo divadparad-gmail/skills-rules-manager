@@ -3,6 +3,46 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { test, describe, before, after } from 'node:test';
+
+// Simulation de l'environnement VS Code pour l'exécution des tests unitaires hors VS Code
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const Module = require('module');
+const origResolve = Module._resolveFilename;
+Module._resolveFilename = function (request: string, ...args: any[]) {
+  if (request === 'vscode') {
+    return 'vscode';
+  }
+  return origResolve.call(this, request, ...args);
+};
+require.cache['vscode'] = {
+  id: 'vscode',
+  filename: 'vscode',
+  loaded: true,
+  exports: {
+    window: {
+      createOutputChannel: (name: string) => ({
+        appendLine: () => {},
+        dispose: () => {},
+      }),
+      showInformationMessage: () => Promise.resolve(),
+      showErrorMessage: () => Promise.resolve(),
+      showWarningMessage: () => Promise.resolve(),
+    },
+    workspace: {
+      workspaceFolders: [],
+      getConfiguration: () => ({
+        get: (key: string, def: any) => def,
+      }),
+    },
+    env: { appName: 'Antigravity IDE' },
+    Uri: {
+      file: (f: string) => ({ fsPath: f, scheme: 'file' }),
+    },
+    commands: {
+      executeCommand: () => Promise.resolve(),
+    },
+  },
+} as any;
 import {
   IntegrityService,
   areContentsIdentical,
@@ -495,10 +535,10 @@ describe('Suite de Tests : Intégrité & Synchronisation NAS vs Local', () => {
     assert.strictEqual(NasScanner.getUncHost('C:\\Users\\LocalUser'), null);
   });
 
-  test('18. Guide & Bonnes Pratiques IA (v0.3.0) : intégrité des templates et composants webview', () => {
+  test('18. Guide & Bonnes Pratiques IA (v0.3.11) : intégrité des templates et composants webview', () => {
     const rootDir = path.resolve(__dirname, '../..');
     const pkg = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8'));
-    assert.strictEqual(pkg.version, '0.3.0', 'package.json doit être en version 0.3.0');
+    assert.strictEqual(pkg.version, '0.3.11', 'package.json doit être en version 0.3.11');
 
     const sidebarHtml = fs.readFileSync(path.join(rootDir, 'src/webview/sidebar.html'), 'utf8');
     const dashboardHtml = fs.readFileSync(path.join(rootDir, 'src/webview/dashboard.html'), 'utf8');
@@ -513,11 +553,22 @@ describe('Suite de Tests : Intégrité & Synchronisation NAS vs Local', () => {
     assert.ok(sidebarHtml.includes('pillClaude'), 'sidebar.html doit contenir pillClaude');
     assert.ok(sidebarHtml.includes('pillAntigravity'), 'sidebar.html doit contenir pillAntigravity');
 
+    // Vérification du contrôle interactif Chrono & Diagnostic dans Banc d'Essai
+    assert.ok(sidebarHtml.includes('id="btnToggleDebugTiming"'), 'sidebar.html doit contenir btnToggleDebugTiming');
+    assert.ok(sidebarHtml.includes('id="timingConsoleWrapper"'), 'sidebar.html doit contenir timingConsoleWrapper');
+    assert.ok(sidebarHtml.includes('id="timingConsoleOutput"'), 'sidebar.html doit contenir timingConsoleOutput');
+    assert.ok(sidebarHtml.includes('id="btnClearTimingLogs"'), 'sidebar.html doit contenir btnClearTimingLogs');
+    assert.ok(stylesCss.includes('.timing-toggle-pill'), 'styles.css doit contenir .timing-toggle-pill');
+    assert.ok(stylesCss.includes('.timing-console-wrapper'), 'styles.css doit contenir .timing-console-wrapper');
+    assert.ok(mainJs.includes('btnToggleDebugTiming'), 'main.js doit gérer btnToggleDebugTiming');
+
     // Vérification de la page cheatsheet.html (onglet plein éditeur à droite)
     assert.ok(cheatsheetHtml.includes('modalTabClaude'), 'cheatsheet.html doit contenir modalTabClaude');
     assert.ok(cheatsheetHtml.includes('modalTabAntigravity'), 'cheatsheet.html doit contenir modalTabAntigravity');
     assert.ok(cheatsheetHtml.includes('contentClaude'), 'cheatsheet.html doit contenir contentClaude');
     assert.ok(cheatsheetHtml.includes('contentAntigravity'), 'cheatsheet.html doit contenir contentAntigravity');
+    assert.ok(cheatsheetHtml.includes('Comment se calcule le total de tokens des règles (Claude Code)'), 'cheatsheet.html doit expliquer le calcul tokens Claude');
+    assert.ok(cheatsheetHtml.includes('Comment se calcule le total de tokens des règles (Antigravity)'), 'cheatsheet.html doit expliquer le calcul tokens Antigravity');
     assert.ok(cheatsheetHtml.includes('workspace-tool-pills'), 'cheatsheet.html doit utiliser le style pilules workspace-tool-pills');
 
     // Vérification du script cheatsheet.js
@@ -1159,6 +1210,1684 @@ globs: "*.ts"
     assert.strictEqual(fs.existsSync(geminiPath), false, 'GEMINI.md de scénario doit être nettoyé');
     assert.strictEqual(cleanResult.deletedCount, 1, 'GEMINI.md doit être comptabilisé dans deletedCount');
     assert.strictEqual(cleanResult.preservedCount, 0, 'Aucun fichier ne doit être préservé');
+  });
+
+  // --------------------------------------------------------------------------
+  // Test 32 : Protection de ScenarioManager.clean contre la destruction récursive
+  // --------------------------------------------------------------------------
+  test('32. Sécurité Banc d\'essai : clean() ne supprime JAMAIS récursivement .agents ou le travail du dev', async () => {
+    const ws = path.join(tempBaseDir, 'ws-safe-clean-no-nuke');
+    const userRulesDir = path.join(ws, '.agents', 'rules');
+    const userSkillDir = path.join(ws, '.agents', 'skills', 'mon-skill', 'scripts');
+    await fs.promises.mkdir(userRulesDir, { recursive: true });
+    await fs.promises.mkdir(userSkillDir, { recursive: true });
+
+    const userRule = path.join(userRulesDir, 'mon-guide-perso.md');
+    const userSkillMd = path.join(ws, '.agents', 'skills', 'mon-skill', 'SKILL.md');
+    const userScript = path.join(userSkillDir, 'helper.sh');
+    const realGeminiMd = path.join(ws, 'GEMINI.md');
+
+    await fs.promises.writeFile(userRule, '# Règle personnelle de dev', 'utf8');
+    await fs.promises.writeFile(userSkillMd, '# Skill personnel de dev', 'utf8');
+    await fs.promises.writeFile(userScript, '#!/bin/bash\necho "ok"', 'utf8');
+    await fs.promises.writeFile(realGeminiMd, '# Vrai GEMINI.md du projet sans fixture', 'utf8');
+
+    // Appel de clean sans manifest et sans localItems (le cas qui détruisait tout avant la correction !)
+    const cleanResult = await ScenarioManager.clean(ws, 'all');
+
+    // Vérification de survie absolue
+    assert.strictEqual(fs.existsSync(userRule), true, 'La règle utilisateur doit TOUJOURS exister');
+    assert.strictEqual(fs.existsSync(userSkillMd), true, 'Le skill utilisateur doit TOUJOURS exister');
+    assert.strictEqual(fs.existsSync(userScript), true, 'Le script annexe utilisateur doit TOUJOURS exister');
+    assert.strictEqual(fs.existsSync(realGeminiMd), true, 'Le GEMINI.md utilisateur doit TOUJOURS exister');
+    assert.strictEqual(fs.existsSync(path.join(ws, '.agents')), true, 'Le dossier .agents doit TOUJOURS exister');
+    assert.strictEqual(cleanResult.deletedCount, 0, 'Aucun fichier utilisateur ne doit être supprimé');
+  });
+
+  // --------------------------------------------------------------------------
+  // Test 33 : Nettoyage ciblé du scénario sans localItems via le manifeste
+  // --------------------------------------------------------------------------
+  test('33. Nettoyage ciblé du scénario sans localItems : supprime uniquement les fichiers du manifeste', async () => {
+    const ws = path.join(tempBaseDir, 'ws-manifest-targeted-clean');
+    const rulesDir = path.join(ws, '.agents', 'rules');
+    await fs.promises.mkdir(rulesDir, { recursive: true });
+
+    const fixtureRule = path.join(rulesDir, 'fixture-rule.md');
+    const userRule = path.join(rulesDir, 'user-rule.md');
+    await fs.promises.writeFile(fixtureRule, '# Fixture', 'utf8');
+    await fs.promises.writeFile(userRule, '# Vrai travail', 'utf8');
+
+    const manifestPath = path.join(ws, ScenarioManager.MANIFEST_FILE);
+    const manifestData = {
+      target: 'antigravity',
+      deployedAt: new Date().toISOString(),
+      files: ['.agents/rules/fixture-rule.md'],
+    };
+    await fs.promises.writeFile(manifestPath, JSON.stringify(manifestData), 'utf8');
+
+    // Exécution du nettoyage sans localItems
+    const cleanResult = await ScenarioManager.clean(ws, 'antigravity');
+
+    assert.strictEqual(fs.existsSync(fixtureRule), false, 'La fixture listée au manifeste doit être supprimée');
+    assert.strictEqual(fs.existsSync(userRule), true, 'Le fichier utilisateur hors manifeste doit être préservé');
+    assert.strictEqual(fs.existsSync(manifestPath), false, 'Le manifeste doit être nettoyé');
+    assert.strictEqual(cleanResult.deletedCount, 1, 'Exactement 1 fichier de manifeste supprimé');
+  });
+
+  // --------------------------------------------------------------------------
+  // Test 34 : GlobalScanner anti-duplication de candidate dirs (Défaut n°2)
+  // --------------------------------------------------------------------------
+  test('34. GlobalScanner : aucune duplication de règles ou de tokens lors du scan global', async () => {
+    const { GlobalScanner } = await import('../src/services/GlobalScanner');
+    const fakeGlobal = path.join(tempBaseDir, 'fake-global-dir', 'config');
+    const rulesDir1 = path.join(fakeGlobal, 'rules');
+    await fs.promises.mkdir(rulesDir1, { recursive: true });
+
+    const ruleFile = path.join(rulesDir1, 'unique-rule.md');
+    await fs.promises.writeFile(ruleFile, '# Titre Règle\nConsigne de test de 100 caractères pour tester le décompte unique.', 'utf8');
+
+    const scanResult = await GlobalScanner.scan(fakeGlobal, 'antigravity');
+    const matches = scanResult.items.filter((i) => i.id === 'unique-rule');
+
+    assert.strictEqual(matches.length, 1, 'La règle ne doit apparaître qu\'une seule fois dans les items');
+    assert.strictEqual(scanResult.rulesStat.totalCount, 1, 'Le totalCount de règles doit être 1');
+  });
+
+  // --------------------------------------------------------------------------
+  // Test 35 : DuplicateService étanchéité par référence et type (Défaut n°3)
+  // --------------------------------------------------------------------------
+  test('35. DuplicateService : association étanche entre même type (skill vs skill, rule vs rule)', () => {
+    const { DuplicateService } = require('../src/services/DuplicateService');
+
+    const localSkill: ResourceItem = {
+      id: 'deploy',
+      name: 'Deploy Skill',
+      description: '',
+      type: 'skill',
+      scope: 'local',
+      enabled: true,
+      path: '/loc/skills/deploy',
+      targetTool: 'antigravity',
+      isFolder: true,
+      tokenCount: 50,
+    };
+
+    const localRule: ResourceItem = {
+      id: 'deploy',
+      name: 'Deploy Rule',
+      description: '',
+      type: 'rule',
+      scope: 'local',
+      enabled: true,
+      path: '/loc/rules/deploy.md',
+      targetTool: 'antigravity',
+      isFolder: false,
+      tokenCount: 100,
+    };
+
+    const globalSkill: ResourceItem = {
+      id: 'deploy',
+      name: 'Deploy Skill Twin',
+      description: '',
+      type: 'skill',
+      scope: 'global',
+      enabled: true,
+      path: '/glob/skills/deploy',
+      targetTool: 'antigravity',
+      isFolder: true,
+      tokenCount: 50,
+    };
+
+    const result = DuplicateService.detectDuplicates([globalSkill], [localSkill, localRule]);
+    assert.strictEqual(result.stats.totalDuplicates, 1, 'Seul le skill doit matcher avec le skill');
+    assert.strictEqual(result.enrichedLocal.length, 2, 'Il doit y avoir 2 items locaux');
+    const skillRes = result.enrichedLocal.find((i: ResourceItem) => i.type === 'skill');
+    const ruleRes = result.enrichedLocal.find((i: ResourceItem) => i.type === 'rule');
+    assert.ok(skillRes, 'skillRes doit exister');
+    assert.ok(ruleRes, 'ruleRes doit exister');
+    assert.strictEqual(skillRes.metadata?.duplicateInfo?.hasDuplicate, true, 'Le skill local a un doublon');
+    assert.strictEqual(ruleRes.metadata?.duplicateInfo?.hasDuplicate, undefined, 'La règle avec le même ID ne doit PAS être polluée');
+  });
+
+  // --------------------------------------------------------------------------
+  // Test 36 : extractFrontmatter avec tirets dans le texte (Défaut n°4)
+  // --------------------------------------------------------------------------
+  test('36. extractFrontmatter : supporte les tirets dans les descriptions sans tronquer prématurément', () => {
+    const { extractFrontmatter } = require('../src/utils/frontmatter');
+
+    const sample = `---
+name: rule-robust
+description: Règle avec des tirets --- au milieu de sa description
+trigger: glob
+globs: "*.ts"
+---
+
+# Titre du Document
+Corps du texte.`;
+
+    const parsed = extractFrontmatter(sample);
+    assert.strictEqual(parsed.metadata.name, 'rule-robust');
+    assert.strictEqual(parsed.metadata.description, 'Règle avec des tirets --- au milieu de sa description');
+    assert.strictEqual(parsed.metadata.trigger, 'glob');
+    assert.strictEqual(parsed.metadata.globs, '*.ts');
+    assert.ok(parsed.body.includes('# Titre du Document'), 'Le corps doit être préservé après le vrai délimiteur de fermeture');
+  });
+
+  // --------------------------------------------------------------------------
+  // Test 37 : NasScanner sécurité et annulation de timer (Défauts n°5 et n°6)
+  // --------------------------------------------------------------------------
+  test('37. NasScanner.checkNasAccess : retourne available: false sans faux positif et libère le timer', async () => {
+    const { NasScanner } = await import('../src/services/NasScanner');
+
+    const nonExistentPath = path.join(tempBaseDir, 'chemin_qui_n_existe_pas_du_tout_12345');
+    const result = await NasScanner.checkNasAccess(nonExistentPath, 500);
+
+    assert.strictEqual(result.available, false, 'Un dossier inexistant doit retourner available: false');
+    assert.ok(result.error, 'Un message d\'erreur explicite doit être fourni');
+  });
+
+  // --------------------------------------------------------------------------
+  // Test 38 : ToggleManager symétrie sur formats divers sans forcer .md (Défaut n°8)
+  // --------------------------------------------------------------------------
+  test('38. ToggleManager : bascule symétrique de fichiers personnalisés sans forcer .md', async () => {
+    const { ToggleManager } = await import('../src/services/ToggleManager');
+    const testDir = path.join(tempBaseDir, 'ws-toggle-custom-ext');
+    await fs.promises.mkdir(testDir, { recursive: true });
+
+    const txtFile = path.join(testDir, 'instructions.txt');
+    const txtDisabled = path.join(testDir, 'instructions.txt.disabled');
+    await fs.promises.writeFile(txtFile, 'Consignes en texte brut', 'utf8');
+
+    const itemTxt: ResourceItem = {
+      id: 'instructions',
+      name: 'instructions.txt',
+      description: '',
+      type: 'rule',
+      scope: 'local',
+      enabled: true,
+      path: txtFile,
+      targetTool: 'antigravity',
+      isFolder: false,
+    };
+
+    // 1. Désactiver -> doit créer instructions.txt.disabled (et NON instructions.txt.md.disabled !)
+    await ToggleManager.bulkToggle([itemTxt], 'local', 'rule', false);
+    assert.strictEqual(fs.existsSync(txtDisabled), true, 'instructions.txt.disabled doit exister');
+    assert.strictEqual(fs.existsSync(txtFile), false, 'instructions.txt doit avoir été renommé');
+
+    // 2. Réactiver -> doit retrouver instructions.txt
+    itemTxt.path = txtDisabled;
+    itemTxt.enabled = false;
+    await ToggleManager.bulkToggle([itemTxt], 'local', 'rule', true);
+    assert.strictEqual(fs.existsSync(txtFile), true, 'instructions.txt doit être restauré avec son extension d\'origine');
+    assert.strictEqual(fs.existsSync(txtDisabled), false, 'instructions.txt.disabled ne doit plus exister');
+  });
+
+  // --------------------------------------------------------------------------
+  // Test 39 : Tokenizer BPE (o200k_base via gpt-tokenizer) et repli heuristique
+  // --------------------------------------------------------------------------
+  test('39. Tokenizer : countTokens utilise BPE o200k_base avec repli sur Math.ceil(length/4)', () => {
+    const { countTokens } = require('../src/utils/tokenizer');
+
+    // Cas limites textuels
+    assert.strictEqual(countTokens(null), 0);
+    assert.strictEqual(countTokens(''), 0);
+    assert.strictEqual(countTokens(undefined), 0);
+
+    // Décompte BPE réel vérifié (gpt-tokenizer o200k_base)
+    assert.strictEqual(countTokens('abcd'), 1);
+    assert.strictEqual(countTokens('Hello, world!'), 4);
+    assert.strictEqual(countTokens('Bonjour le monde !'), 4);
+    assert.strictEqual(countTokens('a'.repeat(400)), 50); // BPE regroupe les motifs répétitifs
+  });
+
+  // --------------------------------------------------------------------------
+  // Test 40 : Durcissement clean() : jamais de suppression récursive de dossier sans localItems
+  // --------------------------------------------------------------------------
+  test('40. Sécurité ScenarioManager.clean() sans localItems : ne supprime JAMAIS de dossier utilisateur non vide', async () => {
+    const ws = path.join(tempBaseDir, 'ws-clean-hardening');
+    const userFolder = path.join(ws, '.agents', 'my-custom-skills');
+    await fs.promises.mkdir(userFolder, { recursive: true });
+
+    // Fichier de travail utilisateur qui ne doit JAMAIS disparaître
+    const userFile = path.join(userFolder, 'SKILL.md');
+    await fs.promises.writeFile(userFile, '# Mon skill utilisateur précieux\nNe pas supprimer !', 'utf8');
+
+    // Sous-dossier utilisateur additionnel
+    const nestedUserFolder = path.join(userFolder, 'scripts');
+    await fs.promises.mkdir(nestedUserFolder, { recursive: true });
+    const userScript = path.join(nestedUserFolder, 'build.sh');
+    await fs.promises.writeFile(userScript, '#!/bin/bash\necho "test"', 'utf8');
+
+    // On crée aussi un fichier racine utilisateur
+    const userDoc = path.join(ws, 'DOCUMENTATION.md');
+    await fs.promises.writeFile(userDoc, '# Doc importante', 'utf8');
+
+    // Création d'une structure simulée de test/scenarios dans le workspace qui déclare des dossiers
+    const scenariosBaseDir = path.join(ws, 'test', 'scenarios');
+    await fs.promises.mkdir(scenariosBaseDir, { recursive: true });
+
+    // Appel de ScenarioManager.clean() SANS localItems
+    await ScenarioManager.clean(ws, 'antigravity');
+
+    // Vérification absolue : les dossiers et fichiers utilisateur sont 100% préservés
+    assert.strictEqual(fs.existsSync(userFile), true, 'Le fichier utilisateur ne doit jamais être supprimé');
+    assert.strictEqual(fs.existsSync(userScript), true, 'Le script utilisateur imbriqué ne doit jamais être supprimé');
+    assert.strictEqual(fs.existsSync(userFolder), true, 'Le dossier utilisateur ne doit jamais être supprimé');
+    assert.strictEqual(fs.existsSync(nestedUserFolder), true, 'Le sous-dossier utilisateur ne doit jamais être supprimé');
+    assert.strictEqual(fs.existsSync(userDoc), true, 'Le document utilisateur racine ne doit jamais être supprimé');
+  });
+
+  // --------------------------------------------------------------------------
+  // Test 41 : Centralisation stricte des tokens : zéro Math.ceil(/4) hors tokenizer.ts
+  // --------------------------------------------------------------------------
+  test('41. Centralisation des tokens : aucun Math.ceil(.../4) résiduel dans le code source hors de tokenizer.ts', () => {
+    const srcDir = path.resolve(__dirname, '../../src');
+
+    function scanFiles(dir: string): string[] {
+      const results: string[] = [];
+      const entries = fs.readdirSync(dir, { withFileTypes: true });
+      for (const entry of entries) {
+        const fullPath = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          results.push(...scanFiles(fullPath));
+        } else if (entry.isFile() && (entry.name.endsWith('.ts') || entry.name.endsWith('.js'))) {
+          results.push(fullPath);
+        }
+      }
+      return results;
+    }
+
+    const allSourceFiles = scanFiles(srcDir);
+    const violatingFiles: Array<{ file: string; line: number; content: string }> = [];
+
+    for (const filePath of allSourceFiles) {
+      const normalizedPath = filePath.replace(/\\/g, '/');
+      if (normalizedPath.endsWith('src/utils/tokenizer.ts')) {
+        continue; // Seul point autorisé
+      }
+
+      const content = fs.readFileSync(filePath, 'utf8');
+      const lines = content.split(/\r?\n/);
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (line.includes('Math.ceil') && line.includes('/ 4') && !line.trim().startsWith('//') && !line.trim().startsWith('*')) {
+          violatingFiles.push({ file: path.relative(srcDir, filePath), line: i + 1, content: line.trim() });
+        }
+      }
+    }
+
+    assert.deepStrictEqual(
+      violatingFiles,
+      [],
+      `Aucun Math.ceil(.../4) ne doit subsister hors de tokenizer.ts. Fichiers en faute : ${JSON.stringify(violatingFiles)}`
+    );
+  });
+
+  // --------------------------------------------------------------------------
+  // Test 42 : Concordance absolue : chaque total de catégorie = somme des cartes
+  // --------------------------------------------------------------------------
+  test('42. Concordance absolue : chaque total de catégorie est strictement égal à la somme des cartes', async () => {
+    const { LocalScanner } = await import('../src/services/LocalScanner');
+
+    const wsDir = path.join(tempBaseDir, 'ws-token-concordance');
+    const skillsDir = path.join(wsDir, '.agents', 'skills');
+    const rulesDir = path.join(wsDir, '.agents', 'rules');
+    await fs.promises.mkdir(path.join(skillsDir, 'skill-alpha'), { recursive: true });
+    await fs.promises.mkdir(path.join(skillsDir, 'skill-beta'), { recursive: true });
+    await fs.promises.mkdir(rulesDir, { recursive: true });
+
+    // 1. Âme locale
+    const soulContent = '# Âme du projet de test\nInstructions prioritaires locales.';
+    await fs.promises.writeFile(path.join(wsDir, 'GEMINI.md'), soulContent, 'utf8');
+
+    // 2. Skills
+    await fs.promises.writeFile(
+      path.join(skillsDir, 'skill-alpha', 'SKILL.md'),
+      '---\nname: skill-alpha\ndescription: Premier skill de test\n---\n# Alpha\nContenu du skill alpha.',
+      'utf8'
+    );
+    await fs.promises.writeFile(
+      path.join(skillsDir, 'skill-beta', 'SKILL.md'),
+      '---\nname: skill-beta\ndescription: Deuxième skill de test avec plus de consignes\n---\n# Beta\nContenu beta détaillé.',
+      'utf8'
+    );
+
+    // 3. Règles permanentes
+    await fs.promises.writeFile(
+      path.join(rulesDir, 'rule-perm-one.md'),
+      '# Règle Permanente 1\nDirectives strictes pour le code TypeScript.',
+      'utf8'
+    );
+    await fs.promises.writeFile(
+      path.join(rulesDir, 'rule-perm-two.md'),
+      '# Règle Permanente 2\nArchitecture et design patterns recommandés.',
+      'utf8'
+    );
+
+    // 4. Règle conditionnelle
+    await fs.promises.writeFile(
+      path.join(rulesDir, 'rule-cond-one.md'),
+      '---\ndescription: Règle conditionnelle pour les tests\ntrigger: glob\nglobs: "*.spec.ts"\n---\n# Règle Tests\nConsignes conditionnelles très détaillées.',
+      'utf8'
+    );
+
+    const scanResult = await LocalScanner.scan({
+      hasWorkspace: true,
+      workspacePath: wsDir,
+      tool: 'antigravity',
+      agentsDir: '.agents',
+      claudeDir: null,
+      hasClaudeMd: false,
+    });
+
+    // Extraction des cartes par type
+    const skillCards = scanResult.items.filter((i) => (i.type === 'skill' || i.type === 'workflow') && i.enabled);
+    const soulCards = scanResult.items.filter((i) => i.type === 'soul' && i.enabled);
+    const permRuleCards = scanResult.items.filter((i) => i.type === 'rule' && i.enabled && !i.metadata?.isConditional);
+    const condRuleCards = scanResult.items.filter((i) => i.type === 'rule' && i.enabled && i.metadata?.isConditional);
+
+    // Vérification de concordance Skills : total === somme des cartes
+    const expectedSkillsTotal = skillCards.reduce((acc, i) => acc + (i.tokenCount || 0), 0);
+    assert.strictEqual(
+      scanResult.skillsStat.tokenCount,
+      expectedSkillsTotal,
+      `skillsStat.tokenCount (${scanResult.skillsStat.tokenCount}) doit être STRICTEMENT égal à la somme des cartes (${expectedSkillsTotal})`
+    );
+
+    // Vérification de concordance Âme : total === somme des cartes
+    const expectedSoulTotal = soulCards.reduce((acc, i) => acc + (i.tokenCount || 0), 0);
+    assert.strictEqual(
+      scanResult.soulStat.tokenCount,
+      expectedSoulTotal,
+      `soulStat.tokenCount (${scanResult.soulStat.tokenCount}) doit être STRICTEMENT égal à la somme des cartes (${expectedSoulTotal})`
+    );
+
+    // Vérification de concordance Règles conditionnelles : conditionalTokenCount === somme des cartes conditionnelles
+    const expectedCondTotal = condRuleCards.reduce((acc, i) => acc + (i.tokenCount || 0), 0);
+    assert.strictEqual(
+      scanResult.rulesStat.conditionalTokenCount,
+      expectedCondTotal,
+      `rulesStat.conditionalTokenCount (${scanResult.rulesStat.conditionalTokenCount}) doit être STRICTEMENT égal à la somme des cartes conditionnelles (${expectedCondTotal})`
+    );
+
+    // Vérification de concordance Règles au boot : permanentes + 20 tokens par conditionnelle
+    const expectedRulesBoot = permRuleCards.reduce((acc, i) => acc + (i.tokenCount || 0), 0) + (condRuleCards.length * 20);
+    assert.strictEqual(
+      scanResult.rulesStat.tokenCount,
+      expectedRulesBoot,
+      `rulesStat.tokenCount (${scanResult.rulesStat.tokenCount}) doit être STRICTEMENT égal au boot attendu (${expectedRulesBoot})`
+    );
+  });
+
+  // --------------------------------------------------------------------------
+  // Test 43 : Cache de décompte de tokens par (chemin + mtime + taille)
+  // --------------------------------------------------------------------------
+  test('43. Tokenizer Cache : deux appels identiques = 1 seul encodage, invalidation sur mtime/taille', async () => {
+    const {
+      countTokensForFile,
+      clearTokenCache,
+      resetTokenizerMetrics,
+      getTokenizerMetrics,
+      getTokenCacheSize,
+    } = await import('../src/utils/tokenizer');
+
+    clearTokenCache();
+    resetTokenizerMetrics();
+
+    const dummyFile = path.join(tempBaseDir, 'cached-token-file.md');
+    const content1 = '# Titre 1\nContenu court pour tester le cache de décompte BPE o200k.';
+    await fs.promises.writeFile(dummyFile, content1, 'utf8');
+    const stat1 = await fs.promises.stat(dummyFile);
+
+    // 1er appel : Cache Miss -> Doit encoder
+    const count1 = countTokensForFile(dummyFile, stat1.size, stat1.mtimeMs, content1);
+    assert.ok(count1 > 0);
+    let metrics = getTokenizerMetrics();
+    assert.strictEqual(metrics.encodedCount, 1, '1er appel doit encoder');
+    assert.strictEqual(metrics.cachedCount, 0, '1er appel ne doit pas être servi du cache');
+    assert.strictEqual(getTokenCacheSize(), 1, 'Le cache doit contenir 1 entrée');
+
+    // 2ème appel avec mêmes (chemin, mtime, taille) : Cache Hit -> Ne doit PAS ré-encoder
+    const count2 = countTokensForFile(dummyFile, stat1.size, stat1.mtimeMs, content1);
+    assert.strictEqual(count2, count1, 'Le résultat doit être identique');
+    metrics = getTokenizerMetrics();
+    assert.strictEqual(metrics.encodedCount, 1, 'encodedCount ne doit pas avoir augmenté');
+    assert.strictEqual(metrics.cachedCount, 1, 'cachedCount doit être passé à 1');
+
+    // 3ème appel après modification du mtime : Cache Invalidation -> Ré-encodage
+    const newMtime = stat1.mtimeMs + 5000;
+    const count3 = countTokensForFile(dummyFile, stat1.size, newMtime, content1);
+    assert.strictEqual(count3, count1);
+    metrics = getTokenizerMetrics();
+    assert.strictEqual(metrics.encodedCount, 2, 'Un changement de mtime doit forcer le ré-encodage');
+    assert.strictEqual(metrics.cachedCount, 1);
+
+    // 4ème appel après modification du contenu/taille : Cache Invalidation -> Ré-encodage
+    const content2 = '# Titre 1\nContenu beaucoup plus long qui modifie la taille du fichier.';
+    await fs.promises.writeFile(dummyFile, content2, 'utf8');
+    const stat2 = await fs.promises.stat(dummyFile);
+    const count4 = countTokensForFile(dummyFile, stat2.size, stat2.mtimeMs, content2);
+    assert.ok(count4 !== count1);
+    metrics = getTokenizerMetrics();
+    assert.strictEqual(metrics.encodedCount, 3, 'Un changement de taille doit forcer le ré-encodage');
+  });
+
+  // --------------------------------------------------------------------------
+  // Test 44 : Repli / chargement paresseux et résilience de gpt-tokenizer
+  // --------------------------------------------------------------------------
+  test('44. Tokenizer Lazy & Fallback : vrai BPE quand dispo, repli Math.ceil(length/4) sans crash si indisponible', async () => {
+    const {
+      countTokens,
+      warmupTokenizer,
+      _setEncoderForTesting,
+      _resetEncoderStateForTesting,
+    } = await import('../src/utils/tokenizer');
+
+    // 1. Sans préchauffage explicite préalable, countTokens fonctionne sans planter
+    const sampleText = 'Antigravity IDE et Claude Code partagent des règles modulaires.';
+    const normalCount = countTokens(sampleText);
+    assert.ok(normalCount > 0, 'countTokens doit renvoyer un décompte valide');
+
+    // 2. Le préchauffage warmupTokenizer s\'exécute sans erreur
+    assert.doesNotThrow(() => {
+      warmupTokenizer();
+    });
+
+    // 3. Simulation d\'échec de require(\'gpt-tokenizer\')
+    _setEncoderForTesting(null, true);
+    const fallbackCount = countTokens(sampleText);
+    const expectedFallback = Math.ceil(sampleText.length / 4);
+    assert.strictEqual(
+      fallbackCount,
+      expectedFallback,
+      `En cas d'échec de l'encodeur, doit basculer sur Math.ceil(length / 4) = ${expectedFallback}`
+    );
+
+    // 4. Aucun crash si du texte vide ou null est passé
+    assert.strictEqual(countTokens(''), 0);
+    assert.strictEqual(countTokens(null), 0);
+    assert.strictEqual(countTokens(undefined), 0);
+
+    // Rétablissement de l\'état initial
+    _resetEncoderStateForTesting();
+    const restoredCount = countTokens(sampleText);
+    assert.strictEqual(restoredCount, normalCount, 'L\'encodeur normal doit être rétabli');
+  });
+
+  // --------------------------------------------------------------------------
+  // Test 45 : Utilitaire de Debounce pour rafales de FileSystemWatcher
+  // --------------------------------------------------------------------------
+  test('45. Debounce Utility : une rafale de N appels rapprochés ne déclenche l\'exécution qu\'une seule fois', async () => {
+    const { debounce } = await import('../src/utils/debounce');
+
+    let executionCount = 0;
+    let lastValue = '';
+
+    const debouncedFn = debounce((val: string) => {
+      executionCount++;
+      lastValue = val;
+    }, 50);
+
+    // Rafale de 10 appels rapprochés
+    for (let i = 1; i <= 10; i++) {
+      debouncedFn(`call-${i}`);
+    }
+
+    assert.strictEqual(debouncedFn.pending(), true, 'Le debounce doit être en attente');
+    assert.strictEqual(executionCount, 0, 'La fonction ne doit pas encore avoir été exécutée');
+
+    // Attente du déclenchement
+    await new Promise((resolve) => setTimeout(resolve, 80));
+
+    assert.strictEqual(debouncedFn.pending(), false, 'Le debounce ne doit plus être en attente');
+    assert.strictEqual(executionCount, 1, 'La fonction ne doit avoir été exécutée qu\'une seule fois pour toute la rafale');
+    assert.strictEqual(lastValue, 'call-10', 'La dernière valeur transmise doit avoir été conservée');
+
+    // Test de la méthode cancel()
+    debouncedFn('will-be-cancelled');
+    assert.strictEqual(debouncedFn.pending(), true);
+    debouncedFn.cancel();
+    assert.strictEqual(debouncedFn.pending(), false);
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    assert.strictEqual(executionCount, 1, 'Un appel annulé ne doit pas s\'exécuter');
+
+    // Test de la méthode flush()
+    debouncedFn('flushed-call');
+    debouncedFn.flush();
+    assert.strictEqual(executionCount, 2, 'flush() doit forcer l\'exécution immédiate');
+    assert.strictEqual(lastValue, 'flushed-call');
+  });
+
+  // --------------------------------------------------------------------------
+  // Test 46 : Journal de performance StateManager et non-régression concordance
+  // --------------------------------------------------------------------------
+  test('46. Journal de durée de scan StateManager & non-régression concordance cartes-totaux avec cache actif', async () => {
+    const { StateManager } = await import('../src/services/StateManager');
+    const { clearTokenCache } = await import('../src/utils/tokenizer');
+
+    clearTokenCache();
+    StateManager.setDebugTimingForTesting(true);
+
+    // Exécution du scan
+    const state1 = await StateManager.loadFullState(true);
+    assert.ok(state1, 'Le scan doit réussir');
+    assert.ok(StateManager.lastTimingLog, 'Un log de timing doit avoir été produit');
+
+    // Format exact : Scan terminé en {total} ms — {N} fichiers, {E} encodés, {C} servis du cache, encodage cumulé {Y} ms.
+    const timingRegex = /^Scan terminé en \d+ ms — \d+ fichiers, \d+ encodés, \d+ servis du cache, encodage cumulé \d+ ms\.$/;
+    assert.match(
+      StateManager.lastTimingLog,
+      timingRegex,
+      `Le log généré ("${StateManager.lastTimingLog}") doit correspondre exactement au format requis`
+    );
+
+    // 2ème scan consécutif (sans modification) : les fichiers doivent être servis du cache
+    await StateManager.loadFullState(true);
+    assert.ok(StateManager.lastTimingLog, 'Un second log doit avoir été produit');
+    assert.match(StateManager.lastTimingLog, timingRegex);
+
+    // Non-régression : concordance cartes-totaux (identique au Test 42)
+    const wsDir = path.join(tempBaseDir, 'ws-concordance-test-46');
+    await fs.promises.mkdir(path.join(wsDir, '.agents', 'skills', 'skill-demo'), { recursive: true });
+    await fs.promises.mkdir(path.join(wsDir, '.agents', 'rules'), { recursive: true });
+    await fs.promises.writeFile(
+      path.join(wsDir, '.agents', 'skills', 'skill-demo', 'SKILL.md'),
+      '---\nname: skill-demo\ndescription: Test skill cache\n---\n# Demo\nTest content.',
+      'utf8'
+    );
+    await fs.promises.writeFile(
+      path.join(wsDir, '.agents', 'rules', 'rule-perm.md'),
+      '# Règle Permanente\nContenu permanent testé.',
+      'utf8'
+    );
+    await fs.promises.writeFile(
+      path.join(wsDir, '.agents', 'rules', 'rule-cond.md'),
+      '---\ndescription: Cond\ntrigger: glob\nglobs: "*.ts"\n---\n# Cond\nContenu conditionnel.',
+      'utf8'
+    );
+
+    const scanResult = await LocalScanner.scan({
+      hasWorkspace: true,
+      workspacePath: wsDir,
+      tool: 'antigravity',
+      agentsDir: '.agents',
+      claudeDir: null,
+      hasClaudeMd: false,
+    });
+
+    const skillCards = scanResult.items.filter((i) => (i.type === 'skill' || i.type === 'workflow') && i.enabled);
+    const permRuleCards = scanResult.items.filter((i) => i.type === 'rule' && i.enabled && !i.metadata?.isConditional);
+    const condRuleCards = scanResult.items.filter((i) => i.type === 'rule' && i.enabled && i.metadata?.isConditional);
+
+    const expectedSkillsTotal = skillCards.reduce((acc, i) => acc + (i.tokenCount || 0), 0);
+    assert.strictEqual(scanResult.skillsStat.tokenCount, expectedSkillsTotal);
+
+    const expectedCondTotal = condRuleCards.reduce((acc, i) => acc + (i.tokenCount || 0), 0);
+    assert.strictEqual(scanResult.rulesStat.conditionalTokenCount, expectedCondTotal);
+
+    const expectedRulesBoot = permRuleCards.reduce((acc, i) => acc + (i.tokenCount || 0), 0) + (condRuleCards.length * 20);
+    assert.strictEqual(scanResult.rulesStat.tokenCount, expectedRulesBoot);
+
+    // Nettoyage de l'override de test
+    StateManager.setDebugTimingForTesting(null);
+  });
+
+  // --------------------------------------------------------------------------
+  // Test 47 : Contrôle Interactif du Chrono Anti-Lag (Bouton ON/OFF + Terminal)
+  // --------------------------------------------------------------------------
+  test('47. Chrono & Diagnostic Interactif : setDebugTiming bascule isDebugTiming, clearTimingLogs vide l\'historique', async () => {
+    const { StateManager } = await import('../src/services/StateManager');
+
+    // 1. Activation interactive du debug timing
+    await StateManager.setDebugTiming(true);
+    let state = await StateManager.loadFullState(true);
+    assert.strictEqual(state.isDebugTiming, true, 'state.isDebugTiming doit être activé');
+    assert.ok(state.lastTimingLog, 'state.lastTimingLog doit contenir le rapport du scan');
+    assert.ok(state.timingHistory && state.timingHistory.length > 0, 'state.timingHistory doit contenir au moins 1 entrée');
+
+    // 2. Vidage de l'historique via clearTimingLogs()
+    StateManager.clearTimingLogs();
+    assert.strictEqual(StateManager.getTimingHistory().length, 0, 'getTimingHistory doit être vide après clear');
+    assert.strictEqual(StateManager.lastTimingLog, null, 'lastTimingLog doit être null après clear');
+
+    // 3. Désactivation interactive
+    await StateManager.setDebugTiming(false);
+    state = await StateManager.loadFullState(true);
+    assert.strictEqual(state.isDebugTiming, false, 'state.isDebugTiming doit être désactivé');
+
+    // Nettoyage de l'override de test
+    StateManager.setDebugTimingForTesting(null);
+  });
+
+  // --------------------------------------------------------------------------
+  // Test 48 : FileSystemWatcher - Couverture des fichiers Âme racine & dossiers
+  // --------------------------------------------------------------------------
+  test('48. FileSystemWatcher : motifs distincts pour dossiers (.agents/.claude) et fichiers âme racine (CLAUDE/GEMINI/AGENTS)', async () => {
+    const { WATCHER_PATTERNS } = await import('../src/extension');
+
+    // 1. Vérification des motifs exportés
+    assert.strictEqual(
+      WATCHER_PATTERNS.configFolders,
+      '**/{.agents,.agent,.claude}/**',
+      'Le watcher des dossiers de config doit surveiller tout le contenu de .agents, .agent et .claude'
+    );
+    assert.strictEqual(
+      WATCHER_PATTERNS.soulFiles,
+      '**/{CLAUDE.md,GEMINI.md,AGENTS.md}',
+      'Le watcher des âmes doit cibler spécifiquement les fichiers CLAUDE.md, GEMINI.md et AGENTS.md sans suffixe /**'
+    );
+
+    // 2. Vérification que l'ancien motif avec /** ne pouvait pas matcher les fichiers racine
+    const oldRegex = /^.*[\\/](?:\.agents|\.agent|\.claude|CLAUDE\.md|GEMINI\.md)[\\/].+$/i;
+    assert.strictEqual(oldRegex.test('CLAUDE.md'), false, 'L\'ancien motif échouait sur CLAUDE.md à la racine');
+    assert.strictEqual(oldRegex.test('C:/project/CLAUDE.md'), false, 'L\'ancien motif échouait sur C:/project/CLAUDE.md');
+
+    // 3. Vérification du nouveau motif soulFiles sur les fichiers isolés
+    const soulRegex = /(?:^|[\\/])(CLAUDE\.md|GEMINI\.md|AGENTS\.md)$/i;
+    assert.strictEqual(soulRegex.test('CLAUDE.md'), true, 'soulFiles doit matcher CLAUDE.md');
+    assert.strictEqual(soulRegex.test('C:/workspace/CLAUDE.md'), true, 'soulFiles doit matcher C:/workspace/CLAUDE.md');
+    assert.strictEqual(soulRegex.test('GEMINI.md'), true, 'soulFiles doit matcher GEMINI.md');
+    assert.strictEqual(soulRegex.test('C:/workspace/GEMINI.md'), true, 'soulFiles doit matcher C:/workspace/GEMINI.md');
+    assert.strictEqual(soulRegex.test('AGENTS.md'), true, 'soulFiles doit matcher AGENTS.md');
+    assert.strictEqual(soulRegex.test('C:/workspace/AGENTS.md'), true, 'soulFiles doit matcher C:/workspace/AGENTS.md');
+    assert.strictEqual(soulRegex.test('C:/workspace/README.md'), false, 'soulFiles ne doit pas matcher README.md');
+
+    // 4. Vérification du motif configFolders sur les contenus internes
+    const configRegex = /[\\/](?:\.agents|\.agent|\.claude)[\\/].+$/i;
+    assert.strictEqual(configRegex.test('C:/workspace/.agents/rules/my-rule.md'), true);
+    assert.strictEqual(configRegex.test('C:/workspace/.claude/skills/demo/SKILL.md'), true);
+    assert.strictEqual(configRegex.test('C:/workspace/CLAUDE.md'), false);
+  });
+
+  // --------------------------------------------------------------------------
+  // Test 49 : Filtre « doublons » réel (visibilité simultanée des N paires, Âme comprise)
+  // --------------------------------------------------------------------------
+  test('49. Filtre doublons réel : visibilité simultanée de toutes les paires actives (Âme comprise) et réversibilité', async () => {
+    // Importer main.js pour accéder aux fonctions de filtrage de la webview
+    const mainPath = path.resolve(__dirname, '../../src/webview/main.js');
+    delete require.cache[mainPath];
+    const mainModule = require(mainPath);
+    const { filterItems, sortItemsWithPinnedSoul, setFilterState } = mainModule;
+
+    // Jeu de test : 4 types variés de doublons actifs (Âme, règle, skill, workflow)
+    // + 1 doublon inactif (bothEnabled: false)
+    // + 1 ressource sans doublon
+    const items: ResourceItem[] = [
+      {
+        id: 'GEMINI.md',
+        name: 'GEMINI.md',
+        description: 'Âme locale Antigravity',
+        type: 'soul',
+        scope: 'local',
+        enabled: true,
+        path: '/mock/GEMINI.md',
+        targetTool: 'antigravity',
+        isFolder: false,
+        metadata: {
+          isSoul: true,
+          duplicateInfo: {
+            hasDuplicate: true,
+            duplicateScope: 'global',
+            duplicatePath: '/global/GEMINI.md',
+            isTwinEnabled: true,
+            bothEnabled: true,
+            isIdentical: false,
+            wastedTokens: 1377,
+          },
+        },
+      },
+      {
+        id: 'rule-test-doublon',
+        name: 'Règle Test Doublon',
+        description: 'Règle en double',
+        type: 'rule',
+        scope: 'local',
+        enabled: true,
+        path: '/mock/rule-test-doublon.md',
+        targetTool: 'antigravity',
+        isFolder: false,
+        metadata: {
+          duplicateInfo: {
+            hasDuplicate: true,
+            duplicateScope: 'global',
+            duplicatePath: '/global/rule-test-doublon.md',
+            isTwinEnabled: true,
+            bothEnabled: true,
+            isIdentical: true,
+            wastedTokens: 250,
+          },
+        },
+      },
+      {
+        id: 'skill-brainstorming',
+        name: 'Brainstorming',
+        description: 'Skill brainstorming',
+        type: 'skill',
+        scope: 'local',
+        enabled: true,
+        path: '/mock/skill-brainstorming',
+        targetTool: 'antigravity',
+        isFolder: true,
+        metadata: {
+          duplicateInfo: {
+            hasDuplicate: true,
+            duplicateScope: 'global',
+            duplicatePath: '/global/skill-brainstorming',
+            isTwinEnabled: true,
+            bothEnabled: true,
+            isIdentical: true,
+            wastedTokens: 450,
+          },
+        },
+      },
+      {
+        id: 'wf-deploy',
+        name: 'Déploiement',
+        description: 'Workflow de déploiement',
+        type: 'workflow',
+        scope: 'local',
+        enabled: true,
+        path: '/mock/wf-deploy',
+        targetTool: 'antigravity',
+        isFolder: true,
+        metadata: {
+          duplicateInfo: {
+            hasDuplicate: true,
+            duplicateScope: 'global',
+            duplicatePath: '/global/wf-deploy',
+            isTwinEnabled: true,
+            bothEnabled: true,
+            isIdentical: true,
+            wastedTokens: 600,
+          },
+        },
+      },
+      // Ressource avec doublon INACTIF (twin non activé -> bothEnabled false)
+      {
+        id: 'rule-inactive-dup',
+        name: 'Règle Inactive Jumeau',
+        description: 'Règle inactive',
+        type: 'rule',
+        scope: 'local',
+        enabled: false,
+        path: '/mock/rule-inactive.md',
+        targetTool: 'antigravity',
+        isFolder: false,
+        metadata: {
+          duplicateInfo: {
+            hasDuplicate: true,
+            duplicateScope: 'global',
+            duplicatePath: '/global/rule-inactive.md',
+            isTwinEnabled: true,
+            bothEnabled: false,
+            isIdentical: true,
+            wastedTokens: 0,
+          },
+        },
+      },
+      // Ressource locale sans aucun doublon
+      {
+        id: 'rule-unique-local',
+        name: 'Règle Unique',
+        description: 'Règle locale unique',
+        type: 'rule',
+        scope: 'local',
+        enabled: true,
+        path: '/mock/rule-unique.md',
+        targetTool: 'antigravity',
+        isFolder: false,
+      },
+    ];
+
+    // 1. État normal (filtre doublon inactif) : les 6 items sont présents
+    setFilterState({ showDuplicatesOnly: false, currentFilter: 'all', searchQuery: '' });
+    const normalResult = filterItems(items);
+    assert.strictEqual(normalResult.length, 6, 'Sans filtre doublons, tous les éléments sont visibles');
+
+    // 2. Activation du filtre doublon
+    setFilterState({ showDuplicatesOnly: true, currentFilter: 'all', searchQuery: '' });
+    const dupResult = filterItems(items);
+
+    // Vérification : exactement 4 éléments conservés simultanément (pas un seul)
+    assert.strictEqual(dupResult.length, 4, 'Le filtre doublon doit conserver simultanément les 4 doublons actifs');
+
+    // Vérification de la présence de l'Âme (coquille 2 résolue)
+    const soulItem = dupResult.find((i: ResourceItem) => i.id === 'GEMINI.md');
+    assert.ok(soulItem, 'L\'Âme (GEMINI.md / CLAUDE.md) doit être présente dans les doublons affichés');
+    assert.strictEqual(soulItem.type, 'soul');
+
+    // Vérification de la présence de tous les types variés (règle, skill, workflow)
+    assert.ok(dupResult.some((i: ResourceItem) => i.type === 'rule' && i.id === 'rule-test-doublon'), 'La règle doublon doit être affichée');
+    assert.ok(dupResult.some((i: ResourceItem) => i.type === 'skill' && i.id === 'skill-brainstorming'), 'Le skill doublon doit être affiché');
+    assert.ok(dupResult.some((i: ResourceItem) => i.type === 'workflow' && i.id === 'wf-deploy'), 'Le workflow doublon doit être affiché');
+
+    // Vérification de l'exclusion des non-doublons ou doublons inactifs
+    assert.strictEqual(dupResult.some((i: ResourceItem) => i.id === 'rule-inactive-dup'), false, 'Le doublon inactif ne doit pas être affiché');
+    assert.strictEqual(dupResult.some((i: ResourceItem) => i.id === 'rule-unique-local'), false, 'L\'élément sans doublon ne doit pas être affiché');
+
+    // 3. Vérification du tri avec Âme épinglée en tête
+    const sortedDups = sortItemsWithPinnedSoul(dupResult);
+    assert.strictEqual(sortedDups[0].id, 'GEMINI.md', 'L\'Âme doit être épinglée en première position');
+
+    // 4. Réversibilité : la désactivation du filtre restaure l'ensemble des éléments
+    setFilterState({ showDuplicatesOnly: false, currentFilter: 'all', searchQuery: '' });
+    const restoredResult = filterItems(items);
+    assert.strictEqual(restoredResult.length, 6, 'La désactivation du filtre restaure immédiatement l\'ensemble des 6 éléments');
+
+    // 5. Vérification du code source de main.js : aucun firstDup.name assigné à searchInput.value
+    const mainJs = fs.readFileSync(path.join(__dirname, '../../src/webview/main.js'), 'utf8');
+    assert.ok(!mainJs.includes('searchInput.value = firstDup'), 'main.js ne doit plus injecter firstDup dans searchInput');
+    assert.ok(mainJs.includes('toggleDuplicateFilter'), 'main.js doit utiliser toggleDuplicateFilter');
+  });
+
+  // --------------------------------------------------------------------------
+  // Test 50 : Intégrité CSS du chemin UNC (.nas-config-path)
+  // --------------------------------------------------------------------------
+  test('50. Chemin UNC : .nas-config-path ne porte plus direction: rtl et préserve le préfixe \\\\', () => {
+    const rootDir = path.resolve(__dirname, '../..');
+    const stylesCss = fs.readFileSync(path.join(rootDir, 'src/webview/styles.css'), 'utf8');
+
+    // 1. Extraction du bloc .nas-config-path
+    const nasConfigPathMatch = stylesCss.match(/\.nas-config-path\s*\{([^}]+)\}/);
+    assert.ok(nasConfigPathMatch, '.nas-config-path doit être défini dans styles.css');
+
+    const blockContent = nasConfigPathMatch[1];
+
+    // 2. Vérification de l'absence de direction: rtl et text-align: left
+    assert.ok(
+      !blockContent.includes('direction: rtl'),
+      '.nas-config-path ne doit plus contenir "direction: rtl" (cause de l\'inversion UNC)'
+    );
+    assert.ok(
+      !blockContent.includes('text-align: left'),
+      '.nas-config-path ne doit plus contenir le "text-align: left" compensatoire'
+    );
+
+    // 3. Vérification de l'intégrité visuelle du chemin UNC
+    const sampleUnc = '\\\\Nas1\\DD2\\IA\\Antigravity-Templates';
+    assert.strictEqual(sampleUnc.startsWith('\\\\'), true, 'Le chemin UNC doit commencer par \\\\');
+    assert.strictEqual(sampleUnc.endsWith('\\\\'), false, 'Le chemin UNC ne doit pas avoir ses antislashs déplacés en fin');
+  });
+
+  // --------------------------------------------------------------------------
+  // Test 51 : Calcul de wastedTokens dans DuplicateService
+  // --------------------------------------------------------------------------
+  test('51. DuplicateService : wastedTokens d\'une paire correspond à la taille de la copie globale éteinte', () => {
+    const ws = path.join(tempBaseDir, 'ws-dup-tokens');
+    fs.mkdirSync(ws, { recursive: true });
+
+    const globalFile = path.join(ws, 'global.md');
+    const localFile = path.join(ws, 'local.md');
+    fs.writeFileSync(globalFile, '# Âme Globale\nInstructions globales étendues.', 'utf8');
+    fs.writeFileSync(localFile, '# Âme Locale\nInstructions courtes.', 'utf8');
+
+    // Cas 1 : Copie globale plus volumineuse que locale (ex: GEMINI.md global = 1377 tok, local = 99 tok)
+    const global1: ResourceItem[] = [
+      {
+        id: 'GEMINI.md',
+        name: 'GEMINI.md',
+        description: 'Âme globale test',
+        type: 'soul',
+        scope: 'global',
+        enabled: true,
+        path: globalFile,
+        targetTool: 'antigravity',
+        isFolder: false,
+        tokenCount: 1377,
+      },
+    ];
+    const local1: ResourceItem[] = [
+      {
+        id: 'GEMINI.md',
+        name: 'GEMINI.md',
+        description: 'Âme locale test',
+        type: 'soul',
+        scope: 'local',
+        enabled: true,
+        path: localFile,
+        targetTool: 'antigravity',
+        isFolder: false,
+        tokenCount: 99,
+      },
+    ];
+
+    const res1 = DuplicateService.detectDuplicates(global1, local1);
+    assert.strictEqual(
+      res1.stats.totalWastedTokens,
+      1377,
+      'wastedTokens doit être exactement égal à la taille de la copie globale éteinte (1377 tok)'
+    );
+    assert.strictEqual(
+      res1.enrichedLocal[0].metadata?.duplicateInfo?.wastedTokens,
+      1377,
+      'wastedTokens dans duplicateInfo doit refléter la copie globale (1377 tok)'
+    );
+
+    // Cas 2 : Copie locale plus volumineuse que globale (ex: local = 2500 tok, global = 800 tok)
+    // L'ancien code avec Math.max aurait donné 2500 au lieu de 800 !
+    const global2: ResourceItem[] = [
+      {
+        id: 'rule-custom',
+        name: 'Règle Custom',
+        description: 'Règle globale test',
+        type: 'rule',
+        scope: 'global',
+        enabled: true,
+        path: globalFile,
+        targetTool: 'antigravity',
+        isFolder: false,
+        tokenCount: 800,
+      },
+    ];
+    const local2: ResourceItem[] = [
+      {
+        id: 'rule-custom',
+        name: 'Règle Custom',
+        description: 'Règle locale test',
+        type: 'rule',
+        scope: 'local',
+        enabled: true,
+        path: localFile,
+        targetTool: 'antigravity',
+        isFolder: false,
+        tokenCount: 2500,
+      },
+    ];
+
+    const res2 = DuplicateService.detectDuplicates(global2, local2);
+    assert.strictEqual(
+      res2.stats.totalWastedTokens,
+      800,
+      'Si local (2500) > global (800), wastedTokens doit être 800 (copie globale éteinte), NON 2500'
+    );
+    assert.strictEqual(
+      res2.enrichedLocal[0].metadata?.duplicateInfo?.wastedTokens,
+      800
+    );
+  });
+
+  // --------------------------------------------------------------------------
+  // Test 52 : Incrément 1 des doublons (matrice couleur, libellés, popovers, bouton Éteindre Global)
+  // --------------------------------------------------------------------------
+  test('52. Doublons Incrément 1 : matrice couleur, libellés sans (+tok), popovers et extinction rapide', () => {
+    const mainPath = path.resolve(__dirname, '../../src/webview/main.js');
+    delete require.cache[mainPath];
+    const { getDuplicateBadgeConfig, createDuplicateBadge } = require(mainPath);
+
+    // Mock minimal du Document pour tester le DOM du badge
+    interface MockEl {
+      tagName: string;
+      className: string;
+      innerHTML: string;
+      textContent: string;
+      title: string;
+      children: MockEl[];
+      clickListeners: Array<(e: any) => void>;
+      appendChild: (child: MockEl) => MockEl;
+      addEventListener: (event: string, fn: (e: any) => void) => void;
+    }
+
+    const createMockDoc = () => ({
+      createElement: (tag: string): MockEl => {
+        const el: MockEl = {
+          tagName: tag.toUpperCase(),
+          className: '',
+          innerHTML: '',
+          textContent: '',
+          title: '',
+          children: [],
+          clickListeners: [],
+          appendChild(c: MockEl) {
+            this.children.push(c);
+            return c;
+          },
+          addEventListener(event: string, fn: (e: any) => void) {
+            if (event === 'click') this.clickListeners.push(fn);
+          },
+        };
+        return el;
+      },
+    });
+
+    // Cas 1 : Âme Identique (ex: GEMINI.md global et local identiques)
+    const soulIdentical: ResourceItem = {
+      id: 'GEMINI.md',
+      name: 'GEMINI.md',
+      description: 'Âme identique',
+      type: 'soul',
+      scope: 'local',
+      enabled: true,
+      path: '/local/GEMINI.md',
+      targetTool: 'antigravity',
+      isFolder: false,
+      metadata: {
+        isSoul: true,
+        duplicateInfo: {
+          hasDuplicate: true,
+          duplicateScope: 'global',
+          duplicatePath: '/global/GEMINI.md',
+          isTwinEnabled: true,
+          bothEnabled: true,
+          isIdentical: true,
+          wastedTokens: 1377,
+        },
+      },
+    };
+
+    // Cas 2 : Âme Divergente (ex: GEMINI.md surchargé dans le projet)
+    const soulDivergent: ResourceItem = {
+      id: 'GEMINI.md',
+      name: 'GEMINI.md',
+      description: 'Âme divergente',
+      type: 'soul',
+      scope: 'local',
+      enabled: true,
+      path: '/local/GEMINI.md',
+      targetTool: 'antigravity',
+      isFolder: false,
+      metadata: {
+        isSoul: true,
+        duplicateInfo: {
+          hasDuplicate: true,
+          duplicateScope: 'global',
+          duplicatePath: '/global/GEMINI.md',
+          isTwinEnabled: true,
+          bothEnabled: true,
+          isIdentical: false,
+          wastedTokens: 1377,
+        },
+      },
+    };
+
+    // Cas 3 : Non-Âme Identique (ex: skill-brainstorming identique)
+    const skillIdentical: ResourceItem = {
+      id: 'skill-brainstorming',
+      name: 'skill-brainstorming',
+      description: 'Skill identique',
+      type: 'skill',
+      scope: 'local',
+      enabled: true,
+      path: '/local/skill-brainstorming',
+      targetTool: 'antigravity',
+      isFolder: true,
+      metadata: {
+        duplicateInfo: {
+          hasDuplicate: true,
+          duplicateScope: 'global',
+          duplicatePath: '/global/skill-brainstorming',
+          isTwinEnabled: true,
+          bothEnabled: true,
+          isIdentical: true,
+          wastedTokens: 450,
+        },
+      },
+    };
+
+    // Cas 4 : Non-Âme Divergent (ex: rule-custom modifiée localement)
+    const ruleDivergent: ResourceItem = {
+      id: 'rule-custom',
+      name: 'rule-custom',
+      description: 'Règle divergente',
+      type: 'rule',
+      scope: 'local',
+      enabled: true,
+      path: '/local/rule-custom.md',
+      targetTool: 'antigravity',
+      isFolder: false,
+      metadata: {
+        duplicateInfo: {
+          hasDuplicate: true,
+          duplicateScope: 'global',
+          duplicatePath: '/global/rule-custom.md',
+          isTwinEnabled: true,
+          bothEnabled: true,
+          isIdentical: false,
+          wastedTokens: 300,
+        },
+      },
+    };
+
+    // ========================================================================
+    // Validation Cas 1 : Âme Identique -> Rouge, "Doublon actif", Popover Âme, Pas de bouton
+    // ========================================================================
+    const cfg1 = getDuplicateBadgeConfig(soulIdentical);
+    assert.strictEqual(cfg1?.colorClass, 'pill-duplicate-active', 'Âme identique doit être rouge (pill-duplicate-active)');
+    assert.ok(cfg1?.label.includes('Doublon actif'), 'Âme identique doit afficher le libellé "Doublon actif"');
+    assert.ok(!cfg1?.label.includes('tok'), 'Âme identique ne doit plus avoir (+N tok) dans le libellé');
+    assert.strictEqual(
+      cfg1?.title,
+      'Redondance inutile : la même Âme est injectée en double au démarrage. À corriger.',
+      'Âme identique doit porter le popover spécifié'
+    );
+    assert.strictEqual(cfg1?.hasQuickOff, false, 'L\'Âme identique ne doit JAMAIS afficher le bouton Éteindre Global');
+
+    const dom1 = createDuplicateBadge(soulIdentical, createMockDoc());
+    assert.ok(dom1.className.includes('pill-duplicate-active'));
+    assert.ok(!dom1.className.includes('pill-override-active'));
+    assert.ok(!dom1.innerHTML.includes('tok'));
+    assert.strictEqual(dom1.children.length, 0, 'Aucun bouton ne doit être injecté dans le badge de l\'Âme');
+
+    // ========================================================================
+    // Validation Cas 2 : Âme Divergente -> Orangé, "Surchargé divergent", Popover Âme, Pas de bouton
+    // ========================================================================
+    const cfg2 = getDuplicateBadgeConfig(soulDivergent);
+    assert.strictEqual(cfg2?.colorClass, 'pill-override-active', 'Âme divergente doit être la SEULE à porter orangé (pill-override-active)');
+    assert.ok(cfg2?.label.includes('Surchargé divergent'), 'Âme divergente doit afficher le libellé "Surchargé divergent"');
+    assert.ok(!cfg2?.label.includes('tok'), 'Âme divergente ne doit plus avoir (+N tok) dans le libellé');
+    assert.strictEqual(
+      cfg2?.title,
+      'Vérifiez que les règles locales ne répètent pas les règles globales et qu\'elles sont bien propres au projet.',
+      'Âme divergente doit porter le popover spécifié'
+    );
+    assert.strictEqual(cfg2?.hasQuickOff, false, 'L\'Âme divergente ne doit JAMAIS afficher le bouton Éteindre Global');
+
+    const dom2 = createDuplicateBadge(soulDivergent, createMockDoc());
+    assert.ok(dom2.className.includes('pill-override-active'));
+    assert.ok(!dom2.className.includes('pill-duplicate-active'));
+    assert.ok(!dom2.innerHTML.includes('tok'));
+    assert.strictEqual(dom2.children.length, 0, 'Aucun bouton ne doit être injecté dans le badge de l\'Âme divergente');
+
+    // ========================================================================
+    // Validation Cas 3 : Non-Âme Identique -> Rouge, "Doublon actif", Popover Non-Âme, Bouton Éteindre Global
+    // ========================================================================
+    const cfg3 = getDuplicateBadgeConfig(skillIdentical);
+    assert.strictEqual(cfg3?.colorClass, 'pill-duplicate-active', 'Skill identique doit être rouge (pill-duplicate-active)');
+    assert.ok(cfg3?.label.includes('Doublon actif'), 'Skill identique doit afficher "Doublon actif"');
+    assert.ok(!cfg3?.label.includes('tok'), 'Skill identique ne doit plus avoir (+N tok) dans le libellé');
+    assert.strictEqual(
+      cfg3?.title,
+      'Redondance inutile : les copies globale et locale sont identiques. Éteignez la globale pour récupérer les tokens.',
+      'Skill identique doit porter le popover spécifié'
+    );
+    assert.strictEqual(cfg3?.hasQuickOff, true, 'Le skill identique doit avoir hasQuickOff = true');
+    assert.strictEqual(cfg3?.quickOffLabel, 'Éteindre Global');
+
+    const dom3 = createDuplicateBadge(skillIdentical, createMockDoc());
+    assert.ok(dom3.className.includes('pill-duplicate-active'));
+    assert.ok(!dom3.innerHTML.includes('tok'));
+    assert.strictEqual(dom3.children.length, 1, 'Le bouton doit être présent');
+    assert.strictEqual(dom3.children[0].className, 'btn-quick-off');
+    assert.strictEqual(dom3.children[0].textContent, 'Éteindre Global');
+
+    // ========================================================================
+    // Validation Cas 4 : Non-Âme Divergent -> Rouge (plus orangé !), "Doublon divergent", Popover, Bouton Éteindre Global
+    // ========================================================================
+    const cfg4 = getDuplicateBadgeConfig(ruleDivergent);
+    assert.strictEqual(cfg4?.colorClass, 'pill-duplicate-active', 'Règle divergente doit désormais être ROUGE (pill-duplicate-active, non orangé)');
+    assert.ok(cfg4?.label.includes('Doublon divergent'), 'Règle divergente doit afficher "Doublon divergent"');
+    assert.ok(!cfg4?.label.includes('tok'), 'Règle divergente ne doit plus avoir (+N tok) dans le libellé');
+    assert.strictEqual(
+      cfg4?.title,
+      'Les copies globale et locale diffèrent. Vérifiez laquelle garder.',
+      'Règle divergente doit porter le popover spécifié'
+    );
+    assert.strictEqual(cfg4?.hasQuickOff, true, 'La règle divergente doit avoir hasQuickOff = true');
+    assert.strictEqual(cfg4?.quickOffLabel, 'Éteindre Global');
+
+    const dom4 = createDuplicateBadge(ruleDivergent, createMockDoc());
+    assert.ok(dom4.className.includes('pill-duplicate-active'));
+    assert.ok(!dom4.className.includes('pill-override-active'));
+    assert.ok(!dom4.innerHTML.includes('tok'));
+    assert.strictEqual(dom4.children.length, 1, 'Le bouton doit être présent');
+    assert.strictEqual(dom4.children[0].className, 'btn-quick-off');
+    assert.strictEqual(dom4.children[0].textContent, 'Éteindre Global');
+
+    // ========================================================================
+    // Validation Cas 5 (Inactif) : Doublon identique inactif -> Gris, "♊ Doublon (inactif)", Pas de bouton
+    // ========================================================================
+    const inactiveIdentical: ResourceItem = {
+      id: 'GEMINI.md',
+      name: 'GEMINI.md',
+      description: 'Âme identique inactive',
+      type: 'soul',
+      scope: 'local',
+      enabled: false,
+      path: '/local/GEMINI.md',
+      targetTool: 'antigravity',
+      isFolder: false,
+      metadata: {
+        isSoul: true,
+        duplicateInfo: {
+          hasDuplicate: true,
+          duplicateScope: 'global',
+          duplicatePath: '/global/GEMINI.md',
+          isTwinEnabled: true,
+          bothEnabled: false,
+          isIdentical: true,
+          wastedTokens: 0,
+        },
+      },
+    };
+    const cfg5 = getDuplicateBadgeConfig(inactiveIdentical);
+    assert.strictEqual(cfg5?.colorClass, 'pill-duplicate-inactive', 'Doublon identique inactif doit être gris (pill-duplicate-inactive)');
+    assert.strictEqual(cfg5?.label, '♊ Doublon (inactif)');
+    assert.strictEqual(cfg5?.hasQuickOff, false, 'Doublon inactif ne doit avoir aucun bouton');
+
+    const dom5 = createDuplicateBadge(inactiveIdentical, createMockDoc());
+    assert.ok(dom5.className.includes('pill-duplicate-inactive'));
+    assert.strictEqual(dom5.textContent, '♊ Doublon (inactif)');
+    assert.strictEqual(dom5.children.length, 0);
+
+    // ========================================================================
+    // Validation Cas 6 (Inactif) : Doublon divergent inactif (Local) -> "⚡ Surcharge locale (optimisée)"
+    // ========================================================================
+    const inactiveDivergentLocal: ResourceItem = {
+      id: 'rule-custom',
+      name: 'rule-custom',
+      description: 'Règle divergente inactive locale',
+      type: 'rule',
+      scope: 'local',
+      enabled: false,
+      path: '/local/rule-custom.md',
+      targetTool: 'antigravity',
+      isFolder: false,
+      metadata: {
+        duplicateInfo: {
+          hasDuplicate: true,
+          duplicateScope: 'global',
+          duplicatePath: '/global/rule-custom.md',
+          isTwinEnabled: true,
+          bothEnabled: false,
+          isIdentical: false,
+          wastedTokens: 0,
+        },
+      },
+    };
+    const cfg6 = getDuplicateBadgeConfig(inactiveDivergentLocal);
+    assert.strictEqual(cfg6?.colorClass, 'pill-duplicate-inactive');
+    assert.strictEqual(cfg6?.label, '⚡ Surcharge locale (optimisée)');
+    assert.strictEqual(cfg6?.hasQuickOff, false);
+
+    const dom6 = createDuplicateBadge(inactiveDivergentLocal, createMockDoc());
+    assert.ok(dom6.className.includes('pill-duplicate-inactive'));
+    assert.strictEqual(dom6.textContent, '⚡ Surcharge locale (optimisée)');
+    assert.strictEqual(dom6.children.length, 0);
+
+    // ========================================================================
+    // Validation Cas 7 (Inactif) : Doublon divergent inactif (Global) -> "⚡ Surchargé en local (optimisé)"
+    // ========================================================================
+    const inactiveDivergentGlobal: ResourceItem = {
+      id: 'rule-custom',
+      name: 'rule-custom',
+      description: 'Règle divergente inactive globale',
+      type: 'rule',
+      scope: 'global',
+      enabled: true,
+      path: '/global/rule-custom.md',
+      targetTool: 'antigravity',
+      isFolder: false,
+      metadata: {
+        duplicateInfo: {
+          hasDuplicate: true,
+          duplicateScope: 'local',
+          duplicatePath: '/local/rule-custom.md',
+          isTwinEnabled: false,
+          bothEnabled: false,
+          isIdentical: false,
+          wastedTokens: 0,
+        },
+      },
+    };
+    const cfg7 = getDuplicateBadgeConfig(inactiveDivergentGlobal);
+    assert.strictEqual(cfg7?.colorClass, 'pill-duplicate-inactive');
+    assert.strictEqual(cfg7?.label, '⚡ Surchargé en local (optimisé)');
+    assert.strictEqual(cfg7?.hasQuickOff, false);
+
+    const dom7 = createDuplicateBadge(inactiveDivergentGlobal, createMockDoc());
+    assert.ok(dom7.className.includes('pill-duplicate-inactive'));
+    assert.strictEqual(dom7.textContent, '⚡ Surchargé en local (optimisé)');
+    assert.strictEqual(dom7.children.length, 0);
+  });
+
+  // --------------------------------------------------------------------------
+  // Test 53 : Incrément 2 — Comparaison, Recommandation Heuristique et Bouton Comparer
+  // --------------------------------------------------------------------------
+  test('53. Doublons Incrément 2 : recommandation heuristique (local=NAS, global=NAS, aucun=NAS) et bouton Comparer', () => {
+    const mainPath = path.resolve(__dirname, '../../src/webview/main.js');
+    delete require.cache[mainPath];
+    const { computeDuplicateRecommendation, createItemCard } = require(mainPath);
+
+    // ========================================================================
+    // 1. Tests de la fonction heuristique computeDuplicateRecommendation
+    // ========================================================================
+
+    // Cas A : local correspond au NAS seul -> local est la version maintenue
+    const recLocalMaintained = computeDuplicateRecommendation({
+      localSyncStatus: 'synced',
+      globalSyncStatus: 'modified',
+      localMtimeMs: 1729170000000,
+      globalMtimeMs: 1729160000000,
+      localCharCount: 1500,
+      globalCharCount: 1200,
+      localTokenCount: 375,
+      globalTokenCount: 300,
+    });
+    assert.strictEqual(recLocalMaintained.type, 'local_maintained');
+    assert.ok(recLocalMaintained.recommendation.toLowerCase().includes('probablement'));
+    assert.ok(recLocalMaintained.recommendation.toLowerCase().includes('version maintenue'));
+    assert.strictEqual(recLocalMaintained.moreRecent, 'local');
+    assert.strictEqual(recLocalMaintained.moreDetailed, 'local');
+    assert.ok(recLocalMaintained.signals.some((s: string) => s.includes('la copie locale est plus récente')));
+    assert.ok(recLocalMaintained.signals.some((s: string) => s.includes('la copie locale est plus volumineuse')));
+
+    // Cas B : global correspond au NAS seul -> local est une surcharge propre au projet
+    const recLocalOverride = computeDuplicateRecommendation({
+      localSyncStatus: 'modified',
+      globalSyncStatus: 'synced',
+      localMtimeMs: 1729150000000,
+      globalMtimeMs: 1729180000000,
+      localCharCount: 1000,
+      globalCharCount: 1600,
+      localTokenCount: 250,
+      globalTokenCount: 400,
+    });
+    assert.strictEqual(recLocalOverride.type, 'local_override');
+    assert.ok(recLocalOverride.recommendation.toLowerCase().includes('probablement'));
+    assert.ok(recLocalOverride.recommendation.toLowerCase().includes('surcharge propre au projet'));
+    assert.strictEqual(recLocalOverride.moreRecent, 'global');
+    assert.strictEqual(recLocalOverride.moreDetailed, 'global');
+    assert.ok(recLocalOverride.signals.some((s: string) => s.includes('la copie globale est plus récente')));
+    assert.ok(recLocalOverride.signals.some((s: string) => s.includes('la copie globale est plus volumineuse')));
+
+    // Cas C : aucun ne correspond au NAS -> les deux ont divergé du Catalogue
+    const recBothDiverged = computeDuplicateRecommendation({
+      localSyncStatus: 'modified',
+      globalSyncStatus: 'modified',
+      localMtimeMs: 1729170000000,
+      globalMtimeMs: 1729170000000,
+      localCharCount: 1200,
+      globalCharCount: 1200,
+      localTokenCount: 300,
+      globalTokenCount: 300,
+    });
+    assert.strictEqual(recBothDiverged.type, 'both_diverged');
+    assert.ok(recBothDiverged.recommendation.toLowerCase().includes('divergé'));
+    assert.ok(recBothDiverged.recommendation.includes('Catalogue'));
+    assert.strictEqual(recBothDiverged.moreRecent, 'same');
+    assert.strictEqual(recBothDiverged.moreDetailed, 'same');
+    assert.ok(recBothDiverged.signals.some((s: string) => s.includes('la même date de modification')));
+    assert.ok(recBothDiverged.signals.some((s: string) => s.includes('le même nombre de caractères')));
+
+    // Cas D : NAS hors-ligne
+    const recOffline = computeDuplicateRecommendation({
+      localSyncStatus: 'nas_offline',
+      globalSyncStatus: 'nas_offline',
+    });
+    assert.strictEqual(recOffline.type, 'nas_offline');
+    assert.ok(recOffline.recommendation.includes('Catalogue NAS hors-ligne'));
+
+    // ========================================================================
+    // 2. Tests de présence du bouton « Comparer » sur les cartes
+    // ========================================================================
+
+    interface MockCardEl {
+      tagName: string;
+      className: string;
+      innerHTML: string;
+      textContent: string;
+      title: string;
+      children: MockCardEl[];
+      clickListeners: Array<(e: any) => void>;
+      appendChild: (child: MockCardEl) => MockCardEl;
+      addEventListener: (event: string, fn: (e: any) => void) => void;
+      style: Record<string, string>;
+      classList: {
+        add: (c: string) => void;
+        remove: (c: string) => void;
+        contains: (c: string) => boolean;
+      };
+    }
+
+    const createCardMockDoc = () => ({
+      createElement: (tag: string): MockCardEl => {
+        const classes = new Set<string>();
+        const el: MockCardEl = {
+          tagName: tag.toUpperCase(),
+          className: '',
+          innerHTML: '',
+          textContent: '',
+          title: '',
+          children: [],
+          clickListeners: [],
+          style: {},
+          appendChild(c: MockCardEl) {
+            this.children.push(c);
+            return c;
+          },
+          addEventListener(event: string, fn: (e: any) => void) {
+            if (event === 'click') this.clickListeners.push(fn);
+          },
+          classList: {
+            add: (c: string) => {
+              classes.add(c);
+              el.className = Array.from(classes).join(' ');
+            },
+            remove: (c: string) => {
+              classes.delete(c);
+              el.className = Array.from(classes).join(' ');
+            },
+            contains: (c: string) => classes.has(c),
+          },
+        };
+        return el;
+      },
+    });
+
+    const findElementByClass = (root: MockCardEl, cls: string): MockCardEl | null => {
+      if (root.className && root.className.includes(cls)) return root;
+      for (const child of root.children) {
+        const found = findElementByClass(child, cls);
+        if (found) return found;
+      }
+      return null;
+    };
+
+    // Carte A : Doublon divergent local (règle) -> bouton Comparer DOIT être présent
+    const divergentLocalItem: ResourceItem = {
+      id: 'rule-test',
+      name: 'Règle Test Divergente',
+      description: 'Règle locale divergente',
+      type: 'rule',
+      scope: 'local',
+      enabled: true,
+      path: '/local/rule-test.md',
+      targetTool: 'antigravity',
+      isFolder: false,
+      metadata: {
+        duplicateInfo: {
+          hasDuplicate: true,
+          duplicateScope: 'global',
+          duplicatePath: '/global/rule-test.md',
+          isTwinEnabled: true,
+          bothEnabled: true,
+          isIdentical: false,
+          wastedTokens: 250,
+        },
+      },
+    };
+    const cardA = createItemCard(divergentLocalItem, false, createCardMockDoc());
+    const btnCompareA = findElementByClass(cardA, 'btn-compare');
+    assert.ok(btnCompareA !== null, 'Le bouton .btn-compare doit être présent sur un doublon divergent local');
+    assert.ok(btnCompareA?.textContent.includes('Comparer') || btnCompareA?.innerHTML.includes('Comparer'));
+
+    // Carte B : Doublon divergent global (règle) -> bouton Comparer DOIT également être présent sur la copie globale
+    const divergentGlobalItem: ResourceItem = {
+      id: 'rule-test',
+      name: 'Règle Test Divergente',
+      description: 'Règle globale divergente',
+      type: 'rule',
+      scope: 'global',
+      enabled: true,
+      path: '/global/rule-test.md',
+      targetTool: 'antigravity',
+      isFolder: false,
+      metadata: {
+        duplicateInfo: {
+          hasDuplicate: true,
+          duplicateScope: 'local',
+          duplicatePath: '/local/rule-test.md',
+          isTwinEnabled: true,
+          bothEnabled: true,
+          isIdentical: false,
+          wastedTokens: 250,
+        },
+      },
+    };
+    const cardB = createItemCard(divergentGlobalItem, false, createCardMockDoc());
+    const btnCompareB = findElementByClass(cardB, 'btn-compare');
+    assert.ok(btnCompareB !== null, 'Le bouton .btn-compare doit être présent sur la carte globale du doublon divergent');
+    assert.ok(btnCompareB?.textContent.includes('Comparer') || btnCompareB?.innerHTML.includes('Comparer'));
+
+    // Carte C : Âme divergente -> bouton Comparer DOIT être présent
+    const divergentSoulItem: ResourceItem = {
+      id: 'GEMINI.md',
+      name: 'GEMINI.md',
+      description: 'Âme divergente',
+      type: 'soul',
+      scope: 'local',
+      enabled: true,
+      path: '/local/GEMINI.md',
+      targetTool: 'antigravity',
+      isFolder: false,
+      metadata: {
+        isSoul: true,
+        duplicateInfo: {
+          hasDuplicate: true,
+          duplicateScope: 'global',
+          duplicatePath: '/global/GEMINI.md',
+          isTwinEnabled: true,
+          bothEnabled: true,
+          isIdentical: false,
+          wastedTokens: 1200,
+        },
+      },
+    };
+    const cardC = createItemCard(divergentSoulItem, false, createCardMockDoc());
+    const btnCompareC = findElementByClass(cardC, 'btn-compare');
+    assert.ok(btnCompareC !== null, 'Le bouton .btn-compare doit être présent sur l\'Âme divergente');
+
+    // Carte D : Doublon IDENTIQUE -> bouton Comparer NE DOIT PAS être présent (rien à comparer)
+    const identicalItem: ResourceItem = {
+      id: 'skill-brainstorming',
+      name: 'skill-brainstorming',
+      description: 'Skill identique',
+      type: 'skill',
+      scope: 'local',
+      enabled: true,
+      path: '/local/skill-brainstorming',
+      targetTool: 'antigravity',
+      isFolder: true,
+      metadata: {
+        duplicateInfo: {
+          hasDuplicate: true,
+          duplicateScope: 'global',
+          duplicatePath: '/global/skill-brainstorming',
+          isTwinEnabled: true,
+          bothEnabled: true,
+          isIdentical: true,
+          wastedTokens: 350,
+        },
+      },
+    };
+    const cardD = createItemCard(identicalItem, false, createCardMockDoc());
+    const btnCompareD = findElementByClass(cardD, 'btn-compare');
+    assert.strictEqual(btnCompareD, null, 'Le bouton .btn-compare ne doit PAS apparaître sur un doublon identique');
+
+    // Carte E : Ressource sans doublon -> bouton Comparer NE DOIT PAS être présent
+    const singleItem: ResourceItem = {
+      id: 'rule-unique',
+      name: 'rule-unique',
+      description: 'Règle sans doublon',
+      type: 'rule',
+      scope: 'local',
+      enabled: true,
+      path: '/local/rule-unique.md',
+      targetTool: 'antigravity',
+      isFolder: false,
+    };
+    const cardE = createItemCard(singleItem, false, createCardMockDoc());
+    const btnCompareE = findElementByClass(cardE, 'btn-compare');
+    assert.strictEqual(btnCompareE, null, 'Le bouton .btn-compare ne doit PAS apparaître sans doublon');
+
+    // ========================================================================
+    // 3. Tests de la Modale de Résumé et déclenchement compareDuplicate
+    // ========================================================================
+    const { openCompareModal } = require(mainPath);
+
+    const docElements: MockCardEl[] = [];
+    const mockModalDoc = {
+      body: {
+        appendChild(child: MockCardEl) {
+          docElements.push(child);
+          return child;
+        },
+      },
+      getElementById(id: string): MockCardEl | null {
+        return docElements.find((e) => (e as any).id === id) || null;
+      },
+      addEventListener() {},
+      removeEventListener() {},
+      createElement: (tag: string): MockCardEl => {
+        const classes = new Set<string>();
+        const el: MockCardEl & { id?: string; parentNode?: any } = {
+          tagName: tag.toUpperCase(),
+          className: '',
+          innerHTML: '',
+          textContent: '',
+          title: '',
+          children: [],
+          clickListeners: [],
+          style: {},
+          appendChild(c: MockCardEl & { parentNode?: any }) {
+            c.parentNode = el;
+            this.children.push(c);
+            return c;
+          },
+          addEventListener(event: string, fn: (e: any) => void) {
+            if (event === 'click') this.clickListeners.push(fn);
+          },
+          classList: {
+            add: (c: string) => {
+              classes.add(c);
+              el.className = Array.from(classes).join(' ');
+            },
+            remove: (c: string) => {
+              classes.delete(c);
+              el.className = Array.from(classes).join(' ');
+            },
+            contains: (c: string) => classes.has(c),
+          },
+        };
+        return el;
+      },
+    };
+
+    const sentMessages: any[] = [];
+    (global as any).vscode = {
+      postMessage: (msg: any) => {
+        sentMessages.push(msg);
+      },
+    };
+
+    openCompareModal(divergentLocalItem, mockModalDoc);
+
+    assert.strictEqual(docElements.length, 1, 'La modale doit être injectée dans le body');
+    const overlay = docElements[0];
+    assert.strictEqual((overlay as any).id, 'compareModalOverlay');
+
+    const btnDiff = findElementByClass(overlay, 'btn-diff-native');
+    assert.ok(btnDiff !== null, 'Le bouton Diff natif VS Code doit être présent dans la modale');
+    assert.ok(btnDiff.clickListeners.length > 0, 'Le bouton Diff doit avoir un listener click');
+
+    // Déclencher le clic sur Diff natif
+    btnDiff.clickListeners[0]({} as any);
+
+    assert.strictEqual(sentMessages.length, 1, 'Un message compareDuplicate doit avoir été envoyé');
+    assert.strictEqual(sentMessages[0].type, 'compareDuplicate');
+    assert.strictEqual(sentMessages[0].payload.globalPath, '/global/rule-test.md');
+    assert.strictEqual(sentMessages[0].payload.localPath, '/local/rule-test.md');
+    assert.ok(sentMessages[0].payload.title.includes('Règle Test Divergente'));
   });
 });
 

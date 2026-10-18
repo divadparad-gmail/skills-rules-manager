@@ -10,6 +10,7 @@ import {
   getEffectiveGlobalAntigravityPath,
   getEffectiveGlobalClaudePath,
 } from '../utils/paths';
+import { countTokens, countTokensForFile } from '../utils/tokenizer';
 
 let vscodeModule: any = null;
 try {
@@ -96,8 +97,10 @@ export class GlobalScanner {
           let name = entry.name;
           let tags: string[] = [];
           let rawContent = '';
+          let fileStat: fs.Stats | null = null;
 
           try {
+            fileStat = await fs.promises.stat(activeFile);
             rawContent = await fs.promises.readFile(activeFile, 'utf8');
             const { metadata } = extractFrontmatter(rawContent);
             if (metadata.name && typeof metadata.name === 'string') {
@@ -124,7 +127,7 @@ export class GlobalScanner {
           // Décompte réel de caractères pour la signature de découverte Tier-1
           const discoverySignature = `name: ${name}\ndescription: ${description}\npath: ${activeFile}\n`;
           const charCount = discoverySignature.length;
-          const tokenCount = Math.ceil(charCount / 4);
+          const tokenCount = countTokensForFile(activeFile, fileStat?.size, fileStat?.mtimeMs, discoverySignature);
 
           if (isEnabled) {
             skillsCharTotal += charCount;
@@ -182,8 +185,10 @@ export class GlobalScanner {
           let name = entry.name;
           let tags: string[] = [];
           let rawContent = '';
+          let fileStat: fs.Stats | null = null;
 
           try {
+            fileStat = await fs.promises.stat(activeFile);
             rawContent = await fs.promises.readFile(activeFile, 'utf8');
             const { metadata } = extractFrontmatter(rawContent);
             if (metadata.name && typeof metadata.name === 'string') {
@@ -205,7 +210,7 @@ export class GlobalScanner {
 
           const discoverySignature = `name: ${name}\ndescription: ${description}\npath: ${activeFile}\n`;
           const charCount = discoverySignature.length;
-          const tokenCount = Math.ceil(charCount / 4);
+          const tokenCount = countTokensForFile(activeFile, fileStat?.size, fileStat?.mtimeMs, discoverySignature);
 
           if (isEnabled) {
             skillsCharTotal += charCount;
@@ -248,11 +253,12 @@ export class GlobalScanner {
       for (const geminiPath of geminiCandidates) {
         if (fs.existsSync(geminiPath) && fs.statSync(geminiPath).isFile()) {
           try {
+            const stat = await fs.promises.stat(geminiPath);
             const rawContent = await fs.promises.readFile(geminiPath, 'utf8');
             const fileCharCount = rawContent.length;
             const lineCount = rawContent.split(/\r\n|\r|\n/).length;
             const parsed = extractMarkdownTitleAndSummary(rawContent);
-            const ruleTokenCount = Math.ceil(fileCharCount / 4);
+            const ruleTokenCount = countTokensForFile(geminiPath, stat.size, stat.mtimeMs, rawContent);
             const isWarningLines = lineCount > 200;
             const isWarningSize = fileCharCount > 24000;
 
@@ -293,11 +299,12 @@ export class GlobalScanner {
       for (const claudePath of claudeGlobalCandidates) {
         if (fs.existsSync(claudePath) && fs.statSync(claudePath).isFile()) {
           try {
+            const stat = await fs.promises.stat(claudePath);
             const rawContent = await fs.promises.readFile(claudePath, 'utf8');
             const fileCharCount = rawContent.length;
             const lineCount = rawContent.split(/\r\n|\r|\n/).length;
             const parsed = extractMarkdownTitleAndSummary(rawContent);
-            const tokenCount = Math.ceil(fileCharCount / 4);
+            const tokenCount = countTokensForFile(claudePath, stat.size, stat.mtimeMs, rawContent);
             const isWarningLines = lineCount > 200;
 
             soulCharTotal += fileCharCount;
@@ -337,11 +344,12 @@ export class GlobalScanner {
         path.join(path.dirname(globalPath), 'rules'),
       ];
 
+      const rulesMap = new Map<string, ResourceItem>();
+
       for (const rulesDir of rulesDirCandidates) {
         if (fs.existsSync(rulesDir)) {
           try {
             const entries = await fs.promises.readdir(rulesDir, { withFileTypes: true });
-            const rulesMap = new Map<string, ResourceItem>();
 
             for (const entry of entries) {
               if (!entry.isFile()) continue;
@@ -359,8 +367,10 @@ export class GlobalScanner {
               let fileCharCount = 0;
               let ruleMetadata: Record<string, any> = {};
               let rawContent = '';
+              let fileStat: fs.Stats | null = null;
 
               try {
+                fileStat = await fs.promises.stat(filePath);
                 rawContent = await fs.promises.readFile(filePath, 'utf8');
                 fileCharCount = rawContent.length;
                 const { metadata } = extractFrontmatter(rawContent);
@@ -378,7 +388,7 @@ export class GlobalScanner {
               const isWarn = fileCharCount > 24000;
               const isWarningLines = lineCount > 200;
               const isWarningNoDesc = !summary || summary.trim().length === 0;
-              const ruleTokenCount = Math.ceil(fileCharCount / 4);
+              const ruleTokenCount = countTokensForFile(filePath, fileStat?.size, fileStat?.mtimeMs, rawContent);
 
               const newItem: ResourceItem = {
                 id: cleanId,
@@ -412,24 +422,25 @@ export class GlobalScanner {
                 rulesMap.set(cleanId, newItem);
               }
             }
-
-            for (const ruleItem of rulesMap.values()) {
-              if (ruleItem.enabled && ruleItem.charCount) {
-                if (ruleItem.metadata?.isConditional) {
-                  rulesCharTotal += 80;
-                  rulesConditionalCharTotal += ruleItem.charCount;
-                  rulesConditionalCount++;
-                } else {
-                  rulesCharTotal += ruleItem.charCount;
-                  rulesPermanentCount++;
-                }
-              }
-              items.push(ruleItem);
-            }
           } catch {
             // Ignorer
           }
         }
+      }
+
+      // Consolidation unique des règles globales trouvées
+      for (const ruleItem of rulesMap.values()) {
+        if (ruleItem.enabled && ruleItem.charCount) {
+          if (ruleItem.metadata?.isConditional) {
+            rulesCharTotal += 80;
+            rulesConditionalCharTotal += ruleItem.charCount;
+            rulesConditionalCount++;
+          } else {
+            rulesCharTotal += ruleItem.charCount;
+            rulesPermanentCount++;
+          }
+        }
+        items.push(ruleItem);
       }
 
       // Scan des plugins globaux sous ~/.gemini/config/plugins/
@@ -462,8 +473,10 @@ export class GlobalScanner {
                   let name = pEntry.name;
                   let tags: string[] = [];
                   let rawContent = '';
+                  let fileStat: fs.Stats | null = null;
 
                   try {
+                    fileStat = await fs.promises.stat(activeFile);
                     rawContent = await fs.promises.readFile(activeFile, 'utf8');
                     const { metadata } = extractFrontmatter(rawContent);
                     if (metadata.name && typeof metadata.name === 'string') name = metadata.name;
@@ -481,7 +494,7 @@ export class GlobalScanner {
                   const isWorkflow = pEntry.name.startsWith('wf-') || name.startsWith('wf-');
                   const discoverySignature = `name: ${name}\ndescription: ${description}\npath: ${activeFile}\n`;
                   const charCount = discoverySignature.length;
-                  const tokenCount = Math.ceil(charCount / 4);
+                  const tokenCount = countTokensForFile(activeFile, fileStat?.size, fileStat?.mtimeMs, discoverySignature);
 
                   if (isEnabled) {
                     skillsCharTotal += charCount;
@@ -533,8 +546,10 @@ export class GlobalScanner {
                   let fCount = 0;
                   let pFm: Record<string, any> = {};
                   let rawPluginRule = '';
+                  let rStat: fs.Stats | null = null;
 
                   try {
+                    rStat = await fs.promises.stat(rPath);
                     rawPluginRule = await fs.promises.readFile(rPath, 'utf8');
                     fCount = rawPluginRule.length;
                     const { metadata } = extractFrontmatter(rawPluginRule);
@@ -552,7 +567,7 @@ export class GlobalScanner {
                   const isWarnRuleLines = ruleLineCount > 200;
                   const isWarnRuleNoDesc = !rSummary || rSummary.trim().length === 0;
                   const isEn = isM;
-                  const tCount = Math.ceil(fCount / 4);
+                  const tCount = countTokensForFile(rPath, rStat?.size, rStat?.mtimeMs, rawPluginRule);
 
                   if (isEn) {
                     if (isCond) {
@@ -621,8 +636,10 @@ export class GlobalScanner {
             let fileCharCount = 0;
             let ruleMetadata: Record<string, any> = {};
             let rawRuleContent = '';
+            let fileStat: fs.Stats | null = null;
 
             try {
+              fileStat = await fs.promises.stat(filePath);
               rawRuleContent = await fs.promises.readFile(filePath, 'utf8');
               fileCharCount = rawRuleContent.length;
               const { metadata } = extractFrontmatter(rawRuleContent);
@@ -639,7 +656,7 @@ export class GlobalScanner {
             const isCond = isRuleConditional(ruleMetadata, 'claude-code');
             const isWarningLines = lineCount > 200;
             const isWarningNoDesc = !summary || summary.trim().length === 0;
-            const ruleTokenCount = Math.ceil(fileCharCount / 4);
+            const ruleTokenCount = countTokensForFile(filePath, fileStat?.size, fileStat?.mtimeMs, rawRuleContent);
 
             const newItem: ResourceItem = {
               id: cleanId,
@@ -696,32 +713,47 @@ export class GlobalScanner {
     const allRulesList = items.filter((i) => i.type === 'rule');
     const allSoulList = items.filter((i) => i.type === 'soul');
 
-    const activeSkillsCount = allSkillsList.filter((i) => i.enabled).length;
-    const skillsWarningCount = allSkillsList.filter((i) => i.enabled && (
+    const activeSkillsList = allSkillsList.filter((i) => i.enabled);
+    const activeSkillsCount = activeSkillsList.length;
+    const skillsWarningCount = activeSkillsList.filter((i) => (
       i.metadata?.warningSizeExceeded ||
       i.metadata?.warningLinesExceeded ||
       i.metadata?.warningMcpExceeded ||
       i.metadata?.warningNoDescription
     )).length;
-    const skillsTokenTotal = Math.ceil(skillsCharTotal / 4);
+    // Somme directe des tokens réels de chaque élément actif (concordance absolue avec les cartes)
+    const skillsTokenTotal = activeSkillsList.reduce((sum, i) => sum + (i.tokenCount || 0), 0);
 
-    const activeRulesCount = allRulesList.filter((i) => i.enabled).length;
-    const rulesWarningCount = allRulesList.filter((i) => i.enabled && (
+    const activeRulesList = allRulesList.filter((i) => i.enabled);
+    const activeRulesCount = activeRulesList.length;
+    const rulesWarningCount = activeRulesList.filter((i) => (
       i.metadata?.warningSizeExceeded ||
       i.metadata?.warningLinesExceeded ||
       i.metadata?.warningMcpExceeded ||
       i.metadata?.warningNoDescription
     )).length;
-    const rulesTokenTotal = Math.ceil(rulesCharTotal / 4);
 
-    const activeSoulCount = allSoulList.filter((i) => i.enabled).length;
-    const soulWarningCount = allSoulList.filter((i) => i.enabled && (
+    // Décompte cohérent des règles :
+    // - Règles permanentes : accumulation de leur tokenCount BPE réel
+    // - Règles conditionnelles : 20 tokens légers de routeur au boot
+    // - rulesConditionalTokenTotal : somme des tokens BPE réels des cartes conditionnelles
+    const activePermanentRules = activeRulesList.filter((i) => !i.metadata?.isConditional);
+    const activeConditionalRules = activeRulesList.filter((i) => i.metadata?.isConditional);
+    const permanentRulesTokens = activePermanentRules.reduce((sum, i) => sum + (i.tokenCount || 0), 0);
+    const conditionalRulesBootTokens = activeConditionalRules.length * 20;
+    const rulesTokenTotal = permanentRulesTokens + conditionalRulesBootTokens;
+    const rulesConditionalTokenTotal = activeConditionalRules.reduce((sum, i) => sum + (i.tokenCount || 0), 0);
+
+    const activeSoulList = allSoulList.filter((i) => i.enabled);
+    const activeSoulCount = activeSoulList.length;
+    const soulWarningCount = activeSoulList.filter((i) => (
       i.metadata?.warningSizeExceeded ||
       i.metadata?.warningLinesExceeded ||
       i.metadata?.warningMcpExceeded ||
       i.metadata?.warningNoDescription
     )).length;
-    const soulTokenTotal = Math.ceil(soulCharTotal / 4);
+    // Somme directe des tokens BPE de l'Âme active
+    const soulTokenTotal = activeSoulList.reduce((sum, i) => sum + (i.tokenCount || 0), 0);
 
     const defaultSkillsDir = targetTool === 'claude-code' ? path.join(claudeGlobalPath, 'skills') : skillsDir;
     const defaultRulesDir = targetTool === 'claude-code' ? path.join(claudeGlobalPath, 'rules') : path.join(globalPath, 'rules');
@@ -745,7 +777,7 @@ export class GlobalScanner {
       totalCount: allRulesList.length,
       permanentCount: rulesPermanentCount,
       conditionalCount: rulesConditionalCount,
-      conditionalTokenCount: Math.ceil(rulesConditionalCharTotal / 4),
+      conditionalTokenCount: rulesConditionalTokenTotal,
       charCount: rulesCharTotal,
       tokenCount: rulesTokenTotal,
       warningCount: rulesWarningCount,

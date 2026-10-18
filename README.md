@@ -6,13 +6,13 @@
 [![VS Code Engine](https://img.shields.io/badge/VS%20Code-%5E1.85.0-007ACC?style=for-the-badge&logo=visualstudiocode)](https://code.visualstudio.com/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.3-3178C6?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-emerald?style=for-the-badge)](LICENSE)
-[![Tests: 31/31](https://img.shields.io/badge/Tests-31%2F31%20Passed-success?style=for-the-badge)](#)
+[![Tests: 53/53](https://img.shields.io/badge/Tests-53%2F53%20Passed-success?style=for-the-badge)](#)
 
 <p align="center">
   <strong>Gestionnaire visuel haute performance pour compétences (skills, workflows) et règles sous Google Antigravity IDE et Claude Code.</strong>
 </p>
 
-[ [⬇️ Télécharger la v0.3.0 (.vsix)](https://github.com/divadparad-gmail/skills-rules-manager/releases/latest) ] •
+[ [⬇️ Télécharger la v0.3.11 (.vsix)](https://github.com/divadparad-gmail/skills-rules-manager/releases/latest) ] •
 [ [🐛 Signaler un problème](https://github.com/divadparad-gmail/skills-rules-manager/issues) ] •
 [ [📖 Guide des Bonnes Pratiques IA](#-guide--bonnes-pratiques-ia-intégré) ]
 
@@ -88,16 +88,16 @@ Lorsqu'on orchestre des agents IA modernes (Google Antigravity, Claude Code), l'
 ## ⚡ Installation Express (.vsix)
 
 ### Option 1 : En ligne de commande (CLI)
-Téléchargez le fichier `skills-rules-manager-0.3.0.vsix` depuis les [Releases GitHub](https://github.com/divadparad-gmail/skills-rules-manager/releases/latest) et exécutez :
+Téléchargez le fichier `skills-rules-manager-0.3.5.vsix` depuis les [Releases GitHub](https://github.com/divadparad-gmail/skills-rules-manager/releases/latest) et exécutez :
 
 ```powershell
-code --install-extension skills-rules-manager-0.3.0.vsix
+code --install-extension skills-rules-manager-0.3.5.vsix
 ```
 
 ### Option 2 : Depuis l'interface VS Code / Antigravity IDE
 1. Ouvrez l'onglet Extensions (`Ctrl+Shift+X` ou `Cmd+Shift+X`).
 2. Cliquez sur l'icône `...` (More Actions en haut à droite du panneau d'extensions).
-3. Choisissez **Install from VSIX...** et sélectionnez `skills-rules-manager-0.3.0.vsix`.
+3. Choisissez **Install from VSIX...** et sélectionnez `skills-rules-manager-0.3.5.vsix`.
 
 ---
 
@@ -109,6 +109,7 @@ code --install-extension skills-rules-manager-0.3.0.vsix
 | `skillsManager.globalPath` | `string` | `""` (auto-détecté `~/.gemini/config`) | Emplacement des compétences globales Antigravity |
 | `skillsManager.claudeGlobalPath` | `string` | `""` (auto-détecté `~/.claude`) | Emplacement des compétences Claude Code |
 | `skillsManager.defaultProjectTool` | `enum` | `"auto-detect"` | Outil cible local (`auto-detect`, `antigravity`, `claude-code`) |
+| `skillsManager.debugTiming` | `boolean` | `false` | Mesure et journal de performance des scans et de la tokenisation |
 
 ---
 
@@ -126,7 +127,7 @@ Accessibles depuis la palette de commandes (`Ctrl+Shift+P` / `Cmd+Shift+P`) :
 
 ## 🧪 Tests & Qualité de Code
 
-Le projet est couvert par une suite de 31 tests unitaires automatisés validant la synchronisation de données, l'intégrité, l'isolation bi-moteur et le Coach IA :
+Le projet est couvert par une suite de 42 tests unitaires automatisés validant la synchronisation de données, l'intégrité, l'isolation bi-moteur et le Coach IA :
 
 ```bash
 npm test

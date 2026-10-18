@@ -19,6 +19,11 @@ export interface DuplicateInfo {
   bothEnabled: boolean;
   isIdentical: boolean;
   wastedTokens: number;
+  twinCharCount?: number;
+  twinTokenCount?: number;
+  twinLineCount?: number;
+  twinMtimeMs?: number;
+  twinSyncStatus?: SyncStatus;
 }
 
 export interface DuplicateStats {
@@ -41,6 +46,7 @@ export interface ResourceItem {
   tokenCount?: number;
   lineCount?: number;
   syncStatus?: SyncStatus;
+  mtimeMs?: number;
   metadata?: {
     tags?: string[];
     version?: string;
@@ -117,6 +123,9 @@ export interface ManagerFullState {
   isDashboardOpen: boolean;
   isCheatSheetOpen?: boolean;
   userHome?: string;
+  isDebugTiming?: boolean;
+  lastTimingLog?: string | null;
+  timingHistory?: string[];
 }
 
 // --------------------------------------------------------------------------
@@ -172,6 +181,14 @@ export type WebviewMessage =
       };
     }
   | {
+      type: 'compareDuplicate';
+      payload: {
+        globalPath: string;
+        localPath: string;
+        title?: string;
+      };
+    }
+  | {
       type: 'openInExplorer';
       payload: {
         path: string;
@@ -216,7 +233,14 @@ export type WebviewMessage =
         target?: 'antigravity' | 'claude-code' | 'all';
       };
     }
-  | { type: 'cleanScenarios' };
+  | { type: 'cleanScenarios' }
+  | {
+      type: 'toggleDebugTiming';
+      payload?: {
+        enabled?: boolean;
+      };
+    }
+  | { type: 'clearTimingLogs' };
 
 export type ExtensionMessage =
   | {
