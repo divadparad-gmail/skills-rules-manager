@@ -101,8 +101,8 @@ export class RegistryConfigService {
    */
   public getEffectiveRegistries(): CustomSearchUrlConfig[] {
     const inspected = this.config.inspect<unknown[]>(SEARCH_URLS_SETTING);
-    const userEntries = this.normalizeList(inspected?.userValue);
-    const workspaceEntries = this.normalizeList(inspected?.workspaceValue);
+    const userEntries = this.normalizeList(inspected?.userValue, 'user');
+    const workspaceEntries = this.normalizeList(inspected?.workspaceValue, 'workspace');
 
     const byCanonicalUrl = new Map<string, CustomSearchUrlConfig>();
     for (const entry of userEntries) {
@@ -162,7 +162,7 @@ export class RegistryConfigService {
     if (registry.authType !== 'none' && !registry.secretKeyRef) {
       registry.secretKeyRef = registrySecretKey(registry.id);
     }
-    const issues = RegistryConfigService.validate(registry);
+    const issues = RegistryConfigService.validate(registry, scope);
     if (issues.length > 0) {
       throw new Error(issues.map((issue) => issue.message).join(' '));
     }
@@ -193,7 +193,7 @@ export class RegistryConfigService {
     }
 
     const merged = this.withDefaults({ ...current[index], ...changes, id });
-    const issues = RegistryConfigService.validate(merged);
+    const issues = RegistryConfigService.validate(merged, scope);
     if (issues.length > 0) {
       throw new Error(issues.map((issue) => issue.message).join(' '));
     }
@@ -445,9 +445,13 @@ export class RegistryConfigService {
 
   /**
    * Valide un registre. Le protocole HTTPS est exigé, à la seule exception des
-   * adresses de bouclage utilisées pendant le développement local.
+   * adresses de bouclage utilisées pendant le développement local, tolérées
+   * pour les seuls registres d'origine utilisateur.
    */
-  public static validate(registry: CustomSearchUrlConfig): ValidationIssue[] {
+  public static validate(
+    registry: CustomSearchUrlConfig,
+    origin: RegistryOrigin = registry.origin ?? 'user'
+  ): ValidationIssue[] {
     const issues: ValidationIssue[] = [];
 
     if (!registry.id || !/^[a-z0-9][a-z0-9._-]*$/i.test(registry.id)) {
@@ -461,7 +465,7 @@ export class RegistryConfigService {
       issues.push({ field: 'name', message: 'Le nom lisible du registre est obligatoire.' });
     }
 
-    const urlIssue = validateRegistryUrl(registry.url);
+    const urlIssue = validateRegistryUrl(registry.url, origin);
     if (urlIssue) {
       issues.push({ field: 'url', message: urlIssue });
     }
@@ -526,7 +530,10 @@ export class RegistryConfigService {
 
   private readScope(scope: 'user' | 'workspace'): CustomSearchUrlConfig[] {
     const inspected = this.config.inspect<unknown[]>(SEARCH_URLS_SETTING);
-    return this.normalizeList(scope === 'user' ? inspected?.userValue : inspected?.workspaceValue);
+    return this.normalizeList(
+      scope === 'user' ? inspected?.userValue : inspected?.workspaceValue,
+      scope
+    );
   }
 
   /**
@@ -568,7 +575,7 @@ export class RegistryConfigService {
    * Les identifiants sont rendus uniques : seule la première entrée portant un
    * identifiant donné est retenue.
    */
-  private normalizeList(raw: unknown): CustomSearchUrlConfig[] {
+  private normalizeList(raw: unknown, origin: RegistryOrigin): CustomSearchUrlConfig[] {
     if (!Array.isArray(raw)) return [];
     const normalized: CustomSearchUrlConfig[] = [];
     const seenIds = new Set<string>();
@@ -577,7 +584,7 @@ export class RegistryConfigService {
       const registry = this.withDefaults(entry as Partial<CustomSearchUrlConfig>);
       // Une entrée invalide est ignorée plutôt que de faire échouer la lecture
       // complète du réglage : la vue des réglages signale le problème.
-      if (RegistryConfigService.validate(registry).length > 0) continue;
+      if (RegistryConfigService.validate(registry, origin).length > 0) continue;
       if (seenIds.has(registry.id)) continue;
       seenIds.add(registry.id);
       normalized.push(registry);
@@ -636,8 +643,12 @@ export function canonicalizeUrl(rawUrl: string): string {
 /**
  * Contrôle de forme et de sécurité d'une URL de registre. Retourne le message
  * d'erreur à afficher, ou `null` lorsque l'URL est acceptable.
+ *
+ * Les adresses de bouclage ne sont tolérées que pour un registre d'origine
+ * utilisateur : un dépôt ne doit pas pouvoir diriger des requêtes vers les
+ * services qui écoutent localement sur le poste.
  */
-export function validateRegistryUrl(rawUrl: string): string | null {
+export function validateRegistryUrl(rawUrl: string, origin: RegistryOrigin = 'user'): string | null {
   if (!rawUrl || rawUrl.trim().length === 0) {
     return "L'URL du registre est obligatoire.";
   }
@@ -649,19 +660,39 @@ export function validateRegistryUrl(rawUrl: string): string | null {
     return `L'URL « ${rawUrl} » n'est pas syntaxiquement valide.`;
   }
 
+  const host = parsed.hostname.toLowerCase();
+  if (origin === 'workspace' && isLoopbackHost(host)) {
+    return "Un registre défini par l'espace de travail ne peut pas viser une adresse locale du poste.";
+  }
+
   if (parsed.protocol === 'https:') {
     return null;
   }
 
   if (parsed.protocol === 'http:') {
-    const host = parsed.hostname.toLowerCase();
-    if (host === 'localhost' || host === '127.0.0.1' || host === '::1') {
+    if (origin === 'user' && isLoopbackHost(host)) {
       return null;
     }
-    return "Le protocole HTTP n'est toléré que pour les adresses locales (localhost ou 127.0.0.1) ; utilisez HTTPS.";
+    return "Le protocole HTTP n'est toléré que pour les adresses locales (localhost ou 127.0.0.1) de vos réglages utilisateur ; utilisez HTTPS.";
   }
 
   return `Le protocole « ${parsed.protocol} » n'est pas pris en charge : utilisez HTTPS.`;
+}
+
+/**
+ * Reconnaît une adresse de bouclage : localhost et ses sous-domaines, toute la
+ * plage 127.0.0.0/8, 0.0.0.0 et ::1 (l'analyseur d'URL restitue l'IPv6 entre
+ * crochets).
+ */
+function isLoopbackHost(host: string): boolean {
+  return (
+    host === 'localhost' ||
+    host.endsWith('.localhost') ||
+    /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host) ||
+    host === '0.0.0.0' ||
+    host === '::1' ||
+    host === '[::1]'
+  );
 }
 
 /** Convertit une étiquette de type arbitraire en catégorie connue. */

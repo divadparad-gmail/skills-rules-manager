@@ -534,7 +534,7 @@ describe('Suite de Tests : Réglages des registres et du répertoire NAS', () =>
 
     await assert.rejects(
       () => service.addRegistry({ ...piege, url: 'https://encore.exemple.tld/v1' }),
-      /antigravity.registry.hub/
+      /antigravity\.registry\.hub/
     );
   });
 
@@ -594,6 +594,43 @@ describe('Suite de Tests : Réglages des registres et du répertoire NAS', () =>
     await assert.rejects(
       () => service.storeCredential({ ...registry, origin: 'workspace' }, 'jeton'),
       /espace de travail/
+    );
+  });
+
+  // ------------------------------------------------------------------
+  // Non-régression : registry-localhost-ssrf (audit run-1)
+  // ------------------------------------------------------------------
+
+  test("30. Adresse de bouclage : écartée pour l'espace de travail, admise pour l'utilisateur", () => {
+    const local = buildRegistry({ id: 'local', url: 'http://127.0.0.1:8080/v1/search' });
+
+    const depot = new FakeConfiguration();
+    depot.workspace.set(SEARCH_URLS_SETTING, [local]);
+    assert.deepStrictEqual(new RegistryConfigService(depot).getEffectiveRegistries(), []);
+
+    const utilisateur = new FakeConfiguration();
+    utilisateur.user.set(SEARCH_URLS_SETTING, [local]);
+    const effective = new RegistryConfigService(utilisateur).getEffectiveRegistries();
+    assert.deepStrictEqual(effective.map((entry) => entry.id), ['local']);
+  });
+
+  test('31. Adresse de bouclage : toutes ses formes sont refusées à un dépôt, même en HTTPS', async () => {
+    [
+      'http://localhost:3000/v1',
+      'https://localhost/v1',
+      'http://api.localhost/v1',
+      'http://127.1.2.3/v1',
+      'http://0.0.0.0:8080/v1',
+      'http://[::1]:8080/v1',
+    ].forEach((url) => {
+      assert.match(validateRegistryUrl(url, 'workspace') ?? '', /adresse locale/, url);
+    });
+    assert.strictEqual(validateRegistryUrl('http://[::1]:8080/v1', 'user'), null);
+
+    const service = new RegistryConfigService(new FakeConfiguration());
+    await assert.rejects(
+      () => service.addRegistry({ id: 'local', name: 'Local', url: 'http://localhost:3000/v1' }, 'workspace'),
+      /adresse locale/
     );
   });
 });
