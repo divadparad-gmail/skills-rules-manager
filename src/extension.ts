@@ -11,6 +11,7 @@ import { extensionEventBus } from './common/ExtensionEventBus';
 import { DiscoveryViewProvider } from './ui/DiscoveryViewProvider';
 import { EnvironmentStatusBar } from './ui/EnvironmentStatusBar';
 import { registerDiscoveryCommands, refreshFavoritesContextKey } from './ui/discoveryCommands';
+import { registerManifestPreview } from './ui/vscodeDeployReview';
 import { HostEnvironmentDetector } from './environment/HostEnvironmentDetector';
 import { AgentRuntimeDetector } from './environment/AgentRuntimeDetector';
 
@@ -129,6 +130,8 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(environmentStatusBar);
 
   registerDiscoveryCommands(context, container, discoveryProvider, environmentStatusBar);
+  // Aperçu en lecture seule des manifestes, montré avant toute installation.
+  registerManifestPreview(context);
 
   // La clé de contexte des favoris pilote l'activation du raccourci de
   // déploiement express : elle suit chaque bascule d'étoile.

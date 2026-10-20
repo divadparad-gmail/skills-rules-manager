@@ -4,9 +4,13 @@
  * Un même manifeste peut être injecté dans trois destinations : le dépôt
  * ouvert, le partage NAS centralisé ou le profil global de la machine. Le
  * service choisit la destination réelle en fonction de l'agent détecté,
- * applique la politique de conflit demandée, vérifie le contenu avant écriture
- * et replie le déploiement NAS sur le projet local lorsque le partage est
- * injoignable.
+ * applique la politique de conflit demandée, contrôle la forme du contenu
+ * avant écriture et replie le déploiement NAS sur le projet local lorsque le
+ * partage est injoignable.
+ *
+ * Le fichier déployé sera lu comme instruction par un agent : aucun filtre ne
+ * peut garantir qu'il est inoffensif. La décision appartient à l'utilisateur,
+ * à qui le parcours de `deployReview` montre le contenu avant l'écriture.
  */
 
 import * as fs from 'fs';
@@ -15,6 +19,7 @@ import {
   ConflictPolicy,
   DeploymentRequest,
   DeploymentResult,
+  ManifestProvenance,
 } from '../common/discoveryTypes';
 import { AgentRuntime, DeployTarget } from '../common/eventTypes';
 import { ExtensionEventBus } from '../common/ExtensionEventBus';
@@ -30,9 +35,15 @@ export interface DeployContext {
   agentsDirName: string | null;
 }
 
-export interface SecurityVerdict {
+/**
+ * Verdict du contrôle de manifeste. `issues` bloque l'écriture ; `warnings`
+ * ne bloque rien et sert à alerter l'utilisateur dans la fenêtre de
+ * confirmation.
+ */
+export interface ManifestVerdict {
   safe: boolean;
   issues: string[];
+  warnings: string[];
 }
 
 /** Opérations de fichiers injectables, pour tester sans toucher au disque. */
@@ -77,9 +88,13 @@ export class MultiTargetDeployService {
       return this.finish(request, {
         success: false,
         target: request.target,
-        error: `Le manifeste a été refusé par la validation de sécurité : ${verdict.issues.join(' ')}`,
+        error: `Le manifeste a été refusé : ${verdict.issues.join(' ')}`,
       });
     }
+
+    const content = request.provenance
+      ? withProvenance(request.manifest, request.provenance)
+      : request.manifest;
 
     let effectiveTarget: DeployTarget = request.target;
     let fellBackToLocal = false;
@@ -136,7 +151,7 @@ export class MultiTargetDeployService {
 
     try {
       await this.fileSystem.mkdir(resolution.directory);
-      await this.fileSystem.writeFile(resolution.file, request.manifest);
+      await this.fileSystem.writeFile(resolution.file, content);
 
       // Les annexes (scripts, références) accompagnent les compétences et les
       // workflows ; elles sont écrites sous le dossier de la ressource.
@@ -266,10 +281,12 @@ export class MultiTargetDeployService {
   }
 
   /**
-   * Vérification du manifeste avant écriture : présence de contenu, taille
-   * bornée et absence de constructions manifestement hostiles.
+   * Contrôle de forme du manifeste avant écriture : présence de contenu,
+   * taille bornée et absence de balisage exécutable. Ce contrôle ne dit rien
+   * de ce que le texte demande à l'agent ; les tournures suspectes sont
+   * seulement signalées en avertissement, sans bloquer.
    */
-  public static validateManifest(manifest: string): SecurityVerdict {
+  public static validateManifest(manifest: string): ManifestVerdict {
     const issues: string[] = [];
 
     if (typeof manifest !== 'string' || manifest.trim().length === 0) {
@@ -289,8 +306,113 @@ export class MultiTargetDeployService {
       issues.push('le contenu embarque un lien à protocole javascript ;');
     }
 
-    return { safe: issues.length === 0, issues };
+    return { safe: issues.length === 0, issues, warnings: detectAgentDirectives(manifest ?? '') };
   }
+}
+
+/**
+ * Tournures typiques d'une instruction détournée : lecture de fichiers du
+ * poste, envoi vers l'extérieur, dissimulation à l'utilisateur, consigne
+ * prioritaire ou commande système. Les motifs portent sur un texte mis en
+ * minuscules et privé de ses accents.
+ */
+const AGENT_DIRECTIVE_PATTERNS: Array<{ pattern: RegExp; message: string }> = [
+  {
+    pattern:
+      /\b(lis|lire|lisez|ouvre|ouvrir|parcours|parcourir|collecte|collecter|recupere|recuperer|extrais|extraire|copie|copier|read|open|scan|collect|gather|extract|dump|cat)\b[^.\n]{0,80}(fichiers? de (configuration|config)|configuration files?|config files?|du poste|de la machine|de l'ordinateur|on (the|this) (machine|computer)|home directory|repertoire (personnel|utilisateur)|\.env\b|\.ssh|id_rsa|\.aws|credentials?|identifiants?|secrets?|tokens?|jetons?|mots? de passe|passwords?|cles? (d'api|privees?)|api keys?|private keys?|variables d'environnement|environment variables)/,
+    message: 'Le texte demande de lire des fichiers ou des secrets du poste.',
+  },
+  {
+    pattern:
+      /\b(envoie|envoyer|transmets|transmettre|televerse|televerser|publie|publier|send|post|upload|transmit|exfiltrat\w*|exfiltr\w*)\b[^.\n]{0,80}(https?:\/\/|\burl\b|serveur|server|webhook|endpoint|adresse)/,
+    message: 'Le texte demande de transmettre des données vers une adresse extérieure.',
+  },
+  {
+    pattern:
+      /(ne (le |les |rien )?(dis|dites|mentionne|mentionnez|signale|signalez|revele|revelez) (pas|rien)|sans (le )?(dire|signaler|mentionner|prevenir|informer)|(do not|don't|never) (tell|mention|reveal|inform|show)|without (telling|informing|notifying))/,
+    message: "Le texte demande de cacher une action à l'utilisateur.",
+  },
+  {
+    pattern:
+      /(ignore[rz]? (toutes |les )?(les )?(instructions|consignes|regles) (precedentes|anterieures|ci-dessus)|ignore (all |any )?(previous|prior|above|earlier) (instructions|rules)|avant (toute|chaque) reponse|before (any|every|each) (response|answer|reply)|(priorite|priority) (absolue|maximale|over all))/,
+    message: "Le texte tente d'imposer une consigne prioritaire à l'agent.",
+  },
+  {
+    pattern:
+      /(\bcurl\s|\bwget\s|invoke-webrequest|invoke-restmethod|\biwr\s|\brm\s+-rf\b|remove-item\b[^\n]*-recurse|\bbase64\b|powershell\s+-e(nc)?\b|\/etc\/passwd|%appdata%|\$env:)/,
+    message: 'Le texte contient une commande système ou un chemin sensible.',
+  },
+  {
+    pattern:
+      /\b(desactive|desactiver|contourne|contourner|disable|bypass|skip)\b[^.\n]{0,60}(securite|confirmation|verification|security|safety|hooks?|permissions?|sandbox|bac a sable)/,
+    message: 'Le texte demande de désactiver une protection ou une confirmation.',
+  },
+];
+
+/**
+ * Détection heuristique de tournures d'instruction destinées à un agent.
+ * Elle produit des avertissements à montrer à l'utilisateur, jamais un
+ * blocage : un manifeste légitime peut employer ces tournures, et un
+ * manifeste hostile peut les éviter.
+ */
+export function detectAgentDirectives(manifest: string): string[] {
+  const normalized = manifest
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[‘’]/g, "'")
+    .toLowerCase();
+  return AGENT_DIRECTIVE_PATTERNS.filter(({ pattern }) => pattern.test(normalized)).map(
+    ({ message }) => message
+  );
+}
+
+/**
+ * Consigne la provenance dans le manifeste sans déplacer son frontmatter.
+ *
+ * Lorsque le fichier commence par un frontmatter YAML, une clé `source` y est
+ * ajoutée juste avant le délimiteur de fin, après retrait de toute clé
+ * `source` fournie par le registre lui-même (elle pourrait se prétendre
+ * d'une autre origine). Sans frontmatter, la provenance est ajoutée en
+ * commentaire HTML à la fin du fichier, pour ne pas créer un frontmatter qui
+ * changerait la façon dont l'agent charge une règle.
+ */
+export function withProvenance(manifest: string, provenance: ManifestProvenance): string {
+  const parts = [`registre « ${provenance.registryName} » (${provenance.registryId})`];
+  if (provenance.url) parts.push(provenance.url);
+  parts.push(`installé le ${provenance.installedAt}`);
+  const summary = parts.join(', ');
+
+  const frontmatter = /^(﻿?---[ \t]*(\r?\n))([\s\S]*?)(\r?\n---[ \t]*(?:\r?\n|$))/.exec(manifest);
+  if (frontmatter) {
+    const [whole, opening, newline, body, closing] = frontmatter;
+    const kept = stripYamlKey(body, 'source', newline);
+    // JSON est un sous-ensemble de YAML : la valeur est échappée sans ambiguïté.
+    const line = `source: ${JSON.stringify(summary)}`;
+    const merged = kept.length > 0 ? `${kept}${newline}${line}` : line;
+    return `${opening}${merged}${closing}${manifest.slice(whole.length)}`;
+  }
+
+  const newline = manifest.includes('\r\n') ? '\r\n' : '\n';
+  const safeSummary = summary.replace(/--/g, '—');
+  const separator = manifest.endsWith('\n') ? '' : newline;
+  return `${manifest}${separator}${newline}<!-- source : ${safeSummary} -->${newline}`;
+}
+
+/** Retire une clé de premier niveau et ses lignes de continuation indentées. */
+function stripYamlKey(yaml: string, key: string, newline: string): string {
+  const lines = yaml.split(/\r?\n/);
+  const kept: string[] = [];
+  let skipping = false;
+  for (const line of lines) {
+    if (new RegExp(`^${key}\\s*:`).test(line)) {
+      skipping = true;
+      continue;
+    }
+    if (skipping && /^[ \t]+\S|^[ \t]*-\s/.test(line)) continue;
+    skipping = false;
+    kept.push(line);
+  }
+  return kept.join(newline);
 }
 
 /**

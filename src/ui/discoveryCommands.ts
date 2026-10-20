@@ -9,15 +9,14 @@
  */
 
 import * as vscode from 'vscode';
-import * as fs from 'fs';
-import * as path from 'path';
 import { DiscoveryContainer } from '../common/container';
-import { DeployTarget, DiscoveryResourceType } from '../common/eventTypes';
+import { DeployTarget } from '../common/eventTypes';
 import { SkillSearchResult } from '../common/discoveryTypes';
 import { DiscoveryViewProvider } from './DiscoveryViewProvider';
 import { EnvironmentStatusBar } from './EnvironmentStatusBar';
-import { AgentRuntimeDetector } from '../environment/AgentRuntimeDetector';
 import { GEMINI_API_KEY_SECRET } from '../search/GeminiClient';
+import { ReviewableResource, reviewAndDeploy } from '../deploy/deployReview';
+import { createVsCodeDeployReview, currentDeployEnvironment } from './vscodeDeployReview';
 
 const TARGET_LABELS: Array<{ target: DeployTarget; label: string; detail: string }> = [
   {
@@ -191,6 +190,9 @@ async function runQuickDeploy(container: DiscoveryContainer): Promise<void> {
     name: chosen.favorite.name,
     type: chosen.favorite.type,
     manifest,
+    registryId: chosen.favorite.registryId,
+    registryName: chosen.favorite.registryName,
+    url: chosen.favorite.url,
   });
 }
 
@@ -211,94 +213,32 @@ async function promptAndDeploy(
     name: result.name,
     type: result.type,
     manifest,
+    registryId: result.registryId,
+    registryName: result.registryName,
+    url: result.url,
   });
 }
 
-/** Demande la cible puis exécute le déploiement et rend compte du résultat. */
-async function deployResource(
-  container: DiscoveryContainer,
-  resource: { id: string; name: string; type: DiscoveryResourceType; manifest: string }
-): Promise<void> {
+/**
+ * Demande la cible puis confie l'aperçu, la confirmation et le déploiement au
+ * parcours partagé avec la vue Découverte.
+ */
+async function deployResource(container: DiscoveryContainer, resource: ReviewableResource): Promise<void> {
   const targetChoice = await vscode.window.showQuickPick(TARGET_LABELS, {
     title: `Où intégrer « ${resource.name} » ?`,
   });
   if (!targetChoice) return;
 
-  const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? null;
-  const runtime = AgentRuntimeDetector.getContext(workspaceRoot).runtime;
-  const conflictPolicy = vscode.workspace
-    .getConfiguration()
-    .get<'prompt' | 'overwrite' | 'increment'>('antigravity.skills.conflictPolicy', 'prompt');
-
-  const result = await container.deploy.deploy(
-    {
-      skillId: stripRegistryPrefix(resource.id),
-      name: resource.name,
-      type: resource.type,
-      manifest: resource.manifest,
-      target: targetChoice.target,
-      conflictPolicy,
-    },
-    { runtime, workspaceRoot, agentsDirName: detectAgentsDirName(workspaceRoot) }
+  await reviewAndDeploy(
+    container.deploy,
+    resource,
+    { target: targetChoice.target, ...currentDeployEnvironment() },
+    createVsCodeDeployReview((level, message) => {
+      if (level === 'error') {
+        void vscode.window.showErrorMessage(message);
+      } else {
+        void vscode.window.showInformationMessage(message);
+      }
+    })
   );
-
-  if (result.success) {
-    const suffix = result.fellBackToLocal
-      ? ' (repli local : le partage NAS était injoignable)'
-      : result.versioned
-        ? ' (version incrémentée)'
-        : '';
-    vscode.window.showInformationMessage(
-      `« ${resource.name} » a été déployée vers ${result.targetPath}${suffix}.`
-    );
-    return;
-  }
-
-  if (conflictPolicy === 'prompt' && result.error?.includes('existe déjà')) {
-    const choice = await vscode.window.showWarningMessage(
-      result.error,
-      { modal: true },
-      'Écraser',
-      'Créer une version'
-    );
-    if (!choice) return;
-
-    const retry = await container.deploy.deploy(
-      {
-        skillId: stripRegistryPrefix(resource.id),
-        name: resource.name,
-        type: resource.type,
-        manifest: resource.manifest,
-        target: targetChoice.target,
-        conflictPolicy: choice === 'Écraser' ? 'overwrite' : 'increment',
-      },
-      { runtime, workspaceRoot, agentsDirName: detectAgentsDirName(workspaceRoot) }
-    );
-    if (retry.success) {
-      vscode.window.showInformationMessage(
-        `« ${resource.name} » a été déployée vers ${retry.targetPath}.`
-      );
-    } else {
-      vscode.window.showErrorMessage(retry.error ?? 'Le déploiement a échoué.');
-    }
-    return;
-  }
-
-  vscode.window.showErrorMessage(result.error ?? 'Le déploiement a échoué.');
-}
-
-function stripRegistryPrefix(compositeId: string): string {
-  const separatorIndex = compositeId.indexOf(':');
-  const raw = separatorIndex >= 0 ? compositeId.slice(separatorIndex + 1) : compositeId;
-  return raw.trim().length > 0 ? raw : compositeId;
-}
-
-function detectAgentsDirName(workspaceRoot: string | null): string | null {
-  if (!workspaceRoot) return null;
-  for (const candidate of ['.agents', '.agent']) {
-    if (fs.existsSync(path.join(workspaceRoot, candidate))) {
-      return candidate;
-    }
-  }
-  return '.agents';
 }

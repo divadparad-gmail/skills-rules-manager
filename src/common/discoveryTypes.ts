@@ -207,6 +207,21 @@ export interface DeploymentRequest {
   conflictPolicy: ConflictPolicy;
   /** Fichiers annexes du paquet, chemins relatifs à la racine de la ressource. */
   assets?: Array<{ relativePath: string; content: string }>;
+  /** Origine du manifeste, consignée dans le fichier déployé. */
+  provenance?: ManifestProvenance;
+}
+
+/**
+ * Provenance d'un manifeste venu d'un registre, pour qu'elle reste lisible
+ * dans le fichier déployé longtemps après l'installation.
+ */
+export interface ManifestProvenance {
+  registryId: string;
+  registryName: string;
+  /** Adresse de la ressource dans le registre, lorsqu'elle est connue. */
+  url?: string;
+  /** Horodatage ISO 8601 de l'installation. */
+  installedAt: string;
 }
 
 /**

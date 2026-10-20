@@ -26,6 +26,8 @@ import { RecentSearchesStore } from '../search/RecentSearchesStore';
 import { RegistryConfigService } from '../settings/RegistryConfigService';
 import { NasPathService } from '../settings/NasPathService';
 import { MultiTargetDeployService } from '../deploy/MultiTargetDeployService';
+import { reviewAndDeploy } from '../deploy/deployReview';
+import { createVsCodeDeployReview, currentDeployEnvironment } from './vscodeDeployReview';
 import { HostEnvironmentDetector } from '../environment/HostEnvironmentDetector';
 import { AgentRuntimeDetector } from '../environment/AgentRuntimeDetector';
 import { GEMINI_API_KEY_SECRET } from '../search/GeminiClient';
@@ -284,16 +286,18 @@ export class DiscoveryViewProvider implements vscode.WebviewViewProvider {
   }
 
   /**
-   * Déploie une ressource vers l'une des trois cibles. Le manifeste provient
-   * des derniers résultats ou du cache hors ligne des favoris.
+   * Déploie une ressource vers l'une des trois cibles, après aperçu et
+   * confirmation. Le manifeste provient des derniers résultats ou du cache
+   * hors ligne des favoris.
    */
   private async deployResource(id: string, target: DeployTarget): Promise<void> {
     const fromResults = this.lastResults.get(id);
     const favorite = this.deps.favorites.listAll({}).find((item) => item.id === id);
     const manifest =
       fromResults?.manifest ?? this.deps.favorites.readCachedManifest(id) ?? favorite?.manifest;
+    const source = fromResults ?? favorite;
 
-    if (!manifest) {
+    if (!manifest || !source) {
       this.notify(
         'error',
         "Le manifeste de cette ressource est introuvable : relancez la recherche pour le récupérer."
@@ -301,78 +305,25 @@ export class DiscoveryViewProvider implements vscode.WebviewViewProvider {
       return;
     }
 
-    const name = fromResults?.name ?? favorite?.name ?? id;
-    const type = fromResults?.type ?? favorite?.type ?? 'skills';
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-    const runtime = AgentRuntimeDetector.getContext(workspaceFolder?.uri.fsPath ?? null).runtime;
-
-    const conflictPolicy = vscode.workspace
-      .getConfiguration()
-      .get<'prompt' | 'overwrite' | 'increment'>('antigravity.skills.conflictPolicy', 'prompt');
-
-    const result = await this.deps.deploy.deploy(
+    const environment = currentDeployEnvironment();
+    const result = await reviewAndDeploy(
+      this.deps.deploy,
       {
-        skillId: this.toResourceId(id, name),
-        name,
-        type,
+        id,
+        name: source.name,
+        type: source.type,
         manifest,
-        target,
-        conflictPolicy,
+        registryId: source.registryId,
+        registryName: source.registryName,
+        url: source.url,
       },
-      {
-        runtime,
-        workspaceRoot: workspaceFolder?.uri.fsPath ?? null,
-        agentsDirName: this.detectAgentsDirName(workspaceFolder?.uri.fsPath ?? null),
-      }
+      { target, ...environment },
+      createVsCodeDeployReview((level, message) => this.notify(level, message))
     );
 
-    if (result.success) {
-      const suffix = result.fellBackToLocal
-        ? ' (repli sur le projet local : le partage NAS était injoignable)'
-        : result.versioned
-          ? ' (une version incrémentée a été créée)'
-          : '';
-      this.notify('info', `« ${name} » a été déployée vers ${result.targetPath}${suffix}.`);
+    if (result?.success) {
       await this.deps.favorites.markUsed(id);
-      return;
     }
-
-    // En politique « demander », le service rend la main : on propose ici les
-    // deux issues possibles plutôt que d'échouer silencieusement.
-    if (conflictPolicy === 'prompt' && result.error?.includes('existe déjà')) {
-      const choice = await vscode.window.showWarningMessage(
-        result.error,
-        { modal: true },
-        'Écraser',
-        'Créer une version'
-      );
-      if (!choice) return;
-
-      const retry = await this.deps.deploy.deploy(
-        {
-          skillId: this.toResourceId(id, name),
-          name,
-          type,
-          manifest,
-          target,
-          conflictPolicy: choice === 'Écraser' ? 'overwrite' : 'increment',
-        },
-        {
-          runtime,
-          workspaceRoot: workspaceFolder?.uri.fsPath ?? null,
-          agentsDirName: this.detectAgentsDirName(workspaceFolder?.uri.fsPath ?? null),
-        }
-      );
-      this.notify(
-        retry.success ? 'info' : 'error',
-        retry.success
-          ? `« ${name} » a été déployée vers ${retry.targetPath}.`
-          : retry.error ?? 'Le déploiement a échoué.'
-      );
-      return;
-    }
-
-    this.notify('error', result.error ?? 'Le déploiement a échoué.');
   }
 
   private async confirmAndRemoveRegistry(id: string): Promise<void> {
@@ -548,26 +499,6 @@ export class DiscoveryViewProvider implements vscode.WebviewViewProvider {
   // ------------------------------------------------------------------
   // Utilitaires
   // ------------------------------------------------------------------
-
-  /**
-   * Convertit l'identifiant composite « registre:entrée » en identifiant de
-   * ressource utilisable comme nom de dossier.
-   */
-  private toResourceId(compositeId: string, fallbackName: string): string {
-    const separatorIndex = compositeId.indexOf(':');
-    const raw = separatorIndex >= 0 ? compositeId.slice(separatorIndex + 1) : compositeId;
-    return raw.trim().length > 0 ? raw : fallbackName;
-  }
-
-  private detectAgentsDirName(workspaceRoot: string | null): string | null {
-    if (!workspaceRoot) return null;
-    for (const candidate of ['.agents', '.agent']) {
-      if (fs.existsSync(path.join(workspaceRoot, candidate))) {
-        return candidate;
-      }
-    }
-    return '.agents';
-  }
 
   private renderHtml(webview: vscode.Webview): string {
     const styleUri = webview.asWebviewUri(
