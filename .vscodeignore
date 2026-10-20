@@ -15,5 +15,7 @@ tsconfig.test.json
 .claude/**
 CLAUDE.md
 .mcp.json
-out/previews/**
+out/**
+esbuild.js
 
+node_modules/**

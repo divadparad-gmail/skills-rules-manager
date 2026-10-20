@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src {{cspSource}} 'unsafe-inline'; script-src 'nonce-{{nonce}}'; font-src {{cspSource}};">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="{{styleUri}}">
+  <title>Découverte & Intégration</title>
+</head>
+<body>
+  <nav class="tabs" role="tablist" aria-label="Sections de la vue Découverte">
+    <button class="tab is-active" role="tab" id="tabSearch" data-panel="panelSearch" aria-selected="true">Recherche</button>
+    <button class="tab" role="tab" id="tabFavorites" data-panel="panelFavorites" aria-selected="false">Favoris</button>
+    <button class="tab" role="tab" id="tabSettings" data-panel="panelSettings" aria-selected="false">Réglages</button>
+  </nav>
+
+  <div id="envBadge" class="env-badge" role="status" aria-live="polite">
+    <span id="envHost">Détection de l'environnement…</span>
+    <button id="btnEnvDiagnostics" class="link-button" type="button" title="Afficher les diagnostics d'environnement">Diagnostics</button>
+  </div>
+
+  <!-- ------------------------------------------------------------------ -->
+  <!-- Panneau : Recherche & Découverte                                    -->
+  <!-- ------------------------------------------------------------------ -->
+  <section id="panelSearch" class="panel is-active" role="tabpanel" aria-labelledby="tabSearch">
+    <fieldset class="type-selector">
+      <legend>Catégories recherchées</legend>
+      <label><input type="checkbox" class="type-pill" value="skills" checked> Compétences</label>
+      <label><input type="checkbox" class="type-pill" value="rules" checked> Règles</label>
+      <label><input type="checkbox" class="type-pill" value="workflows" checked> Workflows</label>
+      <label><input type="checkbox" class="type-pill" value="hooks" checked> Hooks</label>
+    </fieldset>
+
+    <div class="search-row">
+      <label class="visually-hidden" for="searchInput">Description de la recherche</label>
+      <input
+        id="searchInput"
+        type="text"
+        autocomplete="off"
+        placeholder="Décrivez ce que vous cherchez, par exemple : extraire des tableaux dynamiques derrière une authentification"
+        aria-describedby="searchHint">
+      <button id="btnHistory" class="icon-button" type="button" title="Afficher les recherches récentes" aria-haspopup="listbox" aria-expanded="false">🕘</button>
+      <button id="btnSearch" class="primary-button" type="button">Rechercher</button>
+    </div>
+    <p id="searchHint" class="hint">Flèche bas dans un champ vide : rappeler l'historique. Entrée : lancer la recherche.</p>
+
+    <ul id="historyDropdown" class="history-dropdown" role="listbox" hidden></ul>
+    <div id="historyChips" class="history-chips" aria-label="Recherches récentes"></div>
+
+    <fieldset class="filters">
+      <legend>Tri et filtres</legend>
+      <label><input type="radio" name="sortBy" value="relevance" checked> Pertinence</label>
+      <label><input type="radio" name="sortBy" value="downloads"> Téléchargements</label>
+      <label><input type="radio" name="sortBy" value="comments"> Commentaires</label>
+      <label><input type="radio" name="sortBy" value="rating"> Note</label>
+      <label class="filter-inline">
+        Note minimale
+        <select id="minRating">
+          <option value="0">Toutes</option>
+          <option value="3">3 étoiles et plus</option>
+          <option value="4">4 étoiles et plus</option>
+          <option value="4.5">4,5 étoiles et plus</option>
+        </select>
+      </label>
+      <label class="filter-inline"><input type="checkbox" id="verifiedOnly"> Ressources vérifiées seulement</label>
+    </fieldset>
+
+    <div id="refinements" class="refinements" hidden></div>
+    <div id="searchStatus" class="status" role="status" aria-live="polite"></div>
+    <div id="results" class="cards" role="list"></div>
+  </section>
+
+  <!-- ------------------------------------------------------------------ -->
+  <!-- Panneau : Favoris                                                   -->
+  <!-- ------------------------------------------------------------------ -->
+  <section id="panelFavorites" class="panel" role="tabpanel" aria-labelledby="tabFavorites" hidden>
+    <div class="search-row">
+      <label class="visually-hidden" for="favoriteFilter">Filtrer les favoris</label>
+      <input id="favoriteFilter" type="text" placeholder="Filtrer les favoris par mot-clé ou étiquette" autocomplete="off">
+      <label class="visually-hidden" for="favoriteSort">Trier les favoris</label>
+      <select id="favoriteSort">
+        <option value="recent">Récemment utilisés</option>
+        <option value="alphabetical">Alphabétique</option>
+        <option value="category">Par catégorie</option>
+      </select>
+    </div>
+    <div class="button-row">
+      <button id="btnExportFavorites" class="secondary-button" type="button">Exporter…</button>
+      <button id="btnImportFavorites" class="secondary-button" type="button">Importer…</button>
+    </div>
+    <div id="favorites" class="cards" role="list"></div>
+  </section>
+
+  <!-- ------------------------------------------------------------------ -->
+  <!-- Panneau : Réglages (registres, NAS, clé Gemini)                     -->
+  <!-- ------------------------------------------------------------------ -->
+  <section id="panelSettings" class="panel" role="tabpanel" aria-labelledby="tabSettings" hidden>
+    <h2>Registres de recherche</h2>
+    <p class="hint">Les sources actives sont interrogées en parallèle ; la priorité détermine la source retenue en cas de doublon.</p>
+    <div id="registries" class="registry-list"></div>
+
+    <details class="registry-form">
+      <summary>Ajouter un registre</summary>
+      <label>Identifiant<input id="newRegistryId" type="text" placeholder="registre-interne"></label>
+      <label>Nom affiché<input id="newRegistryName" type="text" placeholder="Hub d'entreprise"></label>
+      <label>URL<input id="newRegistryUrl" type="url" placeholder="https://skills.exemple.internal/v1/search"></label>
+      <label>Authentification
+        <select id="newRegistryAuth">
+          <option value="none">Aucune</option>
+          <option value="bearer">Jeton porteur</option>
+          <option value="apiKey">Clé d'API</option>
+          <option value="basic">Authentification de base</option>
+          <option value="customHeader">En-tête personnalisé</option>
+        </select>
+      </label>
+      <button id="btnAddRegistry" class="primary-button" type="button">Ajouter</button>
+    </details>
+
+    <h2>Répertoire NAS</h2>
+    <p id="nasPath" class="mono"></p>
+    <div class="button-row">
+      <button id="btnBrowseNas" class="secondary-button" type="button">Parcourir…</button>
+      <button id="btnValidateNas" class="secondary-button" type="button">Valider le chemin</button>
+    </div>
+    <p id="nasStatus" class="status" role="status" aria-live="polite"></p>
+
+    <h2>Recherche sémantique</h2>
+    <p id="geminiStatus" class="hint"></p>
+    <button id="btnGeminiKey" class="secondary-button" type="button">Configurer la clé Gemini…</button>
+  </section>
+
+  <div id="notification" class="notification" role="alert" hidden></div>
+
+  <script nonce="{{nonce}}" src="{{scriptUri}}"></script>
+</body>
+</html>

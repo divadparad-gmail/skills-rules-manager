@@ -83,6 +83,23 @@ Lorsqu'on orchestre des agents IA modernes (Google Antigravity, Claude Code), l'
 - Détection asynchrone non-bloquante avec timeout court.
 - En cas de déconnexion du NAS, l'interface affiche élégamment l'état `⚠️ NAS Hors Ligne` sans bloquer le travail sur le projet local ou global.
 
+### 5. Découverte & Intégration de Ressources Externes
+- **Recherche sémantique** : décrivez en langage naturel ce que vous cherchez (« extraire des tableaux dynamiques derrière une authentification ») ; le moteur déconstruit l'intention, la pile technique visée et les contraintes, puis explique pourquoi chaque résultat correspond. Sans clé Gemini, une analyse lexicale locale prend le relais : la recherche reste utilisable hors ligne.
+- **Recherche fédérée multi-registres** : les sources actives sont interrogées en parallèle sous plafond de concurrence, les réponses agrégées, puis dédoublonnées — la source de plus haute priorité l'emporte et les autres sont citées en badge. Un registre lent ou en panne n'interrompt jamais la recherche.
+- **Trois cibles d'intégration** : chaque fiche porte les actions « Intégrer au projet local », « Intégrer au NAS » et « Intégrer au projet global ». La destination réelle suit l'agent détecté (`.agents/` pour Anti-Gravity, `.claude/` pour Claude Code) et la politique de conflit choisie (demander, écraser ou incrémenter).
+- **Favoris hors ligne** : les ressources mises en favori conservent leur manifeste en cache local, consultable et déployable sans réseau, avec étiquettes personnelles, export et import de collections.
+- **Historique des recherches** : requêtes conservées dans deux portées (projet et machine), éviction du moins récemment utilisé, pastilles de rappel rapide et saisie semi-automatique. Rien ne quitte la machine.
+
+### 6. Détection d'Environnement Adaptative
+- **Hôte** : une matrice heuristique à cinq signaux (métadonnées applicatives, `product.json`, chemin du binaire, variables d'environnement, socket locale) attribue un score sur 120 ; au-delà de 60 points, l'extension bascule en mode natif Anti-Gravity. La sonde est bornée à moins de 50 ms et n'interrompt jamais l'amorçage.
+- **Agent** : les variables d'environnement et les marqueurs de l'espace de travail départagent Anti-Gravity de Claude Code, et les manifestes sont traduits en conséquence (frontmatter, déclarations d'outils MCP, commandes slash).
+- **Dérogation manuelle** : le badge de la barre d'état ouvre un sélecteur de mode, et la commande de diagnostics détaille chaque signal avec son score brut.
+
+### 7. Architecture Modulaire & Médiateur d'Événements
+- Les vues sont des composants autonomes : aucune ne détient de référence vers une autre, toutes les interactions passent par un médiateur typé (`ExtensionEventBus`) à enveloppe normalisée.
+- Une vue repliée ne perd rien : ses messages sont mis en file circulaire bornée puis rejoués à sa réapparition, après un instantané d'état qui élimine tout affichage périmé.
+- Un abonné fautif ne fait jamais tomber l'hôte d'extension : son erreur part en file de lettres mortes et la diffusion se poursuit vers les vues voisines.
+
 ---
 
 ## ⚡ Installation Express (.vsix)
@@ -110,6 +127,17 @@ code --install-extension skills-rules-manager-0.3.5.vsix
 | `skillsManager.claudeGlobalPath` | `string` | `""` (auto-détecté `~/.claude`) | Emplacement des compétences Claude Code |
 | `skillsManager.defaultProjectTool` | `enum` | `"auto-detect"` | Outil cible local (`auto-detect`, `antigravity`, `claude-code`) |
 | `skillsManager.debugTiming` | `boolean` | `false` | Mesure et journal de performance des scans et de la tokenisation |
+| `antigravity.skills.searchUrls` | `array` | `[]` | Registres interrogés lors de la recherche fédérée (identifiant, nom, URL, priorité, authentification, délai, catégories servies) |
+| `antigravity.skills.enableDefaultRegistry` | `boolean` | `true` | Interroge le registre Anti-Gravity officiel en plus des registres personnalisés |
+| `antigravity.skills.requestTimeoutMs` | `number` | `5000` | Délai d'attente de repli des requêtes de registres (1 000 à 30 000 ms) |
+| `antigravity.skills.maxParallelRegistryQueries` | `number` | `5` | Nombre maximal de registres interrogés simultanément |
+| `antigravity.skills.nasDirectoryPath` | `string` | `""` | Répertoire NAS d'intégration : chemins UNC, lecteurs mappés, montages POSIX et variables `${env:NOM}` |
+| `antigravity.skills.conflictPolicy` | `enum` | `"prompt"` | Conduite à tenir si la ressource existe déjà (`prompt`, `overwrite`, `increment`) |
+| `antigravity.search.recentSearchesLimit` | `number` | `10` | Nombre de recherches conservées dans l'historique (jusqu'à 50) |
+| `antigravity.environment.hostOverride` | `enum` | `"auto"` | Force l'hôte (`auto`, `antigravity-native`, `vscode-standalone`) |
+| `antigravity.environment.overrideMode` | `enum` | `"auto"` | Force l'agent ciblé (`auto`, `antigravity`, `claude-code`) |
+
+> Les identifiants d'accès aux registres privés ne sont jamais écrits dans `settings.json` : ils sont confiés au coffre chiffré du système (`SecretStorage`) et référencés par `secretKeyRef`.
 
 ---
 
@@ -122,15 +150,26 @@ Accessibles depuis la palette de commandes (`Ctrl+Shift+P` / `Cmd+Shift+P`) :
 - `Skills & Rules Manager: Désactiver tous les Workflows (wf-*)`
 - `Skills & Rules Manager: Activer tous les Skills`
 - `Skills & Rules Manager: Autoriser l'hôte NAS (UNC) dans la sécurité VS Code`
+- `Anti-Gravity: Rechercher une compétence, une règle, un workflow ou un hook` — `Ctrl+Alt+S` / `Cmd+Alt+S`
+- `Anti-Gravity: Palette de recherche rapide des compétences` — `Ctrl+Alt+K` / `Cmd+Alt+K`
+- `Anti-Gravity: Déployer rapidement une compétence favorite` — `Ctrl+Alt+I` / `Cmd+Alt+I`
+- `Anti-Gravity: Basculer le mode de fonctionnement (IDE hôte et agent)` — `Ctrl+Alt+E` / `Cmd+Alt+E`
+- `Anti-Gravity: Afficher les diagnostics d'environnement`
+- `Anti-Gravity: Configurer la clé d'API Gemini pour la recherche sémantique`
+
+Le panneau latéral s'ouvre par `Ctrl+Shift+G` / `Cmd+Shift+G`. Dans la liste de résultats, les flèches parcourent les fiches et `Alt+L`, `Alt+N`, `Alt+G` déclenchent respectivement l'intégration locale, NAS et globale.
 
 ---
 
 ## 🧪 Tests & Qualité de Code
 
-Le projet est couvert par une suite de 42 tests unitaires automatisés validant la synchronisation de données, l'intégrité, l'isolation bi-moteur et le Coach IA :
+Le projet est couvert par une suite de 178 tests unitaires automatisés validant la synchronisation de données, l'intégrité, l'isolation bi-moteur, le Coach IA, le médiateur d'événements, la détection d'environnement, la recherche fédérée, les favoris hors ligne et le pipeline de déploiement :
 
 ```bash
-npm test
+npm test          # contrôle syntaxique des vues, compilation et 178 tests
+npm run type-check # vérification de types stricte, sans émission
+npm run bundle     # paquet de production esbuild (dist/extension.js)
+npm run package    # archive .vsix distribuable
 ```
 
 ---

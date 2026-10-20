@@ -18,7 +18,7 @@
   "activationEvents": [
     "onStartupFinished"
   ],
-  "main": "./out/extension.js",
+  "main": "./dist/extension.js",
   "contributes": {
     "viewsContainers": {
       "activitybar": [
@@ -35,6 +35,11 @@
           "type": "webview",
           "id": "skillsRulesManagerView",
           "name": "Skills & Rules"
+        },
+        {
+          "type": "webview",
+          "id": "antigravityDiscoveryView",
+          "name": "Découverte & Intégration"
         }
       ]
     },
@@ -71,6 +76,42 @@
         "command": "skillsRulesManager.allowNasUncHost",
         "title": "Autoriser l'hôte NAS (UNC) dans la sécurité VS Code",
         "category": "Skills & Rules Manager"
+      },
+      {
+        "command": "antigravity.discovery.focusSearch",
+        "title": "Rechercher une compétence, une règle, un workflow ou un hook",
+        "category": "Anti-Gravity",
+        "icon": "$(search)"
+      },
+      {
+        "command": "antigravity.discovery.quickSearch",
+        "title": "Palette de recherche rapide des compétences",
+        "category": "Anti-Gravity",
+        "icon": "$(zap)"
+      },
+      {
+        "command": "antigravity.discovery.quickDeploy",
+        "title": "Déployer rapidement une compétence favorite",
+        "category": "Anti-Gravity",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "antigravity.environment.override",
+        "title": "Basculer le mode de fonctionnement (IDE hôte et agent)",
+        "category": "Anti-Gravity",
+        "icon": "$(circuit-board)"
+      },
+      {
+        "command": "antigravity.environment.diagnostics",
+        "title": "Afficher les diagnostics d'environnement",
+        "category": "Anti-Gravity",
+        "icon": "$(info)"
+      },
+      {
+        "command": "antigravity.skills.setGeminiKey",
+        "title": "Configurer la clé d'API Gemini pour la recherche sémantique",
+        "category": "Anti-Gravity",
+        "icon": "$(key)"
       }
     ],
     "menus": {
@@ -119,26 +160,226 @@
           "type": "boolean",
           "default": false,
           "description": "Active la mesure et le journal de performance des scans et de la tokenisation dans le canal de sortie 'Skills & Rules Manager'"
+        },
+        "antigravity.skills.searchUrls": {
+          "type": "array",
+          "scope": "resource",
+          "default": [],
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "name",
+              "url"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Identifiant unique ou slug du registre, par exemple « corp-internal-registry »."
+              },
+              "name": {
+                "type": "string",
+                "description": "Libellé lisible affiché sur les badges de résultats et les filtres."
+              },
+              "url": {
+                "type": "string",
+                "format": "uri",
+                "description": "URL du point de terminaison de recherche et d'indexation."
+              },
+              "enabled": {
+                "type": "boolean",
+                "default": true,
+                "description": "Inclut ou exclut ce registre de la diffusion parallèle."
+              },
+              "priority": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100,
+                "default": 10,
+                "description": "Ordre de précédence lors de l'agrégation et du dédoublonnage."
+              },
+              "authType": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "bearer",
+                  "apiKey",
+                  "basic",
+                  "customHeader"
+                ],
+                "default": "none",
+                "description": "Schéma d'authentification exigé par le registre."
+              },
+              "secretKeyRef": {
+                "type": "string",
+                "description": "Clé du secret conservé dans le coffre chiffré ; aucun identifiant n'est écrit ici."
+              },
+              "customHeaders": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "description": "En-têtes HTTP additionnels, par exemple {\"X-Organization-ID\": \"ai-core\"}."
+              },
+              "timeoutMs": {
+                "type": "integer",
+                "minimum": 1000,
+                "maximum": 30000,
+                "default": 5000,
+                "description": "Délai d'attente propre à ce registre, en millisecondes."
+              },
+              "supportedTypes": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "skills",
+                    "rules",
+                    "workflows",
+                    "hooks"
+                  ]
+                },
+                "default": [
+                  "skills",
+                  "rules",
+                  "workflows",
+                  "hooks"
+                ],
+                "description": "Catégories de ressources servies par ce registre."
+              }
+            }
+          },
+          "markdownDescription": "Points de terminaison de registres interrogés lors de la recherche fédérée. Les entrées définies dans l'espace de travail complètent celles de l'utilisateur, puis la liste est dédoublonnée sur l'URL canonique."
+        },
+        "antigravity.skills.enableDefaultRegistry": {
+          "type": "boolean",
+          "default": true,
+          "description": "Interroge le registre Anti-Gravity officiel en plus des registres personnalisés."
+        },
+        "antigravity.skills.requestTimeoutMs": {
+          "type": "number",
+          "default": 5000,
+          "minimum": 1000,
+          "maximum": 30000,
+          "description": "Délai d'attente de repli appliqué aux requêtes de registres, en millisecondes."
+        },
+        "antigravity.skills.maxParallelRegistryQueries": {
+          "type": "number",
+          "default": 5,
+          "minimum": 1,
+          "maximum": 20,
+          "description": "Nombre maximal de registres interrogés simultanément lors de la diffusion parallèle."
+        },
+        "antigravity.skills.nasDirectoryPath": {
+          "type": "string",
+          "default": "",
+          "scope": "resource",
+          "markdownDescription": "Chemin du répertoire NAS centralisé utilisé par l'action « Intégrer au NAS ». Les chemins UNC (`\\\\\\\\Nas1\\\\DD2\\\\IA\\\\skills`), les lecteurs mappés (`Z:\\\\skills`), les points de montage POSIX (`/mnt/nas/skills`) et les variables d'environnement (`${env:NAS_ROOT}/skills`) sont pris en charge."
+        },
+        "antigravity.skills.conflictPolicy": {
+          "type": "string",
+          "enum": [
+            "prompt",
+            "overwrite",
+            "increment"
+          ],
+          "default": "prompt",
+          "enumDescriptions": [
+            "Demander quoi faire lorsque la ressource existe déjà.",
+            "Écraser la version déjà déployée.",
+            "Créer une version incrémentée à côté de l'existante."
+          ],
+          "description": "Politique appliquée lorsqu'une ressource de même nom existe déjà à destination."
+        },
+        "antigravity.search.recentSearchesLimit": {
+          "type": "number",
+          "default": 10,
+          "minimum": 1,
+          "maximum": 50,
+          "description": "Nombre de recherches conservées dans l'historique, par éviction du moins récemment utilisé."
+        },
+        "antigravity.environment.hostOverride": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "antigravity-native",
+            "vscode-standalone"
+          ],
+          "default": "auto",
+          "enumDescriptions": [
+            "Laisser la matrice heuristique décider.",
+            "Forcer le mode natif de l'IDE Anti-Gravity.",
+            "Forcer le mode autonome VS Code."
+          ],
+          "description": "Force le mode de fonctionnement de l'hôte au lieu de la détection automatique."
+        },
+        "antigravity.environment.overrideMode": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "antigravity",
+            "claude-code"
+          ],
+          "default": "auto",
+          "enumDescriptions": [
+            "Laisser la sonde décider de l'agent actif.",
+            "Forcer les déploiements vers Anti-Gravity.",
+            "Forcer les déploiements vers Claude Code."
+          ],
+          "description": "Force l'agent ciblé par les déploiements au lieu de la détection automatique."
         }
       }
-    }
+    },
+    "keybindings": [
+      {
+        "command": "workbench.view.extension.skills-rules-manager-sidebar",
+        "key": "ctrl+shift+g",
+        "mac": "cmd+shift+g"
+      },
+      {
+        "command": "antigravity.discovery.focusSearch",
+        "key": "ctrl+alt+s",
+        "mac": "cmd+alt+s"
+      },
+      {
+        "command": "antigravity.discovery.quickSearch",
+        "key": "ctrl+alt+k",
+        "mac": "cmd+alt+k"
+      },
+      {
+        "command": "antigravity.discovery.quickDeploy",
+        "key": "ctrl+alt+i",
+        "mac": "cmd+alt+i",
+        "when": "antigravityHasFavorites"
+      },
+      {
+        "command": "antigravity.environment.override",
+        "key": "ctrl+alt+e",
+        "mac": "cmd+alt+e"
+      }
+    ]
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile",
+    "vscode:prepublish": "npm run type-check && npm run bundle",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "type-check": "tsc --noEmit",
-    "test": "node -c src/webview/main.js && node -c src/webview/cheatsheet.js && tsc -p tsconfig.test.json && node --test out-test/test/**/*.test.js",
+    "test": "node -c src/webview/main.js && node -c src/webview/cheatsheet.js && node -c src/webview/discovery.js && tsc -p tsconfig.test.json && node --test out-test/test/**/*.test.js",
     "test:deploy-antigravity": "node test/scenarios/scripts/runner.js antigravity",
     "test:deploy-claude": "node test/scenarios/scripts/runner.js claude-code",
     "test:deploy-all": "node test/scenarios/scripts/runner.js all",
     "test:clean": "node test/scenarios/scripts/runner.js clean",
-    "package": "vsce package --no-git-tag-version"
+    "package": "vsce package --no-git-tag-version",
+    "bundle": "node esbuild.js --production",
+    "bundle:dev": "node esbuild.js",
+    "watch:bundle": "node esbuild.js --watch"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
     "@types/vscode": "^1.85.0",
     "@vscode/vsce": "^2.24.0",
+    "esbuild": "^0.28.2",
     "puppeteer-core": "^25.14.0",
     "typescript": "^5.3.3"
   },
