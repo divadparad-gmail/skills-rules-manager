@@ -130,10 +130,6 @@ export class RegistryConfigService {
     );
   }
 
-  public isDefaultRegistryEnabled(): boolean {
-    return this.config.get<boolean>('antigravity.skills.enableDefaultRegistry', true);
-  }
-
   public getGlobalTimeoutMs(): number {
     const raw = this.config.get<number>('antigravity.skills.requestTimeoutMs', DEFAULT_TIMEOUT_MS);
     return clamp(raw, MIN_TIMEOUT_MS, MAX_TIMEOUT_MS);

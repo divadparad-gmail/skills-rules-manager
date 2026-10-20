@@ -112,7 +112,11 @@ describe('Suite de Tests : Chaîne de construction et contributions du manifeste
   test('6. Réglages auxiliaires : clés, valeurs par défaut et bornes conformes au PRD', () => {
     const properties = readPackageJson().contributes.configuration.properties;
 
-    assert.strictEqual(properties['antigravity.skills.enableDefaultRegistry'].default, true);
+    assert.strictEqual(
+      properties['antigravity.skills.enableDefaultRegistry'],
+      undefined,
+      "Aucun registre implicite n'est proposé : le réglage d'activation a disparu."
+    );
     assert.strictEqual(properties['antigravity.skills.requestTimeoutMs'].default, 5000);
     assert.strictEqual(properties['antigravity.skills.maxParallelRegistryQueries'].default, 5);
     assert.strictEqual(properties['antigravity.skills.nasDirectoryPath'].default, '');
@@ -239,5 +243,18 @@ describe('Suite de Tests : Chaîne de construction et contributions du manifeste
 
     assert.match(script, /registry\.origin === 'workspace'/);
     assert.match(script, /défini par ce dépôt/);
+  });
+
+  test("15. Registre par défaut : aucun domaine non vérifié n'est codé en dur dans les sources", () => {
+    const sources = [
+      'src/search/FederatedSearchService.ts',
+      'src/settings/RegistryConfigService.ts',
+      'src/webview/discovery.js',
+    ];
+    for (const file of sources) {
+      const content = fs.readFileSync(path.join(ROOT, file), 'utf8');
+      assert.ok(!content.includes('antigravity.dev'), `${file} ne doit plus viser registry.antigravity.dev.`);
+      assert.ok(!content.includes('DEFAULT_REGISTRY'), `${file} ne doit plus déclarer de registre implicite.`);
+    }
   });
 });

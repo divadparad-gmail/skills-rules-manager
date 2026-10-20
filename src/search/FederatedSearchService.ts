@@ -30,18 +30,6 @@ export interface HttpSearchPort {
   ): Promise<{ statusCode: number; body: string }>;
 }
 
-/** Registre officiel interrogé en complément des sources personnalisées. */
-export const DEFAULT_REGISTRY: CustomSearchUrlConfig = {
-  id: 'antigravity-default',
-  name: 'Registre Anti-Gravity officiel',
-  url: 'https://registry.antigravity.dev/v1/search',
-  enabled: true,
-  priority: 1,
-  authType: 'none',
-  timeoutMs: 5000,
-  supportedTypes: ['skills', 'rules', 'workflows', 'hooks'],
-};
-
 export interface FederatedSearchOutcome {
   queryId: string;
   results: SkillSearchResult[];
@@ -129,16 +117,12 @@ export class FederatedSearchService {
   }
 
   /**
-   * Compose la liste des registres à interroger : sources personnalisées
-   * actives, complétées du registre officiel si celui-ci reste activé.
+   * Compose la liste des registres à interroger : uniquement les sources
+   * actives configurées. Aucun registre implicite n'est ajouté : la
+   * description saisie ne part que vers des serveurs choisis explicitement.
    */
   public collectRegistries(types: DiscoveryResourceType[]): CustomSearchUrlConfig[] {
-    const custom = this.registryConfig.getActiveRegistries(types);
-    if (!this.registryConfig.isDefaultRegistryEnabled()) {
-      return custom;
-    }
-    // Le registre officiel est placé en tête, sa priorité valant 1.
-    return [DEFAULT_REGISTRY, ...custom];
+    return this.registryConfig.getActiveRegistries(types);
   }
 
   /**

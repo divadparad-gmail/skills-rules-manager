@@ -15,7 +15,6 @@ import { RankingEngine, logNormalize } from '../src/search/RankingEngine';
 import {
   buildDedupKey,
   buildSearchUrl,
-  DEFAULT_REGISTRY,
   FederatedSearchService,
   parseRegistryResponse,
   runWithConcurrencyLimit,
@@ -352,8 +351,6 @@ describe('Suite de Tests : Découverte sémantique, classement et recherche féd
     config.user.set(SEARCH_URLS_SETTING, [
       buildRegistry({ id: 'interne', name: 'Hub interne', url: 'https://interne.exemple.com/v1', priority: 2 }),
     ]);
-    config.user.set('antigravity.skills.enableDefaultRegistry', false);
-
     const bus = new ExtensionEventBus();
     const topics: string[] = [];
     bus.subscribe('skill:search:initiated', (envelope) => { topics.push(envelope.topic); });
@@ -394,8 +391,6 @@ describe('Suite de Tests : Découverte sémantique, classement et recherche féd
       buildRegistry({ id: 'sain', name: 'Sain', url: 'https://sain.exemple.com/v1', priority: 1 }),
       buildRegistry({ id: 'panne', name: 'En panne', url: 'https://panne.exemple.com/v1', priority: 2 }),
     ]);
-    config.user.set('antigravity.skills.enableDefaultRegistry', false);
-
     const service = new FederatedSearchService(
       new RegistryConfigService(config),
       {
@@ -423,8 +418,6 @@ describe('Suite de Tests : Découverte sémantique, classement et recherche féd
   test('22. Identifiants refusés : le registre est signalé comme en échec authentifié', async () => {
     const config = new FakeConfiguration();
     config.user.set(SEARCH_URLS_SETTING, [buildRegistry({ id: 'prive', name: 'Privé' })]);
-    config.user.set('antigravity.skills.enableDefaultRegistry', false);
-
     const service = new FederatedSearchService(
       new RegistryConfigService(config),
       { get: async () => ({ statusCode: 403, body: '' }) },
@@ -437,19 +430,26 @@ describe('Suite de Tests : Découverte sémantique, classement et recherche féd
     assert.match(outcome.failures[0].reason, /refusés/);
   });
 
-  test('23. Registre officiel : il est interrogé en tête tant qu’il reste activé', () => {
+  test("23. Aucun registre implicite : sans configuration, la description ne part vers aucun serveur", async () => {
     const config = new FakeConfiguration();
+    // Un ancien réglage resté dans settings.json ne doit rien réactiver.
+    config.user.set('antigravity.skills.enableDefaultRegistry', true);
+    const urls: string[] = [];
     const service = new FederatedSearchService(
       new RegistryConfigService(config),
-      { get: async () => ({ statusCode: 200, body: '[]' }) },
+      {
+        get: async (url: string) => {
+          urls.push(url);
+          return { statusCode: 200, body: '[]' };
+        },
+      },
       new SemanticSearchEngine()
     );
 
-    const avec = service.collectRegistries(['skills']);
-    assert.strictEqual(avec[0].id, DEFAULT_REGISTRY.id);
-
-    config.user.set('antigravity.skills.enableDefaultRegistry', false);
-    assert.strictEqual(service.collectRegistries(['skills']).length, 0);
+    assert.deepStrictEqual(service.collectRegistries(['skills', 'rules', 'workflows', 'hooks']), []);
+    const outcome = await service.search({ query: 'projet confidentiel', types: ['skills'], sortBy: 'relevance' });
+    assert.deepStrictEqual(urls, [], 'Aucune requête ne doit partir sans registre configuré.');
+    assert.strictEqual(outcome.results.length, 0);
   });
 
   test("24. Historique : la ré-exécution promeut la requête sans la dupliquer", async () => {

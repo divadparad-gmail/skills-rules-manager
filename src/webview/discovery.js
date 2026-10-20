@@ -565,7 +565,7 @@
     if (registries.length === 0) {
       const empty = document.createElement('p');
       empty.className = 'empty-state';
-      empty.textContent = 'Aucun registre personnalisé : seul le registre officiel est interrogé.';
+      empty.textContent = 'Aucun registre configuré : ajoutez-en un ci-dessous pour lancer des recherches.';
       el.registries.appendChild(empty);
       return;
     }

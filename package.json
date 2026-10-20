@@ -262,11 +262,6 @@
           },
           "markdownDescription": "Points de terminaison de registres interrogés lors de la recherche fédérée. Les entrées définies dans l'espace de travail complètent celles de l'utilisateur, puis la liste est dédoublonnée sur l'URL canonique."
         },
-        "antigravity.skills.enableDefaultRegistry": {
-          "type": "boolean",
-          "default": true,
-          "description": "Interroge le registre Anti-Gravity officiel en plus des registres personnalisés."
-        },
         "antigravity.skills.requestTimeoutMs": {
           "type": "number",
           "default": 5000,

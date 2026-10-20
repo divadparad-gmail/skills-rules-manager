@@ -330,7 +330,6 @@ describe('Suite de Tests : Réglages des registres et du répertoire NAS', () =>
     const config = new FakeConfiguration();
     const service = new RegistryConfigService(config);
 
-    assert.strictEqual(service.isDefaultRegistryEnabled(), true);
     assert.strictEqual(service.getGlobalTimeoutMs(), 5000);
     assert.strictEqual(service.getMaxParallelQueries(), 5);
 

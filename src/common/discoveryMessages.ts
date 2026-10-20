@@ -25,7 +25,6 @@ export interface DiscoveryViewState {
   hostOverridden: boolean;
   runtime: AgentRuntime;
   registries: CustomSearchUrlConfig[];
-  defaultRegistryEnabled: boolean;
   favorites: FavoriteSkill[];
   recentSearches: RecentSearchEntry[];
   nasPath: string;

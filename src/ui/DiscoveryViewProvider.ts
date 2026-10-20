@@ -463,7 +463,6 @@ export class DiscoveryViewProvider implements vscode.WebviewViewProvider {
       hostOverridden: hostContext.overridden,
       runtime: runtimeContext.runtime,
       registries: this.deps.registryConfig.getEffectiveRegistries(),
-      defaultRegistryEnabled: this.deps.registryConfig.isDefaultRegistryEnabled(),
       favorites: this.deps.favorites.listAll({}),
       recentSearches: this.deps.recentSearches.listMerged(),
       nasPath: this.deps.nasPaths.getEffectivePath(),
