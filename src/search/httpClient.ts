@@ -37,7 +37,8 @@ export function request(url: string, options: HttpRequestOptions): Promise<HttpR
     try {
       parsed = new URL(url);
     } catch {
-      reject(new Error(`L'URL « ${url} » n'est pas valide.`));
+      // L'URL n'est pas citée : elle pourrait porter un identifiant.
+      reject(new Error("L'URL de la requête n'est pas valide."));
       return;
     }
 

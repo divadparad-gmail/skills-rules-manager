@@ -29,6 +29,8 @@ import {
 } from '../src/settings/RegistryConfigService';
 import { CustomSearchUrlConfig, SkillSearchResult } from '../src/common/discoveryTypes';
 import { ExtensionEventBus } from '../src/common/ExtensionEventBus';
+import { GEMINI_API_KEY_SECRET, GeminiClient } from '../src/search/GeminiClient';
+import { HttpRequestOptions, request } from '../src/search/httpClient';
 
 class FakeConfiguration implements ConfigurationPort {
   public user = new Map<string, unknown>();
@@ -545,5 +547,51 @@ describe('Suite de Tests : Découverte sémantique, classement et recherche féd
 
     assert.strictEqual(entries.length, 1);
     assert.strictEqual(entries[0].query, 'valide');
+  });
+
+  // ------------------------------------------------------------------
+  // Non-régression : gemini-key-in-query-string (audit run-1)
+  // ------------------------------------------------------------------
+
+  test("30. Clé Gemini : elle voyage dans l'en-tête x-goog-api-key, jamais dans l'URL", async () => {
+    const cle = 'AIza-cle-tres-secrete';
+    const appels: Array<{ url: string; options: HttpRequestOptions }> = [];
+    const client = new GeminiClient(
+      {
+        get: async (key: string) => (key === GEMINI_API_KEY_SECRET ? cle : undefined),
+        store: async () => undefined,
+        delete: async () => undefined,
+      },
+      {
+        transport: async (url, options) => {
+          appels.push({ url, options });
+          return url.includes('batchEmbedContents')
+            ? { statusCode: 200, body: JSON.stringify({ embeddings: [{ values: [1, 0] }] }) }
+            : { statusCode: 200, body: JSON.stringify({ candidates: [{ content: { parts: [{ text: '{}' }] } }] }) };
+        },
+      }
+    );
+
+    await client.generate('demande');
+    await client.embed(['texte']);
+
+    assert.strictEqual(appels.length, 2);
+    for (const appel of appels) {
+      assert.ok(!appel.url.includes(cle), "La clé ne doit jamais figurer dans l'URL.");
+      assert.ok(!/[?&]key=/.test(appel.url), 'Aucun paramètre key= ne doit subsister.');
+      assert.strictEqual(appel.options.headers['x-goog-api-key'], cle);
+    }
+  });
+
+  test("31. Transport : le message d'URL invalide ne cite pas l'URL, donc aucun identifiant", async () => {
+    const cle = 'AIza-cle-tres-secrete';
+    await assert.rejects(
+      () => request(`pas une url ?key=${cle}`, { headers: {}, timeoutMs: 1000 }),
+      (err: Error) => {
+        assert.ok(!err.message.includes(cle), 'Le message ne doit pas contenir la clé.');
+        assert.match(err.message, /n'est pas valide/);
+        return true;
+      }
+    );
   });
 });

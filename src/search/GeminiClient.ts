@@ -7,11 +7,13 @@
  *
  * La clé d'API est lue à la demande dans le coffre chiffré ; elle n'est jamais
  * conservée en mémoire au-delà de l'appel, ni écrite dans la configuration.
+ * Elle voyage dans l'en-tête `x-goog-api-key`, jamais dans l'URL : une chaîne
+ * de requête finit dans les journaux des intermédiaires et des serveurs.
  */
 
 import { GeminiClientPort } from './SemanticSearchEngine';
 import { SecretStoragePort } from '../settings/RegistryConfigService';
-import { request } from './httpClient';
+import { HttpRequestOptions, HttpResponse, request } from './httpClient';
 
 export const GEMINI_API_KEY_SECRET = 'antigravity.gemini.apiKey';
 export const DEFAULT_REASONING_MODEL = 'gemini-2.5-flash';
@@ -23,6 +25,8 @@ export interface GeminiClientOptions {
   embeddingModel?: string;
   /** Point d'entrée alternatif, utile pour un déploiement d'entreprise. */
   apiRoot?: string;
+  /** Transport HTTP, injectable pour les tests ; le transport natif par défaut. */
+  transport?: (url: string, options: HttpRequestOptions) => Promise<HttpResponse>;
 }
 
 export class GeminiClient implements GeminiClientPort {
@@ -44,11 +48,11 @@ export class GeminiClient implements GeminiClientPort {
   public async generate(prompt: string, options: { timeoutMs?: number } = {}): Promise<string> {
     const apiKey = await this.requireApiKey();
     const model = this.options.reasoningModel ?? DEFAULT_REASONING_MODEL;
-    const url = `${this.apiRoot()}/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+    const url = `${this.apiRoot()}/${model}:generateContent`;
 
-    const response = await request(url, {
+    const response = await this.send(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
       timeoutMs: options.timeoutMs ?? 10000,
       body: JSON.stringify({
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
@@ -72,11 +76,11 @@ export class GeminiClient implements GeminiClientPort {
 
     const apiKey = await this.requireApiKey();
     const model = this.options.embeddingModel ?? DEFAULT_EMBEDDING_MODEL;
-    const url = `${this.apiRoot()}/${model}:batchEmbedContents?key=${encodeURIComponent(apiKey)}`;
+    const url = `${this.apiRoot()}/${model}:batchEmbedContents`;
 
-    const response = await request(url, {
+    const response = await this.send(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
       timeoutMs: options.timeoutMs ?? 12000,
       body: JSON.stringify({
         requests: texts.map((text) => ({
@@ -91,6 +95,10 @@ export class GeminiClient implements GeminiClientPort {
     }
 
     return extractEmbeddings(response.body);
+  }
+
+  private send(url: string, options: HttpRequestOptions): Promise<HttpResponse> {
+    return (this.options.transport ?? request)(url, options);
   }
 
   private apiRoot(): string {
