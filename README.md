@@ -85,8 +85,8 @@ Lorsqu'on orchestre des agents IA modernes (Google Antigravity, Claude Code), l'
 
 ### 5. Découverte & Intégration de Ressources Externes
 - **Recherche sémantique** : décrivez en langage naturel ce que vous cherchez (« extraire des tableaux dynamiques derrière une authentification ») ; le moteur déconstruit l'intention, la pile technique visée et les contraintes, puis explique pourquoi chaque résultat correspond. Sans clé Gemini, une analyse lexicale locale prend le relais : la recherche reste utilisable hors ligne.
-- **Recherche fédérée multi-registres** : les sources actives sont interrogées en parallèle sous plafond de concurrence, les réponses agrégées, puis dédoublonnées — la source de plus haute priorité l'emporte et les autres sont citées en badge. Un registre lent ou en panne n'interrompt jamais la recherche.
-- **Trois cibles d'intégration** : chaque fiche porte les actions « Intégrer au projet local », « Intégrer au NAS » et « Intégrer au projet global ». La destination réelle suit l'agent détecté (`.agents/` pour Anti-Gravity, `.claude/` pour Claude Code) et la politique de conflit choisie (demander, écraser ou incrémenter).
+- **Recherche fédérée multi-registres** : les registres que vous avez configurés sont interrogés en parallèle sous plafond de concurrence, les réponses agrégées, puis dédoublonnées — la source de plus haute priorité l'emporte et les autres sont citées en badge. Un registre lent ou en panne n'interrompt jamais la recherche. Aucun registre n'est interrogé implicitement : tant qu'aucun n'est configuré, la description saisie ne part vers aucun serveur.
+- **Trois cibles d'intégration** : chaque fiche porte les actions « Intégrer au projet local », « Intégrer au NAS » et « Intégrer au projet global ». La destination réelle suit l'agent détecté (`.agents/` pour Anti-Gravity, `.claude/` pour Claude Code) et la politique de conflit choisie (demander, écraser ou incrémenter). Avant toute écriture, le manifeste est affiché en lecture seule et une confirmation explicite est demandée.
 - **Favoris hors ligne** : les ressources mises en favori conservent leur manifeste en cache local, consultable et déployable sans réseau, avec étiquettes personnelles, export et import de collections.
 - **Historique des recherches** : requêtes conservées dans deux portées (projet et machine), éviction du moins récemment utilisé, pastilles de rappel rapide et saisie semi-automatique. Rien ne quitte la machine.
 
@@ -127,8 +127,7 @@ code --install-extension skills-rules-manager-0.3.5.vsix
 | `skillsManager.claudeGlobalPath` | `string` | `""` (auto-détecté `~/.claude`) | Emplacement des compétences Claude Code |
 | `skillsManager.defaultProjectTool` | `enum` | `"auto-detect"` | Outil cible local (`auto-detect`, `antigravity`, `claude-code`) |
 | `skillsManager.debugTiming` | `boolean` | `false` | Mesure et journal de performance des scans et de la tokenisation |
-| `antigravity.skills.searchUrls` | `array` | `[]` | Registres interrogés lors de la recherche fédérée (identifiant, nom, URL, priorité, authentification, délai, catégories servies) |
-| `antigravity.skills.enableDefaultRegistry` | `boolean` | `true` | Interroge le registre Anti-Gravity officiel en plus des registres personnalisés |
+| `antigravity.skills.searchUrls` | `array` | `[]` | Registres interrogés lors de la recherche fédérée (identifiant, nom, URL, priorité, authentification, délai, catégories servies). C'est la seule source de la recherche : aucun registre par défaut n'est interrogé |
 | `antigravity.skills.requestTimeoutMs` | `number` | `5000` | Délai d'attente de repli des requêtes de registres (1 000 à 30 000 ms) |
 | `antigravity.skills.maxParallelRegistryQueries` | `number` | `5` | Nombre maximal de registres interrogés simultanément |
 | `antigravity.skills.nasDirectoryPath` | `string` | `""` | Répertoire NAS d'intégration : chemins UNC, lecteurs mappés, montages POSIX et variables `${env:NOM}` |
@@ -137,7 +136,40 @@ code --install-extension skills-rules-manager-0.3.5.vsix
 | `antigravity.environment.hostOverride` | `enum` | `"auto"` | Force l'hôte (`auto`, `antigravity-native`, `vscode-standalone`) |
 | `antigravity.environment.overrideMode` | `enum` | `"auto"` | Force l'agent ciblé (`auto`, `antigravity`, `claude-code`) |
 
-> Les identifiants d'accès aux registres privés ne sont jamais écrits dans `settings.json` : ils sont confiés au coffre chiffré du système (`SecretStorage`) et référencés par `secretKeyRef`.
+> Les identifiants d'accès aux registres privés ne sont jamais écrits dans `settings.json` : ils sont confiés au coffre chiffré du système (`SecretStorage`) et référencés par `secretKeyRef`, qui vaut toujours `antigravity.registry.<id>`.
+
+> Le réglage `antigravity.skills.enableDefaultRegistry` a été supprimé avec le registre par défaut qu'il activait. S'il subsiste dans votre `settings.json`, il est simplement ignoré.
+
+---
+
+## 🔒 Sécurité
+
+La découverte de ressources fait entrer du contenu tiers dans le contexte de votre agent et envoie vos descriptions de recherche à des serveurs. Les garde-fous suivants s'appliquent.
+
+### Registres définis par un dépôt
+
+Un dépôt cloné peut déclarer ses propres registres dans son `.vscode/settings.json`. L'extension les traite comme non fiables :
+
+- **Aucun accès au coffre.** Un registre d'espace de travail ne reçoit jamais de secret ni d'en-tête personnalisé, quelle que soit la valeur de `secretKeyRef`. Il ne peut pas non plus recevoir d'identifiant depuis la vue.
+- **Origine non falsifiable.** L'origine d'un registre (utilisateur ou dépôt) est calculée à la lecture de la configuration ; un champ `origin` écrit dans `settings.json` est ignoré.
+- **Clé de coffre canonique.** Un registre ne peut désigner que sa propre clé, `antigravity.registry.<id>`. Toute autre valeur, par exemple la clé Gemini, invalide l'entrée.
+- **Pas d'usurpation.** Les identifiants en double sont écartés, et un registre de dépôt ne peut pas reprendre l'identifiant d'un de vos registres.
+- **Pas d'adresse locale.** Un registre de dépôt ne peut pas viser `localhost`, `127.0.0.0/8`, `0.0.0.0` ni `::1`. La tolérance HTTP des adresses locales reste réservée à vos réglages utilisateur.
+- **Signalement visuel.** La vue Découverte affiche un badge « défini par ce dépôt » sur ces registres.
+- **Mode restreint.** Dans un espace de travail non approuvé, VS Code ignore les valeurs de dépôt de `antigravity.skills.searchUrls` et `antigravity.skills.nasDirectoryPath`.
+
+### Installation d'un manifeste distant
+
+Un manifeste installé est lu comme instruction par votre agent. Aucun filtre automatique ne peut garantir qu'il est inoffensif ; la décision vous revient :
+
+- Le manifeste est ouvert dans un onglet en lecture seule, puis une fenêtre « Installer / Annuler » rappelle son nom et son registre d'origine. Rien n'est écrit sans confirmation.
+- Une heuristique signale dans cette fenêtre les tournures suspectes : lecture de fichiers ou de secrets du poste, envoi vers une adresse extérieure, consigne cachée à l'utilisateur, instruction prioritaire, commande système. Elle avertit sans bloquer et ne remplace pas votre relecture.
+- La provenance (registre, adresse, date d'installation) est consignée dans une clé `source:` du frontmatter, ou en commentaire final si le fichier n'a pas de frontmatter.
+
+### Données transmises
+
+- **Registres configurés** : la description saisie (reformulée par l'analyse d'intention lorsqu'elle est disponible), les catégories recherchées et le nombre de résultats souhaité, en paramètres `q`, `types` et `limit` de l'URL.
+- **Gemini**, si une clé est enregistrée : la description à analyser, puis les descriptions des résultats candidats pour le calcul de pertinence. La clé voyage dans l'en-tête `x-goog-api-key`, jamais dans l'URL.
 
 ---
 
