@@ -356,6 +356,13 @@ select {
   font-size: 0.78em;
 }
 
+/* Origine d'un registre imposé par le dépôt ouvert. */
+.badge-workspace {
+  background-color: var(--vscode-inputValidation-warningBackground);
+  color: var(--vscode-foreground);
+  border: 1px solid var(--vscode-inputValidation-warningBorder);
+}
+
 .metrics {
   display: flex;
   flex-wrap: wrap;

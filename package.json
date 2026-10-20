@@ -12,6 +12,16 @@
   "engines": {
     "vscode": "^1.85.0"
   },
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "En mode restreint, les registres de recherche et le répertoire NAS déclarés par l'espace de travail sont ignorés.",
+      "restrictedConfigurations": [
+        "antigravity.skills.searchUrls",
+        "antigravity.skills.nasDirectoryPath"
+      ]
+    }
+  },
   "categories": [
     "Other"
   ],
@@ -213,7 +223,7 @@
               },
               "secretKeyRef": {
                 "type": "string",
-                "description": "Clé du secret conservé dans le coffre chiffré ; aucun identifiant n'est écrit ici."
+                "description": "Clé du secret conservé dans le coffre chiffré, toujours de la forme « antigravity.registry.<id> » ; aucun identifiant n'est écrit ici. Un registre défini par l'espace de travail n'accède jamais au coffre."
               },
               "customHeaders": {
                 "type": "object",

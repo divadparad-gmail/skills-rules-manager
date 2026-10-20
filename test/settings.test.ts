@@ -9,6 +9,7 @@ import {
   canonicalizeUrl,
   ConfigurationPort,
   RegistryConfigService,
+  registrySecretKey,
   SEARCH_URLS_SETTING,
   ScopedSettingValue,
   SecretStoragePort,
@@ -21,6 +22,7 @@ import {
   normalizeNetworkPath,
 } from '../src/settings/NasPathService';
 import { CustomSearchUrlConfig } from '../src/common/discoveryTypes';
+import { GEMINI_API_KEY_SECRET } from '../src/search/GeminiClient';
 
 /** Configuration en mémoire reproduisant les deux portées de VS Code. */
 class FakeConfiguration implements ConfigurationPort {
@@ -47,7 +49,10 @@ class FakeConfiguration implements ConfigurationPort {
 
 class FakeSecretStorage implements SecretStoragePort {
   public store_ = new Map<string, string>();
+  /** Clés lues, pour vérifier qu'un registre n'a pas interrogé le coffre. */
+  public reads: string[] = [];
   public async get(key: string): Promise<string | undefined> {
+    this.reads.push(key);
     return this.store_.get(key);
   }
   public async store(key: string, value: string): Promise<void> {
@@ -105,7 +110,7 @@ describe('Suite de Tests : Réglages des registres et du répertoire NAS', () =>
     assert.ok(sansSecret.some((issue) => issue.field === 'secretKeyRef'));
 
     const avecSecret = RegistryConfigService.validate(
-      buildRegistry({ authType: 'bearer', secretKeyRef: 'cle-hub' })
+      buildRegistry({ authType: 'bearer', secretKeyRef: 'antigravity.registry.registre-interne' })
     );
     assert.strictEqual(avecSecret.length, 0);
   });
@@ -193,16 +198,16 @@ describe('Suite de Tests : Réglages des registres et du répertoire NAS', () =>
       name: 'Hub',
       url: 'https://skills.exemple.com/v1',
       authType: 'bearer',
-      secretKeyRef: 'cle-hub',
+      secretKeyRef: 'antigravity.registry.hub',
     });
-    await secrets.store('cle-hub', 'jeton-secret');
+    await secrets.store('antigravity.registry.hub', 'jeton-secret');
 
     const disabled = await service.toggleRegistry('hub', false);
     assert.strictEqual(disabled.enabled, false);
 
     await service.removeRegistry('hub');
     assert.strictEqual(service.getEffectiveRegistries().length, 0);
-    assert.strictEqual(await secrets.get('cle-hub'), undefined, 'Le secret est purgé avec le registre.');
+    assert.strictEqual(await secrets.get('antigravity.registry.hub'), undefined, 'Le secret est purgé avec le registre.');
   });
 
   test('11. Réordonnancement : la position dans la liste fixe la priorité de recherche', async () => {
@@ -244,26 +249,26 @@ describe('Suite de Tests : Réglages des registres et du répertoire NAS', () =>
     const config = new FakeConfiguration();
     const secrets = new FakeSecretStorage();
     const service = new RegistryConfigService(config, secrets);
-    await secrets.store('cle', 'valeur-secrete');
+    await secrets.store('antigravity.registry.registre-interne', 'valeur-secrete');
 
     const bearer = await service.buildAuthHeaders(
-      buildRegistry({ authType: 'bearer', secretKeyRef: 'cle' })
+      buildRegistry({ authType: 'bearer', secretKeyRef: 'antigravity.registry.registre-interne' })
     );
     assert.strictEqual(bearer.Authorization, 'Bearer valeur-secrete');
 
     const apiKey = await service.buildAuthHeaders(
-      buildRegistry({ authType: 'apiKey', secretKeyRef: 'cle' })
+      buildRegistry({ authType: 'apiKey', secretKeyRef: 'antigravity.registry.registre-interne' })
     );
     assert.strictEqual(apiKey['X-API-Key'], 'valeur-secrete');
 
     const basic = await service.buildAuthHeaders(
-      buildRegistry({ authType: 'basic', secretKeyRef: 'cle' })
+      buildRegistry({ authType: 'basic', secretKeyRef: 'antigravity.registry.registre-interne' })
     );
     assert.strictEqual(basic.Authorization, `Basic ${Buffer.from('valeur-secrete').toString('base64')}`);
 
-    await secrets.store('cle-entete', 'X-Organization-ID: ai-core');
+    await secrets.store('antigravity.registry.entete', 'X-Organization-ID: ai-core');
     const custom = await service.buildAuthHeaders(
-      buildRegistry({ authType: 'customHeader', secretKeyRef: 'cle-entete' })
+      buildRegistry({ id: 'entete', authType: 'customHeader', secretKeyRef: 'antigravity.registry.entete' })
     );
     assert.strictEqual(custom['X-Organization-ID'], 'ai-core');
   });
@@ -454,5 +459,141 @@ describe('Suite de Tests : Réglages des registres et du répertoire NAS', () =>
     assert.strictEqual(NasPathService.getUncHost('//Serveur/partage'), 'serveur');
     assert.strictEqual(NasPathService.getUncHost('Z:\\skills'), null);
     assert.strictEqual(NasPathService.getUncHost(''), null);
+  });
+
+  // ------------------------------------------------------------------
+  // Non-régression : registry-secretref-workspace-scope (audit run-1)
+  // ------------------------------------------------------------------
+
+  test("23. Registre d'espace de travail : aucun secret ni en-tête imposé, coffre jamais interrogé", async () => {
+    const config = new FakeConfiguration();
+    const secrets = new FakeSecretStorage();
+    await secrets.store(GEMINI_API_KEY_SECRET, 'cle-gemini-de-la-victime');
+    const service = new RegistryConfigService(config, secrets);
+
+    const headers = await service.buildAuthHeaders(
+      buildRegistry({
+        id: 'hub',
+        url: 'https://collecteur.exemple.tld/v1/search',
+        authType: 'bearer',
+        secretKeyRef: GEMINI_API_KEY_SECRET,
+        customHeaders: { 'X-Exfiltration': 'oui' },
+        origin: 'workspace',
+      })
+    );
+
+    assert.deepStrictEqual(headers, { Accept: 'application/json' });
+    assert.deepStrictEqual(secrets.reads, [], "Le coffre ne doit jamais être ouvert pour l'espace de travail.");
+  });
+
+  test("24. Origine forgée : « origin: user » écrit par un dépôt reste traité comme espace de travail", async () => {
+    const config = new FakeConfiguration();
+    const secrets = new FakeSecretStorage();
+    await secrets.store(registrySecretKey('hub'), 'jeton-utilisateur');
+    config.workspace.set(SEARCH_URLS_SETTING, [
+      {
+        ...buildRegistry({
+          id: 'hub',
+          url: 'https://collecteur.exemple.tld/v1/search',
+          authType: 'bearer',
+          secretKeyRef: registrySecretKey('hub'),
+          customHeaders: { 'X-Exfiltration': 'oui' },
+        }),
+        origin: 'user',
+      },
+    ]);
+    const service = new RegistryConfigService(config, secrets);
+
+    const [registry] = service.getEffectiveRegistries();
+    assert.strictEqual(registry.origin, 'workspace');
+
+    const headers = await service.buildAuthHeaders(registry);
+    assert.strictEqual(headers.Authorization, undefined);
+    assert.strictEqual(headers['X-Exfiltration'], undefined);
+    assert.deepStrictEqual(secrets.reads, []);
+  });
+
+  test('25. Référence de secret non canonique : elle est refusée, quelle que soit la portée', async () => {
+    const issues = RegistryConfigService.validate(
+      buildRegistry({ id: 'hub', authType: 'bearer', secretKeyRef: GEMINI_API_KEY_SECRET })
+    );
+    assert.ok(issues.some((issue) => issue.field === 'secretKeyRef'));
+    assert.ok(
+      RegistryConfigService.validate(
+        buildRegistry({ id: 'hub', authType: 'bearer', secretKeyRef: registrySecretKey('autre') })
+      ).some((issue) => issue.field === 'secretKeyRef'),
+      "Un registre ne peut pas viser la clé d'un autre registre."
+    );
+
+    const config = new FakeConfiguration();
+    const piege = buildRegistry({ id: 'hub', authType: 'bearer', secretKeyRef: GEMINI_API_KEY_SECRET });
+    config.user.set(SEARCH_URLS_SETTING, [piege]);
+    config.workspace.set(SEARCH_URLS_SETTING, [{ ...piege, url: 'https://autre.exemple.tld/v1' }]);
+    const service = new RegistryConfigService(config);
+    assert.deepStrictEqual(service.getEffectiveRegistries(), []);
+
+    await assert.rejects(
+      () => service.addRegistry({ ...piege, url: 'https://encore.exemple.tld/v1' }),
+      /antigravity.registry.hub/
+    );
+  });
+
+  test('26. Identifiants en double : seule la première entrée est retenue à la lecture', () => {
+    const config = new FakeConfiguration();
+    config.workspace.set(SEARCH_URLS_SETTING, [
+      buildRegistry({ id: 'hub', name: 'Premier', url: 'https://a.exemple.tld/v1' }),
+      buildRegistry({ id: 'hub', name: 'Second', url: 'https://b.exemple.tld/v1' }),
+    ]);
+
+    const effective = new RegistryConfigService(config).getEffectiveRegistries();
+
+    assert.deepStrictEqual(effective.map((entry) => entry.name), ['Premier']);
+  });
+
+  test("27. Usurpation d'identifiant : un registre d'espace de travail ne peut pas reprendre celui d'un registre utilisateur", () => {
+    const config = new FakeConfiguration();
+    config.user.set(SEARCH_URLS_SETTING, [buildRegistry({ id: 'hub', url: 'https://hub.exemple.com/v1' })]);
+    config.workspace.set(SEARCH_URLS_SETTING, [
+      buildRegistry({ id: 'hub', url: 'https://collecteur.exemple.tld/v1' }),
+    ]);
+
+    const effective = new RegistryConfigService(config).getEffectiveRegistries();
+
+    assert.strictEqual(effective.length, 1);
+    assert.strictEqual(effective[0].url, 'https://hub.exemple.com/v1');
+    assert.strictEqual(effective[0].origin, 'user');
+  });
+
+  test("28. Champ d'origine : il n'est jamais persisté par l'ajout, la mise à jour ni le réordonnancement", async () => {
+    const config = new FakeConfiguration();
+    const service = new RegistryConfigService(config);
+    await service.addRegistry({ id: 'a', name: 'A', url: 'https://a.exemple.com/v1', origin: 'workspace' });
+    await service.addRegistry({ id: 'b', name: 'B', url: 'https://b.exemple.com/v1' });
+    await service.updateRegistry('b', { name: 'B modifié', origin: 'workspace' });
+    await service.reorderRegistries(['b', 'a']);
+
+    const persisted = JSON.stringify(config.user.get(SEARCH_URLS_SETTING));
+    assert.ok(!persisted.includes('origin'), "Le champ d'origine ne doit jamais atteindre settings.json.");
+    assert.ok(service.getEffectiveRegistries().every((entry) => entry.origin === 'user'));
+  });
+
+  test('29. Identifiants : la clé canonique est imposée et refusée aux registres du dépôt', async () => {
+    const config = new FakeConfiguration();
+    const secrets = new FakeSecretStorage();
+    const service = new RegistryConfigService(config, secrets);
+
+    const registry = await service.addRegistry({
+      id: 'hub',
+      name: 'Hub',
+      url: 'https://hub.exemple.com/v1',
+      authType: 'bearer',
+    });
+    assert.strictEqual(registry.secretKeyRef, registrySecretKey('hub'));
+    assert.strictEqual(await service.storeCredential(registry, 'jeton'), registrySecretKey('hub'));
+
+    await assert.rejects(
+      () => service.storeCredential({ ...registry, origin: 'workspace' }, 'jeton'),
+      /espace de travail/
+    );
   });
 });

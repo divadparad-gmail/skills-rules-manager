@@ -410,6 +410,13 @@ export class DiscoveryViewProvider implements vscode.WebviewViewProvider {
       .getEffectiveRegistries()
       .find((entry) => entry.id === id);
     if (!registry) return;
+    if (registry.origin === 'workspace') {
+      this.notify(
+        'warning',
+        `« ${registry.name} » est défini par le dépôt ouvert : il ne peut pas recevoir d'identifiant.`
+      );
+      return;
+    }
 
     const secret = await vscode.window.showInputBox({
       prompt: `Identifiant d'accès pour « ${registry.name} »`,

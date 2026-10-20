@@ -10,12 +10,25 @@
 import {
   CustomSearchUrlConfig,
   RegistryAuthType,
+  RegistryOrigin,
   RegistryProbeResult,
 } from '../common/discoveryTypes';
 import { DiscoveryResourceType } from '../common/eventTypes';
 
 /** Clé du réglage contribué dans package.json. */
 export const SEARCH_URLS_SETTING = 'antigravity.skills.searchUrls';
+
+/** Préfixe des clés de coffre réservées aux registres. */
+export const REGISTRY_SECRET_PREFIX = 'antigravity.registry.';
+
+/**
+ * Seule clé de coffre qu'un registre peut désigner. Lier la clé à
+ * l'identifiant empêche une entrée de viser le secret d'un autre registre ou
+ * la clé Gemini.
+ */
+export function registrySecretKey(registryId: string): string {
+  return `${REGISTRY_SECRET_PREFIX}${registryId}`;
+}
 
 export const DEFAULT_TIMEOUT_MS = 5000;
 export const MIN_TIMEOUT_MS = 1000;
@@ -81,6 +94,10 @@ export class RegistryConfigService {
    * l'espace de travail sont ajoutées à celles de l'utilisateur, puis la liste
    * est dédoublonnée sur l'URL canonique — une définition d'espace de travail
    * l'emportant sur une définition utilisateur de même URL.
+   *
+   * Chaque entrée reçoit ici son origine, qui conditionne l'accès au coffre.
+   * Une entrée d'espace de travail reprenant l'identifiant d'un registre
+   * utilisateur d'URL différente est écartée : elle usurperait ses actions.
    */
   public getEffectiveRegistries(): CustomSearchUrlConfig[] {
     const inspected = this.config.inspect<unknown[]>(SEARCH_URLS_SETTING);
@@ -89,10 +106,14 @@ export class RegistryConfigService {
 
     const byCanonicalUrl = new Map<string, CustomSearchUrlConfig>();
     for (const entry of userEntries) {
-      byCanonicalUrl.set(canonicalizeUrl(entry.url), entry);
+      byCanonicalUrl.set(canonicalizeUrl(entry.url), { ...entry, origin: 'user' });
     }
+    const userUrlById = new Map(userEntries.map((entry) => [entry.id, canonicalizeUrl(entry.url)]));
     for (const entry of workspaceEntries) {
-      byCanonicalUrl.set(canonicalizeUrl(entry.url), entry);
+      const canonical = canonicalizeUrl(entry.url);
+      const userUrl = userUrlById.get(entry.id);
+      if (userUrl !== undefined && userUrl !== canonical) continue;
+      byCanonicalUrl.set(canonical, { ...entry, origin: 'workspace' });
     }
 
     return [...byCanonicalUrl.values()].sort((a, b) => {
@@ -136,6 +157,11 @@ export class RegistryConfigService {
     scope: 'user' | 'workspace' = 'user'
   ): Promise<CustomSearchUrlConfig> {
     const registry = this.withDefaults(candidate);
+    // La clé du coffre ne peut être que la clé canonique : on la renseigne
+    // d'office lorsque le mode d'authentification en exige une.
+    if (registry.authType !== 'none' && !registry.secretKeyRef) {
+      registry.secretKeyRef = registrySecretKey(registry.id);
+    }
     const issues = RegistryConfigService.validate(registry);
     if (issues.length > 0) {
       throw new Error(issues.map((issue) => issue.message).join(' '));
@@ -196,8 +222,10 @@ export class RegistryConfigService {
     }
     await this.config.update(SEARCH_URLS_SETTING, next, scope);
 
-    if (target?.secretKeyRef && this.secrets) {
-      await this.secrets.delete(target.secretKeyRef);
+    // Seul un registre utilisateur possède un secret : retirer une entrée
+    // d'espace de travail homonyme ne doit pas purger celui de l'utilisateur.
+    if (scope === 'user' && target?.secretKeyRef && this.secrets) {
+      await this.secrets.delete(registrySecretKey(target.id));
     }
   }
 
@@ -243,12 +271,20 @@ export class RegistryConfigService {
   // Identifiants et en-têtes d'authentification
   // ------------------------------------------------------------------
 
-  /** Enregistre le secret d'un registre dans le coffre chiffré du système. */
+  /**
+   * Enregistre le secret d'un registre dans le coffre chiffré du système, sous
+   * la clé canonique dérivée de son identifiant.
+   */
   public async storeCredential(registry: CustomSearchUrlConfig, secret: string): Promise<string> {
     if (!this.secrets) {
       throw new Error("Le coffre de secrets n'est pas disponible dans ce contexte.");
     }
-    const key = registry.secretKeyRef || `antigravity.registry.${registry.id}`;
+    if (registry.origin === 'workspace') {
+      throw new Error(
+        "Un registre défini par l'espace de travail ne peut pas recevoir d'identifiant : ajoutez-le à vos réglages utilisateur."
+      );
+    }
+    const key = registrySecretKey(registry.id);
     await this.secrets.store(key, secret);
     return key;
   }
@@ -256,15 +292,32 @@ export class RegistryConfigService {
   /**
    * Construit les en-têtes HTTP d'une requête vers un registre, en récupérant
    * le secret au dernier moment : il ne transite jamais par la configuration.
+   *
+   * Les trois chemins de requête (recherche du panneau, recherche rapide et
+   * test de connexion) passent par cette méthode : c'est ici que se décide
+   * l'accès au coffre.
    */
   public async buildAuthHeaders(registry: CustomSearchUrlConfig): Promise<Record<string, string>> {
+    // Un registre déclaré par l'espace de travail provient d'un dépôt : il
+    // n'accède jamais au coffre et n'impose aucun en-tête.
+    if (registry.origin === 'workspace') {
+      return { Accept: 'application/json' };
+    }
+
     const headers: Record<string, string> = { Accept: 'application/json', ...(registry.customHeaders ?? {}) };
 
     if (registry.authType === 'none' || !registry.secretKeyRef || !this.secrets) {
       return headers;
     }
 
-    const secret = await this.secrets.get(registry.secretKeyRef);
+    // Défense en profondeur : même si une entrée échappait à la validation,
+    // seule la clé canonique de ce registre peut être lue.
+    const key = registrySecretKey(registry.id);
+    if (registry.secretKeyRef !== key) {
+      return headers;
+    }
+
+    const secret = await this.secrets.get(key);
     if (!secret) {
       return headers;
     }
@@ -450,6 +503,13 @@ export class RegistryConfigService {
       });
     }
 
+    if (registry.secretKeyRef && registry.secretKeyRef !== registrySecretKey(registry.id)) {
+      issues.push({
+        field: 'secretKeyRef',
+        message: `La référence de secret doit valoir « ${registrySecretKey(registry.id)} » : un registre ne peut désigner que sa propre clé du coffre.`,
+      });
+    }
+
     if (!Array.isArray(registry.supportedTypes) || registry.supportedTypes.length === 0) {
       issues.push({
         field: 'supportedTypes',
@@ -469,7 +529,11 @@ export class RegistryConfigService {
     return this.normalizeList(scope === 'user' ? inspected?.userValue : inspected?.workspaceValue);
   }
 
-  /** Applique les valeurs par défaut documentées au chapitre 3.3 du PRD. */
+  /**
+   * Applique les valeurs par défaut documentées au chapitre 3.3 du PRD. Seuls
+   * les champs énumérés ici sont recopiés : `origin`, calculé à la lecture,
+   * n'est donc jamais repris de la configuration ni persisté.
+   */
   private withDefaults(candidate: Partial<CustomSearchUrlConfig>): CustomSearchUrlConfig {
     const supportedTypes = Array.isArray(candidate.supportedTypes)
       ? candidate.supportedTypes.filter((type): type is DiscoveryResourceType =>
@@ -499,18 +563,24 @@ export class RegistryConfigService {
     };
   }
 
-  /** Transforme une valeur brute de configuration en registres exploitables. */
+  /**
+   * Transforme une valeur brute de configuration en registres exploitables.
+   * Les identifiants sont rendus uniques : seule la première entrée portant un
+   * identifiant donné est retenue.
+   */
   private normalizeList(raw: unknown): CustomSearchUrlConfig[] {
     if (!Array.isArray(raw)) return [];
     const normalized: CustomSearchUrlConfig[] = [];
+    const seenIds = new Set<string>();
     for (const entry of raw) {
       if (!entry || typeof entry !== 'object') continue;
       const registry = this.withDefaults(entry as Partial<CustomSearchUrlConfig>);
       // Une entrée invalide est ignorée plutôt que de faire échouer la lecture
       // complète du réglage : la vue des réglages signale le problème.
-      if (RegistryConfigService.validate(registry).length === 0) {
-        normalized.push(registry);
-      }
+      if (RegistryConfigService.validate(registry).length > 0) continue;
+      if (seenIds.has(registry.id)) continue;
+      seenIds.add(registry.id);
+      normalized.push(registry);
     }
     return normalized;
   }

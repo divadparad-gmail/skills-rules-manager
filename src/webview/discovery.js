@@ -576,6 +576,10 @@
   }
 
   function buildRegistryRow(registry, index, total) {
+    // Un registre déclaré par le dépôt ouvert ne se modifie que dans son
+    // fichier .vscode/settings.json : seules la lecture et la sonde restent.
+    const fromWorkspace = registry.origin === 'workspace';
+
     const row = document.createElement('div');
     row.className = 'registry';
     row.dataset.registryId = registry.id;
@@ -587,6 +591,7 @@
     const toggle = document.createElement('input');
     toggle.type = 'checkbox';
     toggle.checked = registry.enabled;
+    toggle.disabled = fromWorkspace;
     toggle.addEventListener('change', function () {
       send('discovery:registry:toggle', { id: registry.id, enabled: toggle.checked });
     });
@@ -596,6 +601,12 @@
     name.textContent = ' ' + registry.name + ' (priorité ' + registry.priority + ')';
     toggleLabel.appendChild(name);
     header.appendChild(toggleLabel);
+    if (fromWorkspace) {
+      const origin = buildBadge('défini par ce dépôt');
+      origin.classList.add('badge-workspace');
+      origin.title = "Registre déclaré dans le .vscode/settings.json du dépôt ouvert : il n'accède jamais à vos identifiants.";
+      header.appendChild(origin);
+    }
     row.appendChild(header);
 
     const url = document.createElement('div');
@@ -609,18 +620,20 @@
     actions.appendChild(buildRegistryAction('Tester', function () {
       send('discovery:registry:test', { id: registry.id });
     }));
-    actions.appendChild(buildRegistryAction('Identifiants…', function () {
-      send('discovery:registry:setSecret', { id: registry.id });
-    }));
-    if (index > 0) {
-      actions.appendChild(buildRegistryAction('Monter', function () { moveRegistry(index, -1); }));
+    if (!fromWorkspace) {
+      actions.appendChild(buildRegistryAction('Identifiants…', function () {
+        send('discovery:registry:setSecret', { id: registry.id });
+      }));
+      if (index > 0) {
+        actions.appendChild(buildRegistryAction('Monter', function () { moveRegistry(index, -1); }));
+      }
+      if (index < total - 1) {
+        actions.appendChild(buildRegistryAction('Descendre', function () { moveRegistry(index, 1); }));
+      }
+      actions.appendChild(buildRegistryAction('Supprimer', function () {
+        send('discovery:registry:remove', { id: registry.id });
+      }));
     }
-    if (index < total - 1) {
-      actions.appendChild(buildRegistryAction('Descendre', function () { moveRegistry(index, 1); }));
-    }
-    actions.appendChild(buildRegistryAction('Supprimer', function () {
-      send('discovery:registry:remove', { id: registry.id });
-    }));
     row.appendChild(actions);
 
     const probe = document.createElement('div');

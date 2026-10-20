@@ -222,4 +222,22 @@ describe('Suite de Tests : Chaîne de construction et contributions du manifeste
     assert.match(testScript, /node -c src\/webview\/cheatsheet\.js/);
     assert.match(testScript, /node -c src\/webview\/discovery\.js/);
   });
+
+  test("13. Espace de travail non approuvé : les réglages qu'un dépôt pourrait détourner sont restreints", () => {
+    const capability = readPackageJson().capabilities?.untrustedWorkspaces;
+
+    assert.ok(capability, 'La capacité untrustedWorkspaces doit être déclarée.');
+    assert.strictEqual(capability.supported, 'limited');
+    assert.deepStrictEqual([...capability.restrictedConfigurations].sort(), [
+      'antigravity.skills.nasDirectoryPath',
+      'antigravity.skills.searchUrls',
+    ]);
+  });
+
+  test("14. Vue Découverte : l'origine « dépôt » d'un registre est signalée par un badge", () => {
+    const script = fs.readFileSync(path.join(ROOT, 'src', 'webview', 'discovery.js'), 'utf8');
+
+    assert.match(script, /registry\.origin === 'workspace'/);
+    assert.match(script, /défini par ce dépôt/);
+  });
 });

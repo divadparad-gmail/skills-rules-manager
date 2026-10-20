@@ -34,7 +34,17 @@ export interface CustomSearchUrlConfig {
   timeoutMs: number;
   /** Catégories de ressources prises en charge par ce registre. */
   supportedTypes: DiscoveryResourceType[];
+  /**
+   * Portée de configuration d'où provient l'entrée. Ce champ est calculé à la
+   * lecture par `getEffectiveRegistries` : il n'est jamais lu depuis la
+   * configuration ni persisté, sans quoi un dépôt pourrait se déclarer
+   * « utilisateur » dans son propre `.vscode/settings.json`.
+   */
+  origin?: RegistryOrigin;
 }
+
+/** Portée de configuration d'où provient un registre. */
+export type RegistryOrigin = 'user' | 'workspace';
 
 export type RegistryProbeStatus = 'connected' | 'unreachable' | 'unauthorized' | 'invalid_schema';
 
