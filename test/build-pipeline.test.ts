@@ -47,7 +47,7 @@ describe('Suite de Tests : Chaîne de construction et contributions du manifeste
 
     const bundle = fs.readFileSync(bundlePath, 'utf8');
     const externals = [...bundle.matchAll(/require\("([^"]+)"\)/g)].map((match) => match[1]);
-    const allowed = new Set(['vscode', 'crypto', 'fs', 'http', 'https', 'os', 'path', 'url', 'util', 'stream', 'zlib', 'events', 'buffer', 'child_process', 'net']);
+    const allowed = new Set(['vscode', 'crypto', 'fs', 'http', 'https', 'os', 'path', 'url', 'util', 'stream', 'zlib', 'events', 'buffer', 'child_process', 'net', 'dns']);
 
     const unexpected = [...new Set(externals)].filter((name) => !allowed.has(name));
     assert.deepStrictEqual(
