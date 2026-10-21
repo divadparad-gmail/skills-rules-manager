@@ -11,6 +11,9 @@ import {
   getEffectiveGlobalClaudePath,
 } from '../utils/paths';
 import { countTokens, countTokensForFile } from '../utils/tokenizer';
+import { measureAntigravitySoul } from '../utils/antigravityRules';
+import { buildAntigravityRuleItem, countsAtBoot, hasResourceWarning } from './antigravityRuleItem';
+import { listFlatRuleFiles } from './antigravityRuleSources';
 
 let vscodeModule: any = null;
 try {
@@ -66,6 +69,19 @@ export class GlobalScanner {
     let rulesConditionalCount = 0;
     let soulCharTotal = 0;
     let soulPathFound = '';
+
+    // Cumul des caractères des règles chargées au démarrage (règles ignorées par l'agent exclues)
+    const accountRule = (item: ResourceItem) => {
+      if (!countsAtBoot(item) || !item.charCount) return;
+      if (item.metadata?.isConditional) {
+        rulesCharTotal += 80;
+        rulesConditionalCharTotal += item.charCount;
+        rulesConditionalCount++;
+      } else {
+        rulesCharTotal += item.charCount;
+        rulesPermanentCount++;
+      }
+    };
 
     const skillsDir = path.join(globalPath, 'skills');
     const claudeGlobalPath = getEffectiveGlobalClaudePath();
@@ -244,35 +260,39 @@ export class GlobalScanner {
 
     // 2. Scan du fichier maître d'Âme selon l'outil actif
     if (targetTool === 'antigravity') {
-      // Âme globale Antigravity Niveau 0 (GEMINI.md)
-      const geminiCandidates = [
-        path.join(path.dirname(globalPath), 'GEMINI.md'),
-        path.join(globalPath, 'GEMINI.md'),
+      // Âmes globales Antigravity : fichiers autonomes toujours actifs, tous chargés et cumulés
+      // (~/.gemini/AGENTS.md, ~/.gemini/GEMINI.md, ~/.gemini/config/AGENTS.md, ~/.gemini/config/GEMINI.md)
+      const geminiRoot = path.dirname(globalPath);
+      const soulCandidates = [
+        { id: 'AGENTS.md', path: path.join(geminiRoot, 'AGENTS.md') },
+        { id: 'GEMINI.md', path: path.join(geminiRoot, 'GEMINI.md') },
+        { id: 'config/AGENTS.md', path: path.join(globalPath, 'AGENTS.md') },
+        { id: 'config/GEMINI.md', path: path.join(globalPath, 'GEMINI.md') },
       ];
 
-      for (const geminiPath of geminiCandidates) {
-        if (fs.existsSync(geminiPath) && fs.statSync(geminiPath).isFile()) {
+      for (const candidate of soulCandidates) {
+        if (fs.existsSync(candidate.path) && fs.statSync(candidate.path).isFile()) {
           try {
-            const stat = await fs.promises.stat(geminiPath);
-            const rawContent = await fs.promises.readFile(geminiPath, 'utf8');
+            const stat = await fs.promises.stat(candidate.path);
+            const rawContent = await fs.promises.readFile(candidate.path, 'utf8');
             const fileCharCount = rawContent.length;
             const lineCount = rawContent.split(/\r\n|\r|\n/).length;
             const parsed = extractMarkdownTitleAndSummary(rawContent);
-            const ruleTokenCount = countTokensForFile(geminiPath, stat.size, stat.mtimeMs, rawContent);
-            const isWarningLines = lineCount > 200;
-            const isWarningSize = fileCharCount > 24000;
+            const measured = await measureAntigravitySoul(rawContent, candidate.path);
+            const ruleTokenCount = measured.expandedTokenCount
+              ?? countTokensForFile(candidate.path, stat.size, stat.mtimeMs, rawContent);
 
             soulCharTotal += fileCharCount;
-            soulPathFound = geminiPath;
+            if (!soulPathFound) soulPathFound = candidate.path;
 
             items.push({
-              id: 'GEMINI.md',
-              name: 'GEMINI.md',
+              id: candidate.id,
+              name: candidate.id,
               description: parsed.summary || 'Instructions fondamentales globales d\'Antigravity (Niveau 0)',
               type: 'soul',
               scope: 'global',
               enabled: true,
-              path: geminiPath,
+              path: candidate.path,
               targetTool: 'antigravity',
               isFolder: false,
               charCount: fileCharCount,
@@ -281,11 +301,10 @@ export class GlobalScanner {
               metadata: {
                 isSoul: true,
                 locked: true,
-                warningLinesExceeded: isWarningLines,
-                warningSizeExceeded: isWarningSize,
+                byteSize: measured.byteSize,
+                warningSizeExceeded: measured.warningSizeExceeded,
               },
             });
-            break; // Trouvé et ajouté
           } catch {
             // Ignorer
           }
@@ -339,107 +358,28 @@ export class GlobalScanner {
 
     // 3. Scan des règles globales et plugins
     if (targetTool === 'antigravity') {
-      const rulesDirCandidates = [
-        path.join(globalPath, 'rules'),
-        path.join(path.dirname(globalPath), 'rules'),
-      ];
-
+      // Règles globales modulaires : ~/.gemini/config/rules/*.md uniquement (seul emplacement documenté)
       const rulesMap = new Map<string, ResourceItem>();
 
-      for (const rulesDir of rulesDirCandidates) {
-        if (fs.existsSync(rulesDir)) {
-          try {
-            const entries = await fs.promises.readdir(rulesDir, { withFileTypes: true });
+      for (const filePath of await listFlatRuleFiles(path.join(globalPath, 'rules'))) {
+        const cleanId = path.basename(filePath).replace(/\.disabled$/, '').replace(/\.md$/, '');
+        const newItem = await buildAntigravityRuleItem(filePath, {
+          id: cleanId,
+          scope: 'global',
+          fallbackDescription: 'Règle globale Antigravity',
+          spreadFrontmatter: true,
+        });
 
-            for (const entry of entries) {
-              if (!entry.isFile()) continue;
-
-              const fileName = entry.name;
-              const isMd = fileName.endsWith('.md');
-              const isDisabled = fileName.endsWith('.md.disabled');
-
-              if (!isMd && !isDisabled) continue;
-
-              const filePath = path.join(rulesDir, fileName);
-              const cleanId = fileName.replace(/\.disabled$/, '').replace(/\.md$/, '');
-              let title = cleanId;
-              let summary = '';
-              let fileCharCount = 0;
-              let ruleMetadata: Record<string, any> = {};
-              let rawContent = '';
-              let fileStat: fs.Stats | null = null;
-
-              try {
-                fileStat = await fs.promises.stat(filePath);
-                rawContent = await fs.promises.readFile(filePath, 'utf8');
-                fileCharCount = rawContent.length;
-                const { metadata } = extractFrontmatter(rawContent);
-                ruleMetadata = metadata;
-                const parsed = extractMarkdownTitleAndSummary(rawContent);
-                if (parsed.title) title = parsed.title;
-                if (parsed.summary) summary = parsed.summary;
-              } catch {
-                // Lecture fallback
-              }
-
-              const isRuleEnabled = isMd;
-              const lineCount = rawContent ? rawContent.split(/\r\n|\r|\n/).length : 0;
-              const isCond = isRuleConditional(ruleMetadata, 'antigravity');
-              const isWarn = fileCharCount > 24000;
-              const isWarningLines = lineCount > 200;
-              const isWarningNoDesc = !summary || summary.trim().length === 0;
-              const ruleTokenCount = countTokensForFile(filePath, fileStat?.size, fileStat?.mtimeMs, rawContent);
-
-              const newItem: ResourceItem = {
-                id: cleanId,
-                name: title,
-                description: summary || 'Règle globale Antigravity',
-                type: 'rule',
-                scope: 'global',
-                enabled: isRuleEnabled,
-                path: filePath,
-                targetTool: 'antigravity',
-                isFolder: false,
-                charCount: fileCharCount,
-                tokenCount: ruleTokenCount,
-                lineCount,
-                metadata: {
-                  ...ruleMetadata,
-                  isConditional: isCond,
-                  warningSizeExceeded: isWarn,
-                  warningLinesExceeded: isWarningLines,
-                  warningNoDescription: isWarningNoDesc,
-                  hasDisabledSuffix: isDisabled,
-                },
-              };
-
-              if (rulesMap.has(cleanId)) {
-                const existing = rulesMap.get(cleanId)!;
-                if (!existing.enabled && isRuleEnabled) {
-                  rulesMap.set(cleanId, newItem);
-                }
-              } else {
-                rulesMap.set(cleanId, newItem);
-              }
-            }
-          } catch {
-            // Ignorer
-          }
+        // Un .md et son .md.disabled désignent la même règle : le fichier actif est prioritaire
+        const existing = rulesMap.get(cleanId);
+        if (!existing || (!existing.enabled && newItem.enabled)) {
+          rulesMap.set(cleanId, newItem);
         }
       }
 
       // Consolidation unique des règles globales trouvées
       for (const ruleItem of rulesMap.values()) {
-        if (ruleItem.enabled && ruleItem.charCount) {
-          if (ruleItem.metadata?.isConditional) {
-            rulesCharTotal += 80;
-            rulesConditionalCharTotal += ruleItem.charCount;
-            rulesConditionalCount++;
-          } else {
-            rulesCharTotal += ruleItem.charCount;
-            rulesPermanentCount++;
-          }
-        }
+        accountRule(ruleItem);
         items.push(ruleItem);
       }
 
@@ -531,80 +471,17 @@ export class GlobalScanner {
             // Rules internes du plugin global
             const pRulesDir = path.join(pluginRoot, 'rules');
             if (fs.existsSync(pRulesDir)) {
-              try {
-                const pRuleEntries = await fs.promises.readdir(pRulesDir, { withFileTypes: true });
-                for (const rEntry of pRuleEntries) {
-                  if (!rEntry.isFile()) continue;
-                  const isM = rEntry.name.endsWith('.md');
-                  const isD = rEntry.name.endsWith('.md.disabled');
-                  if (!isM && !isD) continue;
-
-                  const rPath = path.join(pRulesDir, rEntry.name);
-                  const cId = rEntry.name.replace(/\.disabled$/, '').replace(/\.md$/, '');
-                  let rTitle = cId;
-                  let rSummary = '';
-                  let fCount = 0;
-                  let pFm: Record<string, any> = {};
-                  let rawPluginRule = '';
-                  let rStat: fs.Stats | null = null;
-
-                  try {
-                    rStat = await fs.promises.stat(rPath);
-                    rawPluginRule = await fs.promises.readFile(rPath, 'utf8');
-                    fCount = rawPluginRule.length;
-                    const { metadata } = extractFrontmatter(rawPluginRule);
-                    pFm = metadata;
-                    const parsed = extractMarkdownTitleAndSummary(rawPluginRule);
-                    if (parsed.title) rTitle = parsed.title;
-                    if (parsed.summary) rSummary = parsed.summary;
-                  } catch {
-                    // Ignorer
-                  }
-
-                  const ruleLineCount = rawPluginRule ? rawPluginRule.split(/\r\n|\r|\n/).length : 0;
-                  const isCond = isRuleConditional(pFm, 'antigravity');
-                  const isWarn = fCount > 24000;
-                  const isWarnRuleLines = ruleLineCount > 200;
-                  const isWarnRuleNoDesc = !rSummary || rSummary.trim().length === 0;
-                  const isEn = isM;
-                  const tCount = countTokensForFile(rPath, rStat?.size, rStat?.mtimeMs, rawPluginRule);
-
-                  if (isEn) {
-                    if (isCond) {
-                      rulesCharTotal += 80;
-                      rulesConditionalCharTotal += fCount;
-                      rulesConditionalCount++;
-                    } else {
-                      rulesCharTotal += fCount;
-                      rulesPermanentCount++;
-                    }
-                  }
-
-                  items.push({
-                    id: `${pFolder.name}:${cId}`,
-                    name: `${rTitle} [Plugin: ${pFolder.name}]`,
-                    description: rSummary || `Règle du plugin global ${pFolder.name}`,
-                    type: 'rule',
-                    scope: 'global',
-                    enabled: isEn,
-                    path: rPath,
-                    targetTool: 'antigravity',
-                    isFolder: false,
-                    charCount: fCount,
-                    tokenCount: tCount,
-                    lineCount: ruleLineCount,
-                    metadata: {
-                      pluginName: pFolder.name,
-                      isConditional: isCond,
-                      warningSizeExceeded: isWarn,
-                      warningLinesExceeded: isWarnRuleLines,
-                      warningNoDescription: isWarnRuleNoDesc,
-                      hasDisabledSuffix: isD,
-                    },
-                  });
-                }
-              } catch {
-                // Ignorer
+              for (const rPath of await listFlatRuleFiles(pRulesDir)) {
+                const cId = path.basename(rPath).replace(/\.disabled$/, '').replace(/\.md$/, '');
+                const ruleItem = await buildAntigravityRuleItem(rPath, {
+                  id: `${pFolder.name}:${cId}`,
+                  scope: 'global',
+                  fallbackDescription: `Règle du plugin global ${pFolder.name}`,
+                  nameSuffix: `[Plugin: ${pFolder.name}]`,
+                  pluginName: pFolder.name,
+                });
+                accountRule(ruleItem);
+                items.push(ruleItem);
               }
             }
           }
@@ -726,19 +603,16 @@ export class GlobalScanner {
 
     const activeRulesList = allRulesList.filter((i) => i.enabled);
     const activeRulesCount = activeRulesList.length;
-    const rulesWarningCount = activeRulesList.filter((i) => (
-      i.metadata?.warningSizeExceeded ||
-      i.metadata?.warningLinesExceeded ||
-      i.metadata?.warningMcpExceeded ||
-      i.metadata?.warningNoDescription
-    )).length;
+    const rulesWarningCount = activeRulesList.filter(hasResourceWarning).length;
 
     // Décompte cohérent des règles :
     // - Règles permanentes : accumulation de leur tokenCount BPE réel
-    // - Règles conditionnelles : 20 tokens légers de routeur au boot
+    // - Règles conditionnelles : ~20 tokens au boot (estimation de l'extension, non documentée)
+    // - Règles ignorées par l'agent : aucun coût au boot
     // - rulesConditionalTokenTotal : somme des tokens BPE réels des cartes conditionnelles
-    const activePermanentRules = activeRulesList.filter((i) => !i.metadata?.isConditional);
-    const activeConditionalRules = activeRulesList.filter((i) => i.metadata?.isConditional);
+    const bootRules = activeRulesList.filter(countsAtBoot);
+    const activePermanentRules = bootRules.filter((i) => !i.metadata?.isConditional);
+    const activeConditionalRules = bootRules.filter((i) => i.metadata?.isConditional);
     const permanentRulesTokens = activePermanentRules.reduce((sum, i) => sum + (i.tokenCount || 0), 0);
     const conditionalRulesBootTokens = activeConditionalRules.length * 20;
     const rulesTokenTotal = permanentRulesTokens + conditionalRulesBootTokens;

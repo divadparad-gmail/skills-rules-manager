@@ -7,7 +7,7 @@ globs: "*.ts, *.tsx"
 # Règle Conditionnelle Trigger Glob (Chaîne Simple)
 
 Cette règle est conditionnelle sous Antigravity grâce à `trigger: glob` et `globs: "*.ts, *.tsx"`.
-Elle ne doit consommer que **~20 tokens** au boot pour le routeur dans la jauge de contexte.
+L'extension la compte pour **~20 tokens** au boot dans la jauge (estimation de l'extension, non chiffrée par la documentation).
 
 ## Directives TypeScript Spécifiques
 - Toujours typer les arguments et le type de retour des fonctions publiques.

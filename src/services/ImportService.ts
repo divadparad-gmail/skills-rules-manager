@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { ResourceItem, WorkspaceContext } from '../types';
 import { getEffectiveGlobalAntigravityPath, getEffectiveGlobalClaudePath } from '../utils/paths';
+import { ensureAntigravityTrigger } from '../utils/antigravityRules';
 
 export class ImportService {
   /**
@@ -12,7 +13,7 @@ export class ImportService {
     item: ResourceItem,
     destinationScope: 'global' | 'local',
     workspace: WorkspaceContext
-  ): Promise<{ success: boolean; targetPath?: string; error?: string }> {
+  ): Promise<{ success: boolean; targetPath?: string; error?: string; notice?: string }> {
     try {
       if (destinationScope === 'global') {
         return await this.importToGlobal(item);
@@ -33,7 +34,7 @@ export class ImportService {
    */
   private static async importToGlobal(
     item: ResourceItem
-  ): Promise<{ success: boolean; targetPath: string }> {
+  ): Promise<{ success: boolean; targetPath: string; notice?: string }> {
     const globalPath = getEffectiveGlobalAntigravityPath();
 
     if (item.type === 'soul') {
@@ -83,9 +84,9 @@ export class ImportService {
       }
 
       const targetFile = activeFile;
-      await fs.promises.copyFile(item.path, targetFile);
+      const notice = await this.copyRuleForAntigravity(item.path, targetFile);
 
-      return { success: true, targetPath: targetFile };
+      return { success: true, targetPath: targetFile, notice };
     }
   }
 
@@ -95,7 +96,7 @@ export class ImportService {
   private static async importToLocal(
     item: ResourceItem,
     workspace: WorkspaceContext
-  ): Promise<{ success: boolean; targetPath: string }> {
+  ): Promise<{ success: boolean; targetPath: string; notice?: string }> {
     if (!workspace.hasWorkspace || !workspace.workspacePath) {
       throw new Error('Aucun espace de travail ouvert pour importer en local.');
     }
@@ -116,7 +117,7 @@ export class ImportService {
     item: ResourceItem,
     workspaceRoot: string,
     agentsDirName: string
-  ): Promise<{ success: boolean; targetPath: string }> {
+  ): Promise<{ success: boolean; targetPath: string; notice?: string }> {
     if (item.type === 'soul') {
       const targetFile = path.join(workspaceRoot, 'GEMINI.md');
       if (fs.existsSync(targetFile)) {
@@ -164,9 +165,9 @@ export class ImportService {
       }
 
       const targetFile = activeFile;
-      await fs.promises.copyFile(item.path, targetFile);
+      const notice = await this.copyRuleForAntigravity(item.path, targetFile);
 
-      return { success: true, targetPath: targetFile };
+      return { success: true, targetPath: targetFile, notice };
     }
   }
 
@@ -176,7 +177,7 @@ export class ImportService {
   private static async importToClaudeLocal(
     item: ResourceItem,
     workspaceRoot: string
-  ): Promise<{ success: boolean; targetPath: string }> {
+  ): Promise<{ success: boolean; targetPath: string; notice?: string }> {
     if (item.type === 'soul') {
       const targetFile = path.join(workspaceRoot, 'CLAUDE.md');
       if (fs.existsSync(targetFile)) {
@@ -223,6 +224,19 @@ export class ImportService {
 
       return { success: true, targetPath: targetFile };
     }
+  }
+
+  /**
+   * Copie une règle vers un dossier rules/ d'Antigravity en garantissant un trigger valide
+   * (sans trigger, Antigravity ignorerait la règle). Retourne un message si le frontmatter a été complété.
+   */
+  private static async copyRuleForAntigravity(sourcePath: string, targetFile: string): Promise<string | undefined> {
+    const content = await fs.promises.readFile(sourcePath, 'utf8');
+    const prepared = ensureAntigravityTrigger(content);
+    await fs.promises.writeFile(targetFile, prepared.content, 'utf8');
+    return prepared.addedTrigger
+      ? `Le frontmatter a été complété avec « trigger: ${prepared.addedTrigger} », sans quoi Antigravity ignorerait la règle.`
+      : undefined;
   }
 
   /**

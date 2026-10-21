@@ -1,5 +1,7 @@
 ---
 scenario_fixture: true
+description: Règle de test du scénario doublon Global vs Local
+trigger: always_on
 ---
 
 # Règle Test : Scénario Doublon Global vs Local

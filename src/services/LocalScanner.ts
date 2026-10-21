@@ -7,7 +7,15 @@ import {
   isRuleConditional,
 } from '../utils/frontmatter';
 import { countTokens, countTokensForFile } from '../utils/tokenizer';
+import { measureAntigravitySoul } from '../utils/antigravityRules';
 import { ScenarioManager } from './ScenarioManager';
+import { buildAntigravityRuleItem, countsAtBoot, hasResourceWarning } from './antigravityRuleItem';
+import {
+  ANTIGRAVITY_AGENT_DIRS,
+  collectRulesJsonFiles,
+  findNestedRuleSources,
+  listFlatRuleFiles,
+} from './antigravityRuleSources';
 
 export class LocalScanner {
   /**
@@ -42,6 +50,19 @@ export class LocalScanner {
     let skillsDirFound = '';
     let rulesDirFound = '';
     const targetTool = workspace.tool;
+
+    // Cumul des caractères des règles chargées au démarrage (règles ignorées et règles de dossier exclues)
+    const accountRule = (item: ResourceItem) => {
+      if (!countsAtBoot(item) || !item.charCount) return;
+      if (item.metadata?.isConditional) {
+        rulesCharTotal += 80; // Métadonnées au boot
+        rulesConditionalCharTotal += item.charCount;
+        rulesConditionalCount++;
+      } else {
+        rulesCharTotal += item.charCount;
+        rulesPermanentCount++;
+      }
+    };
 
     // 1. Scan Antigravity (.agents ou .agent) uniquement si targetTool === 'antigravity'
     if (targetTool === 'antigravity') {
@@ -135,102 +156,57 @@ export class LocalScanner {
           }
         }
 
-        // Rules locales (.agents/rules)
+        // Rules locales : .agents/rules/*.md, l'ancien .agent/rules/*.md (tous deux chargés
+        // par Antigravity) et les règles déclarées par .agents/rules.json
         const rulesDir = path.join(agentsDir, 'rules');
         rulesDirFound = rulesDir;
-
-        if (fs.existsSync(rulesDir)) {
-          try {
-            const entries = await fs.promises.readdir(rulesDir, { withFileTypes: true });
-            const rulesMap = new Map<string, ResourceItem>();
-
-            for (const entry of entries) {
-              if (!entry.isFile()) continue;
-
-              const fileName = entry.name;
-              const isMd = fileName.endsWith('.md');
-              const isDisabled = fileName.endsWith('.md.disabled');
-
-              if (!isMd && !isDisabled) continue;
-
-              const filePath = path.join(rulesDir, fileName);
-              const cleanId = fileName.replace(/\.disabled$/, '').replace(/\.md$/, '');
-              let title = cleanId;
-              let summary = '';
-              let fileCharCount = 0;
-              let parsedMetadata: Record<string, unknown> = {};
-
-              let rawContent = '';
-              let fileStat: fs.Stats | null = null;
-              try {
-                fileStat = await fs.promises.stat(filePath);
-                rawContent = await fs.promises.readFile(filePath, 'utf8');
-                fileCharCount = rawContent.length;
-                const parsed = extractMarkdownTitleAndSummary(rawContent);
-                if (parsed.title) title = parsed.title;
-                if (parsed.summary) summary = parsed.summary;
-                parsedMetadata = extractFrontmatter(rawContent).metadata;
-              } catch {
-                // Lecture fallback
-              }
-
-              const lineCount = rawContent ? rawContent.split(/\r\n|\r|\n/).length : 0;
-              const isConditional = isRuleConditional(parsedMetadata, 'antigravity');
-              const isWarningSize = fileCharCount > 24000;
-              const isWarningLines = lineCount > 200;
-              const isWarningNoDesc = !summary || summary.trim().length === 0;
-              const isRuleEnabled = isMd;
-              const ruleTokenCount = countTokensForFile(filePath, fileStat?.size, fileStat?.mtimeMs, rawContent);
-
-              const newItem: ResourceItem = {
-                id: cleanId,
-                name: title,
-                description: summary || 'Règle locale du projet',
-                type: 'rule',
-                scope: 'local',
-                enabled: isRuleEnabled,
-                path: filePath,
-                targetTool: 'antigravity',
-                isFolder: false,
-                charCount: fileCharCount,
-                tokenCount: ruleTokenCount,
-                lineCount,
-                metadata: {
-                  hasDisabledSuffix: isDisabled,
-                  isConditional,
-                  warningSizeExceeded: isWarningSize,
-                  warningLinesExceeded: isWarningLines,
-                  warningNoDescription: isWarningNoDesc,
-                },
-              };
-
-              if (rulesMap.has(cleanId)) {
-                // Doublon sur le disque ! Priorité au fichier actif (.md)
-                const existing = rulesMap.get(cleanId)!;
-                if (!existing.enabled && isRuleEnabled) {
-                  rulesMap.set(cleanId, newItem);
-                }
-              } else {
-                rulesMap.set(cleanId, newItem);
-              }
-            }
-
-            for (const ruleItem of rulesMap.values()) {
-              if (ruleItem.enabled && ruleItem.charCount) {
-                if (ruleItem.metadata?.isConditional) {
-                  rulesCharTotal += 80; // Métadonnées au boot
-                  rulesConditionalCharTotal += ruleItem.charCount;
-                  rulesConditionalCount++;
-                } else {
-                  rulesCharTotal += ruleItem.charCount;
-                  rulesPermanentCount++;
-                }
-              }
-              items.push(ruleItem);
-            }
-          } catch {
-            // Ignorer
+        const ruleDirs = [rulesDir];
+        for (const dirName of ANTIGRAVITY_AGENT_DIRS) {
+          const candidate = path.join(rootPath, dirName, 'rules');
+          if (!ruleDirs.some((dir) => path.resolve(dir) === path.resolve(candidate))) {
+            ruleDirs.push(candidate);
           }
+        }
+
+        // Clé = chemin sans « .disabled » : un .md et son .md.disabled désignent la même règle,
+        // le fichier actif est prioritaire
+        const rulesMap = new Map<string, ResourceItem>();
+        const addRule = (item: ResourceItem) => {
+          const key = path.resolve(item.path).replace(/\.disabled$/, '');
+          const existing = rulesMap.get(key);
+          if (!existing || (!existing.enabled && item.enabled)) {
+            rulesMap.set(key, item);
+          }
+        };
+
+        for (const dir of ruleDirs) {
+          const isPrimary = dir === rulesDir;
+          for (const filePath of await listFlatRuleFiles(dir)) {
+            const cleanId = path.basename(filePath).replace(/\.disabled$/, '').replace(/\.md$/, '');
+            addRule(await buildAntigravityRuleItem(filePath, {
+              id: isPrimary ? cleanId : `${path.basename(path.dirname(dir))}/${cleanId}`,
+              scope: 'local',
+              fallbackDescription: 'Règle locale du projet',
+            }));
+          }
+        }
+
+        const rulesJsonPath = path.join(agentsDir, 'rules.json');
+        if (fs.existsSync(rulesJsonPath)) {
+          for (const entry of await collectRulesJsonFiles(rulesJsonPath)) {
+            if (rulesMap.has(path.resolve(entry.path).replace(/\.disabled$/, ''))) continue;
+            addRule(await buildAntigravityRuleItem(entry.path, {
+              id: entry.relativePath.replace(/\.disabled$/, '').replace(/\.md$/, ''),
+              scope: 'local',
+              fallbackDescription: 'Règle déclarée par .agents/rules.json',
+              fromRulesJson: true,
+            }));
+          }
+        }
+
+        for (const ruleItem of rulesMap.values()) {
+          accountRule(ruleItem);
+          items.push(ruleItem);
         }
 
         // Plugins locaux Antigravity (.agents/plugins)
@@ -311,79 +287,17 @@ export class LocalScanner {
               // 2. Rules du plugin
               const pRulesDir = path.join(pPath, 'rules');
               if (fs.existsSync(pRulesDir)) {
-                try {
-                  const pRuleEntries = await fs.promises.readdir(pRulesDir, { withFileTypes: true });
-                  for (const rEntry of pRuleEntries) {
-                    if (!rEntry.isFile()) continue;
-                    const fName = rEntry.name;
-                    const isM = fName.endsWith('.md');
-                    const isD = fName.endsWith('.md.disabled');
-                    if (!isM && !isD) continue;
-
-                    const rPath = path.join(pRulesDir, fName);
-                    const cId = fName.replace(/\.disabled$/, '').replace(/\.md$/, '');
-                    let rTitle = cId;
-                    let rSummary = '';
-                    let fCount = 0;
-                    let pFm: Record<string, unknown> = {};
-                    let rawRuleContent = '';
-                    let rStat: fs.Stats | null = null;
-                    try {
-                      rStat = await fs.promises.stat(rPath);
-                      rawRuleContent = await fs.promises.readFile(rPath, 'utf8');
-                      fCount = rawRuleContent.length;
-                      const parsed = extractMarkdownTitleAndSummary(rawRuleContent);
-                      if (parsed.title) rTitle = parsed.title;
-                      if (parsed.summary) rSummary = parsed.summary;
-                      pFm = extractFrontmatter(rawRuleContent).metadata;
-                    } catch {
-                      // Ignorer
-                    }
-
-                    const ruleLineCount = rawRuleContent ? rawRuleContent.split(/\r\n|\r|\n/).length : 0;
-                    const isCond = isRuleConditional(pFm, 'antigravity');
-                    const isWarn = fCount > 24000;
-                    const isWarnRuleLines = ruleLineCount > 200;
-                    const isWarnRuleNoDesc = !rSummary || rSummary.trim().length === 0;
-                    const isEn = isM;
-                    const tCount = countTokensForFile(rPath, rStat?.size, rStat?.mtimeMs, rawRuleContent);
-
-                    if (isEn) {
-                      if (isCond) {
-                        rulesCharTotal += 80;
-                        rulesConditionalCharTotal += fCount;
-                        rulesConditionalCount++;
-                      } else {
-                        rulesCharTotal += fCount;
-                        rulesPermanentCount++;
-                      }
-                    }
-
-                    items.push({
-                      id: `${pFolder.name}:${cId}`,
-                      name: `${rTitle} [Plugin: ${pFolder.name}]`,
-                      description: rSummary || `Règle du plugin ${pFolder.name}`,
-                      type: 'rule',
-                      scope: 'local',
-                      enabled: isEn,
-                      path: rPath,
-                      targetTool: 'antigravity',
-                      isFolder: false,
-                      charCount: fCount,
-                      tokenCount: tCount,
-                      lineCount: ruleLineCount,
-                      metadata: {
-                        pluginName: pFolder.name,
-                        isConditional: isCond,
-                        warningSizeExceeded: isWarn,
-                        warningLinesExceeded: isWarnRuleLines,
-                        warningNoDescription: isWarnRuleNoDesc,
-                        hasDisabledSuffix: isD,
-                      },
-                    });
-                  }
-                } catch {
-                  // Ignorer
+                for (const rPath of await listFlatRuleFiles(pRulesDir)) {
+                  const cId = path.basename(rPath).replace(/\.disabled$/, '').replace(/\.md$/, '');
+                  const ruleItem = await buildAntigravityRuleItem(rPath, {
+                    id: `${pFolder.name}:${cId}`,
+                    scope: 'local',
+                    fallbackDescription: `Règle du plugin ${pFolder.name}`,
+                    nameSuffix: `[Plugin: ${pFolder.name}]`,
+                    pluginName: pFolder.name,
+                  });
+                  accountRule(ruleItem);
+                  items.push(ruleItem);
                 }
               }
             }
@@ -392,6 +306,27 @@ export class LocalScanner {
           }
         }
       }
+
+      // Règles limitées à un sous-dossier : chargées seulement quand l'agent lit ou modifie
+      // un fichier de ce dossier, donc sans coût au démarrage
+      const nestedRules = new Map<string, ResourceItem>();
+      for (const source of await findNestedRuleSources(rootPath)) {
+        const relativeFile = path.relative(path.join(rootPath, source.directoryScope), source.path).split(path.sep).join('/');
+        const nestedItem = await buildAntigravityRuleItem(source.path, {
+          id: `${source.directoryScope}/${relativeFile.replace(/\.disabled$/, '').replace(/\.md$/, '')}`,
+          scope: 'local',
+          fallbackDescription: `Règle limitée au dossier ${source.directoryScope}`,
+          nameSuffix: `[${source.directoryScope}/]`,
+          directoryScope: source.directoryScope,
+          standalone: source.kind === 'standalone',
+        });
+        // Un .md et son .md.disabled désignent la même règle : le fichier actif est prioritaire
+        const existing = nestedRules.get(nestedItem.id);
+        if (!existing || (!existing.enabled && nestedItem.enabled)) {
+          nestedRules.set(nestedItem.id, nestedItem);
+        }
+      }
+      items.push(...nestedRules.values());
     }
 
     // 2. Scan Claude Code (.claude/rules et .claude/skills) uniquement si targetTool === 'claude-code'
@@ -571,6 +506,8 @@ export class LocalScanner {
         : [
             { file: 'GEMINI.md', tool: 'antigravity' },
             { file: 'AGENTS.md', tool: 'antigravity' },
+            { file: '.agents/AGENTS.md', tool: 'antigravity' },
+            { file: '.agents/GEMINI.md', tool: 'antigravity' },
           ];
 
     for (const candidate of soulCandidates) {
@@ -583,9 +520,13 @@ export class LocalScanner {
           const lineCount = rawContent.split(/\r\n|\r|\n/).length;
           const { metadata: soulMetadata } = extractFrontmatter(rawContent);
           const parsed = extractMarkdownTitleAndSummary(rawContent);
-          const tokenCount = countTokensForFile(candidatePath, stat.size, stat.mtimeMs, rawContent);
-          const isWarningLines = lineCount > 200;
-          const isWarningSize = candidate.tool === 'antigravity' && fileCharCount > 24000;
+          const isAntigravity = candidate.tool === 'antigravity';
+          // Antigravity : 24 000 octets après inclusions ; la documentation ne fixe pas de limite de lignes
+          const measured = isAntigravity ? await measureAntigravitySoul(rawContent, candidatePath) : null;
+          const tokenCount = measured?.expandedTokenCount
+            ?? countTokensForFile(candidatePath, stat.size, stat.mtimeMs, rawContent);
+          const isWarningLines = !isAntigravity && lineCount > 200;
+          const isWarningSize = measured?.warningSizeExceeded ?? false;
 
           soulCharTotal += fileCharCount;
           if (!soulPathFound) soulPathFound = candidatePath;
@@ -634,19 +575,16 @@ export class LocalScanner {
 
     const activeRulesList = allRulesList.filter((i) => i.enabled);
     const activeRulesCount = activeRulesList.length;
-    const rulesWarningCount = activeRulesList.filter((i) => (
-      i.metadata?.warningSizeExceeded ||
-      i.metadata?.warningLinesExceeded ||
-      i.metadata?.warningMcpExceeded ||
-      i.metadata?.warningNoDescription
-    )).length;
+    const rulesWarningCount = activeRulesList.filter(hasResourceWarning).length;
 
     // Décompte cohérent des règles :
     // - Règles permanentes : accumulation de leur tokenCount BPE réel
-    // - Règles conditionnelles : 20 tokens légers de routeur au boot
+    // - Règles conditionnelles : ~20 tokens au boot (estimation de l'extension, non documentée)
+    // - Règles ignorées par l'agent et règles limitées à un dossier : aucun coût au boot
     // - rulesConditionalTokenTotal : somme des tokens BPE réels des cartes conditionnelles
-    const activePermanentRules = activeRulesList.filter((i) => !i.metadata?.isConditional);
-    const activeConditionalRules = activeRulesList.filter((i) => i.metadata?.isConditional);
+    const bootRules = activeRulesList.filter(countsAtBoot);
+    const activePermanentRules = bootRules.filter((i) => !i.metadata?.isConditional);
+    const activeConditionalRules = bootRules.filter((i) => i.metadata?.isConditional);
     const permanentRulesTokens = activePermanentRules.reduce((sum, i) => sum + (i.tokenCount || 0), 0);
     const conditionalRulesBootTokens = activeConditionalRules.length * 20;
     const rulesTokenTotal = permanentRulesTokens + conditionalRulesBootTokens;

@@ -104,8 +104,81 @@ function cleanYamlValue(val: string): any {
 }
 
 /**
+ * Valeurs de `trigger` reconnues par Antigravity, à la casse près.
+ * Source : https://antigravity.google/docs/rules/
+ */
+export const ANTIGRAVITY_RULE_TRIGGERS = ['always_on', 'model_decision', 'glob', 'manual'] as const;
+export type AntigravityRuleTrigger = (typeof ANTIGRAVITY_RULE_TRIGGERS)[number];
+
+/**
+ * Défauts de frontmatter d'une règle Antigravity (`rules/*.md`) :
+ * - missing-frontmatter, missing-trigger, invalid-trigger : Antigravity ignore la règle en silence ;
+ * - missing-description (model_decision), missing-globs (glob) : champ obligatoire absent ;
+ * - globs-not-string : `globs` écrit autrement qu'en chaîne séparée par des virgules (format non documenté).
+ */
+export type AntigravityRuleIssue =
+  | 'missing-frontmatter'
+  | 'missing-trigger'
+  | 'invalid-trigger'
+  | 'missing-description'
+  | 'missing-globs'
+  | 'globs-not-string';
+
+export interface AntigravityRuleCheck {
+  trigger: AntigravityRuleTrigger | null;
+  /** Vrai quand Antigravity écarte la règle (frontmatter absent ou trigger non reconnu). */
+  ignored: boolean;
+  hasDescription: boolean;
+  issues: AntigravityRuleIssue[];
+}
+
+/**
+ * Vérifie le frontmatter d'un fichier `rules/*.md` selon la documentation d'Antigravity.
+ */
+export function checkAntigravityRuleFrontmatter(content: string): AntigravityRuleCheck {
+  const { metadata, body } = extractFrontmatter(content);
+  const hasFrontmatter = body !== content;
+  const description = metadata.description;
+  const hasDescription = typeof description === 'string' && description.trim().length > 0;
+
+  if (!hasFrontmatter) {
+    return { trigger: null, ignored: true, hasDescription, issues: ['missing-frontmatter'] };
+  }
+
+  const rawTrigger = metadata.trigger;
+  if (rawTrigger === undefined || (typeof rawTrigger === 'string' && rawTrigger.trim() === '')) {
+    return { trigger: null, ignored: true, hasDescription, issues: ['missing-trigger'] };
+  }
+
+  const trigger = typeof rawTrigger === 'string' ? rawTrigger.trim() : '';
+  if (!(ANTIGRAVITY_RULE_TRIGGERS as readonly string[]).includes(trigger)) {
+    return { trigger: null, ignored: true, hasDescription, issues: ['invalid-trigger'] };
+  }
+
+  const issues: AntigravityRuleIssue[] = [];
+  if (trigger === 'model_decision' && !hasDescription) {
+    issues.push('missing-description');
+  }
+  if (trigger === 'glob') {
+    const globs = metadata.globs ?? metadata.glob;
+    const isEmptyString = typeof globs === 'string' && globs.trim().length === 0;
+    if (globs === undefined || isEmptyString || (Array.isArray(globs) && globs.length === 0)) {
+      issues.push('missing-globs');
+    } else if (typeof globs !== 'string') {
+      issues.push('globs-not-string');
+    }
+  }
+
+  return { trigger: trigger as AntigravityRuleTrigger, ignored: false, hasDescription, issues };
+}
+
+/**
  * Détermine si une règle Markdown est conditionnelle (chargée à la demande)
  * ou permanente (chargée au boot en intégralité).
+ *
+ * Pour Antigravity, seules les valeurs exactes `glob`, `model_decision` et `manual`
+ * rendent une règle conditionnelle. Une règle sans trigger valide n'est ni permanente
+ * ni conditionnelle : Antigravity l'ignore (voir checkAntigravityRuleFrontmatter).
  */
 export function isRuleConditional(
   metadata: Record<string, any>,
@@ -119,15 +192,8 @@ export function isRuleConditional(
   }
 
   // Antigravity
-  const trigger = typeof metadata.trigger === 'string' ? metadata.trigger.toLowerCase().trim() : '';
-  if (trigger === 'glob' || trigger === 'globs' || trigger === 'model_decision' || trigger === 'manual') {
-    return true;
-  }
-  const globs = metadata.globs || metadata.glob;
-  if (Array.isArray(globs) && globs.length > 0) return true;
-  if (typeof globs === 'string' && globs.trim().length > 0) return true;
-
-  return false;
+  const trigger = typeof metadata.trigger === 'string' ? metadata.trigger.trim() : '';
+  return trigger === 'glob' || trigger === 'model_decision' || trigger === 'manual';
 }
 
 /**

@@ -1,3 +1,8 @@
+---
+description: Règle de déduplication (version active)
+trigger: always_on
+---
+
 # Règle Déduplication (Version Active)
 
 Cette règle existe à la fois sous forme active (`.md`) et désactivée (`.md.disabled`).

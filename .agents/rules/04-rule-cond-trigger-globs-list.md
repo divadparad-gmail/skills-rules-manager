@@ -1,5 +1,5 @@
 ---
-description: Règle conditionnelle avec liste de motifs globaux en tableau YAML
+description: Règle conditionnelle dont les globs sont écrits en liste YAML, un format non documenté
 trigger: glob
 globs:
   - "src/webview/**/*.js"
@@ -8,8 +8,8 @@ globs:
 
 # Règle Conditionnelle Trigger Globs (Liste YAML)
 
-Cette règle teste la prise en charge de la syntaxe de tableau YAML (`- "..."`) pour la clé `globs:`.
-Elle doit être détectée comme **Conditionnelle** avec le badge `⚡ Conditionnel` et décomptée à ~20 tokens au boot.
+Cette règle écrit `globs:` en tableau YAML (`- "..."`), alors que la documentation d'Antigravity décrit une chaîne de motifs séparés par des virgules.
+Elle reste détectée comme **Conditionnelle** (`trigger: glob`), mais l'extension doit afficher le badge `⚠️ Frontmatter` pour signaler le format de `globs`.
 
 ## Directives Webview UI
 - Éviter les sélecteurs CSS globaux susceptibles de polluer d'autres panneaux.

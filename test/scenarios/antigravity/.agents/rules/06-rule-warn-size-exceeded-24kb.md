@@ -1,3 +1,8 @@
+---
+description: Règle volumineuse servant à tester l'avertissement de dépassement de 24 000 octets
+trigger: always_on
+---
+
 # Règle Volumineuse de Test (Dépassement du Cap Physique de 24 Ko)
 
 > [!WARNING]
@@ -5,7 +10,7 @@
 > Dans l'extension Skills & Rules Manager, il doit afficher un badge d'avertissement ambre/rouge "⚠️ > 24 Ko".
 
 ## Section 1 : Introduction et Justification de la Limite
-Dans le runtime de Google Antigravity IDE, chaque fichier individuel de règle injecté dans la session dispose d'un plafond strict de 24 000 octets (environ 6 000 tokens). Si un fichier dépasse ce volume, le moteur applique une troncature brutale du buffer ou peut l'ignorer, ce qui crée une perte d'instructions pour l'agent.
+Dans le runtime de Google Antigravity IDE, chaque fichier individuel de règle dispose d'un plafond strict de 24 000 octets, mesuré après développement des inclusions `@[label](path)`. Si un fichier dépasse ce volume, Antigravity le tronque, ce qui crée une perte d'instructions pour l'agent.
 La bonne pratique consiste à découper les règles volumineuses en compétences (Skills) ou en plusieurs règles modulaires.
 
 ## Section 2 : Catalogue des Bonnes Pratiques d'Architecture

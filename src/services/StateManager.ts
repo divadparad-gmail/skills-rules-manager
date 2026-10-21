@@ -217,20 +217,27 @@ export class StateManager {
     const mcpGlobal = mcpGlobalStat;
     const mcpLocal = mcpLocalStat;
 
-    const usedTokensTotal =
+    // Antigravity : le budget de 20 000 tokens est réservé aux règles (âmes comprises) ; les skills
+    // et les MCP relèvent d'un budget de personnalisation distinct (https://antigravity.google/docs/rules/)
+    const budgetExcludesPersonalization = workspace.tool === 'antigravity';
+    const rulesAndSoulTokens =
       soulGlobal.tokenCount +
       soulLocal.tokenCount +
       rulesGlobal.tokenCount +
-      rulesLocal.tokenCount +
-      skillsGlobal.tokenCount +
-      skillsLocal.tokenCount +
-      mcpGlobal.tokenCount +
-      mcpLocal.tokenCount;
+      rulesLocal.tokenCount;
+    const usedTokensTotal = budgetExcludesPersonalization
+      ? rulesAndSoulTokens
+      : rulesAndSoulTokens +
+        skillsGlobal.tokenCount +
+        skillsLocal.tokenCount +
+        mcpGlobal.tokenCount +
+        mcpLocal.tokenCount;
 
     const availablePercentage = Number(Math.max(0, 100 - (usedTokensTotal / budgetTotal) * 100).toFixed(1));
 
     const stats: ManagerStats = {
       budgetTotal,
+      budgetExcludesPersonalization,
       usedTokensTotal,
       availablePercentage,
       soulGlobal,
@@ -328,7 +335,8 @@ export class StateManager {
     if (result.success) {
       const destLabel = destinationScope === 'global' ? 'Global PC' : 'Projet Local';
       vscode.window.showInformationMessage(
-        `Import réussi ! "${item.name || item.id}" a été copié vers ${destLabel}.`
+        `Import réussi ! "${item.name || item.id}" a été copié vers ${destLabel}.` +
+          (result.notice ? ` ${result.notice}` : '')
       );
     } else {
       vscode.window.showErrorMessage(

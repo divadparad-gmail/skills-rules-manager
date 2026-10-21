@@ -55,6 +55,18 @@ export interface ResourceItem {
     isSoul?: boolean;
     locked?: boolean;
     isConditional?: boolean;
+    /** Règle Antigravity écartée par l'agent (frontmatter absent ou trigger non reconnu). */
+    ignoredByAgent?: boolean;
+    /** Défauts de frontmatter d'une règle Antigravity (voir AntigravityRuleIssue). */
+    ruleIssues?: string[];
+    /** Valeur de trigger reconnue d'une règle Antigravity. */
+    trigger?: string;
+    /** Taille en octets UTF-8, inclusions @[label](path) développées (Antigravity). */
+    byteSize?: number;
+    /** Dossier (relatif au projet) auquel une règle imbriquée est limitée ; aucun coût au démarrage. */
+    directoryScope?: string;
+    /** Règle déclarée par .agents/rules.json plutôt que trouvée dans .agents/rules/. */
+    fromRulesJson?: boolean;
     pluginName?: string;
     warningSizeExceeded?: boolean;
     warningLinesExceeded?: boolean;
@@ -93,6 +105,11 @@ export interface TokenCategoryStat {
 
 export interface ManagerStats {
   budgetTotal: number; // Ex: 20000 tokens
+  /**
+   * Vrai sous Antigravity : le budget de 20 000 tokens ne couvre que l'âme et les règles,
+   * les skills et les MCP relevant d'un budget de personnalisation distinct.
+   */
+  budgetExcludesPersonalization?: boolean;
   usedTokensTotal: number;
   availablePercentage: number;
   soulGlobal: TokenCategoryStat;

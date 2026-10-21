@@ -637,10 +637,12 @@
       setSegmentWidth('barSoulLocal', stats.soulLocal ? stats.soulLocal.percentage : 0);
       setSegmentWidth('barRuleGlobal', stats.rulesGlobal ? stats.rulesGlobal.percentage : 0);
       setSegmentWidth('barRuleLocal', stats.rulesLocal ? stats.rulesLocal.percentage : 0);
-      setSegmentWidth('barSkillGlobal', stats.skillsGlobal ? stats.skillsGlobal.percentage : 0);
-      setSegmentWidth('barSkillLocal', stats.skillsLocal ? stats.skillsLocal.percentage : 0);
-      setSegmentWidth('barMcpGlobal', stats.mcpGlobal ? stats.mcpGlobal.percentage : 0);
-      setSegmentWidth('barMcpLocal', stats.mcpLocal ? stats.mcpLocal.percentage : 0);
+      // Antigravity : skills et MCP relèvent d'un budget de personnalisation distinct du budget des règles
+      const excludesPersonalization = stats.budgetExcludesPersonalization === true;
+      setSegmentWidth('barSkillGlobal', !excludesPersonalization && stats.skillsGlobal ? stats.skillsGlobal.percentage : 0);
+      setSegmentWidth('barSkillLocal', !excludesPersonalization && stats.skillsLocal ? stats.skillsLocal.percentage : 0);
+      setSegmentWidth('barMcpGlobal', !excludesPersonalization && stats.mcpGlobal ? stats.mcpGlobal.percentage : 0);
+      setSegmentWidth('barMcpLocal', !excludesPersonalization && stats.mcpLocal ? stats.mcpLocal.percentage : 0);
 
       // Mise à jour des lignes de détail de la légende (titre avec nombre actif entre parenthèses)
       updateBreakdownRow('SoulGlobal', stats.soulGlobal, 'Âme (global)');
@@ -736,7 +738,11 @@
         const dupNotice = (dupStats && dupStats.activeDuplicates > 0)
           ? ` • <span style="color: #fca5a5; font-weight: 700;">⚠️ ${dupStats.totalWastedTokens.toLocaleString('fr-FR')} tokens gaspillés en doublons</span>`
           : '';
-        totalSummaryEl.innerHTML = `Total utilisé : ${usedTokens.toLocaleString()} / ${budget.toLocaleString()} tokens (${usedPct}%)${dupNotice}`;
+        const personalizationNotice = excludesPersonalization
+          ? ` • Skills et MCP : ${(skillTotalTokens + mcpTotalTokens).toLocaleString()} tokens, hors budget des règles (budget de personnalisation distinct)`
+          : '';
+        const totalLabel = excludesPersonalization ? 'Budget des règles (âme comprise)' : 'Total utilisé';
+        totalSummaryEl.innerHTML = `${totalLabel} : ${usedTokens.toLocaleString()} / ${budget.toLocaleString()} tokens (${usedPct}%)${personalizationNotice}${dupNotice}`;
       }
     }
   }
@@ -765,8 +771,13 @@
       }
     }
 
+    const outsideRulesBudget = (stat.type === 'skill' || stat.type === 'mcp') &&
+      currentState?.stats?.budgetExcludesPersonalization === true;
+
     if (valEl) {
-      valEl.textContent = `${stat.tokenCount.toLocaleString()} tok (${stat.percentage}%)`;
+      valEl.textContent = outsideRulesBudget
+        ? `${stat.tokenCount.toLocaleString()} tok (hors budget des règles)`
+        : `${stat.tokenCount.toLocaleString()} tok (${stat.percentage}%)`;
     }
 
     if (tooltipEl) {
@@ -782,7 +793,9 @@
         }
         tooltipEl.textContent =
           `📊 ${defaultTitle} (Cumul Global + Local) :\n` +
-          `• Tokens au Boot : ${stat.tokenCount.toLocaleString()} tok (${stat.percentage}% du budget)\n` +
+          (outsideRulesBudget
+            ? `• Tokens : ${stat.tokenCount.toLocaleString()} tok, hors budget de 20 000 tokens des règles (budget de personnalisation distinct, non chiffré par la documentation d'Antigravity)\n`
+            : `• Tokens au Boot : ${stat.tokenCount.toLocaleString()} tok (${stat.percentage}% du budget)\n`) +
           `• Caractères : ${stat.charCount.toLocaleString()} caractères` +
           extraInfo +
           `\nℹ️ Estimation des tokens (BPE o200k / repli 1 tok ≈ 4 car.)` +
@@ -1452,20 +1465,65 @@
       badgesLine.appendChild(fixtureBadge);
     }
 
-    if (item.metadata && item.metadata.isConditional) {
+    // Règle Antigravity écartée par l'agent : frontmatter absent ou trigger non reconnu
+    if (item.metadata && item.metadata.ignoredByAgent) {
+      const ignoredBadge = targetDoc.createElement('span');
+      ignoredBadge.className = 'item-badge-pill pill-warn';
+      ignoredBadge.textContent = '⛔ Ignorée par Antigravity';
+      const issue = (item.metadata.ruleIssues || [])[0];
+      const reason = issue === 'missing-frontmatter'
+        ? 'le fichier ne commence pas par un frontmatter YAML'
+        : issue === 'invalid-trigger'
+          ? 'la valeur de trigger n\'est pas reconnue (casse exacte requise)'
+          : 'le frontmatter ne déclare pas de trigger';
+      ignoredBadge.title = `Antigravity ignore cette règle en silence : ${reason}.\nAjoutez « trigger: » avec always_on, model_decision, glob ou manual.`;
+      badgesLine.appendChild(ignoredBadge);
+    }
+
+    // Champs de frontmatter manquants ou mal formés (règle tout de même chargée)
+    const frontmatterIssues = (item.metadata && !item.metadata.ignoredByAgent && item.metadata.ruleIssues) || [];
+    if (frontmatterIssues.length > 0) {
+      const issueLabels = {
+        'missing-description': '« description » est obligatoire avec trigger: model_decision',
+        'missing-globs': '« globs » est obligatoire avec trigger: glob',
+        'globs-not-string': '« globs » doit être une chaîne de motifs séparés par des virgules (ex. "*.ts, *.tsx")',
+      };
+      const issueBadge = targetDoc.createElement('span');
+      issueBadge.className = 'item-badge-pill pill-warn-amber';
+      issueBadge.textContent = '⚠️ Frontmatter';
+      issueBadge.title = 'Frontmatter à corriger :\n' + frontmatterIssues.map((code) => `• ${issueLabels[code] || code}`).join('\n');
+      badgesLine.appendChild(issueBadge);
+    }
+
+    if (item.metadata && item.metadata.directoryScope !== undefined) {
+      const scopeBadge = targetDoc.createElement('span');
+      scopeBadge.className = 'item-badge-pill pill-cond';
+      scopeBadge.textContent = `📂 ${item.metadata.directoryScope}/`;
+      scopeBadge.title = `Règle limitée au dossier ${item.metadata.directoryScope}/ : Antigravity la charge seulement quand l'agent lit ou modifie un fichier de ce dossier. Aucun coût au démarrage.`;
+      badgesLine.appendChild(scopeBadge);
+    } else if (item.metadata && item.metadata.isConditional) {
       const condBadge = targetDoc.createElement('span');
       condBadge.className = 'item-badge-pill pill-cond';
       condBadge.textContent = '⚡ Conditionnel';
-      condBadge.title = 'Règle conditionnelle : chargée uniquement sur trigger/glob (~20 tokens au boot pour le routeur)';
+      condBadge.title = `Règle conditionnelle (trigger: ${item.metadata.trigger || 'glob'}) : contenu complet chargé seulement à l'activation (~20 tokens au boot, estimation de l'extension)`;
       badgesLine.appendChild(condBadge);
     }
 
-    // Avertissement dépassement taille physique (> 24 Ko sous Antigravity)
+    if (item.metadata && item.metadata.fromRulesJson) {
+      const jsonBadge = targetDoc.createElement('span');
+      jsonBadge.className = 'item-badge-pill pill-plugin';
+      jsonBadge.textContent = '🔗 rules.json';
+      jsonBadge.title = 'Règle déclarée par .agents/rules.json (entrée partagée ou sous-dossier de règles).';
+      badgesLine.appendChild(jsonBadge);
+    }
+
+    // Avertissement dépassement taille physique (> 24 000 octets sous Antigravity, inclusions développées)
     if (item.metadata && item.metadata.warningSizeExceeded) {
       const warnBadge = targetDoc.createElement('span');
       warnBadge.className = 'item-badge-pill pill-warn';
       warnBadge.textContent = '⚠️ > 24 Ko';
-      warnBadge.title = 'Attention : ce fichier dépasse la limite physique de 24 000 octets d\'Antigravity ! Risque de troncature.';
+      const bytes = typeof item.metadata.byteSize === 'number' ? ` (${item.metadata.byteSize.toLocaleString('fr-FR')} octets)` : '';
+      warnBadge.title = `Attention : ce fichier dépasse la limite de 24 000 octets d'Antigravity${bytes}, inclusions @[label](path) comprises. Antigravity le tronque.`;
       badgesLine.appendChild(warnBadge);
     }
 
@@ -1528,9 +1586,14 @@
     const charStr = charCount.toLocaleString('fr-FR');
     const tokStr = tokenCount.toLocaleString('fr-FR');
 
-    if (item.metadata && item.metadata.isConditional) {
-      metricsEl.innerHTML = `<span>${charStr} car.</span> <span class="tok-highlight" title="Coût au boot : ~20 tokens (routeur). Fichier complet si activé : ${tokStr} tokens">~20 tok (${tokStr} plein)</span>`;
-      metricsEl.title = `Règle conditionnelle :\n• Coût au boot : ~20 tokens (routeur de déclenchement)\n• Poids complet si activé : ${charStr} car. (${tokStr} tokens)`;
+    if (item.metadata && (item.metadata.ignoredByAgent || item.metadata.directoryScope !== undefined)) {
+      metricsEl.innerHTML = `<span>${charStr} car.</span> <span class="tok-highlight">0 tok au boot (${tokStr} plein)</span>`;
+      metricsEl.title = item.metadata.ignoredByAgent
+        ? `Règle ignorée par Antigravity : aucun coût, car elle n'est jamais chargée.\n• Poids si corrigée : ${charStr} car. (${tokStr} tokens)`
+        : `Règle de dossier : aucun coût au démarrage.\n• Poids à l'activation : ${charStr} car. (${tokStr} tokens)`;
+    } else if (item.metadata && item.metadata.isConditional) {
+      metricsEl.innerHTML = `<span>${charStr} car.</span> <span class="tok-highlight" title="Coût au boot : ~20 tokens (estimation de l'extension). Fichier complet si activé : ${tokStr} tokens">~20 tok (${tokStr} plein)</span>`;
+      metricsEl.title = `Règle conditionnelle :\n• Coût au boot : ~20 tokens (estimation de l'extension, non chiffrée par la documentation)\n• Poids complet si activé : ${charStr} car. (${tokStr} tokens)`;
     } else {
       metricsEl.innerHTML = `<span>${charStr} car.</span> <span class="tok-highlight">(${tokStr} tokens)</span>`;
       let metricsTitle = `Taille réelle : ${charStr} caractères (${tokStr} tokens)\nEstimation : BPE o200k (repli 1 token ≈ 4 car.)`;

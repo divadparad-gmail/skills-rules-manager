@@ -3,6 +3,7 @@ import * as path from 'path';
 import { NasStatus, ResourceItem, ResourceType } from '../types';
 import { extractFrontmatter, extractMarkdownTitleAndSummary } from '../utils/frontmatter';
 import { countTokens, countTokensForFile } from '../utils/tokenizer';
+import { buildAntigravityRuleItem } from './antigravityRuleItem';
 
 let vscodeModule: any = null;
 try {
@@ -271,49 +272,11 @@ export class NasScanner {
 
           const filePath = path.join(rulesDir, fileName);
           const cleanId = fileName.replace(/\.disabled$/, '').replace(/\.md$/, '');
-          let title = cleanId;
-          let summary = '';
-          let fileCharCount = 0;
-          let rawContent = '';
-          let fileStat: fs.Stats | null = null;
-
-          try {
-            fileStat = await fs.promises.stat(filePath);
-            rawContent = await fs.promises.readFile(filePath, 'utf8');
-            fileCharCount = rawContent.length;
-            const parsed = extractMarkdownTitleAndSummary(rawContent);
-            if (parsed.title) title = parsed.title;
-            if (parsed.summary) summary = parsed.summary;
-          } catch {
-            // Lecture fallback
-          }
-
-          const lineCount = rawContent ? rawContent.split(/\r\n|\r|\n/).length : 0;
-          const isWarningLines = lineCount > 200;
-          const isWarningSize = fileCharCount > 24000;
-          const isWarningNoDesc = !summary || summary.trim().length === 0;
-          const ruleTokenCount = countTokensForFile(filePath, fileStat?.size, fileStat?.mtimeMs, rawContent);
-
-          const newItem: ResourceItem = {
+          const newItem = await buildAntigravityRuleItem(filePath, {
             id: cleanId,
-            name: title,
-            description: summary || 'Règle de gouvernance Antigravity',
-            type: 'rule',
             scope: 'nas',
-            enabled: isMd,
-            path: filePath,
-            targetTool: 'antigravity',
-            isFolder: false,
-            charCount: fileCharCount,
-            tokenCount: ruleTokenCount,
-            lineCount,
-            metadata: {
-              hasDisabledSuffix: isDisabled,
-              warningLinesExceeded: isWarningLines,
-              warningSizeExceeded: isWarningSize,
-              warningNoDescription: isWarningNoDesc,
-            },
-          };
+            fallbackDescription: 'Règle de gouvernance Antigravity',
+          });
 
           if (rulesMap.has(cleanId)) {
             const existing = rulesMap.get(cleanId)!;

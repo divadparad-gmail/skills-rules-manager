@@ -608,7 +608,7 @@ describe('Suite de Tests : Intégrité & Synchronisation NAS vs Local', () => {
   // Test 19 : Détection des règles conditionnelles (paths Claude vs trigger Antigravity)
   // --------------------------------------------------------------------------
   test('19. isRuleConditional : gère paths: Claude Code et trigger/globs Antigravity', async () => {
-    const { isRuleConditional, extractFrontmatter } = await import('../src/utils/frontmatter');
+    const { isRuleConditional, extractFrontmatter, checkAntigravityRuleFrontmatter } = await import('../src/utils/frontmatter');
 
     // Claude Code avec paths
     const claudeRuleContent = `---
@@ -632,13 +632,24 @@ globs: "*.tsx, *.jsx"
     assert.strictEqual(isRuleConditional(agyFm, 'antigravity'), true, 'Antigravity avec trigger: glob doit être conditionnel');
     assert.strictEqual(isRuleConditional(agyFm, 'claude-code'), false, 'trigger: glob ne doit pas impacter Claude Code');
 
-    // Antigravity sans trigger (always_on)
+    // Antigravity sans trigger : la règle n'est ni permanente ni conditionnelle, Antigravity l'ignore
+    const agyNoTrigger = `---
+description: Règle sans trigger
+---
+# Règle Standard`;
+    const noTriggerFm = extractFrontmatter(agyNoTrigger).metadata;
+    assert.strictEqual(isRuleConditional(noTriggerFm, 'antigravity'), false, 'Sans trigger, la règle Antigravity n\'est pas conditionnelle');
+    assert.strictEqual(checkAntigravityRuleFrontmatter(agyNoTrigger).ignored, true, 'Sans trigger, Antigravity ignore la règle');
+
+    // Antigravity avec trigger: always_on : permanente
     const agyAlwaysOn = `---
 description: Règle toujours active
+trigger: always_on
 ---
 # Règle Standard`;
     const alwaysFm = extractFrontmatter(agyAlwaysOn).metadata;
-    assert.strictEqual(isRuleConditional(alwaysFm, 'antigravity'), false, 'Sans trigger, la règle Antigravity est permanente');
+    assert.strictEqual(isRuleConditional(alwaysFm, 'antigravity'), false, 'trigger: always_on rend la règle permanente');
+    assert.strictEqual(checkAntigravityRuleFrontmatter(agyAlwaysOn).ignored, false);
   });
 
   // --------------------------------------------------------------------------
@@ -652,7 +663,7 @@ description: Règle toujours active
     await fs.promises.mkdir(path.join(projectDir, '.agents', 'plugins', 'my-pack', 'rules'), { recursive: true });
 
     // 1 règle permanente (400 chars -> 100 tok)
-    const permContent = '# Perm Rule\n' + 'A'.repeat(380);
+    const permContent = '---\ntrigger: always_on\n---\n# Perm Rule\n' + 'A'.repeat(380);
     await fs.promises.writeFile(path.join(projectDir, '.agents', 'rules', 'perm.md'), permContent, 'utf8');
 
     // 1 règle conditionnelle (1200 chars -> 80 chars au boot ~20 tok, conditionnel = 1200 chars)
@@ -672,7 +683,7 @@ globs: "*.ts"
     );
     await fs.promises.writeFile(
       path.join(projectDir, '.agents', 'plugins', 'my-pack', 'rules', 'plugin-rule.md'),
-      '# Plugin Rule\nRègle du plugin.',
+      '---\ntrigger: always_on\n---\n# Plugin Rule\nRègle du plugin.',
       'utf8'
     );
 
@@ -701,7 +712,7 @@ globs: "*.ts"
   // --------------------------------------------------------------------------
   // Tests 21 à 24 : Système d'Alertes Techniques (Coach IA Proactif)
   // --------------------------------------------------------------------------
-  test('21. Alertes Lignes : Détecte warningLinesExceeded sur Règle > 200 li. et Skill > 500 li.', async () => {
+  test('21. Alertes Lignes : aucune limite de lignes documentée pour une règle Antigravity, Skill > 500 li. détecté', async () => {
     const coachDir = path.join(tempBaseDir, 'coach-lines-test');
     await fs.promises.mkdir(path.join(coachDir, '.agents', 'rules'), { recursive: true });
     await fs.promises.mkdir(path.join(coachDir, '.agents', 'skills', 'skill-large'), { recursive: true });
@@ -710,7 +721,7 @@ globs: "*.ts"
     const longRuleLines = Array.from({ length: 250 }, (_, i) => `Ligne ${i + 1} de la règle`).join('\n');
     await fs.promises.writeFile(
       path.join(coachDir, '.agents', 'rules', 'rule-long.md'),
-      `# Longue Règle\nDescription de la règle.\n${longRuleLines}`,
+      `---\ntrigger: always_on\n---\n# Longue Règle\nDescription de la règle.\n${longRuleLines}`,
       'utf8'
     );
 
@@ -734,7 +745,7 @@ globs: "*.ts"
     const ruleItem = scanResult.items.find((i: ResourceItem) => i.id === 'rule-long');
     assert.ok(ruleItem, 'La règle rule-long doit exister');
     assert.ok(ruleItem?.lineCount! > 200, `lineCount doit dépasser 200 (reçu: ${ruleItem?.lineCount})`);
-    assert.strictEqual(ruleItem?.metadata?.warningLinesExceeded, true, 'warningLinesExceeded doit être true sur règle > 200 lignes');
+    assert.notStrictEqual(ruleItem?.metadata?.warningLinesExceeded, true, 'La documentation d\'Antigravity ne fixe aucune limite de lignes pour une règle');
 
     const skillItem = scanResult.items.find((i: ResourceItem) => i.id === 'skill-large');
     assert.ok(skillItem, 'Le skill skill-large doit exister');
@@ -748,7 +759,7 @@ globs: "*.ts"
     await fs.promises.mkdir(path.join(warnDir, '.agents', 'skills', 'skill-no-desc'), { recursive: true });
 
     // Règle volumineuse > 24 000 octets
-    const heavyContent = '# Règle Volumineuse\n' + 'X'.repeat(25000);
+    const heavyContent = '---\ntrigger: always_on\n---\n# Règle Volumineuse\n' + 'X'.repeat(25000);
     await fs.promises.writeFile(path.join(warnDir, '.agents', 'rules', 'rule-heavy.md'), heavyContent, 'utf8');
 
     // Skill sans champ description dans le frontmatter
@@ -812,10 +823,10 @@ globs: "*.ts"
     const aggDir = path.join(tempBaseDir, 'coach-agg-test');
     await fs.promises.mkdir(path.join(aggDir, '.agents', 'rules'), { recursive: true });
 
-    // 2 règles avec alertes (une > 200 lignes, une > 24 Ko) et 1 normale
-    const normalRule = '# Règle Normale\nContenu court et propre.';
-    const longRule = Array.from({ length: 220 }, (_, i) => `Ligne ${i + 1}`).join('\n');
-    const heavyRule = '# Règle Lourde\n' + 'H'.repeat(25000);
+    // 2 règles avec alertes (une ignorée faute de trigger, une > 24 Ko) et 1 normale
+    const normalRule = '---\ntrigger: always_on\ndescription: Règle normale\n---\n# Règle Normale\nContenu court et propre.';
+    const longRule = '---\ndescription: Règle sans trigger\n---\n' + Array.from({ length: 220 }, (_, i) => `Ligne ${i + 1}`).join('\n');
+    const heavyRule = '---\ntrigger: always_on\ndescription: Règle lourde\n---\n# Règle Lourde\n' + 'H'.repeat(25000);
 
     await fs.promises.writeFile(path.join(aggDir, '.agents', 'rules', 'rule-norm.md'), normalRule, 'utf8');
     await fs.promises.writeFile(path.join(aggDir, '.agents', 'rules', 'rule-long.md'), longRule, 'utf8');
@@ -831,7 +842,7 @@ globs: "*.ts"
     });
 
     assert.strictEqual(scanResult.rulesStat.totalCount, 3);
-    assert.strictEqual(scanResult.rulesStat.warningCount, 2, 'rulesStat.warningCount doit être 2 (rule-long et rule-heavy)');
+    assert.strictEqual(scanResult.rulesStat.warningCount, 2, 'rulesStat.warningCount doit être 2 (rule-long ignorée et rule-heavy)');
   });
 
   test('25. Chemins Universels : détection dynamique du profil hôte sans hardcoding', async () => {
@@ -1556,12 +1567,12 @@ Corps du texte.`;
     // 3. Règles permanentes
     await fs.promises.writeFile(
       path.join(rulesDir, 'rule-perm-one.md'),
-      '# Règle Permanente 1\nDirectives strictes pour le code TypeScript.',
+      '---\ntrigger: always_on\n---\n# Règle Permanente 1\nDirectives strictes pour le code TypeScript.',
       'utf8'
     );
     await fs.promises.writeFile(
       path.join(rulesDir, 'rule-perm-two.md'),
-      '# Règle Permanente 2\nArchitecture et design patterns recommandés.',
+      '---\ntrigger: always_on\n---\n# Règle Permanente 2\nArchitecture et design patterns recommandés.',
       'utf8'
     );
 
@@ -1798,7 +1809,7 @@ Corps du texte.`;
     );
     await fs.promises.writeFile(
       path.join(wsDir, '.agents', 'rules', 'rule-perm.md'),
-      '# Règle Permanente\nContenu permanent testé.',
+      '---\ntrigger: always_on\n---\n# Règle Permanente\nContenu permanent testé.',
       'utf8'
     );
     await fs.promises.writeFile(

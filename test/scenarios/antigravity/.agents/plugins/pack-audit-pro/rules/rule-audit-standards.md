@@ -1,3 +1,8 @@
+---
+description: Standards d'audit du plugin pack-audit-pro
+trigger: always_on
+---
+
 # Standards d'Audit (Plugin pack-audit-pro)
 
 Règle permanente intégrée dans le plugin `pack-audit-pro`.

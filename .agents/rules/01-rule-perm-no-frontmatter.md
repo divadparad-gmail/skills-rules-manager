@@ -1,8 +1,9 @@
-# Règle Permanente Sans Frontmatter (Format Markdown Brut)
+# Règle Sans Frontmatter (Ignorée par Antigravity)
 
-Cette règle permanente ne contient aucun bloc YAML initial.
-L'extension doit en extraire le titre depuis ce premier en-tête H1 et un résumé depuis ce paragraphe.
+Ce fichier ne commence pas par un frontmatter YAML déclarant un `trigger`.
+Selon la documentation d'Antigravity, une règle de `.agents/rules/` sans frontmatter est ignorée en silence.
+L'extension doit afficher le badge « ⛔ Ignorée par Antigravity » et ne compter aucun token au démarrage.
 
-## Directives
+## Directives (jamais chargées)
 - Toujours utiliser l'encodage UTF-8 sous Windows.
 - Vérifier la présence des variables d'environnement requises avant d'exécuter un script.
