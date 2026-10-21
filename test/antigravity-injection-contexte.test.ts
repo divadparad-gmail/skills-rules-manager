@@ -193,6 +193,8 @@ const cellulesNonFigees = (baseline: Baseline, rapport: Rapport): string[] => {
 
 /** Valeur de meta.version_antigravity dans le schéma de SONDE.md, à remplacer après la sonde. */
 const VERSION_A_REMPLIR = 'A_REMPLIR';
+/** Valeurs qui ne renseignent pas la version : l'agent sondé écrit INCONNU quand il ne la connaît pas. */
+const VERSIONS_NON_RENSEIGNEES = new Set(['', VERSION_A_REMPLIR, 'INCONNU']);
 const AVERTISSEMENT_VERSION = "⚠️ Version d'Antigravity non renseignée (Help > About)";
 
 /** Avertissements à afficher avant la comparaison, sans jamais produire d'écart. */
@@ -203,8 +205,10 @@ const avertissementsRapport = (rapport: Rapport): string[] => {
     out.push(`⚠️ RAPPORT SUSPECT : la sonde déclare ${infractions.length} infraction(s) :`);
     out.push(...infractions.map((infraction) => `   - ${infraction}`));
   }
-  const version = rapport.meta?.version_antigravity?.trim();
-  if (!version || version === VERSION_A_REMPLIR) out.push(AVERTISSEMENT_VERSION);
+  const version = rapport.meta?.version_antigravity;
+  if (typeof version !== 'string' || VERSIONS_NON_RENSEIGNEES.has(version.trim().toUpperCase())) {
+    out.push(AVERTISSEMENT_VERSION);
+  }
   return out;
 };
 
@@ -395,8 +399,9 @@ describe('Suite de Tests : Injection de contexte Antigravity (intégrité des fi
     assert.ok(avertissements.some((a) => a.includes('zz-g3.md')), 'Chaque infraction est citée');
     assert.deepStrictEqual(ecartsDe(suspect), [], 'Une infraction avertit sans produire d\'écart');
 
-    // Point 5 : version d'Antigravity absente, vide ou laissée à A_REMPLIR : avertissement, jamais un écart
-    for (const version of [undefined, '', '  ', VERSION_A_REMPLIR]) {
+    // Point 5 : version d'Antigravity absente, vide, laissée à A_REMPLIR ou déclarée INCONNU par l'agent :
+    // avertissement, jamais un écart (l'étalonnage du 2026-10-21 a produit "INCONNU")
+    for (const version of [undefined, '', '  ', VERSION_A_REMPLIR, 'a_remplir', 'INCONNU', ' inconnu ']) {
       const sansVersion = conformeALaBaseline();
       sansVersion.meta!.version_antigravity = version;
       assert.deepStrictEqual(avertissementsRapport(sansVersion), [AVERTISSEMENT_VERSION], `version ${JSON.stringify(version)}`);
@@ -405,6 +410,12 @@ describe('Suite de Tests : Injection de contexte Antigravity (intégrité des fi
     const sansMeta = conformeALaBaseline();
     delete sansMeta.meta;
     assert.deepStrictEqual(avertissementsRapport(sansMeta), [AVERTISSEMENT_VERSION]);
+    const versionNonTexte = conformeALaBaseline();
+    (versionNonTexte.meta as Record<string, unknown>).version_antigravity = 2.5;
+    assert.deepStrictEqual(avertissementsRapport(versionNonTexte), [AVERTISSEMENT_VERSION]);
+    const versionRenseignee = conformeALaBaseline();
+    versionRenseignee.meta!.version_antigravity = '2.5.5';
+    assert.deepStrictEqual(avertissementsRapport(versionRenseignee), [], 'Une vraie version ne donne aucun avertissement');
 
     // Point 6 : chemins absolus vers un dossier utilisateur, détectés quelle que soit leur forme
     const fuite = [

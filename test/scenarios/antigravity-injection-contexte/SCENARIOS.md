@@ -42,6 +42,8 @@ Chaque scénario regroupe des entrées de la baseline [`attendu/baseline-2026-10
 
 **La confiance.** Une étape suivie d'un astérisque (`E2*`) est une entrée **transposée** : le mécanisme a été observé sur une autre règle pendant l'enquête, mais ce canari précis est nouveau. Une étape sans astérisque est une entrée **observée** telle quelle le 2026-10-21. Un écart sur une entrée transposée peut donc venir de la transposition elle-même plutôt que d'un changement d'Antigravity.
 
+**Étalonnage.** L'étalonnage du 2026-10-21 à 17:14 (`resultats/2026-10-21-1714.json`, Antigravity IDE 2.5.5) a confirmé les 51 entrées transposées, ainsi que les 105 entrées observées : 156 conformes sur 156, sans infraction. Leur confiance reste `transpose` dans la baseline, qui garde la trace de ce qui avait été mesuré pendant l'enquête.
+
 **L'attribution des entrées.** Une entrée appartient par défaut au scénario de son canari. Deux exceptions s'appliquent :
 - À l'étape E5 (`list_dir`), toutes les entrées relèvent de SC09, sauf `CANARI-DOSSIER`, qui reste dans SC08.
 - Aux étapes E7 et E8 (modification et création), les entrées où le canari est attendu **présent** relèvent de SC09. Les entrées attendues absentes restent dans le scénario de leur canari.
@@ -171,6 +173,12 @@ Les entrées de `CANARI-L2` aux étapes E7 et E8 relèvent de SC09.
 - `CANARI-DOSSIER` : absent en E0, E1, E2, E3, E4, E5, E6 et E7.
 
 **Résultat figé.** Le fichier n'est chargé ni au démarrage, ni à la lecture d'un fichier du dossier (E6) ou d'un sous-dossier (E4), ni au listing du dossier (E5), ni à la modification (E7).
+
+**Précision : les dossiers parents, eux, sont chargés** (source : étalonnage 2026-10-21 17:14, informatif). Les `autres_regles` des étapes E0 à E8 montrent qu'Antigravity charge aussi les règles des dossiers **parents** de l'espace de travail, jusqu'à la racine du dépôt Git :
+- le `GEMINI.md` et les règles `.agents/rules/*` de la racine du projet, selon leur déclencheur : les règles permanentes au démarrage, la règle `model_decision` dans l'index, et la règle glob `03-rule-cond-trigger-glob.md` à chaque fichier `.ts` ;
+- le fichier global `~/.gemini/GEMINI.md`.
+
+Le chargement remonte donc vers les dossiers parents, mais ne descend jamais dans un sous-dossier. Le rapport écrit les chemins de la racine sous la forme `../../…`, alors que la racine du dépôt se trouve trois niveaux au-dessus de la suite (`../../../`). C'est une approximation de l'agent sondé, laissée telle quelle dans le rapport brut. Ces règles s'ajoutent à celles de la suite (voir « Dépendance à l'environnement » dans le [README.md](README.md#dépendance-à-lenvironnement)).
 
 **Si ça change.** Si DOSSIER apparaît, les règles de dossier redeviennent utilisables. Noter l'étape où il apparaît : elle indique le déclencheur.
 

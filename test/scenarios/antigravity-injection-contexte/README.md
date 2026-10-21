@@ -48,11 +48,19 @@ Les scripts associés se trouvent dans `test/scenarios/scripts/` :
 5. **Vérifie qu'un fichier est apparu** dans `resultats/`, nommé `AAAA-MM-JJ-HHMM.json`.
 6. **Lance la comparaison** depuis la racine du dépôt : `npm run test:injection`. Si le test de confidentialité échoue (« Chemin absolu vers un dossier utilisateur : caviarder avant de commiter »), le rapport contient un chemin absolu malgré la consigne de la sonde : **caviarde-le avant de le commiter**. Remplace le chemin du projet par `<PROJET>` et celui du dossier personnel par `<HOME>`, aux lignes que le message indique.
 7. **Relance la réinitialisation** : `npm run test:injection-reset`.
-8. **Note la version d'Antigravity** dans le rapport : dans l'objet `meta`, remplace la valeur `"A_REMPLIR"` de la clé `version_antigravity` par la version affichée dans Help > About. Le test l'affiche en tête de la comparaison. Tant que la valeur est absente ou vaut `A_REMPLIR`, le test affiche l'avertissement « Version d'Antigravity non renseignée (Help > About) », sans le compter comme un écart. **Ne renomme pas le fichier** : seuls les noms au format `AAAA-MM-JJ-HHMM.json` sont retenus automatiquement.
+8. **Note la version d'Antigravity** dans le rapport : dans l'objet `meta`, remplace la valeur `"A_REMPLIR"` de la clé `version_antigravity` par la version affichée dans Help > About. Le test l'affiche en tête de la comparaison. L'agent sondé écrit parfois `INCONNU`, car il ne voit pas la version : remplace aussi cette valeur. Tant que la valeur est absente ou vaut `A_REMPLIR` ou `INCONNU`, le test affiche l'avertissement « Version d'Antigravity non renseignée (Help > About) », sans le compter comme un écart. **Ne renomme pas le fichier** : seuls les noms au format `AAAA-MM-JJ-HHMM.json` sont retenus automatiquement.
 
 Pendant l'étape 6, la vérification « état avant sonde » du test statique est volontairement ignorée, car la sonde vient de modifier `module.ts` et de créer `nouveau.ts`. Si tu lances `npm test` sans avoir fait l'étape 7, ce test échoue avec le message « lance le script de réinitialisation ».
 
-Les règles globales de ton profil Antigravity (`~/.gemini/…`) restent actives dans l'espace de travail sondé. La sonde les rapporte dans `autres_regles`, que le test affiche sans les comparer.
+## Dépendance à l'environnement
+
+L'espace de travail sondé n'est pas isolé. Antigravity charge aussi les règles des dossiers parents, jusqu'à la racine du dépôt Git : le `GEMINI.md` et les règles `.agents/rules/*` de la racine du projet, en plus des règles globales `~/.gemini/` comme `~/.gemini/GEMINI.md`. Cela a été constaté lors de l'étalonnage du 2026-10-21 (voir SC08 dans [SCENARIOS.md](SCENARIOS.md)). La sonde rapporte ces règles dans `autres_regles`, que le test affiche sans les comparer.
+
+Ces règles s'ajoutent à celles de la suite et **partagent le budget de 20 000 tokens des règles permanentes**. Une grosse règle `always_on` ajoutée à la racine du projet ou dans `~/.gemini/` pourrait donc faire rétrograder `r-tronque.md` en simple pointeur, et produire un **faux écart sur SC01**.
+
+**En cas d'écart sur SC01, vérifie d'abord la taille totale des règles permanentes de la racine** : le `GEMINI.md` et les fichiers `trigger: always_on` de `.agents/rules/` à la racine du dépôt, ainsi que `~/.gemini/GEMINI.md`. Ne conclus à un changement d'Antigravity qu'après avoir écarté cette cause.
+
+À titre de repère, au moment de l'étalonnage, les règles permanentes de la racine du projet totalisaient 41 095 octets. `06-rule-warn-size-exceeded-24kb.md` en représentait à lui seul 39 106 ; les autres étaient `GEMINI.md`, `02-rule-perm-standard-always-on.md`, `08-rule-dedup-active.md` et `rule-test-doublon.md`.
 
 ## Lire le résultat de la comparaison
 
@@ -62,7 +70,7 @@ Le test affiche un tableau `id | scénario | attendu | observé | confiance | ve
 - **Rapport suspect.** Si l'agent sondé déclare des infractions dans `meta.infractions` (lecture interdite, recherche textuelle…), un avertissement « RAPPORT SUSPECT » cite chacune d'elles. Vérifie-les avant de conclure à un changement d'Antigravity.
 - **Informations, jamais en échec** : les canaris observés dans des cellules non figées, les `autres_regles` de chaque étape, `S5.octets_tronques`, `S10` (MCP) et `S12` (skills intégrés).
 - **Fichiers ignorés.** Tout autre fichier `.json` de `resultats/` est signalé par un avertissement et n'est pas comparé.
-- **Version non renseignée.** Si `meta.version_antigravity` est absente ou vaut encore `A_REMPLIR`, un avertissement le signale, sans écart (voir l'étape 8).
+- **Version non renseignée.** Si `meta.version_antigravity` est absente ou vaut `A_REMPLIR` ou `INCONNU`, un avertissement le signale, sans écart (voir l'étape 8).
 
 Le test tolère la rédaction libre de l'agent sondé :
 - Dans `canaris`, chaque élément est fouillé, sans tenir compte de la casse. Par exemple, `"CANARI-G3 (réinjecté)"` compte comme `CANARI-G3`, et un élément sans canari est ignoré.

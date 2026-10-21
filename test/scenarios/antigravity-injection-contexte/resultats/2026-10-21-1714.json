@@ -1,0 +1,135 @@
+{
+  "version_sonde": "1",
+  "meta": {
+    "date": "2026-10-21T17:14",
+    "modele": "Gemini 3.8 Flash",
+    "version_antigravity": "2.5.5",
+    "infractions": []
+  },
+  "etapes": {
+    "E0": {
+      "canaris": [
+        "CANARI-RACINE",
+        "CANARI-ALWAYS",
+        "CANARI-TRONQUE-DEBUT"
+      ],
+      "autres_regles": [
+        "~/.gemini/GEMINI.md",
+        "../../GEMINI.md",
+        "../../.agents/rules/02-rule-perm-standard-always-on.md",
+        "../../.agents/rules/06-rule-warn-size-exceeded-24kb.md",
+        "../../.agents/rules/08-rule-dedup-active.md",
+        "../../.agents/rules/rule-test-doublon.md",
+        "../../.agents/rules/05-rule-cond-trigger-model-decision.md",
+        ".agents/rules/zz-model.md"
+      ],
+      "notes": "3 canaris observés dans le contexte initial (GEMINI.md racine du scénario, r-always.md et r-tronque.md)"
+    },
+    "E1": {
+      "canaris": [
+        "CANARI-G3",
+        "CANARI-G4",
+        "CANARI-GLOB-EXT",
+        "CANARI-L2"
+      ],
+      "autres_regles": [
+        "../../.agents/rules/03-rule-cond-trigger-glob.md"
+      ],
+      "notes": "Lecture de sandbox-enquete/app.ts : 4 canaris injectés dans le postambule de l'outil"
+    },
+    "E2": {
+      "canaris": [],
+      "autres_regles": [],
+      "notes": "Lecture de sandbox-enquete/notes.md : aucune règle injectée pour un fichier .md"
+    },
+    "E3": {
+      "canaris": [
+        "CANARI-G3",
+        "CANARI-GLOB-EXT",
+        "CANARI-L2"
+      ],
+      "autres_regles": [
+        "../../.agents/rules/03-rule-cond-trigger-glob.md"
+      ],
+      "notes": "Lecture de src/zz-test.ts : CANARI-G4 non injecté"
+    },
+    "E4": {
+      "canaris": [
+        "CANARI-G3",
+        "CANARI-GLOB-EXT",
+        "CANARI-L2"
+      ],
+      "autres_regles": [
+        "../../.agents/rules/03-rule-cond-trigger-glob.md"
+      ],
+      "notes": "Lecture de sandbox-enquete/sous/profond/x.ts : CANARI-G4 non injecté"
+    },
+    "E5": {
+      "canaris": [],
+      "autres_regles": [],
+      "notes": "Listing du dossier sandbox-enquete/sous/ : aucune injection de règle dans list_dir"
+    },
+    "E6": {
+      "canaris": [
+        "CANARI-G3",
+        "CANARI-GLOB-EXT",
+        "CANARI-L2"
+      ],
+      "autres_regles": [
+        "../../.agents/rules/03-rule-cond-trigger-glob.md"
+      ],
+      "notes": "Lecture de sandbox-enquete/sous/module.ts : CANARI-G4 non injecté"
+    },
+    "E7": {
+      "canaris": [
+        "CANARI-G3",
+        "CANARI-GLOB-EXT",
+        "CANARI-L2"
+      ],
+      "autres_regles": [
+        "../../.agents/rules/03-rule-cond-trigger-glob.md"
+      ],
+      "notes": "Modification de sandbox-enquete/sous/module.ts : postambule injecté dans replace_file_content"
+    },
+    "E8": {
+      "canaris": [
+        "CANARI-G3",
+        "CANARI-GLOB-EXT",
+        "CANARI-L2"
+      ],
+      "autres_regles": [
+        "../../.agents/rules/03-rule-cond-trigger-glob.md"
+      ],
+      "notes": "Création de sandbox-enquete/nouveau.ts : postambule injecté dans write_to_file"
+    },
+    "E9": {
+      "canaris": [
+        "CANARI-SKILL-CORPS"
+      ],
+      "autres_regles": [],
+      "notes": "Lecture de .agents/skills/zz-skill-test/SKILL.md : mot de passe d'enquête = « orange »"
+    }
+  },
+  "structure": {
+    "S1": true,
+    "S2": false,
+    "S3": true,
+    "S4": true,
+    "S5": {
+      "present": true,
+      "octets_tronques": 5957
+    },
+    "S6": true,
+    "S7": false,
+    "S8": false,
+    "S9": false,
+    "S10": {
+      "descriptions_visibles": 0,
+      "categories": [
+        "Lazy"
+      ]
+    },
+    "S11": "The following text is not part of the file, it is a list of user-defined rules that you MUST follow:",
+    "S12": null
+  }
+}

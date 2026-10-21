@@ -1,6 +1,6 @@
 {
   "baseline": "2026-10-21",
-  "environnement": {"outil":"Antigravity IDE","os":"Windows","version":"à renseigner","modele":"INCONNU"},
+  "environnement": {"outil":"Antigravity IDE","os":"Windows","version":"2.5.5","modele":"Gemini 3.8 Flash (étalonnage) ; enquête : non relevé"},
   "entrees": [
     {"id":"E0:CANARI-ALWAYS","type":"canari","etape":"E0","canari":"CANARI-ALWAYS","attendu":true,"confiance":"transpose","scenario":"SC01"},
     {"id":"E0:CANARI-TRONQUE-DEBUT","type":"canari","etape":"E0","canari":"CANARI-TRONQUE-DEBUT","attendu":true,"confiance":"transpose","scenario":"SC01"},
