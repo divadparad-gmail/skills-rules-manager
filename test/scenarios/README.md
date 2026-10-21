@@ -10,12 +10,12 @@ Il reproduit l'ensemble des cas réels supportés par **Antigravity IDE (Gemini)
 | Fichier / Dossier | Type | Spécificité testée | Résultat visuel & comportement attendu |
 | :--- | :--- | :--- | :--- |
 | `GEMINI.md` | **Âme Système** | Racine projet N1 | • Badge `🔒 Always-On`<br>• Compté dans la catégorie Âme locale (`soulStat`)<br>• Protégé contre toute désactivation |
-| `.agents/rules/01-rule-perm-no-frontmatter.md` | **Règle Permanente** | Aucun frontmatter YAML | • Titre extrait du premier `# Titre`<br>• 100% des tokens comptés au démarrage |
-| `.agents/rules/02-rule-perm-standard-always-on.md` | **Règle Permanente** | Frontmatter avec `description:` seule | • Titre et résumé extraits des métadonnées<br>• Reste active en continu (Always-on) |
-| `.agents/rules/03-rule-cond-trigger-glob.md` | **Règle Conditionnelle** | `trigger: glob` + `globs: "*.ts, *.tsx"` | • Badge **`⚡ Conditionnel`** (violet)<br>• Ne compte que **~20 tokens** au boot pour le routeur<br>• Métrique : `~20 tok (X plein)` |
-| `.agents/rules/04-rule-cond-trigger-globs-list.md` | **Règle Conditionnelle** | `trigger: glob` + liste YAML `- "src/**"` | • Support du format syntaxique YAML en liste<br>• Badge **`⚡ Conditionnel`** |
-| `.agents/rules/05-rule-cond-trigger-model-decision.md` | **Règle Conditionnelle** | `trigger: model_decision` | • Badge **`⚡ Conditionnel`**<br>• Activation sémantique par l'agent |
-| `.agents/rules/06-rule-warn-size-exceeded-24kb.md` | **Règle Permanente** | Taille physique > 24 000 octets | • Badge rouge/ambre **`⚠️ > 24 Ko`**<br>• Avertit du dépassement de la limite physique Antigravity |
+| `.agents/rules/01-rule-perm-no-frontmatter.md` | **Règle Ignorée** | Aucun frontmatter YAML | • Badge **`⛔ Ignorée par Antigravity`**<br>• 0 token au démarrage : Antigravity ignore en silence une règle sans frontmatter |
+| `.agents/rules/02-rule-perm-standard-always-on.md` | **Règle Permanente** | `trigger: always_on` + `description:` | • Titre et résumé extraits des métadonnées<br>• Reste active en continu (Always-on) |
+| `.agents/rules/03-rule-cond-trigger-glob.md` | **Règle Conditionnelle** | `trigger: glob` + `globs: "*.ts, *.tsx"` | • Badge **`⚡ Conditionnel`** (violet)<br>• Compte **~20 tokens** au boot (estimation de l'extension)<br>• Métrique : `~20 tok (X plein)` |
+| `.agents/rules/04-rule-cond-trigger-globs-list.md` | **Règle Conditionnelle** | `trigger: glob` + liste YAML `- "src/**"` | • Badge **`⚡ Conditionnel`**<br>• Badge **`⚠️ Frontmatter`** : la documentation décrit `globs` comme une chaîne séparée par des virgules |
+| `.agents/rules/05-rule-cond-trigger-model-decision.md` | **Règle Conditionnelle** | `trigger: model_decision` + `description:` | • Badge **`⚡ Conditionnel`**<br>• Activation par l'agent à partir de la description |
+| `.agents/rules/06-rule-warn-size-exceeded-24kb.md` | **Règle Permanente** | Taille > 24 000 octets (UTF-8, inclusions comprises) | • Badge rouge/ambre **`⚠️ > 24 Ko`**<br>• Antigravity tronque le fichier au-delà de la limite |
 | `.agents/rules/07-rule-disabled-suffix.md.disabled` | **Règle Désactivée** | Extension physique `.disabled` | • Switch à l'état **OFF**<br>• Ne consomme 0 token au boot |
 | `.agents/rules/08-rule-dedup-active.md` & `.md.disabled` | **Déduplication** | Même identifiant présent en `.md` et `.disabled` | • Le fichier actif gagne sans créer de doublon visuel |
 | `.agents/skills/skill-standard/SKILL.md` | **Skill** | Compétence standard avec tags | • Nom et description découverts au boot (~20-50 tok)<br>• Switch actif |

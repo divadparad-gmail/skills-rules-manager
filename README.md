@@ -74,9 +74,11 @@ Lorsqu'on orchestre des agents IA modernes (Google Antigravity, Claude Code), l'
 - ⚡ **Extinction en 1 Clic** : Bouton d'action directe `Éteindre` sur la carte pour désactiver immédiatement la surcharge sans quitter la vue.
 
 ### 4. Coach IA & Alertes de Surcharge
-- ⚠️ **Règles > 200 lignes** : alerte sur le risque de dilution d'attention du modèle.
+- ⚠️ **Règles Claude Code > 200 lignes** : alerte sur le risque de dilution d'attention du modèle.
 - ⚠️ **Skills > 500 lignes** : recommandation de découpage modulaire vers `references/` ou `scripts/`.
-- ⚠️ **Poids physique > 24 Ko** : signalement préventif de saturation de tokens.
+- ⚠️ **Règles Antigravity > 24 000 octets** : taille mesurée en octets UTF-8, inclusions `@[label](path)` comprises ; au-delà, Antigravity tronque le fichier.
+- ⛔ **Règles Antigravity ignorées** : une règle de `rules/` sans frontmatter ou sans `trigger` valide (`always_on`, `model_decision`, `glob`, `manual`) est signalée, car Antigravity l'écarte en silence. Le badge `⚠️ Frontmatter` signale un champ obligatoire manquant (`description` pour `model_decision`, `globs` pour `glob`) ou un `globs` qui n'est pas une chaîne séparée par des virgules.
+- 📂 **Emplacements Antigravity complets** : âmes globales et du projet (`AGENTS.md`, `GEMINI.md`, `.agents/AGENTS.md`), ancien dossier `.agent/rules/`, règles déclarées par `.agents/rules.json` et règles limitées à un sous-dossier.
 - ⚠️ **Outils Claude Code MCP > 2 048 car.** : détection des risques de troncature API.
 
 ### 4. Résilience Réseau NAS (SMB)
