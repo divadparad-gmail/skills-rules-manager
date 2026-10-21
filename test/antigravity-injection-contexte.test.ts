@@ -71,6 +71,8 @@ const CANARY_PATTERN = /CANARI-[A-Z0-9][A-Z0-9-]*/g;
 const CANARY_REPORT_PATTERN = /CANARI-[A-Z0-9-]+/gi;
 /** Guillemets droits et typographiques, apostrophes et accents graves retirés de S11. */
 const QUOTES_PATTERN = /["'`“”«»‘’]/g;
+/** Chemins absolus vers un dossier utilisateur (Windows, macOS, Linux) : à caviarder avant tout commit. */
+const CHEMINS_UTILISATEUR = [/[A-Za-z]:[\\/]+Users[\\/]+[^\\/<\s]+/i, /\/(home|Users)\/[^\/<\s]+/];
 /** Seuls les rapports nommés AAAA-MM-JJ-HHMM.json sont sélectionnés automatiquement. */
 const RAPPORT_NOM = /^\d{4}-\d{2}-\d{2}-\d{4}\.json$/;
 const ETAPES = ['E0', 'E1', 'E2', 'E3', 'E4', 'E5', 'E6', 'E7', 'E8', 'E9'];
@@ -218,6 +220,10 @@ const choisirRapport = (dir: string): { rapport: string | null; ignores: string[
     ignores: json.filter((f) => !RAPPORT_NOM.test(f)),
   };
 };
+
+/** Numéros des lignes qui contiennent un chemin absolu vers un dossier utilisateur. */
+const lignesAvecCheminUtilisateur = (texte: string): number[] =>
+  texte.split(/\r?\n/).flatMap((ligne, i) => (CHEMINS_UTILISATEUR.some((re) => re.test(ligne)) ? [i + 1] : []));
 
 /** Ligne « Si ça change » de chaque scénario, lue dans le tableau récapitulatif de SCENARIOS.md. */
 const lireSiCaChange = (): Record<string, string> => {
@@ -399,11 +405,50 @@ describe('Suite de Tests : Injection de contexte Antigravity (intégrité des fi
     const sansMeta = conformeALaBaseline();
     delete sansMeta.meta;
     assert.deepStrictEqual(avertissementsRapport(sansMeta), [AVERTISSEMENT_VERSION]);
+
+    // Point 6 : chemins absolus vers un dossier utilisateur, détectés quelle que soit leur forme
+    const fuite = [
+      '{ "S12": "C:\\\\Users\\\\jdupont\\\\.gemini\\\\builtin" }',
+      'aucun chemin ici',
+      '- file:///c:/Users/jdupont/projet/app.ts',
+      'D:\\Users\\jdupont',
+      '/home/jdupont/.gemini',
+      'Chemin : /Users/jdupont/Documents',
+    ].join('\n');
+    assert.deepStrictEqual(lignesAvecCheminUtilisateur(fuite), [1, 3, 4, 5, 6]);
+    const propre = [
+      '<HOME>\\.gemini\\antigravity-ide\\builtin\\skills\\',
+      '<PROJET>/sandbox-enquete/app.ts',
+      'file:///<PROJET>/.agents/rules/zz-model.md',
+      '~/.gemini/antigravity-ide/builtin/skills/',
+      'sandbox-enquete/sous/module.ts',
+      'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
+      'C:\\Users\\<HOME>',
+    ].join('\n');
+    assert.deepStrictEqual(lignesAvecCheminUtilisateur(propre), []);
+  });
+
+  test('8. Confidentialité : aucun chemin absolu vers un dossier utilisateur dans resultats/ ni historique/', () => {
+    const fuites: string[] = [];
+    for (const dossier of ['resultats', 'historique']) {
+      const abs = path.join(SUITE, dossier);
+      if (!fs.existsSync(abs)) continue;
+      for (const rel of listFiles(abs, dossier)) {
+        for (const ligne of lignesAvecCheminUtilisateur(fs.readFileSync(path.join(SUITE, rel), 'utf8'))) {
+          fuites.push(`${rel}:${ligne}`);
+        }
+      }
+    }
+    assert.deepStrictEqual(
+      fuites,
+      [],
+      `Chemin absolu vers un dossier utilisateur : caviarder avant de commiter.\n${fuites.map((f) => `- ${f}`).join('\n')}`
+    );
   });
 });
 
 describe('Suite de Tests : Injection de contexte Antigravity (comparaison au rapport de sonde)', () => {
-  test('8. Le dernier rapport de sonde est conforme à la baseline du 2026-10-21', (t) => {
+  test('9. Le dernier rapport de sonde est conforme à la baseline du 2026-10-21', (t) => {
     if (!COMPARE) {
       t.skip('Comparaison désactivée dans npm test : lance npm run test:injection.');
       return;

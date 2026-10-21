@@ -46,7 +46,7 @@ Les scripts associés se trouvent dans `test/scenarios/scripts/` :
 3. **Recharge la fenêtre** avec la commande `Developer: Reload Window`.
 4. **Ouvre une nouvelle conversation** et colles-y tout le contenu de [SONDE.md](SONDE.md).
 5. **Vérifie qu'un fichier est apparu** dans `resultats/`, nommé `AAAA-MM-JJ-HHMM.json`.
-6. **Lance la comparaison** depuis la racine du dépôt : `npm run test:injection`.
+6. **Lance la comparaison** depuis la racine du dépôt : `npm run test:injection`. Si le test de confidentialité échoue (« Chemin absolu vers un dossier utilisateur : caviarder avant de commiter »), le rapport contient un chemin absolu malgré la consigne de la sonde : **caviarde-le avant de le commiter**. Remplace le chemin du projet par `<PROJET>` et celui du dossier personnel par `<HOME>`, aux lignes que le message indique.
 7. **Relance la réinitialisation** : `npm run test:injection-reset`.
 8. **Note la version d'Antigravity** dans le rapport : dans l'objet `meta`, remplace la valeur `"A_REMPLIR"` de la clé `version_antigravity` par la version affichée dans Help > About. Le test l'affiche en tête de la comparaison. Tant que la valeur est absente ou vaut `A_REMPLIR`, le test affiche l'avertissement « Version d'Antigravity non renseignée (Help > About) », sans le compter comme un écart. **Ne renomme pas le fichier** : seuls les noms au format `AAAA-MM-JJ-HHMM.json` sont retenus automatiquement.
 
@@ -104,6 +104,7 @@ Le test statique échoue si une fixture est modifiée par accident, car une fixt
 - que chaque fixture a son contenu exact, et que `zz-sans-fm.md` n'a pas de frontmatter ;
 - que `r-tronque.md` dépasse 24 000 octets et reste bornée par `CANARI-TRONQUE-DEBUT` et `CANARI-TRONQUE-FIN` ;
 - qu'aucun fichier inattendu n'a été ajouté à l'espace de travail sondé ;
-- que chaque canari n'apparaît que dans sa fixture. Les seules exceptions sont `README.md`, `SCENARIOS.md`, `SONDE.md`, `attendu/`, `resultats/` et `historique/`.
+- que chaque canari n'apparaît que dans sa fixture. Les seules exceptions sont `README.md`, `SCENARIOS.md`, `SONDE.md`, `attendu/`, `resultats/` et `historique/` ;
+- qu'aucun fichier de `resultats/` ni de `historique/` ne contient de chemin absolu vers un dossier utilisateur (`X:\Users\…`, `/Users/…`, `/home/…`). Le message d'échec cite le fichier et la ligne, sans recopier le chemin.
 
 Si tu ajoutes un document dans ce dossier, ajoute-le à la liste `DOCS` du test : sinon, il sera signalé comme fichier parasite.

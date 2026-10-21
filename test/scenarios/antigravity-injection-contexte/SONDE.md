@@ -12,6 +12,7 @@ Tu es un instrument de mesure. Statuts : OBSERVÉ / INCONNU. Aucune invention, a
 ## Définition de mesure
 Pour chaque étape, `canaris` = toutes les chaînes « CANARI-… » présentes **dans le résultat de l'outil de cette étape** (ou dans ton contexte initial pour E0), même si tu les as déjà vues avant. Ne compte jamais les chaînes qui figurent dans ce prompt.
 `autres_regles` = chemins ou titres de toute autre règle injectée sans canari (bruit de l'environnement).
+Confidentialité : tout chemin écrit dans le rapport (`autres_regles`, `notes`, `S11`, `S12`, etc.) doit être relatif à la racine de l'espace de travail (ex. `sandbox-enquete/app.ts`) ou commencer par `~` pour le dossier personnel (ex. `~/.gemini/…`). Aucun chemin absolu, aucun nom d'utilisateur. Cette règle ne change pas la mesure : elle ne porte que sur la façon d'écrire les chemins.
 
 ## Étapes
 - E0. Aucun outil. Inspecte ton contexte initial.
