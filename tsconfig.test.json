@@ -5,5 +5,5 @@
     "outDir": "out-test"
   },
   "include": ["src/**/*", "test/**/*"],
-  "exclude": ["node_modules", ".vscode-test"]
+  "exclude": ["node_modules", ".vscode-test", "test/scenarios/antigravity-injection-contexte"]
 }

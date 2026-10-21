@@ -42,6 +42,18 @@ Il reproduit l'ensemble des cas réels supportés par **Antigravity IDE (Gemini)
 
 ---
 
+## 🔬 Suite de régression « injection-contexte » (`test/scenarios/antigravity-injection-contexte/`)
+
+Ce dossier n'est **pas** déployé par le banc d'essai. Il fige le comportement réel d'Antigravity IDE observé le 2026-10-21 : quand et comment les règles, les skills et les plugins sont injectés dans le contexte de l'agent. Il s'ouvre comme espace de travail autonome dans Antigravity pour y lancer une sonde, dont le rapport est ensuite comparé à une baseline figée.
+
+- `npm test` vérifie l'intégrité de ses fixtures.
+- `npm run test:injection` compare le dernier rapport de sonde à la baseline.
+- `npm run test:injection-reset` remet les fixtures dans l'état d'avant la sonde.
+
+La procédure complète est décrite dans son [README.md](antigravity-injection-contexte/README.md), et les scénarios dans son [SCENARIOS.md](antigravity-injection-contexte/SCENARIOS.md).
+
+---
+
 ## 🚀 Utilisation
 
 ### Via l'Interface VS Code (Sidebar)

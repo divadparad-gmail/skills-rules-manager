@@ -375,6 +375,8 @@
     "test:deploy-claude": "node test/scenarios/scripts/runner.js claude-code",
     "test:deploy-all": "node test/scenarios/scripts/runner.js all",
     "test:clean": "node test/scenarios/scripts/runner.js clean",
+    "test:injection": "tsc -p tsconfig.test.json && node test/scenarios/scripts/compare-injection-contexte.js",
+    "test:injection-reset": "node test/scenarios/scripts/reset-injection-contexte.js",
     "package": "vsce package --no-git-tag-version",
     "bundle": "node esbuild.js --production",
     "bundle:dev": "node esbuild.js",
