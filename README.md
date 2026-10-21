@@ -12,7 +12,7 @@
   <strong>Gestionnaire visuel haute performance pour compétences (skills, workflows) et règles sous Google Antigravity IDE et Claude Code.</strong>
 </p>
 
-[ [⬇️ Télécharger la v0.3.11 (.vsix)](https://github.com/divadparad-gmail/skills-rules-manager/releases/latest) ] •
+[ [⬇️ Télécharger la v0.3.12 (.vsix)](https://github.com/divadparad-gmail/skills-rules-manager/releases/latest) ] •
 [ [🐛 Signaler un problème](https://github.com/divadparad-gmail/skills-rules-manager/issues) ] •
 [ [📖 Guide des Bonnes Pratiques IA](#-guide--bonnes-pratiques-ia-intégré) ]
 

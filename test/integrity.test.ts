@@ -535,10 +535,10 @@ describe('Suite de Tests : Intégrité & Synchronisation NAS vs Local', () => {
     assert.strictEqual(NasScanner.getUncHost('C:\\Users\\LocalUser'), null);
   });
 
-  test('18. Guide & Bonnes Pratiques IA (v0.3.11) : intégrité des templates et composants webview', () => {
+  test('18. Guide & Bonnes Pratiques IA (v0.3.12) : intégrité des templates et composants webview', () => {
     const rootDir = path.resolve(__dirname, '../..');
     const pkg = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8'));
-    assert.strictEqual(pkg.version, '0.3.11', 'package.json doit être en version 0.3.11');
+    assert.strictEqual(pkg.version, '0.3.12', 'package.json doit être en version 0.3.12');
 
     const sidebarHtml = fs.readFileSync(path.join(rootDir, 'src/webview/sidebar.html'), 'utf8');
     const dashboardHtml = fs.readFileSync(path.join(rootDir, 'src/webview/dashboard.html'), 'utf8');
