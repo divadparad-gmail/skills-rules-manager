@@ -11,6 +11,12 @@ import * as https from 'https';
 import { URL } from 'url';
 import { HttpSearchPort } from './FederatedSearchService';
 import { HealthProbePort } from '../settings/RegistryConfigService';
+import {
+  LookupFunction,
+  NonPublicDestinationError,
+  createPublicOnlyLookup,
+  isNonPublicHostname,
+} from '../common/networkPolicy';
 
 /** Taille maximale de réponse acceptée, pour borner l'empreinte mémoire. */
 export const MAX_RESPONSE_BYTES = 4 * 1024 * 1024;
@@ -20,6 +26,14 @@ export interface HttpRequestOptions {
   timeoutMs: number;
   method?: 'GET' | 'POST' | 'OPTIONS';
   body?: string;
+  /**
+   * Restreint la destination à l'Internet public : une adresse IP littérale
+   * interne est refusée d'emblée, et un nom de domaine est résolu par une
+   * fonction qui refuse toute adresse interne au moment de la connexion.
+   */
+  publicOnly?: boolean;
+  /** Résolveur sous-jacent, injectable pour les tests ; `dns.lookup` par défaut. */
+  resolve?: LookupFunction;
 }
 
 export interface HttpResponse {
@@ -42,6 +56,13 @@ export function request(url: string, options: HttpRequestOptions): Promise<HttpR
       return;
     }
 
+    // Une adresse IP littérale ne passe pas par la résolution : elle est jugée
+    // ici, avant toute connexion.
+    if (options.publicOnly && isNonPublicHostname(parsed.hostname)) {
+      reject(new NonPublicDestinationError(parsed.hostname));
+      return;
+    }
+
     const transport = parsed.protocol === 'http:' ? http : https;
     const headers = { ...options.headers };
     if (options.body) {
@@ -52,6 +73,7 @@ export function request(url: string, options: HttpRequestOptions): Promise<HttpR
       method: options.method ?? 'GET',
       headers,
       timeout: options.timeoutMs,
+      ...(options.publicOnly ? { lookup: createPublicOnlyLookup(options.resolve) } : {}),
     };
 
     const clientRequest = transport.request(parsed, requestOptions, (response) => {
@@ -95,7 +117,11 @@ export function request(url: string, options: HttpRequestOptions): Promise<HttpR
 /** Transport utilisé par la recherche fédérée. */
 export const httpSearchPort: HttpSearchPort = {
   get(url, options) {
-    return request(url, { headers: options.headers, timeoutMs: options.timeoutMs });
+    return request(url, {
+      headers: options.headers,
+      timeoutMs: options.timeoutMs,
+      publicOnly: options.publicOnly,
+    });
   },
 };
 
@@ -106,6 +132,7 @@ export const httpHealthProbePort: HealthProbePort = {
       headers: options.headers,
       timeoutMs: options.timeoutMs,
       method: 'GET',
+      publicOnly: options.publicOnly,
     });
   },
 };

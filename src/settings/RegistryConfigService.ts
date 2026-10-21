@@ -14,6 +14,7 @@ import {
   RegistryProbeResult,
 } from '../common/discoveryTypes';
 import { DiscoveryResourceType } from '../common/eventTypes';
+import { isNonPublicHostname } from '../common/networkPolicy';
 
 /** Clé du réglage contribué dans package.json. */
 export const SEARCH_URLS_SETTING = 'antigravity.skills.searchUrls';
@@ -69,7 +70,12 @@ export interface SecretStoragePort {
 export interface HealthProbePort {
   probe(
     url: string,
-    options: { headers: Record<string, string>; timeoutMs: number }
+    options: {
+      headers: Record<string, string>;
+      timeoutMs: number;
+      /** Refuse toute adresse résolue interne ; vrai pour un registre de dépôt. */
+      publicOnly?: boolean;
+    }
   ): Promise<{ statusCode: number; body: string }>;
 }
 
@@ -383,6 +389,7 @@ export class RegistryConfigService {
       const response = await this.healthProbe.probe(registry.url, {
         headers,
         timeoutMs: registry.timeoutMs,
+        publicOnly: registry.origin === 'workspace',
       });
       const latencyMs = Date.now() - started;
 
@@ -640,9 +647,14 @@ export function canonicalizeUrl(rawUrl: string): string {
  * Contrôle de forme et de sécurité d'une URL de registre. Retourne le message
  * d'erreur à afficher, ou `null` lorsque l'URL est acceptable.
  *
- * Les adresses de bouclage ne sont tolérées que pour un registre d'origine
- * utilisateur : un dépôt ne doit pas pouvoir diriger des requêtes vers les
- * services qui écoutent localement sur le poste.
+ * Un registre d'espace de travail ne peut viser que l'Internet public : ni le
+ * poste (bouclage), ni le réseau local ou d'entreprise (plages privées, lien
+ * local). Ce contrôle porte sur le nom écrit dans l'URL ; un nom de domaine qui
+ * pointe vers une adresse interne est arrêté plus tard, à la connexion, par la
+ * résolution contrôlée du transport (`createPublicOnlyLookup`).
+ *
+ * Les adresses de bouclage restent tolérées en HTTP pour un registre d'origine
+ * utilisateur, à des fins de développement local.
  */
 export function validateRegistryUrl(rawUrl: string, origin: RegistryOrigin = 'user'): string | null {
   if (!rawUrl || rawUrl.trim().length === 0) {
@@ -657,8 +669,8 @@ export function validateRegistryUrl(rawUrl: string, origin: RegistryOrigin = 'us
   }
 
   const host = parsed.hostname.toLowerCase();
-  if (origin === 'workspace' && isLoopbackHost(host)) {
-    return "Un registre défini par l'espace de travail ne peut pas viser une adresse locale du poste.";
+  if (origin === 'workspace' && isNonPublicHostname(host)) {
+    return "Un registre défini par l'espace de travail ne peut pas viser une adresse locale du poste ni du réseau interne.";
   }
 
   if (parsed.protocol === 'https:') {

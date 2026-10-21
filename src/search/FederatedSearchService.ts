@@ -26,7 +26,12 @@ import { RankingEngine } from './RankingEngine';
 export interface HttpSearchPort {
   get(
     url: string,
-    options: { headers: Record<string, string>; timeoutMs: number }
+    options: {
+      headers: Record<string, string>;
+      timeoutMs: number;
+      /** Refuse toute adresse résolue interne ; vrai pour un registre de dépôt. */
+      publicOnly?: boolean;
+    }
   ): Promise<{ statusCode: number; body: string }>;
 }
 
@@ -138,7 +143,13 @@ export class FederatedSearchService {
     const timeoutMs = registry.timeoutMs || this.registryConfig.getGlobalTimeoutMs();
     const url = buildSearchUrl(registry, criteria, normalizedQuery);
 
-    const response = await this.http.get(url, { headers, timeoutMs });
+    // Un registre déclaré par le dépôt ne peut atteindre que l'Internet public :
+    // l'adresse résolue est vérifiée au moment de la connexion.
+    const response = await this.http.get(url, {
+      headers,
+      timeoutMs,
+      publicOnly: registry.origin === 'workspace',
+    });
 
     if (response.statusCode === 401 || response.statusCode === 403) {
       throw new Error(`Identifiants refusés par « ${registry.name} » (code ${response.statusCode}).`);

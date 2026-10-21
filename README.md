@@ -154,7 +154,7 @@ Un dépôt cloné peut déclarer ses propres registres dans son `.vscode/setting
 - **Origine non falsifiable.** L'origine d'un registre (utilisateur ou dépôt) est calculée à la lecture de la configuration ; un champ `origin` écrit dans `settings.json` est ignoré.
 - **Clé de coffre canonique.** Un registre ne peut désigner que sa propre clé, `antigravity.registry.<id>`. Toute autre valeur, par exemple la clé Gemini, invalide l'entrée.
 - **Pas d'usurpation.** Les identifiants en double sont écartés, et un registre de dépôt ne peut pas reprendre l'identifiant d'un de vos registres.
-- **Pas d'adresse locale.** Un registre de dépôt ne peut pas viser `localhost`, `127.0.0.0/8`, `0.0.0.0` ni `::1`. La tolérance HTTP des adresses locales reste réservée à vos réglages utilisateur.
+- **Internet public uniquement.** Un registre de dépôt ne peut viser ni votre poste (`localhost`, `127.0.0.0/8`, `0.0.0.0`, `::1`), ni votre réseau local ou d'entreprise (`10/8`, `172.16/12`, `192.168/16`, `169.254/16`, `100.64/10`, `fc00::/7`, `fe80::/10`). Les formes détournées (`http://2130706433`, `[::ffff:127.0.0.1]`…) sont reconnues. Un nom de domaine qui *pointe* vers une adresse interne est arrêté au moment de la connexion, sur l'adresse réellement résolue. Vos propres registres, déclarés dans vos réglages utilisateur, peuvent viser une adresse interne (NAS, registre d'entreprise), et la tolérance HTTP de `localhost` leur reste réservée.
 - **Signalement visuel.** La vue Découverte affiche un badge « défini par ce dépôt » sur ces registres.
 - **Mode restreint.** Dans un espace de travail non approuvé, VS Code ignore les valeurs de dépôt de `antigravity.skills.searchUrls` et `antigravity.skills.nasDirectoryPath`.
 
