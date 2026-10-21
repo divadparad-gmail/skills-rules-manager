@@ -65,7 +65,7 @@ const realisticState = {
   },
   workspace: {
     hasWorkspace: true,
-    workspacePath: "C:\\Users\\David\\Documents\\Sites Web\\creer-extension-vscode-rules-skills-manager",
+    workspacePath: ROOT_DIR,
     tool: "antigravity",
     agentsDir: ".agents",
     claudeDir: null,
