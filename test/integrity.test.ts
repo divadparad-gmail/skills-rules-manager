@@ -2928,6 +2928,52 @@ Corps du texte.`;
     assert.strictEqual(sentMessages[0].payload.localPath, '/local/rule-test.md');
     assert.ok(sentMessages[0].payload.title.includes('Règle Test Divergente'));
   });
+
+  // --------------------------------------------------------------------------
+  // Test 54 : Aucun catalogue NAS par défaut
+  // --------------------------------------------------------------------------
+  test('54. Catalogue NAS non configuré : valeur par défaut vide, catalogue absent sans erreur', async () => {
+    const rootDir = path.resolve(__dirname, '../..');
+    const pkg = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8'));
+    assert.strictEqual(
+      pkg.contributes.configuration.properties['skillsManager.nasPath'].default,
+      '',
+      'skillsManager.nasPath doit être vide par défaut'
+    );
+
+    // Aucun chemin d'infrastructure réel ne doit subsister dans le code distribué
+    for (const relative of [
+      'package.json',
+      'src/extension.ts',
+      'src/services/NasScanner.ts',
+      'src/providers/DashboardPanel.ts',
+      'src/providers/SidebarViewProvider.ts',
+      'src/webview/main.js',
+      'src/webview/sidebar.html',
+      'src/webview/dashboard.html',
+      'src/webview/cheatsheet.html',
+    ]) {
+      const content = fs.readFileSync(path.join(rootDir, relative), 'utf8');
+      assert.ok(!/Antigravity-Templates/.test(content), `${relative} ne doit plus contenir l'ancien chemin NAS par défaut`);
+    }
+
+    // Le réglage simulé renvoie la valeur par défaut : le scan ne tente aucun accès et ne signale aucune panne
+    const result = await NasScanner.scan();
+    assert.strictEqual(result.status.configured, false, 'Le catalogue doit être signalé comme non configuré');
+    assert.strictEqual(result.status.online, false);
+    assert.strictEqual(result.status.path, '');
+    assert.strictEqual(result.status.error, undefined, 'Un catalogue absent n\'est pas une erreur');
+    assert.deepStrictEqual(result.items, []);
+
+    // Les ressources locales restent utilisables : elles sont simplement non vérifiables
+    const enriched = await IntegrityService.enrichResourcesWithSyncStatus(
+      [{ id: 'regle', name: 'regle.md', description: '', type: 'rule', scope: 'local', path: '/local/regle.md', enabled: true } as ResourceItem],
+      result.items,
+      result.status.online
+    );
+    assert.strictEqual(enriched.length, 1);
+    assert.strictEqual(enriched[0].syncStatus, 'nas_offline');
+  });
 });
 
 

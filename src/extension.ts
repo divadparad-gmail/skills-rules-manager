@@ -81,7 +81,7 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.commands.registerCommand('skillsRulesManager.allowNasUncHost', async () => {
       const config = vscode.workspace.getConfiguration('skillsManager');
-      const nasPath = config.get<string>('nasPath', '\\\\Nas1\\DD2\\IA\\Antigravity-Templates');
+      const nasPath = config.get<string>('nasPath', '');
       await NasScanner.ensureAllowedUNCHost(nasPath);
       await StateManager.loadFullState(true);
       vscode.window.showInformationMessage('Hôte UNC autorisé dans les paramètres de sécurité VS Code.');

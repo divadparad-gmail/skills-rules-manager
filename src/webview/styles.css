@@ -1423,6 +1423,12 @@ input:checked + .slider:before {
   border: 1px solid rgba(248, 113, 113, 0.3);
 }
 
+.badge-nas-indicator.status-unconfigured {
+  background: rgba(148, 163, 184, 0.12);
+  color: #94a3b8;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+}
+
 .nas-config-path {
   font-family: var(--font-mono, monospace);
   font-size: 10px;

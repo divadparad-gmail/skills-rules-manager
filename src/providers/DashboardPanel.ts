@@ -168,7 +168,7 @@ export class DashboardPanel {
 
           case 'allowUncHost': {
             const config = vscode.workspace.getConfiguration('skillsManager');
-            const targetPath = message.payload?.path || config.get<string>('nasPath', '\\\\Nas1\\DD2\\IA\\Antigravity-Templates');
+            const targetPath = message.payload?.path || config.get<string>('nasPath', '');
             const host = NasScanner.getUncHost(targetPath);
             await NasScanner.ensureAllowedUNCHost(targetPath);
             vscode.window.showInformationMessage(`Hôte UNC "${host || targetPath}" autorisé dans VS Code.`);
@@ -224,7 +224,7 @@ export class DashboardPanel {
 
           case 'browseNasPath': {
             const config = vscode.workspace.getConfiguration('skillsManager');
-            const currentPath = config.get<string>('nasPath', '\\\\Nas1\\DD2\\IA\\Antigravity-Templates');
+            const currentPath = config.get<string>('nasPath', '');
             const defaultUri = fs.existsSync(currentPath) ? vscode.Uri.file(currentPath) : undefined;
             const uris = await vscode.window.showOpenDialog({
               canSelectFiles: false,
@@ -246,7 +246,7 @@ export class DashboardPanel {
 
           case 'editNasPath': {
             const config = vscode.workspace.getConfiguration('skillsManager');
-            const currentPath = config.get<string>('nasPath', '\\\\Nas1\\DD2\\IA\\Antigravity-Templates');
+            const currentPath = config.get<string>('nasPath', '');
             const input = await vscode.window.showInputBox({
               prompt: 'Entrez le chemin réseau (UNC) ou local du Catalogue Source (NAS / Templates)',
               value: currentPath,

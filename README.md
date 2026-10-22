@@ -59,7 +59,7 @@ Lorsqu'on orchestre des agents IA modernes (Google Antigravity, Claude Code), l'
 ## 🚀 Fonctionnalités Majeures
 
 ### 1. Cartographie d'Architecture en 3 Niveaux
-- **🏛️ 1. Catalogue NAS (Maître Réseau)** : `\\Nas1\DD2\IA\Antigravity-Templates\` (Source centrale de vérité).
+- **🏛️ 1. Catalogue NAS (Maître Réseau)** : le dossier désigné par le réglage `skillsManager.nasPath`, par exemple `\\serveur\partage\catalogue\` (Source centrale de vérité). Ce réglage est vide par défaut : sans lui, la colonne du catalogue indique « Aucun catalogue configuré » et le reste de l'extension fonctionne normalement.
 - **💻 2. Global (Machine Utilisateur)** : `~/.gemini/config/` et `~/.claude/` (Connecteurs et compétences par défaut).
 - **📂 3. Local (Projet Courant)** : `./.agents/` ou `./.claude/` (Règles locales et configurations de projet).
 
@@ -127,7 +127,7 @@ code --install-extension skills-rules-manager-0.3.5.vsix
 
 | Paramètre | Type | Valeur par défaut | Description |
 | :--- | :--- | :--- | :--- |
-| `skillsManager.nasPath` | `string` | `\\\\Nas1\\DD2\\IA\\Antigravity-Templates` | Chemin UNC vers le catalogue maître NAS |
+| `skillsManager.nasPath` | `string` | `""` | Chemin UNC ou local du catalogue maître NAS, par exemple `\\serveur\partage\catalogue`. Laisser vide sans catalogue |
 | `skillsManager.globalPath` | `string` | `""` (auto-détecté `~/.gemini/config`) | Emplacement des compétences globales Antigravity |
 | `skillsManager.claudeGlobalPath` | `string` | `""` (auto-détecté `~/.claude`) | Emplacement des compétences Claude Code |
 | `skillsManager.defaultProjectTool` | `enum` | `"auto-detect"` | Outil cible local (`auto-detect`, `antigravity`, `claude-code`) |

@@ -143,8 +143,8 @@
       "properties": {
         "skillsManager.nasPath": {
           "type": "string",
-          "default": "\\\\Nas1\\DD2\\IA\\Antigravity-Templates",
-          "description": "Chemin UNC vers le catalogue maître NAS (skills, rules, workflows)"
+          "default": "",
+          "description": "Chemin UNC ou local du catalogue maître NAS (skills, rules, workflows), par exemple \\\\serveur\\partage\\catalogue. Laisser vide si vous n'utilisez pas de catalogue."
         },
         "skillsManager.globalPath": {
           "type": "string",
@@ -280,7 +280,7 @@
           "type": "string",
           "default": "",
           "scope": "resource",
-          "markdownDescription": "Chemin du répertoire NAS centralisé utilisé par l'action « Intégrer au NAS ». Les chemins UNC (`\\\\\\\\Nas1\\\\DD2\\\\IA\\\\skills`), les lecteurs mappés (`Z:\\\\skills`), les points de montage POSIX (`/mnt/nas/skills`) et les variables d'environnement (`${env:NAS_ROOT}/skills`) sont pris en charge."
+          "markdownDescription": "Chemin du répertoire NAS centralisé utilisé par l'action « Intégrer au NAS ». Les chemins UNC (`\\\\\\\\serveur\\\\partage\\\\skills`), les lecteurs mappés (`Z:\\\\skills`), les points de montage POSIX (`/mnt/nas/skills`) et les variables d'environnement (`${env:NAS_ROOT}/skills`) sont pris en charge."
         },
         "antigravity.skills.conflictPolicy": {
           "type": "string",

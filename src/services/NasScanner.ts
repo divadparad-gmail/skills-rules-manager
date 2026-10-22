@@ -116,8 +116,17 @@ export class NasScanner {
     targetTool: 'antigravity' | 'claude-code' = 'antigravity'
   ): Promise<{ status: NasStatus; items: ResourceItem[] }> {
     const config = vscodeModule && vscodeModule.workspace ? vscodeModule.workspace.getConfiguration('skillsManager') : null;
-    const rawNasPath = customNasPath || (config ? config.get('nasPath', '\\\\Nas1\\DD2\\IA\\Antigravity-Templates') : '\\\\Nas1\\DD2\\IA\\Antigravity-Templates');
+    const rawNasPath = customNasPath || (config ? config.get('nasPath', '') : '');
     const nasPath = (rawNasPath || '').trim().replace(/[\/\\]+$/, '');
+
+    // Aucun catalogue configuré : ce n'est pas une panne, le catalogue est simplement absent.
+    // Aucun accès disque ni réseau n'est tenté.
+    if (!nasPath) {
+      return {
+        status: { online: false, configured: false, path: '', checkedAt: Date.now() },
+        items: [],
+      };
+    }
 
     const checkResult = await this.checkNasAccess(nasPath);
 

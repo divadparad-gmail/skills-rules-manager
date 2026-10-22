@@ -273,6 +273,8 @@ export interface ManagerStats {
 
 export interface NasStatus {
   online: boolean;
+  /** Faux lorsqu'aucun chemin de catalogue n'est renseigné (`skillsManager.nasPath` vide). */
+  configured?: boolean;
   path: string;
   checkedAt: number;
   error?: string;

@@ -472,12 +472,19 @@
     // Gestion du statut et chemin Catalogue (NAS) dans la sidebar
     const sidebarNasPathEl = document.getElementById('sidebarNasPathText');
     const sidebarNasBadgeEl = document.getElementById('sidebarNasStatusBadge');
+    const nasUnconfigured = isNasUnconfigured(state);
     if (sidebarNasPathEl && state.nasStatus) {
-      sidebarNasPathEl.textContent = state.nasStatus.path;
-      sidebarNasPathEl.title = `Chemin actuel du catalogue source :\n${state.nasStatus.path}`;
+      sidebarNasPathEl.textContent = nasUnconfigured ? 'Aucun catalogue configuré' : state.nasStatus.path;
+      sidebarNasPathEl.title = nasUnconfigured
+        ? 'Renseignez le réglage skillsManager.nasPath, ou utilisez « Parcourir », pour activer le catalogue.'
+        : `Chemin actuel du catalogue source :\n${state.nasStatus.path}`;
     }
     if (sidebarNasBadgeEl && state.nasStatus) {
-      if (state.nasStatus.online) {
+      if (nasUnconfigured) {
+        sidebarNasBadgeEl.className = 'badge-nas-indicator status-unconfigured';
+        sidebarNasBadgeEl.textContent = '○ Non configuré';
+        sidebarNasBadgeEl.title = 'Aucun catalogue NAS : le réglage skillsManager.nasPath est vide';
+      } else if (state.nasStatus.online) {
         sidebarNasBadgeEl.className = 'badge-nas-indicator status-online';
         sidebarNasBadgeEl.textContent = '● En ligne';
         sidebarNasBadgeEl.title = 'Catalogue NAS connecté et accessible';
@@ -1203,13 +1210,16 @@
     const nasSkillsCount = (state.nasResources || []).filter((i) => i.type === 'skill' || i.type === 'workflow').length;
     const nasSoulCount = (state.nasResources || []).filter((i) => i.type === 'soul' || (i.metadata && i.metadata.isSoul)).length;
 
-    const baseNas = state.nasStatus ? state.nasStatus.path : '\\\\Nas1\\DD2\\IA\\Antigravity-Templates';
+    const baseNas = state.nasStatus ? state.nasStatus.path : '';
+    const nasUnconfigured = isNasUnconfigured(state);
     const nasSoulItem = (state.nasResources || []).find((i) => i.type === 'soul' || (i.metadata && i.metadata.isSoul));
     const nasSoulPath = nasSoulItem ? nasSoulItem.path : `${baseNas}\\${isClaude ? 'CLAUDE.md' : 'GEMINI.md'}`;
     const nasSoulLabel = nasSoulItem ? nasSoulItem.name : (isClaude ? 'CLAUDE.md' : 'GEMINI.md');
 
     const nasPathItems = [];
-    if (currentFilter === 'all') {
+    if (nasUnconfigured) {
+      // Sans chemin, aucun dossier du catalogue n'est affiché.
+    } else if (currentFilter === 'all') {
       if (nasSoulCount > 0) {
         nasPathItems.push({ label: `${nasSoulLabel} (Source Maître)`, fullPath: nasSoulPath, icon: '🏛️', count: nasSoulCount });
       }
@@ -1225,7 +1235,7 @@
     renderColumnPath(nasPathEl, nasPathItems);
 
     if (nasStatusBanner) {
-      if (state.nasStatus && !state.nasStatus.online) {
+      if (state.nasStatus && !state.nasStatus.online && !nasUnconfigured) {
         nasStatusBanner.style.display = 'flex';
         const errMsg = state.nasStatus.error || 'Inaccessible';
         const isUncBlocked = errMsg.includes('UNC host') || errMsg.includes('not allowed');
@@ -1259,7 +1269,16 @@
 
     if (nasContainer) {
       nasContainer.innerHTML = '';
-      if (!state.nasStatus || !state.nasStatus.online) {
+      if (nasUnconfigured) {
+        if (nasCountBadge) nasCountBadge.textContent = '0 items';
+        nasContainer.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state-icon">🏛️</div>
+            <div>Aucun catalogue configuré</div>
+            <div>Renseignez le réglage <code>skillsManager.nasPath</code> pour comparer vos fichiers à un catalogue de référence.</div>
+          </div>
+        `;
+      } else if (!state.nasStatus || !state.nasStatus.online) {
         if (nasCountBadge) nasCountBadge.textContent = '0 items';
         nasContainer.innerHTML = `
           <div class="empty-state">
@@ -2128,7 +2147,9 @@
       } else if (syncStatus === 'nas_offline') {
         btnTrash.disabled = true;
         btnTrash.classList.add('is-blocked');
-        btnTrash.title = 'Suppression bloquée : Catalogue NAS inaccessible pour vérifier l\'intégrité';
+        btnTrash.title = isNasUnconfigured(currentState)
+          ? 'Suppression bloquée : aucun catalogue NAS n\'est configuré pour conserver une copie de secours'
+          : 'Suppression bloquée : Catalogue NAS inaccessible pour vérifier l\'intégrité';
       } else {
         // local_only
         btnTrash.disabled = true;
@@ -2298,7 +2319,9 @@
       recommendation = 'Probablement une surcharge propre au projet (à garder ici) : la copie globale correspond au Catalogue maître NAS, tandis que la copie locale a été adaptée spécifiquement à ce projet.';
     } else if (nasOffline) {
       type = 'nas_offline';
-      recommendation = 'Catalogue NAS hors-ligne : impossible de vérifier la correspondance avec le Catalogue maître. Comparez le diff côte à côte et vérifiez les dates et tailles ci-dessous.';
+      recommendation = isNasUnconfigured(currentState)
+        ? 'Aucun catalogue NAS configuré : aucune copie de référence ne permet de départager les deux versions. Comparez le diff côte à côte et vérifiez les dates et tailles ci-dessous.'
+        : 'Catalogue NAS hors-ligne : impossible de vérifier la correspondance avec le Catalogue maître. Comparez le diff côte à côte et vérifiez les dates et tailles ci-dessous.';
     } else {
       type = 'both_diverged';
       recommendation = 'Attention, divergence double : ni la copie locale ni la copie globale ne correspondent au Catalogue maître NAS. Les deux ont divergé du Catalogue, à vérifier manuellement.';
@@ -2384,6 +2407,11 @@
     }
   }
 
+  /** Vrai lorsqu'aucun chemin de catalogue n'est renseigné : le catalogue est absent, pas en panne. */
+  function isNasUnconfigured(state) {
+    return !!(state && state.nasStatus && state.nasStatus.configured === false);
+  }
+
   function formatSyncStatus(syncStatus) {
     switch (syncStatus) {
       case 'synced':
@@ -2393,7 +2421,9 @@
       case 'local_only':
         return '<span class="sync-status-badge sync-local">ℹ️ Absent du Catalogue NAS</span>';
       case 'nas_offline':
-        return '<span class="sync-status-badge sync-offline">⚪ Catalogue NAS hors-ligne</span>';
+        return isNasUnconfigured(currentState)
+          ? '<span class="sync-status-badge sync-offline">⚪ Aucun catalogue NAS configuré</span>'
+          : '<span class="sync-status-badge sync-offline">⚪ Catalogue NAS hors-ligne</span>';
       default:
         return '<span class="sync-status-badge">Inconnu</span>';
     }

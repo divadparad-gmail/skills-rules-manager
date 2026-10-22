@@ -32,7 +32,10 @@ export class DeleteService {
         } else if (item.syncStatus === 'local_only') {
           reason = 'Ce fichier n\'existe pas dans le Catalogue NAS. Suppression bloquée car il n\'y a aucune copie de secours.';
         } else if (item.syncStatus === 'nas_offline') {
-          reason = 'Le Catalogue NAS est hors ligne. Impossible de vérifier l\'intégrité de la ressource.';
+          const nasPath = vscode.workspace.getConfiguration('skillsManager').get<string>('nasPath', '');
+          reason = nasPath.trim()
+            ? 'Le Catalogue NAS est hors ligne. Impossible de vérifier l\'intégrité de la ressource.'
+            : 'Aucun catalogue NAS n\'est configuré (réglage skillsManager.nasPath) : la suppression exige une copie de secours dans le catalogue.';
         }
         vscode.window.showErrorMessage(`Suppression impossible : ${reason}`);
         return { success: false, error: reason };
