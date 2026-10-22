@@ -158,15 +158,13 @@ describe('Suite de Tests : Chaîne de construction et contributions du manifeste
     });
   });
 
-  test('8. Raccourcis clavier : les cinq combinaisons du PRD sont enregistrées avec leur variante macOS', () => {
+  test('8. Raccourcis clavier : trois combinaisons avec leur variante macOS, aucune en conflit avec VS Code', () => {
     const keybindings = readPackageJson().contributes.keybindings;
     const byCommand = new Map(keybindings.map((entry: any) => [entry.command, entry]));
 
     const expected: Array<[string, string, string]> = [
-      ['workbench.view.extension.skills-rules-manager-sidebar', 'ctrl+shift+g', 'cmd+shift+g'],
       ['antigravity.discovery.focusSearch', 'ctrl+alt+s', 'cmd+alt+s'],
       ['antigravity.discovery.quickSearch', 'ctrl+alt+k', 'cmd+alt+k'],
-      ['antigravity.discovery.quickDeploy', 'ctrl+alt+i', 'cmd+alt+i'],
       ['antigravity.environment.override', 'ctrl+alt+e', 'cmd+alt+e'],
     ];
 
@@ -176,13 +174,13 @@ describe('Suite de Tests : Chaîne de construction et contributions du manifeste
       assert.strictEqual(binding.key, key);
       assert.strictEqual(binding.mac, mac, 'Chaque raccourci doit porter sa variante macOS.');
     });
+    assert.strictEqual(keybindings.length, expected.length);
 
-    const quickDeploy = byCommand.get('antigravity.discovery.quickDeploy') as any;
-    assert.strictEqual(
-      quickDeploy.when,
-      'antigravityHasFavorites',
-      "Le déploiement express ne s'active qu'en présence de favoris."
-    );
+    // Ctrl+Shift+G ouvre le contrôle de code source et Ctrl+Alt+I la vue Chat de VS Code
+    const keys = keybindings.map((entry: any) => entry.key);
+    ['ctrl+shift+g', 'ctrl+alt+i'].forEach((key) => {
+      assert.ok(!keys.includes(key), `Le raccourci « ${key} » est réservé par VS Code.`);
+    });
   });
 
   test("9. Contenu du paquet : les gabarits de vue sont embarqués, les sources et dépendances exclues", () => {

@@ -189,12 +189,12 @@ Accessibles depuis la palette de commandes (`Ctrl+Shift+P` / `Cmd+Shift+P`) :
 - `Skills & Rules Manager: Autoriser l'hôte NAS (UNC) dans la sécurité VS Code`
 - `Anti-Gravity: Rechercher une compétence, une règle, un workflow ou un hook` — `Ctrl+Alt+S` / `Cmd+Alt+S`
 - `Anti-Gravity: Palette de recherche rapide des compétences` — `Ctrl+Alt+K` / `Cmd+Alt+K`
-- `Anti-Gravity: Déployer rapidement une compétence favorite` — `Ctrl+Alt+I` / `Cmd+Alt+I`
+- `Anti-Gravity: Déployer rapidement une compétence favorite`
 - `Anti-Gravity: Basculer le mode de fonctionnement (IDE hôte et agent)` — `Ctrl+Alt+E` / `Cmd+Alt+E`
 - `Anti-Gravity: Afficher les diagnostics d'environnement`
 - `Anti-Gravity: Configurer la clé d'API Gemini pour la recherche sémantique`
 
-Le panneau latéral s'ouvre par `Ctrl+Shift+G` / `Cmd+Shift+G`. Dans la liste de résultats, les flèches parcourent les fiches et `Alt+L`, `Alt+N`, `Alt+G` déclenchent respectivement l'intégration locale, NAS et globale.
+Le panneau latéral s'ouvre depuis son icône dans la barre d'activité. Dans la liste de résultats, les flèches parcourent les fiches et `Alt+L`, `Alt+N`, `Alt+G` déclenchent respectivement l'intégration locale, NAS et globale.
 
 ---
 

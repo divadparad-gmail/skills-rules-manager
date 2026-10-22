@@ -338,11 +338,6 @@
     },
     "keybindings": [
       {
-        "command": "workbench.view.extension.skills-rules-manager-sidebar",
-        "key": "ctrl+shift+g",
-        "mac": "cmd+shift+g"
-      },
-      {
         "command": "antigravity.discovery.focusSearch",
         "key": "ctrl+alt+s",
         "mac": "cmd+alt+s"
@@ -351,12 +346,6 @@
         "command": "antigravity.discovery.quickSearch",
         "key": "ctrl+alt+k",
         "mac": "cmd+alt+k"
-      },
-      {
-        "command": "antigravity.discovery.quickDeploy",
-        "key": "ctrl+alt+i",
-        "mac": "cmd+alt+i",
-        "when": "antigravityHasFavorites"
       },
       {
         "command": "antigravity.environment.override",
