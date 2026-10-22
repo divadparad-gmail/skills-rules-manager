@@ -410,7 +410,7 @@
                   <td data-label="Taille &amp; tokens">
                     <ul class="ag-points">
                       <li class="ag-reco"><strong>Recommandé : &lt; 200 lignes · ~1 800 – 2 800 tokens</strong> <span class="ag-src">📰📘🧮</span></li>
-                      <li>À chaque tour : 100 % de chaque fichier trouvé <span class="ag-src">🧪</span></li>
+                      <li>Présente en permanence : une seule copie de chaque fichier trouvé dans le contexte <span class="ag-src">🧪</span></li>
                       <li>Cumul : tous les fichiers trouvés s'additionnent <span class="ag-src">🧪</span></li>
                       <li>Plafond par fichier : 24 Ko, inclusions <code>@[label](path)</code> comprises ≈ 5 100 – 6 000 tokens <span class="ag-src">📄📏</span></li>
                       <li>Budget commun : 20 000 tokens, partagés avec les règles permanentes <span class="ag-src">📄</span></li>
@@ -418,7 +418,7 @@
                   </td>
                   <td data-label="Comportement">
                     <ul class="ag-points">
-                      <li>Jamais de frontmatter : toujours actif, contenu complet à chaque tour <span class="ag-src">🧪</span></li>
+                      <li>Jamais de frontmatter : toujours actif, contenu complet présent en permanence, en une seule copie <span class="ag-src">🧪</span></li>
                       <li>Aussi chargé depuis les dossiers parents, jusqu'à la racine du dépôt Git <span class="ag-src">🧪</span></li>
                       <li>Jamais chargé depuis un sous-dossier du dossier ouvert <span class="ag-src">🧪</span></li>
                     </ul>
@@ -436,7 +436,7 @@
                   <td data-label="Taille &amp; tokens">
                     <ul class="ag-points">
                       <li class="ag-reco"><strong>Recommandé : &lt; 200 lignes · ~1 800 – 2 800 tokens par fichier</strong> <span class="ag-src">📰📘🧮</span></li>
-                      <li>À chaque tour : 100 % du corps de chaque fichier, sans le frontmatter <span class="ag-src">🧪</span></li>
+                      <li>Présente en permanence : une seule copie du corps de chaque fichier dans le contexte, sans le frontmatter <span class="ag-src">🧪</span></li>
                       <li>Plafond par fichier : 24 000 octets du corps, frontmatter non compté ≈ 5 100 – 6 000 tokens, le surplus est coupé <span class="ag-src">🧪📏</span></li>
                       <li>Budget commun : 20 000 tokens partagés avec l'Âme, soit environ 7 à 11 fichiers de 200 lignes <span class="ag-src">📄🧮</span></li>
                       <li>Au-delà du budget : les plus gros fichiers deviennent des pointeurs <code>- &lt;chemin&gt;: &lt;description&gt;</code> <span class="ag-src">📄</span></li>
@@ -495,7 +495,7 @@
                     <ul class="ag-points">
                       <li class="ag-reco"><strong>Recommandé, sous-dossiers : ne pas utiliser · 0 token</strong>, mais aussi aucun effet <span class="ag-src">🧪</span></li>
                       <li class="ag-reco"><strong>Recommandé, dossiers parents : &lt; 200 lignes · ~1 800 – 2 800 tokens</strong> <span class="ag-src">📰📘🧮</span></li>
-                      <li>Dossiers parents : chargés à chaque tour, comme l'Âme, et ils entament le même budget <span class="ag-src">🧪</span></li>
+                      <li>Dossiers parents : présents en permanence, en une seule copie, comme l'Âme, et ils entament le même budget <span class="ag-src">🧪</span></li>
                     </ul>
                   </td>
                   <td data-label="Comportement">
@@ -520,7 +520,7 @@
                       <li class="ag-reco"><strong>Recommandé, corps : &lt; 500 lignes · ~4 500 – 7 000 tokens</strong> (Anthropic vise moins de 5 000) <span class="ag-src">📘🧮</span></li>
                       <li class="ag-reco"><strong>Recommandé, description : 1 à 2 phrases</strong> <span class="ag-src">📘</span></li>
                       <li>Au démarrage : une ligne par skill ≈ 50 – 110 tokens (nom + chemin absolu + description) <span class="ag-src">🧪🧮</span></li>
-                      <li>Exemple : 20 skills ≈ 1 000 – 2 200 tokens à chaque tour <span class="ag-src">🧮</span></li>
+                      <li>Exemple : 20 skills ≈ 1 000 – 2 200 tokens, présents en permanence dans l'index <span class="ag-src">🧮</span></li>
                       <li>Skills intégrés : toujours présents, impossibles à retirer (3 sur ce poste en 2.5.5) <span class="ag-src">🧪</span></li>
                       <li>Par activation : 100 % du corps, lu une fois <span class="ag-src">🧪</span></li>
                       <li>Plafond : aucun documenté <span class="ag-src">📄</span></li>
@@ -625,15 +625,18 @@
                     <ul class="ag-points">
                       <li class="ag-reco"><strong>Recommandé : messages injectés &lt; 10 lignes · ~90 – 140 tokens</strong> <span class="ag-src">🧮</span></li>
                       <li>Au démarrage : 0 token, la configuration JSON n'est pas dans le contexte <span class="ag-src">❔</span></li>
-                      <li><code>SessionStart</code> : ce qu'il injecte, une seule fois <span class="ag-src">📄</span></li>
+                      <li><code>SessionStart</code> : ce qu'il injecte, une seule fois <span class="ag-src">📄</span> (documentation web ; absent de la documentation intégrée à l'IDE 2.5.5 <span class="ag-src">❔</span>)</li>
                       <li><code>PreInvocation</code> : ce qu'il injecte, <strong>à chaque appel au modèle</strong> (ex. 100 tokens × 30 appels = 3 000) <span class="ag-src">📄🧮</span></li>
+                      <li><code>PostInvocation</code> : ce qu'il injecte, après chaque série d'appels d'outils <span class="ag-src">📄</span></li>
                       <li><code>PreToolUse</code> : la <code>reason</code> renvoyée <span class="ag-src">📄</span></li>
+                      <li>L'extension liste les hooks du projet et globaux, et signale ce coût dynamique pour <code>SessionStart</code>, <code>PreInvocation</code> et <code>PostInvocation</code>. Elle n'exécute jamais un hook, et ne peut donc pas mesurer ce qu'il injecte</li>
                     </ul>
                   </td>
                   <td data-label="Comportement">
                     <ul class="ag-points">
                       <li>JSON qui lance des <strong>commandes shell</strong> (entrée et sortie en JSON), délai de 30 s par défaut <span class="ag-src">📄</span></li>
-                      <li><strong>6 événements</strong> : SessionStart, PreToolUse, PostToolUse, PreInvocation, PostInvocation, Stop <span class="ag-src">📄</span></li>
+                      <li><strong>5 ou 6 événements selon la source</strong> : PreToolUse, PostToolUse, PreInvocation, PostInvocation, Stop <span class="ag-src">📄</span>, et SessionStart <span class="ag-src">📄</span> (documentation web ; absent de la documentation intégrée à l'IDE 2.5.5 <span class="ag-src">❔</span>)</li>
+                      <li>Format : un objet dont chaque clé est le nom d'un hook, qui associe à chaque événement ses gestionnaires ; <code>"enabled": false</code> désactive le hook <span class="ag-src">📄</span></li>
                       <li>PreToolUse peut bloquer (<code>deny</code>) ou exiger une confirmation (<code>ask</code>, <code>force_ask</code>) <span class="ag-src">📄</span></li>
                     </ul>
                   </td>
@@ -656,6 +659,7 @@
                       <li><strong>Hors service depuis le 19 octobre 2026</strong> <span class="ag-src">📄</span></li>
                       <li><code>/migrate-workflows</code>, annoncé par la documentation, est <strong>absent</strong> de l'IDE 2.5.5 <span class="ag-src">🧪</span></li>
                       <li>Migrer manuellement vers des skills</li>
+                      <li>Les « workflows » <code>wf-*</code> gérés par l'extension sont des skills (<code>skills/wf-*/SKILL.md</code>) : Antigravity les liste comme des skills, et ils restent comptés</li>
                     </ul>
                   </td>
                 </tr>
@@ -738,6 +742,34 @@
           <div class="ag-formula">
             Coût d'une session = (somme des tokens des règles <code>glob</code> correspondantes) × (nombre d'opérations sur des fichiers correspondants)
           </div>
+          <div class="ag-subtitle">Le comparatif <code>always_on</code> / <code>glob</code></div>
+          <div class="cs-table-wrap">
+            <table class="cs-table ag-simple-table">
+              <thead>
+                <tr>
+                  <th>Type</th>
+                  <th>Copies dans le contexte</th>
+                  <th>Coût sur une session de 20 opérations</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code>always_on</code></td>
+                  <td>1, toujours présente</td>
+                  <td>Sa taille, une fois</td>
+                </tr>
+                <tr>
+                  <td><code>glob</code></td>
+                  <td>1 de plus à chaque opération correspondante</td>
+                  <td>Sa taille × 20</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <ul class="ag-list">
+            <li>Pour des fichiers que vous touchez souvent (<code>*.ts</code> dans un projet TypeScript), une règle <code>glob</code> coûte plus qu'une règle <code>always_on</code> de même taille dès la deuxième opération. <code>glob</code> est rentable pour des fichiers rares (<code>package.json</code>, <code>*.proto</code>). Cette comparaison suppose que chaque copie reste dans l'historique, ce qui est déduit mais non mesuré. <span class="ag-src">🧪❔</span></li>
+            <li>Dans l'extension, chaque carte <code>glob</code> active affiche son coût par fichier correspondant, et le panneau « ⏱️ Coûts dynamiques », sous la jauge, regroupe les règles <code>glob</code> par motif : vous voyez ce que coûte chaque fichier <code>.ts</code> lu ou modifié.</li>
+          </ul>
           <div class="ag-subtitle">Les règles d'or</div>
           <ul class="ag-list">
             <li>Moins de 30 lignes courtes, soit environ 270 à 420 tokens.</li>
@@ -755,7 +787,7 @@
           <div class="ag-subtitle">Exemple 1 — Le fichier trop gros</div>
           <ul class="ag-list">
             <li>Une règle permanente de 39 Ko est coupée à 24 Ko.</li>
-            <li>Elle injecte ≈ <strong>5 250 tokens à chaque tour</strong>, soit <strong>26 % du budget</strong> de 20 000 tokens à elle seule.</li>
+            <li>Elle occupe en permanence ≈ <strong>5 250 tokens</strong>, soit <strong>26 % du budget</strong> de 20 000 tokens à elle seule.</li>
             <li>Et ≈ <strong>3 100 tokens de fin sont perdus</strong>, coupés au milieu d'un titre : l'agent ne voit jamais la fin de la règle.</li>
             <li>Leçon : double peine. Rester sous 24 Ko, et idéalement sous 200 lignes.</li>
           </ul>
@@ -907,16 +939,16 @@ description: Règles générales du projet
             <div>
               <strong>1. Détection des Doublons (Global vs Local) :</strong>
               <div style="color: var(--muted-fg); margin-top: 2px;">
-                Lorsqu'une règle ou une compétence de <code>~/.gemini/config/</code> est dupliquée dans <code>.agents/</code>, laisser les deux copies actives consomme deux fois votre budget de démarrage. Utilisez le bouton <em>« Éteindre »</em> du badge <code>⚠️ Doublon actif</code> pour supprimer instantanément cette redondance.
+                Lorsqu'une règle ou une compétence de <code>~/.gemini/config/</code> est dupliquée dans <code>.agents/</code>, laisser les deux copies actives consomme deux fois votre budget de démarrage. Le surcoût affiché est le plus petit des deux coûts au démarrage : l'enveloppe d'une règle permanente, l'entrée d'index d'une règle <code>model_decision</code>, la ligne d'index d'un skill. Une paire <code>glob</code> ou <code>manual</code> ne coûte rien au démarrage et porte la mention « coût dynamique » : les deux copies sont injectées quand elles s'appliquent. Une copie ⛔ ne compte jamais, et deux âmes (globale et du projet) ne forment un doublon que si leurs contenus sont identiques. Utilisez le bouton <em>« Éteindre »</em> du badge <code>⚠️ Doublon actif</code> pour supprimer instantanément cette redondance.
               </div>
             </div>
             <div>
-              <strong>2. Les 5 Alertes du Coach IA Proactif :</strong>
+              <strong>2. Les Alertes du Coach IA Proactif :</strong>
               <div style="color: var(--muted-fg); margin-top: 2px;">
-                • <strong style="color: #ef4444;">⚠️ &gt; 24 Ko :</strong> Le fichier dépasse la limite physique absolue d'Antigravity (24 000 octets). Risque de troncature silencieuse.<br>
-                • <strong style="color: #f59e0b;">⚠️ &gt; 200 li. :</strong> Règle ou Âme trop longue. Risque de dilution de l'attention (<em>Lost in the Middle</em>). Scindez en sous-règles conditionnelles.
-                <div class="cs-callout cs-callout-warning ag-revoir"><span>⚠️</span><div><strong>À revoir</strong> — contredit par les tests (2026-10-21) : une règle <code>glob</code> est réinjectée à chaque fichier correspondant ; découper une grosse règle en plusieurs règles <code>glob</code> peut multiplier son coût. Préférer <code>model_decision</code> ou un skill.</div></div>
-                • <strong style="color: #f59e0b;">⚠️ &gt; 500 li. :</strong> Skill volumineux. Déplacez la documentation détaillée dans <code>references/</code> et les scripts dans <code>scripts/</code>.<br>
+                • <strong style="color: #ef4444;">✂️ Tronquée :</strong> le corps dépasse 24 000 octets, frontmatter non compté, inclusions comprises. Antigravity coupe le surplus : la carte indique les octets coupés et les tokens jamais lus par l'agent.<br>
+                • <strong style="color: #f59e0b;">⚠️ N li. :</strong> le fichier dépasse la taille recommandée pour son type, en lignes de corps (frontmatter exclu, lignes vides comprises) : 200 lignes pour l'Âme, les règles permanentes et les dossiers parents ; 30 lignes ou environ 420 tokens pour une règle <code>glob</code>, réinjectée à chaque fichier correspondant ; 200 lignes pour une règle <code>model_decision</code> ; 500 lignes pour le corps d'un skill. L'infobulle donne la raison et la mesure. Une carte déjà <code>✂️ Tronquée</code> ne reçoit pas de second avertissement de taille. Pour alléger une grosse règle, préférez <code>model_decision</code> ou un skill : la découper en plusieurs règles <code>glob</code> peut multiplier son coût.<br>
+                • <strong style="color: #94a3b8;">ℹ️ Annexes :</strong> information seulement. Un fichier annexe de skill dépasse 300 lignes, ou dépasse 100 lignes sans table des matières repérée (détection approximative). Les annexes ne coûtent rien au démarrage.<br>
+                • <strong style="color: #ef4444;">⚠️ &gt; 24 Ko :</strong> règle ⛔, donc jamais lue, dont le corps dépasserait le plafond de 24 000 octets une fois corrigée. Aucun plafond n'est documenté pour un skill : les skills n'ont pas cette alerte.<br>
                 • <strong style="color: #ef4444;">⚠️ MCP &gt; 2 Ko :</strong> Dépassement du cap de 2 048 car. par outil sous Claude Code.<br>
                 • <strong style="color: #f59e0b;">⚠️ Sans description :</strong> L'IA ne dispose d'aucun indice sémantique pour savoir quand invoquer cette ressource.
               </div>
@@ -948,6 +980,9 @@ description: Règles générales du projet
                 <li><strong>Conséquence sur la jauge :</strong> Additionner les tokens affichés sur les cartes des règles conditionnelles ne redonne pas le total des règles. C'est normal et voulu — le total reflète la consommation au démarrage, pas la consommation maximale si toutes les règles conditionnelles étaient déclenchées en même temps.</li>
                 <li><strong>Skills :</strong> chaque skill coûte sa ligne dans l'index (nom, chemin de <code>SKILL.md</code> et description). Un skill de plugin est listé deux fois (index et section du plugin), plus l'en-tête de la section. Les skills intégrés sont comptés et verrouillés ; ceux des anciens emplacements sont comptés avec le badge <code>❔ Ancien emplacement</code>. <span class="ag-src">🧪📄</span></li>
                 <li><strong>MCP :</strong> un titre par serveur actif, puis les noms de ses outils, lus dans le cache d'Antigravity moins <code>disabledTools</code> (observé, non documenté). Sans cache, la liste est inconnue : comptez environ 3 à 8 tokens par outil. Les serveurs <code>disabled</code> et les serveurs distants sans <code>serverUrl</code> sont exclus. <span class="ag-src">🧪📄</span></li>
+                <li><strong>Coûts dynamiques, hors jauge :</strong> le panneau repliable « ⏱️ Coûts dynamiques », sous la jauge, montre ce qu'Antigravity ajoute en cours de session. Chaque règle <code>glob</code> active y est regroupée par motif de nom de fichier, avec ce que coûte chaque fichier correspondant lu ou modifié (en-tête de réinjection compris) et une estimation sur une session ordinaire de 20 opérations. Au-delà de 20 000 tokens d'âme et de règles permanentes, il liste les fichiers que la documentation annonce transformés en pointeurs, sans modifier les totaux, car ce comportement n'a pas été testé. <span class="ag-src">🧪📄❔</span></li>
+                <li><strong>Hooks :</strong> 0 token au démarrage. Le panneau liste les hooks de <code>.agents/hooks.json</code> et de <code>~/.gemini/config/hooks.json</code> (nom, événements), signale un fichier au format non reconnu, et avertit d'un coût dynamique pour <code>SessionStart</code>, <code>PreInvocation</code> et <code>PostInvocation</code>. L'extension n'exécute jamais un hook, et refuse d'en installer un vers Antigravity depuis la Découverte. <span class="ag-src">📄❔</span></li>
+                <li><strong>Workflows <code>wf-*</code> :</strong> ce sont des skills, listés comme tels par Antigravity : ils sont comptés comme des skills. Les workflows d'Antigravity, eux, sont hors service depuis le 19 octobre 2026. <span class="ag-src">📄</span></li>
                 <li><strong>Totaux :</strong> le total de l'Âme et celui des skills correspondent à la somme des cartes actives, plus les en-têtes injectés une seule fois (détaillés dans les info-bulles). Sous Antigravity, la jauge de 20 000 tokens ne compte que l'âme et les règles : les skills et les MCP sont affichés hors de ce budget.</li>
               </ul>
             </div>
