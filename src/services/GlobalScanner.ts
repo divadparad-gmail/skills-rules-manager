@@ -12,7 +12,7 @@ import {
 } from '../utils/paths';
 import { countTokens, countTokensForFile } from '../utils/tokenizer';
 import { measureAntigravitySoul } from '../utils/antigravityRules';
-import { appliesInAntigravity, buildAntigravityRuleItem, countsAtBoot, hasResourceWarning } from './antigravityRuleItem';
+import { appliesInAntigravity, buildAntigravityRuleItem, countsAtBoot, hasResourceWarning, soulSizeAdvice } from './antigravityRuleItem';
 import { listFlatRuleFiles } from './antigravityRuleSources';
 import { buildAntigravitySkillItem, listSkillFolders, pluginSectionHeadersTokens } from './antigravitySkillItem';
 import { antigravityRulesBootStat, truncationSummary } from './antigravityBootCost';
@@ -220,6 +220,7 @@ export class GlobalScanner {
             // Enveloppe F1, corps tronqué à 24 000 octets après inclusions
             const measured = await measureAntigravitySoul(rawContent, candidate.path, stat);
             const ruleTokenCount = measured.bootTokenCount;
+            const sizeAdvice = soulSizeAdvice(rawContent, measured.truncatedBytes);
 
             soulCharTotal += measured.bootCharCount;
             if (!soulPathFound) soulPathFound = candidate.path;
@@ -245,6 +246,7 @@ export class GlobalScanner {
                 bootCharCount: measured.bootCharCount,
                 ...(measured.truncatedBytes > 0 ? { truncatedBytes: measured.truncatedBytes, lostTokens: measured.lostTokens } : {}),
                 warningSizeExceeded: measured.warningSizeExceeded,
+                ...(sizeAdvice ? { sizeAdvice, warningLinesExceeded: true } : {}),
               },
             });
           } catch {

@@ -2337,6 +2337,58 @@ body.vscode-high-contrast-light #contentAntigravity .btn-copy-code {
   border: 1px solid rgba(14, 165, 233, 0.35);
 }
 
+/* Information sans gravité (annexes de skill) */
+.pill-info {
+  background: rgba(148, 163, 184, 0.12);
+  color: var(--muted-fg);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+}
+
+/* Panneau des coûts dynamiques d'Antigravity, sous la jauge */
+.dynamic-costs-panel {
+  margin: 6px 0 4px 0;
+}
+
+.dynamic-costs-body {
+  padding: 6px 10px 8px 10px;
+  font-size: 11px;
+  color: var(--fg-color);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dynamic-costs-heading {
+  font-weight: 700;
+  color: var(--muted-fg);
+}
+
+.dynamic-costs-stack {
+  padding-left: 8px;
+  border-left: 2px solid rgba(139, 92, 246, 0.45);
+}
+
+.dynamic-costs-stack-title code {
+  font-weight: 700;
+}
+
+.dynamic-costs-rules {
+  margin: 2px 0 0 0;
+  padding-left: 14px;
+  color: var(--muted-fg);
+}
+
+.dynamic-costs-warning {
+  padding: 5px 8px;
+  border-left: 2px solid #f59e0b;
+  background: rgba(245, 158, 11, 0.08);
+}
+
+.dynamic-costs-note {
+  color: var(--muted-fg);
+  font-style: italic;
+}
+
 /* Carte Banc d'Essai & Scénarios */
 .test-scenarios-card {
   background: var(--card-bg);

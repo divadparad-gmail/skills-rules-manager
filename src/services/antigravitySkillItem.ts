@@ -1,9 +1,68 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { ResourceItem, ResourceScope, ResourceType } from '../types';
+import { ResourceItem, ResourceScope, ResourceType, SkillAnnexNote } from '../types';
 import { extractFrontmatter } from '../utils/frontmatter';
 import { countTokens, countTokensForFile } from '../utils/tokenizer';
-import { formatPluginSectionHeader, formatSkillIndexLine, PLUGIN_SKILL_INDEX_COPIES } from '../antigravity/behavior';
+import {
+  countBodyLines,
+  formatPluginSectionHeader,
+  formatSkillIndexLine,
+  hasTableOfContents,
+  PLUGIN_SKILL_INDEX_COPIES,
+  SKILL_ANNEX_MAX_LINES,
+  SKILL_ANNEX_TOC_FROM_LINES,
+  sizeAdviceFor,
+} from '../antigravity/behavior';
+
+/** Annexes lues : textes du dossier du skill, sur quelques niveaux, dans une limite raisonnable. */
+const ANNEX_EXTENSIONS = new Set(['.md', '.txt']);
+const ANNEX_MAX_DEPTH = 3;
+const ANNEX_MAX_FILES = 200;
+const ANNEX_MAX_READ_BYTES = 1024 * 1024;
+
+/**
+ * Fichiers annexes d'un skill à signaler, à titre d'information : plus de 300 lignes, ou plus
+ * de 100 lignes sans table des matières. Ils ne coûtent rien au démarrage, et Antigravity ne
+ * les lit que si SKILL.md y renvoie (phase 2 de l'enquête).
+ */
+export async function collectAnnexNotes(skillFolder: string): Promise<SkillAnnexNote[]> {
+  const notes: SkillAnnexNote[] = [];
+  let visited = 0;
+  const walk = async (dir: string, depth: number): Promise<void> => {
+    let entries: fs.Dirent[];
+    try {
+      entries = await fs.promises.readdir(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      if (visited >= ANNEX_MAX_FILES) return;
+      if (entry.name.startsWith('.') || entry.name === 'node_modules') continue;
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (depth < ANNEX_MAX_DEPTH) await walk(fullPath, depth + 1);
+        continue;
+      }
+      if (!entry.isFile() || !ANNEX_EXTENSIONS.has(path.extname(entry.name).toLowerCase())) continue;
+      if (depth === 0 && /^SKILL\.md(\.disabled)?$/.test(entry.name)) continue;
+      visited++;
+      try {
+        if ((await fs.promises.stat(fullPath)).size > ANNEX_MAX_READ_BYTES) continue;
+        const content = await fs.promises.readFile(fullPath, 'utf8');
+        const lines = countBodyLines(content);
+        const tooLong = lines > SKILL_ANNEX_MAX_LINES;
+        const missingToc = lines > SKILL_ANNEX_TOC_FROM_LINES && !hasTableOfContents(content);
+        if (tooLong || missingToc) {
+          notes.push({ file: path.relative(skillFolder, fullPath).split(path.sep).join('/'), lines, tooLong, missingToc });
+        }
+      } catch {
+        // Fichier illisible : ignoré
+      }
+    }
+  };
+  await walk(skillFolder, 0);
+  return notes.sort((a, b) => a.file.localeCompare(b.file));
+}
 
 export interface AntigravitySkillItemOptions {
   scope: ResourceScope;
@@ -78,9 +137,14 @@ export async function buildAntigravitySkillItem(itemFolder: string, options: Ant
     ...(options.legacyLocation ? { legacyLocation: true } : {}),
   };
   if (!options.builtin) {
-    metadata.warningLinesExceeded = lineCount > 500;
-    metadata.warningSizeExceeded = rawContent.length > 24000;
+    // Corps de SKILL.md, frontmatter exclu ; aucun plafond de taille n'est documenté pour un
+    // skill, d'où l'absence d'alerte de 24 Ko (lot A3)
+    const sizeAdvice = sizeAdviceFor('skill', countBodyLines(rawContent));
+    if (sizeAdvice) metadata.sizeAdvice = sizeAdvice;
+    metadata.warningLinesExceeded = sizeAdvice !== null;
     metadata.warningNoDescription = !description || description.trim().length === 0;
+    const annexNotes = await collectAnnexNotes(itemFolder);
+    if (annexNotes.length > 0) metadata.annexNotes = annexNotes;
   }
 
   return {

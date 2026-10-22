@@ -3,8 +3,9 @@
  * qu'annonce sa documentation (les deux divergent).
  *
  * Source unique des faits R1 à R6, vérifiés par la suite de régression
- * test/scenarios/antigravity-injection-contexte/ (voir SCENARIOS.md dans ce dossier), et des
- * formats F1 à F8 injectés au démarrage, qui fondent le comptage des tokens (en fin de module).
+ * test/scenarios/antigravity-injection-contexte/ (voir SCENARIOS.md dans ce dossier), des
+ * formats F1 à F8 injectés au démarrage, qui fondent le comptage des tokens, et des
+ * recommandations de taille et coûts dynamiques du lot A3 (en fin de module).
  * Si la suite montre un changement de comportement, c'est ce module qu'il faut mettre à jour :
  * le scanner, l'import et le déploiement Discovery s'appuient tous sur lui.
  */
@@ -348,3 +349,99 @@ export function isUnsupportedRemoteMcpServer(config: unknown): boolean {
   const server = config as Record<string, unknown>;
   return server.serverUrl === undefined && (server.url !== undefined || server.httpUrl !== undefined);
 }
+
+// ---------------------------------------------------------------------------------------------
+// Recommandations de taille et coûts dynamiques (lot A3), reprises de l'onglet Antigravity du
+// guide. Sources : 📰 recommandation Google, 📘 recommandation Anthropic, 🧪 testé,
+// 📄 documentation Antigravity, 🧮 calculé à partir des mesures, ❔ non vérifié.
+// Une « ligne » est une ligne du corps : frontmatter exclu, lignes vides comprises.
+// ---------------------------------------------------------------------------------------------
+
+export type SizeAdviceKind = 'permanent' | 'glob' | 'model_decision' | 'skill';
+
+/**
+ * Seuils recommandés par type de fichier ; l'avertissement se déclenche au-delà.
+ * - permanent : âme, règle permanente, règle d'un dossier parent, < 200 lignes 📰📘 ;
+ * - glob : < 30 lignes et ≤ ~420 tokens de corps, car réinjectée à chaque fichier correspondant 🧪🧮 ;
+ * - model_decision : < 200 lignes 📘 ;
+ * - skill : corps de SKILL.md < 500 lignes 📘. Aucun plafond n'est documenté pour un skill 📄 :
+ *   le plafond de 24 000 octets ne vaut que pour les règles et les âmes.
+ * `manual` n'a pas de recommandation dans le guide.
+ */
+export const SIZE_RECOMMENDATIONS: Record<SizeAdviceKind, { maxLines: number; maxTokens?: number }> = {
+  permanent: { maxLines: 200 },
+  glob: { maxLines: 30, maxTokens: 420 },
+  model_decision: { maxLines: 200 },
+  skill: { maxLines: 500 },
+};
+
+/** Fichier annexe d'un skill : recommandé sous 300 lignes 🧮, table des matières au-delà de 100 lignes 📘. */
+export const SKILL_ANNEX_MAX_LINES = 300;
+export const SKILL_ANNEX_TOC_FROM_LINES = 100;
+
+/** Nombre de lignes d'un texte ; la fin de ligne finale n'ouvre pas une ligne de plus. */
+export function countLines(text: string): number {
+  if (text === '') return 0;
+  const lines = text.split(/\r\n|\r|\n/);
+  if (lines[lines.length - 1] === '') lines.pop();
+  return lines.length;
+}
+
+/** Lignes du corps d'une règle ou d'un SKILL.md, sans le frontmatter ni la fin de ligne du `---` fermant. */
+export function countBodyLines(content: string): number {
+  return countLines(splitRuleBody(content).body.replace(/^\r?\n/, ''));
+}
+
+export interface SizeAdvice {
+  kind: SizeAdviceKind;
+  lines: number;
+  maxLines: number;
+  /** Tokens du corps, comparés au seuil des règles `glob` seulement. */
+  tokens?: number;
+  maxTokens?: number;
+}
+
+/** Avertissement de taille, ou null si le fichier respecte la recommandation de son type. */
+export function sizeAdviceFor(kind: SizeAdviceKind, lines: number, tokens?: number): SizeAdvice | null {
+  const { maxLines, maxTokens } = SIZE_RECOMMENDATIONS[kind];
+  const tooManyLines = lines > maxLines;
+  const tooManyTokens = maxTokens !== undefined && tokens !== undefined && tokens > maxTokens;
+  if (!tooManyLines && !tooManyTokens) return null;
+  return {
+    kind,
+    lines,
+    maxLines,
+    ...(maxTokens !== undefined && tokens !== undefined ? { tokens, maxTokens } : {}),
+  };
+}
+
+/**
+ * Heuristique : une table des matières est un titre « Table des matières », « Sommaire »
+ * ou « Contents », ou au moins 3 liens vers des ancres internes `](#…)`.
+ */
+export function hasTableOfContents(content: string): boolean {
+  if (/^#{1,6}\s*(table des mati[eè]res|sommaire|contents|table of contents)\b/im.test(content)) return true;
+  return (content.match(/\]\(#[^)\s]+\)/g) ?? []).length >= 3;
+}
+
+/**
+ * 🧪 (phase 3b) : une règle `glob` est ajoutée à la fin du résultat de l'outil qui lit, modifie ou
+ * crée un fichier dont le nom correspond, sous cet en-tête, avec toutes les règles qui correspondent
+ * au même fichier. L'enveloppe de chaque règle n'a pas été observée : seul son corps est compté.
+ */
+export const GLOB_REINJECTION_HEADER =
+  'The following text is not part of the file, it is a list of user-defined rules that you MUST follow:\n';
+
+/** ❔ Chaque copie réinjectée reste dans l'historique de la conversation : déduit, non mesuré. */
+export const GLOB_COPIES_PERSISTENCE_MEASURED = false;
+
+/** 🧮 Session ordinaire retenue par le guide pour chiffrer le coût d'une règle `glob`. */
+export const ORDINARY_SESSION = { reads: 15, writes: 5 } as const;
+
+/**
+ * 📄 Budget de l'âme et des règles permanentes. Au-delà, la documentation annonce que les plus
+ * gros fichiers deviennent des pointeurs `- <chemin>: <description>`. Non testé : les totaux ne
+ * sont pas modifiés, seul un avertissement est affiché.
+ */
+export const RULES_BUDGET_TOKENS = 20000;
+export const RULES_BUDGET_POINTERS_TESTED = false;

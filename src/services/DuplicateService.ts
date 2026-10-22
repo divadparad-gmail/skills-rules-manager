@@ -8,6 +8,7 @@ export class DuplicateService {
   /**
    * Analyse et enrichit les listes de ressources globales et locales avec la détection des doublons.
    * Calcule les tokens gaspillés lorsque deux copies sont actives simultanément au boot.
+   * Antigravity : le gaspillage est le plus petit des deux coûts au démarrage (lot A3).
    */
   public static detectDuplicates(
     globalResources: ResourceItem[],
@@ -39,6 +40,7 @@ export class DuplicateService {
       isIdentical: boolean;
       bothEnabled: boolean;
       wastedTokens: number;
+      dynamicCost: boolean;
       localMtime: number;
       globalMtime: number;
     }> = [];
@@ -48,11 +50,19 @@ export class DuplicateService {
       const gItem = globalMap.get(key);
 
       if (gItem) {
+        const isAntigravityPair = lItem.targetTool === 'antigravity' && gItem.targetTool === 'antigravity';
+        const isIdentical = this.checkIfIdentical(lItem, gItem);
+        // Antigravity : une âme globale et une âme locale sont deux fichiers distincts, chargés tous
+        // les deux ; elles ne font un doublon que si leurs contenus sont identiques
+        if (isAntigravityPair && lItem.type === 'soul' && !isIdentical) continue;
+
         totalDuplicates++;
         // Une règle ⛔ (jamais chargée, ignorée, ne se déclenchant jamais) ne fait pas un doublon actif
         const bothEnabled = lItem.enabled && gItem.enabled && appliesInAntigravity(lItem) && appliesInAntigravity(gItem);
-        const isIdentical = this.checkIfIdentical(lItem, gItem);
-        const wastedTokens = bothEnabled ? (gItem.tokenCount || 0) : 0;
+        const wastedTokens = !bothEnabled ? 0
+          : isAntigravityPair ? Math.min(this.antigravityBootCost(lItem), this.antigravityBootCost(gItem))
+          : (gItem.tokenCount || 0);
+        const dynamicCost = isAntigravityPair && bothEnabled && (this.hasDynamicTrigger(lItem) || this.hasDynamicTrigger(gItem));
         const localMtime = this.getMtimeMs(lItem);
         const globalMtime = this.getMtimeMs(gItem);
 
@@ -67,6 +77,7 @@ export class DuplicateService {
           isIdentical,
           bothEnabled,
           wastedTokens,
+          dynamicCost,
           localMtime,
           globalMtime,
         });
@@ -85,6 +96,7 @@ export class DuplicateService {
           bothEnabled: pair.bothEnabled,
           isIdentical: pair.isIdentical,
           wastedTokens: pair.wastedTokens,
+          ...(pair.dynamicCost ? { dynamicCost: true } : {}),
           twinCharCount: pair.globalItem.charCount,
           twinTokenCount: pair.globalItem.tokenCount,
           twinLineCount: pair.globalItem.lineCount,
@@ -115,6 +127,7 @@ export class DuplicateService {
           bothEnabled: pair.bothEnabled,
           isIdentical: pair.isIdentical,
           wastedTokens: pair.wastedTokens,
+          ...(pair.dynamicCost ? { dynamicCost: true } : {}),
           twinCharCount: pair.localItem.charCount,
           twinTokenCount: pair.localItem.tokenCount,
           twinLineCount: pair.localItem.lineCount,
@@ -144,6 +157,21 @@ export class DuplicateService {
       enrichedLocal,
       stats,
     };
+  }
+
+  /**
+   * Antigravity : coût au démarrage d'une copie. Seule la copie chargée au démarrage compte :
+   * enveloppe F1 d'une règle permanente ou d'une âme, entrée d'index d'une règle
+   * `model_decision`, 0 pour `glob` et `manual`, ligne d'index d'un skill.
+   */
+  private static antigravityBootCost(item: ResourceItem): number {
+    if (item.type === 'rule' || item.type === 'soul') return item.metadata?.bootTokenCount ?? 0;
+    return item.tokenCount || 0;
+  }
+
+  /** Règle `glob` ou `manual` : injectée en cours de session, quand elle s'applique. */
+  private static hasDynamicTrigger(item: ResourceItem): boolean {
+    return item.type === 'rule' && (item.metadata?.trigger === 'glob' || item.metadata?.trigger === 'manual');
   }
 
   /**

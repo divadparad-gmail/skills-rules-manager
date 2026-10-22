@@ -334,11 +334,11 @@
     renderHeaderStats(currentState);
     renderTimingConsole(currentState);
 
+    // La barre latérale reste un résumé (statistiques d'en-tête) : seules les colonnes du Grand
+    // Dashboard affichent les cartes
     const isDashboard = document.getElementById('columnNas') !== null;
     if (isDashboard) {
       renderDashboard(currentState);
-    } else {
-      renderSidebar(currentState);
     }
   }
 
@@ -756,6 +756,8 @@
         const totalLabel = excludesPersonalization ? 'Budget des règles (âme comprise)' : 'Total utilisé';
         totalSummaryEl.innerHTML = `${totalLabel} : ${usedTokens.toLocaleString()} / ${budget.toLocaleString()} tokens (${usedPct}%)${personalizationNotice}${dupNotice}`;
       }
+
+      renderDynamicCosts(state);
     }
   }
 
@@ -786,6 +788,149 @@
       return 'Coût au démarrage : 0 token (absente du contexte initial)';
     }
     return `Coût au démarrage : ${boot} tokens (corps sans frontmatter, entre deux balises <RULE[chemin]> qui portent chacune le chemin complet)`;
+  }
+
+  /** Badge et infobulle d'un dépassement de taille recommandée (Antigravity, lot A3). */
+  function describeSizeAdvice(advice) {
+    const fmt = (n) => (n || 0).toLocaleString('fr-FR');
+    const lines = `${fmt(advice.lines)} ligne${advice.lines > 1 ? 's' : ''}`;
+    const tooManyLines = advice.lines > advice.maxLines;
+    switch (advice.kind) {
+      case 'glob': {
+        const measure = tooManyLines ? lines : `${fmt(advice.tokens)} tokens`;
+        return {
+          label: tooManyLines ? `⚠️ ${fmt(advice.lines)} li.` : `⚠️ ${fmt(advice.tokens)} tok`,
+          title: `${measure} : une règle glob est réinjectée à chaque fichier correspondant. Visez moins de ${advice.maxLines} lignes (≤ ~${fmt(advice.maxTokens)} tokens), ou passez en model_decision.`,
+        };
+      }
+      case 'model_decision':
+        return {
+          label: `⚠️ ${fmt(advice.lines)} li.`,
+          title: `${lines} : l'agent lit ce fichier entier quand il juge la règle utile. Visez moins de ${advice.maxLines} lignes.`,
+        };
+      case 'skill':
+        return {
+          label: `⚠️ ${fmt(advice.lines)} li.`,
+          title: `${lines} : le corps de SKILL.md est lu en entier à l'activation du skill. Visez moins de ${advice.maxLines} lignes, et déplacez le détail dans des fichiers annexes. Aucun plafond de taille n'est documenté pour un skill.`,
+        };
+      default:
+        return {
+          label: `⚠️ ${fmt(advice.lines)} li.`,
+          title: `${lines} : ce fichier est présent en permanence dans le contexte. Visez moins de ${advice.maxLines} lignes, ou déplacez le détail dans une règle model_decision ou un skill.`,
+        };
+    }
+  }
+
+  /** Infobulle des annexes de skill signalées (information, aucun coût au démarrage). */
+  function describeAnnexNotes(notes) {
+    const lines = notes.map((note) => {
+      const reasons = [];
+      if (note.tooLong) reasons.push('plus de 300 lignes');
+      if (note.missingToc) reasons.push('pas de table des matières repérée');
+      return `• ${note.file} : ${note.lines.toLocaleString('fr-FR')} lignes, ${reasons.join(', ')}`;
+    });
+    return 'Fichiers annexes à surveiller (information) :\n' + lines.join('\n') +
+      '\n\nRecommandé : moins de 300 lignes, et une table des matières au-delà de 100 lignes. Les annexes ne coûtent rien au démarrage : l\'agent ne les lit que si SKILL.md y renvoie. La détection de la table des matières est approximative.';
+  }
+
+  /** « fichier .ts » ou « fichier app.ts » pour un motif de nom de fichier. */
+  function describePatternFiles(pattern) {
+    const extension = /^\*(\.[^*?\\/]+)$/.exec(pattern);
+    if (extension) return `fichier ${extension[1]}`;
+    return /[*?]/.test(pattern) ? `fichier qui correspond à ${pattern}` : `fichier ${pattern}`;
+  }
+
+  /**
+   * Antigravity : coûts ajoutés en cours de session, hors jauge (lot A3). Les règles glob actives
+   * sont regroupées par motif de nom de fichier ; au-delà du budget, la liste des fichiers qui
+   * deviendraient des pointeurs (documentation, non testé). Textes insérés par textContent.
+   */
+  function renderDynamicCosts(state, doc) {
+    const targetDoc = doc || (typeof document !== 'undefined' ? document : null);
+    if (!targetDoc) return;
+    const panel = targetDoc.getElementById('dynamicCostsPanel');
+    const summary = targetDoc.getElementById('dynamicCostsSummary');
+    const body = targetDoc.getElementById('dynamicCostsBody');
+    if (!panel || !summary || !body) return;
+
+    const costs = state && state.stats && state.stats.dynamicCosts;
+    const isClaude = state && state.workspace && state.workspace.tool === 'claude-code';
+    if (!costs || isClaude) {
+      panel.style.display = 'none';
+      return;
+    }
+    panel.style.display = '';
+
+    const fmt = (n) => (n || 0).toLocaleString('fr-FR');
+    const plural = (n, word) => `${n} ${word}${n > 1 ? 's' : ''}`;
+    const el = (tag, className, text) => {
+      const node = targetDoc.createElement(tag);
+      if (className) node.className = className;
+      if (text !== undefined) node.textContent = text;
+      return node;
+    };
+    const stacks = costs.globStacks || [];
+    const overflow = costs.budgetOverflow;
+    const session = costs.ordinarySession || { reads: 15, writes: 5 };
+    const operations = session.reads + session.writes;
+
+    summary.textContent = `⏱️ Coûts dynamiques : ${plural(stacks.length, 'motif')} glob${overflow ? ' · ⚠️ budget dépassé' : ''}`;
+    body.innerHTML = '';
+
+    if (overflow) {
+      const box = el('div', 'dynamic-costs-warning');
+      box.appendChild(el('div', '', `⚠️ Âme et règles permanentes : ${fmt(overflow.totalTokens)} / ${fmt(overflow.budget)} tokens. Antigravity transformera les plus gros fichiers en pointeurs (documentation, non testé) :`));
+      const list = el('ul', 'dynamic-costs-rules');
+      overflow.pointerCandidates.forEach((candidate) => {
+        list.appendChild(el('li', '', `${candidate.id} (${candidate.scope === 'global' ? 'global' : 'projet'}) : ${fmt(candidate.tokens)} tok`));
+      });
+      box.appendChild(list);
+      box.appendChild(el('div', 'dynamic-costs-note', 'Les totaux de la jauge ne sont pas modifiés, car ce remplacement n\'a pas été testé.'));
+      body.appendChild(box);
+    }
+
+    body.appendChild(el('div', 'dynamic-costs-heading', 'Règles glob réinjectées, par motif de nom de fichier'));
+    if (stacks.length === 0) {
+      body.appendChild(el('div', 'dynamic-costs-note', 'Aucune règle glob active.'));
+    }
+    const stackByPattern = new Map(stacks.map((stack) => [stack.pattern, stack]));
+    stacks.forEach((stack) => {
+      const block = el('div', 'dynamic-costs-stack');
+      const title = el('div', 'dynamic-costs-stack-title');
+      title.appendChild(el('code', '', stack.pattern));
+      title.appendChild(el('span', '', ` : ${plural(stack.rules.length, 'règle')}, ${fmt(stack.tokensPerFile)} tok injectés à chaque ${describePatternFiles(stack.pattern)} lu ou modifié (+ ${fmt(stack.headerTokens)} tok d'en-tête)`));
+      block.appendChild(title);
+
+      // Un fichier qui correspond à un motif plus large reçoit aussi les règles de ce motif
+      const allRules = new Map(stack.rules.map((rule) => [`${rule.scope}:${rule.id}`, rule]));
+      (stack.alsoMatchedBy || []).forEach((pattern) => {
+        const wider = stackByPattern.get(pattern);
+        if (wider) wider.rules.forEach((rule) => allRules.set(`${rule.scope}:${rule.id}`, rule));
+      });
+      const perOperation = [...allRules.values()].reduce((sum, rule) => sum + rule.tokensPerFile, 0) + stack.headerTokens;
+      if (allRules.size > stack.rules.length) {
+        block.appendChild(el('div', '', `Ces fichiers correspondent aussi à ${stack.alsoMatchedBy.join(', ')} : ${plural(allRules.size, 'règle')} et ${fmt(perOperation)} tok à chaque opération, en-tête compris.`));
+      }
+      block.appendChild(el('div', '', `≈ ${fmt(perOperation)} × ${operations} = ${fmt(perOperation * operations)} tokens sur une session ordinaire (${session.reads} lectures + ${session.writes} modifications), en-tête compris.`));
+
+      const list = el('ul', 'dynamic-costs-rules');
+      stack.rules.forEach((rule) => {
+        const inherited = rule.inheritedFrom !== undefined ? `, héritée de ${rule.inheritedFrom}` : '';
+        const line = el('li', '', `${rule.id} (${rule.scope === 'global' ? 'global' : 'projet'}${inherited}) : ${fmt(rule.tokensPerFile)} tok`);
+        line.title = rule.name;
+        list.appendChild(line);
+      });
+      block.appendChild(list);
+      body.appendChild(block);
+    });
+
+    body.appendChild(el('div', 'dynamic-costs-note', 'Ces coûts ne figurent pas dans la jauge, qui ne compte que ce qui est injecté au démarrage. Chaque copie réinjectée reste dans l\'historique de la conversation : c\'est déduit, non mesuré.'));
+  }
+
+  /** Session ordinaire retenue pour chiffrer une règle glob (src/antigravity/behavior.ts). */
+  function ordinarySession() {
+    const session = currentState && currentState.stats && currentState.stats.dynamicCosts && currentState.stats.dynamicCosts.ordinarySession;
+    return session || { reads: 15, writes: 5 };
   }
 
   /** Lignes d'infobulle propres à Antigravity : en-têtes injectés, troncatures, détail des serveurs MCP. */
@@ -907,29 +1052,6 @@
     }
   }
 
-  function renderSidebar(state) {
-    const listContainer = document.getElementById('sidebarItemsList');
-    if (!listContainer) return;
-
-    // Concaténer local et global pour un aperçu rapide
-    const allItems = [...state.localResources, ...state.globalResources];
-    const filtered = filterItems(allItems);
-    const sorted = sortItemsWithPinnedSoul(filtered);
-
-    if (sorted.length === 0) {
-      listContainer.innerHTML = `
-        <div class="empty-state">
-          <div class="empty-state-icon">🔍</div>
-          <div>Aucune ressource trouvée</div>
-        </div>
-      `;
-      return;
-    }
-
-    listContainer.innerHTML = '';
-    appendGroupedCards(listContainer, sorted, false, state);
-  }
-
   // État d'ouverture de la section repliée « Non chargées », conservé entre deux rendus
   let neverLoadedGroupOpen = false;
 
@@ -987,6 +1109,18 @@
     note.textContent = 'ℹ️ Pas de dépôt Git : héritage des dossiers parents non vérifié';
     note.title = 'Antigravity charge les règles des dossiers parents jusqu\'à la racine du dépôt Git. Sans dépôt, son comportement n\'a pas été testé : aucun dossier parent n\'est compté.';
     return note;
+  }
+
+  /**
+   * Compteur du libellé « projet-local\.agents\rules\ » : sous Antigravity, les règles de
+   * sous-dossier (⛔ jamais chargées) et celles des dossiers parents n'y sont pas, et ont leurs
+   * propres groupes dans la colonne.
+   */
+  function localRulesHeaderCount(items, isClaude) {
+    const isOutsideAgentsRules = (i) => !isClaude && !!(i.metadata && (
+      i.metadata.antigravityStatus === 'never-loaded' || i.metadata.inheritedFrom !== undefined
+    ));
+    return (items || []).filter((i) => i.type === 'rule' && !isOutsideAgentsRules(i)).length;
   }
 
   function renderDashboard(state) {
@@ -1168,7 +1302,7 @@
     const localPathEl = document.getElementById('localPathLabel');
     const wsPath = state.workspace && state.workspace.workspacePath ? state.workspace.workspacePath : '';
 
-    const localRulesCount = (state.localResources || []).filter((i) => i.type === 'rule').length;
+    const localRulesCount = localRulesHeaderCount(state.localResources, isClaude);
     const localSkillsCount = (state.localResources || []).filter((i) => i.type === 'skill' || i.type === 'workflow').length;
     const localSoulCount = (state.localResources || []).filter((i) => i.type === 'soul' || (i.metadata && i.metadata.isSoul)).length;
 
@@ -1496,12 +1630,16 @@
     if (!config) return null;
 
     const dup = item.metadata && item.metadata.duplicateInfo;
+    // Antigravity : une copie glob ou manual ne coûte rien au démarrage, mais s'ajoute à l'autre quand elle s'applique
+    const label = dup && dup.dynamicCost ? `${config.label} · coût dynamique` : config.label;
     const dupBadge = targetDoc.createElement('span');
     dupBadge.className = `item-badge-pill ${config.colorClass}`;
-    dupBadge.title = config.title;
+    dupBadge.title = dup && dup.dynamicCost
+      ? `${config.title}\nCoût dynamique : l'une des copies est une règle glob ou manual. Elle ne coûte rien au démarrage, mais elle est injectée en plus de l'autre copie quand elle s'applique.`
+      : config.title;
 
     if (config.active) {
-      dupBadge.innerHTML = `<span>${config.label}</span>`;
+      dupBadge.innerHTML = `<span>${label}</span>`;
       if (config.hasQuickOff) {
         const btnQuickOff = targetDoc.createElement('button');
         btnQuickOff.className = 'btn-quick-off';
@@ -1603,16 +1741,20 @@
       badgesLine.appendChild(badge);
     };
 
-    // R6 : frontmatter absent ou trigger non reconnu
-    if (item.metadata && item.metadata.ignoredByAgent) {
+    // R6 : frontmatter absent ou trigger non reconnu ; une règle de sous-dossier ne porte que le
+    // badge « ⛔ Jamais chargée », qui reprend ce défaut dans son infobulle
+    const ignoredReason = (() => {
+      if (!item.metadata || !item.metadata.ignoredByAgent) return null;
       const issue = (item.metadata.ruleIssues || [])[0];
-      const reason = issue === 'missing-frontmatter'
+      return issue === 'missing-frontmatter'
         ? 'le fichier ne commence pas par un frontmatter YAML'
         : issue === 'invalid-trigger'
           ? 'la valeur de trigger n\'est pas reconnue (casse exacte requise)'
           : 'le frontmatter ne déclare pas de trigger';
+    })();
+    if (ignoredReason && agStatus !== 'never-loaded') {
       addBadge('pill-warn', '⛔ Ignorée par Antigravity',
-        `Antigravity ignore silencieusement ce fichier : ${reason}.\nAjoutez « trigger: » avec always_on, model_decision, glob ou manual.`);
+        `Antigravity ignore silencieusement ce fichier : ${ignoredReason}.\nAjoutez « trigger: » avec always_on, model_decision, glob ou manual.`);
     }
 
     // R4 : globs en liste YAML
@@ -1644,8 +1786,11 @@
 
     // R1 : règle d'un sous-dossier du dossier ouvert
     if (agStatus === 'never-loaded') {
+      const alsoIgnored = ignoredReason
+        ? `\nMême à la racine, elle serait ignorée : ${ignoredReason}. Ajoutez « trigger: » avec always_on, model_decision, glob ou manual.`
+        : '';
       addBadge('pill-warn', '⛔ Jamais chargée',
-        `${behavior.version} ne charge jamais les règles des sous-dossiers du dossier ouvert (testé le ${behavior.testedOn}). Déplacez-la dans .agents/rules/ à la racine.`);
+        `${behavior.version} ne charge jamais les règles des sous-dossiers du dossier ouvert (testé le ${behavior.testedOn}). Déplacez-la dans .agents/rules/ à la racine.${alsoIgnored}`);
     }
 
     // R2 : ressource héritée d'un dossier parent
@@ -1692,8 +1837,13 @@
       badgesLine.appendChild(warnBadge);
     }
 
-    // Avertissement dépassement du nombre de lignes (> 200 pour Rules/Soul, > 500 pour Skills)
-    if (item.metadata && item.metadata.warningLinesExceeded) {
+    // Antigravity : taille recommandée par type de fichier (src/antigravity/behavior.ts), un seul
+    // avertissement de taille par carte (aucun si ✂️ Tronquée est déjà affiché)
+    if (item.metadata && item.metadata.sizeAdvice) {
+      const advice = describeSizeAdvice(item.metadata.sizeAdvice);
+      addBadge('pill-warn-amber', advice.label, advice.title);
+    } else if (item.metadata && item.metadata.warningLinesExceeded) {
+      // Avertissement dépassement du nombre de lignes (> 200 pour Rules/Soul, > 500 pour Skills)
       const warnLinesBadge = targetDoc.createElement('span');
       warnLinesBadge.className = 'item-badge-pill pill-warn-amber';
       if (item.type === 'skill' || item.type === 'workflow') {
@@ -1706,6 +1856,12 @@
         warnLinesBadge.title = `Attention : règle ou âme volumineuse${lines}.\nRisque de "Lost in the Middle" et dilution de l'attention de l'IA (recommandé < 200 lignes).`;
       }
       badgesLine.appendChild(warnLinesBadge);
+    }
+
+    // Antigravity : annexes de skill longues ou sans table des matières, à titre d'information
+    const annexNotes = (item.metadata && item.metadata.annexNotes) || [];
+    if (annexNotes.length > 0) {
+      addBadge('pill-info', `ℹ️ Annexes (${annexNotes.length})`, describeAnnexNotes(annexNotes));
     }
 
     // Avertissement dépassement MCP (> 2 Ko sous Claude Code)
@@ -1760,6 +1916,13 @@
           : 'Règle ignorée par Antigravity';
       metricsEl.innerHTML = `<span>${charStr} car.</span> <span class="tok-highlight">0 tok au boot (${tokStr} plein)</span>`;
       metricsEl.title = `${why} : aucun coût.\n• Poids si corrigée : ${charStr} car. (${tokStr} tokens)`;
+    } else if (isAntigravityItem && item.enabled && item.metadata && item.metadata.trigger === 'glob') {
+      // Réinjectée à chaque fichier correspondant : le coût se paie par opération, pas au démarrage
+      const session = ordinarySession();
+      const operations = session.reads + session.writes;
+      const sessionStr = (tokenCount * operations).toLocaleString('fr-FR');
+      metricsEl.innerHTML = `<span>${charStr} car.</span> <span class="tok-highlight">0 tok au boot · ${tokStr} tok par fichier correspondant</span>`;
+      metricsEl.title = `Règle glob :\n• Coût au démarrage : 0 token\n• À chaque lecture, modification ou création d'un fichier correspondant : ${tokStr} tokens (corps sans frontmatter), ajoutés au résultat de l'outil\n• Exemple : ≈ ${tokStr} × ${operations} = ${sessionStr} tokens sur une session ordinaire (${session.reads} lectures + ${session.writes} modifications), si chaque copie reste dans l'historique (déduit, non mesuré)`;
     } else if (item.metadata && item.metadata.isConditional && isAntigravityItem) {
       const bootStr = (item.metadata.bootTokenCount || 0).toLocaleString('fr-FR');
       metricsEl.innerHTML = `<span>${charStr} car.</span> <span class="tok-highlight">${bootStr} tok au boot (${tokStr} plein)</span>`;
@@ -2411,6 +2574,9 @@
       computeDuplicateRecommendation,
       openCompareModal,
       createItemCard,
+      describeSizeAdvice,
+      renderDynamicCosts,
+      localRulesHeaderCount,
       setFilterState: (state) => {
         if ('showDuplicatesOnly' in state) showDuplicatesOnly = state.showDuplicatesOnly;
         if ('currentFilter' in state) currentFilter = state.currentFilter;

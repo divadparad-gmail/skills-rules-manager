@@ -9,7 +9,7 @@ import {
 import { countTokens, countTokensForFile } from '../utils/tokenizer';
 import { measureAntigravitySoul } from '../utils/antigravityRules';
 import { ScenarioManager } from './ScenarioManager';
-import { appliesInAntigravity, buildAntigravityRuleItem, countsAtBoot, hasResourceWarning } from './antigravityRuleItem';
+import { appliesInAntigravity, buildAntigravityRuleItem, countsAtBoot, hasResourceWarning, soulSizeAdvice } from './antigravityRuleItem';
 import { buildAntigravitySkillItem, listSkillFolders, pluginSectionHeadersTokens } from './antigravitySkillItem';
 import { antigravityRulesBootStat, truncationSummary } from './antigravityBootCost';
 import {
@@ -446,13 +446,14 @@ export class LocalScanner {
           const { metadata: soulMetadata } = extractFrontmatter(rawContent);
           const parsed = extractMarkdownTitleAndSummary(rawContent);
           const isAntigravity = candidate.tool === 'antigravity';
-          // Antigravity : enveloppe F1, corps tronqué à 24 000 octets après inclusions ; la
-          // documentation ne fixe pas de limite de lignes
+          // Antigravity : enveloppe F1, corps tronqué à 24 000 octets après inclusions ; au-delà de
+          // 200 lignes, avertissement de taille, sauf pour une âme déjà tronquée (lot A3)
           const measured = isAntigravity ? await measureAntigravitySoul(rawContent, candidatePath, stat) : null;
           const tokenCount = measured
             ? measured.bootTokenCount
             : countTokensForFile(candidatePath, stat.size, stat.mtimeMs, rawContent);
-          const isWarningLines = !isAntigravity && lineCount > 200;
+          const sizeAdvice = measured ? soulSizeAdvice(rawContent, measured.truncatedBytes) : null;
+          const isWarningLines = measured ? sizeAdvice !== null : lineCount > 200;
           const isWarningSize = measured?.warningSizeExceeded ?? false;
 
           soulCharTotal += measured ? measured.bootCharCount : fileCharCount;
@@ -480,6 +481,7 @@ export class LocalScanner {
               ...(candidate.inheritedFrom !== undefined ? { inheritedFrom: candidate.inheritedFrom } : {}),
               ...(measured ? { byteSize: measured.byteSize, bootTokenCount: measured.bootTokenCount, bootCharCount: measured.bootCharCount } : {}),
               ...(measured && measured.truncatedBytes > 0 ? { truncatedBytes: measured.truncatedBytes, lostTokens: measured.lostTokens } : {}),
+              ...(sizeAdvice ? { sizeAdvice } : {}),
               warningLinesExceeded: isWarningLines,
               warningSizeExceeded: isWarningSize,
             },

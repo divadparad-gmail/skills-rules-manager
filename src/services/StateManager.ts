@@ -13,6 +13,7 @@ import { IntegrityService } from './IntegrityService';
 import { DeleteService } from './DeleteService';
 import { DuplicateService } from './DuplicateService';
 import { applyAntigravityIndexHeaders } from './antigravityBootCost';
+import { computeAntigravityDynamicCosts } from './antigravityDynamicCosts';
 import { DashboardPanel } from '../providers/DashboardPanel';
 import { CheatSheetPanel } from '../providers/CheatSheetPanel';
 import { getUserHome } from '../utils/paths';
@@ -257,6 +258,8 @@ export class StateManager {
       mcpGlobal,
       mcpLocal,
       duplicateStats,
+      // Antigravity : réinjection des règles glob et dépassement du budget, hors des totaux
+      ...(workspace.tool === 'antigravity' ? { dynamicCosts: computeAntigravityDynamicCosts([...finalGlobal, ...finalLocal]) } : {}),
     };
 
     const state: ManagerFullState = {

@@ -2,7 +2,15 @@ import * as fs from 'fs';
 import { ResourceItem, ResourceScope } from '../types';
 import { extractFrontmatter, extractMarkdownTitleAndSummary } from '../utils/frontmatter';
 import { AntigravityRuleInspection, inspectAntigravityRule, measureAntigravitySoul } from '../utils/antigravityRules';
-import { isAppliedStatus, SUBFOLDER_RULES_LOADED } from '../antigravity/behavior';
+import {
+  countBodyLines,
+  countLines,
+  isAppliedStatus,
+  SizeAdvice,
+  SizeAdviceKind,
+  sizeAdviceFor,
+  SUBFOLDER_RULES_LOADED,
+} from '../antigravity/behavior';
 
 export interface AntigravityRuleItemOptions {
   id: string;
@@ -45,6 +53,7 @@ export async function buildAntigravityRuleItem(filePath: string, options: Antigr
         isConditional: false,
         status: 'active',
         deadGlobs: [],
+        globPatterns: [],
         issues: [],
         warningNoDescription: false,
       }
@@ -53,6 +62,7 @@ export async function buildAntigravityRuleItem(filePath: string, options: Antigr
   const status = options.directoryScope !== undefined && !SUBFOLDER_RULES_LOADED ? 'never-loaded' : inspection.status;
   const frontmatterDescription = typeof frontmatter.description === 'string' ? frontmatter.description.trim() : '';
   const title = parsed.title || options.id;
+  const sizeAdvice = ruleSizeAdvice(rawContent, inspection, isAppliedStatus(status), options.standalone === true);
 
   return {
     id: options.id,
@@ -80,6 +90,7 @@ export async function buildAntigravityRuleItem(filePath: string, options: Antigr
       ignoredByAgent: inspection.ignored,
       antigravityStatus: status,
       ...(inspection.deadGlobs.length > 0 ? { deadGlobs: inspection.deadGlobs } : {}),
+      ...(inspection.globPatterns.length > 0 ? { globPatterns: inspection.globPatterns } : {}),
       ruleIssues: inspection.issues,
       ...(inspection.trigger ? { trigger: inspection.trigger } : {}),
       byteSize: inspection.byteSize,
@@ -87,9 +98,39 @@ export async function buildAntigravityRuleItem(filePath: string, options: Antigr
       bootCharCount: inspection.bootCharCount,
       ...(inspection.truncatedBytes > 0 ? { truncatedBytes: inspection.truncatedBytes, lostTokens: inspection.lostTokens } : {}),
       warningSizeExceeded: inspection.warningSizeExceeded,
+      ...(sizeAdvice ? { sizeAdvice, warningLinesExceeded: true } : {}),
       warningNoDescription: inspection.warningNoDescription,
     },
   };
+}
+
+const ADVICE_KIND_BY_TRIGGER: Partial<Record<string, SizeAdviceKind>> = {
+  always_on: 'permanent',
+  glob: 'glob',
+  model_decision: 'model_decision',
+};
+
+/**
+ * Avertissement de taille d'une règle lue par l'agent (lot A3). Une règle tronquée porte déjà
+ * le badge ✂️ : un seul avertissement de taille par carte. `manual` n'a pas de recommandation.
+ */
+function ruleSizeAdvice(
+  rawContent: string,
+  inspection: AntigravityRuleInspection,
+  applied: boolean,
+  standalone: boolean
+): SizeAdvice | null {
+  if (!applied || inspection.truncatedBytes > 0 || !inspection.trigger) return null;
+  const kind = ADVICE_KIND_BY_TRIGGER[inspection.trigger];
+  if (!kind) return null;
+  // Une âme n'a pas de frontmatter : le fichier entier est son corps
+  const lines = standalone ? countLines(rawContent) : countBodyLines(rawContent);
+  return sizeAdviceFor(kind, lines, kind === 'glob' ? inspection.bodyTokenCount : undefined);
+}
+
+/** Avertissement de taille d'une âme Antigravity (fichier entier, sans frontmatter), sauf si elle est tronquée. */
+export function soulSizeAdvice(rawContent: string, truncatedBytes: number): SizeAdvice | null {
+  return truncatedBytes > 0 ? null : sizeAdviceFor('permanent', countLines(rawContent));
 }
 
 /** Coût au démarrage d'une carte de règle ou d'âme Antigravity (formats F1 à F4). */

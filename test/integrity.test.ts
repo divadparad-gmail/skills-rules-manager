@@ -727,7 +727,7 @@ globs: "*.ts"
   // --------------------------------------------------------------------------
   // Tests 21 à 24 : Système d'Alertes Techniques (Coach IA Proactif)
   // --------------------------------------------------------------------------
-  test('21. Alertes Lignes : aucune limite de lignes documentée pour une règle Antigravity, Skill > 500 li. détecté', async () => {
+  test('21. Alertes Lignes : règle Antigravity permanente > 200 lignes de corps (lot A3), Skill > 500 li. détecté', async () => {
     const coachDir = path.join(tempBaseDir, 'coach-lines-test');
     await fs.promises.mkdir(path.join(coachDir, '.agents', 'rules'), { recursive: true });
     await fs.promises.mkdir(path.join(coachDir, '.agents', 'skills', 'skill-large'), { recursive: true });
@@ -760,7 +760,9 @@ globs: "*.ts"
     const ruleItem = scanResult.items.find((i: ResourceItem) => i.id === 'rule-long');
     assert.ok(ruleItem, 'La règle rule-long doit exister');
     assert.ok(ruleItem?.lineCount! > 200, `lineCount doit dépasser 200 (reçu: ${ruleItem?.lineCount})`);
-    assert.notStrictEqual(ruleItem?.metadata?.warningLinesExceeded, true, 'La documentation d\'Antigravity ne fixe aucune limite de lignes pour une règle');
+    // Recommandation du guide (📰📘) : une règle permanente de moins de 200 lignes de corps
+    assert.strictEqual(ruleItem?.metadata?.warningLinesExceeded, true, 'Une règle permanente de plus de 200 lignes de corps est signalée');
+    assert.deepStrictEqual(ruleItem?.metadata?.sizeAdvice, { kind: 'permanent', lines: 252, maxLines: 200 });
 
     const skillItem = scanResult.items.find((i: ResourceItem) => i.id === 'skill-large');
     assert.ok(skillItem, 'Le skill skill-large doit exister');
@@ -1018,6 +1020,8 @@ globs: "*.ts"
         targetTool: 'antigravity',
         isFolder: false,
         tokenCount: 1055,
+        // Coût au démarrage d'une règle permanente (enveloppe F1), porté par toute carte Antigravity
+        metadata: { trigger: 'always_on', bootTokenCount: 1055 },
       },
       {
         id: 'rule-unique-global',
@@ -1030,6 +1034,8 @@ globs: "*.ts"
         targetTool: 'antigravity',
         isFolder: false,
         tokenCount: 500,
+        // Coût au démarrage d'une règle permanente (enveloppe F1), porté par toute carte Antigravity
+        metadata: { trigger: 'always_on', bootTokenCount: 500 },
       },
     ];
 
@@ -1045,6 +1051,8 @@ globs: "*.ts"
         targetTool: 'antigravity',
         isFolder: false,
         tokenCount: 1055,
+        // Coût au démarrage d'une règle permanente (enveloppe F1), porté par toute carte Antigravity
+        metadata: { trigger: 'always_on', bootTokenCount: 1055 },
       },
     ];
 
@@ -2142,7 +2150,9 @@ Corps du texte.`;
   // --------------------------------------------------------------------------
   // Test 51 : Calcul de wastedTokens dans DuplicateService
   // --------------------------------------------------------------------------
-  test('51. DuplicateService : wastedTokens d\'une paire correspond à la taille de la copie globale éteinte', () => {
+  test('51. DuplicateService : wastedTokens d\'une paire correspond à la taille de la copie globale éteinte (Claude Code)', () => {
+    // Claude Code : le gaspillage est la copie globale. Antigravity compte le plus petit des deux coûts
+    // au démarrage, et deux âmes différentes ne font pas un doublon (lot A3, test/antigravity-dynamic-costs.test.ts)
     const ws = path.join(tempBaseDir, 'ws-dup-tokens');
     fs.mkdirSync(ws, { recursive: true });
 
@@ -2161,7 +2171,7 @@ Corps du texte.`;
         scope: 'global',
         enabled: true,
         path: globalFile,
-        targetTool: 'antigravity',
+        targetTool: 'claude-code',
         isFolder: false,
         tokenCount: 1377,
       },
@@ -2175,7 +2185,7 @@ Corps du texte.`;
         scope: 'local',
         enabled: true,
         path: localFile,
-        targetTool: 'antigravity',
+        targetTool: 'claude-code',
         isFolder: false,
         tokenCount: 99,
       },
@@ -2204,7 +2214,7 @@ Corps du texte.`;
         scope: 'global',
         enabled: true,
         path: globalFile,
-        targetTool: 'antigravity',
+        targetTool: 'claude-code',
         isFolder: false,
         tokenCount: 800,
       },
@@ -2218,7 +2228,7 @@ Corps du texte.`;
         scope: 'local',
         enabled: true,
         path: localFile,
-        targetTool: 'antigravity',
+        targetTool: 'claude-code',
         isFolder: false,
         tokenCount: 2500,
       },

@@ -19,6 +19,11 @@ export interface DuplicateInfo {
   bothEnabled: boolean;
   isIdentical: boolean;
   wastedTokens: number;
+  /**
+   * Antigravity : l'une des copies actives est une règle `glob` ou `manual`. Elle ne coûte rien au
+   * démarrage, mais les deux copies sont injectées quand elles s'appliquent.
+   */
+  dynamicCost?: boolean;
   twinCharCount?: number;
   twinTokenCount?: number;
   twinLineCount?: number;
@@ -83,6 +88,12 @@ export interface ResourceItem {
     antigravityStatus?: 'active' | 'partial' | 'never-loaded' | 'never-triggers' | 'ignored-yaml-list' | 'ignored';
     /** Motifs `globs` qui contiennent un dossier et ne se déclencheront jamais (R3). */
     deadGlobs?: string[];
+    /** Motifs `globs` qui se déclenchent (R3), tels qu'écrits dans le frontmatter. */
+    globPatterns?: string[];
+    /** Antigravity : dépassement de la taille recommandée pour ce type de fichier (lot A3). */
+    sizeAdvice?: AntigravitySizeAdvice;
+    /** Antigravity : fichiers annexes d'un skill longs ou sans table des matières (information). */
+    annexNotes?: SkillAnnexNote[];
     /** Dossier parent (relatif au projet, ex. « ../.. ») d'où la règle est héritée (R2). */
     inheritedFrom?: string;
     /** Règle déclarée par .agents/rules.json plutôt que trouvée dans .agents/rules/. */
@@ -147,6 +158,66 @@ export interface McpServerStat {
   tokenCount: number;
 }
 
+/** Dépassement de la taille recommandée (voir SIZE_RECOMMENDATIONS dans src/antigravity/behavior.ts). */
+export interface AntigravitySizeAdvice {
+  kind: 'permanent' | 'glob' | 'model_decision' | 'skill';
+  /** Lignes du corps, frontmatter exclu. */
+  lines: number;
+  maxLines: number;
+  tokens?: number;
+  maxTokens?: number;
+}
+
+/** Fichier annexe d'un skill à signaler, à titre d'information. */
+export interface SkillAnnexNote {
+  /** Chemin relatif au dossier du skill, avec des `/`. */
+  file: string;
+  lines: number;
+  /** Plus de 300 lignes. */
+  tooLong: boolean;
+  /** Plus de 100 lignes sans table des matières (heuristique). */
+  missingToc: boolean;
+}
+
+/** Règle `glob` réinjectée avec les autres règles d'un même motif. */
+export interface GlobStackRule {
+  id: string;
+  name: string;
+  scope: ResourceScope;
+  inheritedFrom?: string;
+  /** Tokens du corps, injectés à chaque fichier correspondant. */
+  tokensPerFile: number;
+}
+
+/** Règles `glob` actives qui s'empilent sur un même motif de nom de fichier. */
+export interface GlobStack {
+  /** Motif sans préfixe `**\/` (`**\/*.ts` et `*.ts` désignent les mêmes fichiers, R3). */
+  pattern: string;
+  rules: GlobStackRule[];
+  /** Somme des corps des règles du motif. */
+  tokensPerFile: number;
+  /** En-tête de réinjection, ajouté une fois par opération. */
+  headerTokens: number;
+  /** Motifs plus larges qui correspondent aussi à ces fichiers (`app.ts` : `*.ts`). */
+  alsoMatchedBy: string[];
+}
+
+/** Dépassement du budget de l'âme et des règles permanentes (documentation, non testé). */
+export interface BudgetOverflow {
+  totalTokens: number;
+  budget: number;
+  /** Fichiers permanents, du plus gros au plus petit, jusqu'à repasser sous le budget. */
+  pointerCandidates: Array<{ id: string; name: string; scope: ResourceScope; tokens: number }>;
+}
+
+/** Coûts qu'Antigravity ajoute en cours de session, hors jauge (lot A3). */
+export interface AntigravityDynamicCosts {
+  globStacks: GlobStack[];
+  budgetOverflow: BudgetOverflow | null;
+  /** Session ordinaire retenue pour chiffrer le coût d'une règle `glob` sur une session. */
+  ordinarySession: { reads: number; writes: number };
+}
+
 /** Résultat de la remontée vers les dossiers parents (Antigravity, R2). */
 export interface AntigravityParentsInfo {
   /** Faux sans dépôt Git : l'héritage des dossiers parents n'est alors pas vérifié. */
@@ -172,6 +243,8 @@ export interface ManagerStats {
   mcpGlobal: TokenCategoryStat;
   mcpLocal: TokenCategoryStat;
   duplicateStats?: DuplicateStats;
+  /** Antigravity : empilement des règles `glob` et dépassement du budget, sans effet sur les totaux. */
+  dynamicCosts?: AntigravityDynamicCosts;
 }
 
 export interface NasStatus {

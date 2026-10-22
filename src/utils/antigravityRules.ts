@@ -123,6 +123,8 @@ export interface AntigravityRuleInspection extends AntigravityBootCost {
   status: AntigravityRuleStatus;
   /** Motifs `globs` qui contiennent un dossier et ne se déclencheront jamais (R3). */
   deadGlobs: string[];
+  /** Motifs `globs` qui se déclenchent (R3) ; vide pour une liste YAML (R4). */
+  globPatterns: string[];
   issues: AntigravityRuleIssue[];
   /** Description absente du frontmatter (recommandée pour toutes les règles). */
   warningNoDescription: boolean;
@@ -184,6 +186,9 @@ export async function inspectAntigravityRule(rawContent: string, filePath: strin
     isConditional: check.trigger === 'glob' || check.trigger === 'model_decision' || check.trigger === 'manual',
     status,
     deadGlobs: verdict?.deadPatterns ?? [],
+    globPatterns: verdict && verdict.status !== 'yaml-list'
+      ? verdict.patterns.filter((pattern) => !verdict.deadPatterns.includes(pattern))
+      : [],
     issues: check.issues,
     // Pour model_decision, l'absence de description est déjà signalée comme champ obligatoire manquant ;
     // pour une règle ignorée, le défaut de trigger prime.
