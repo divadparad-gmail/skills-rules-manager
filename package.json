@@ -2,8 +2,8 @@
   "name": "skills-rules-manager",
   "displayName": "Skills & Rules Manager",
   "description": "Gestionnaire visuel de compétences (skills, workflows) et règles pour Antigravity IDE et Claude Code (NAS, Global, Local).",
-  "version": "0.3.12",
-  "publisher": "antigravity",
+  "version": "0.4.0",
+  "publisher": "divadparad",
   "license": "MIT",
   "repository": {
     "type": "git",

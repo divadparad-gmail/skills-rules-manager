@@ -6,13 +6,12 @@
 [![VS Code Engine](https://img.shields.io/badge/VS%20Code-%5E1.85.0-007ACC?style=for-the-badge&logo=visualstudiocode)](https://code.visualstudio.com/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.3-3178C6?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-emerald?style=for-the-badge)](LICENSE)
-[![Tests: 53/53](https://img.shields.io/badge/Tests-53%2F53%20Passed-success?style=for-the-badge)](#)
 
 <p align="center">
   <strong>Gestionnaire visuel haute performance pour compétences (skills, workflows) et règles sous Google Antigravity IDE et Claude Code.</strong>
 </p>
 
-[ [⬇️ Télécharger la v0.3.12 (.vsix)](https://github.com/divadparad-gmail/skills-rules-manager/releases/latest) ] •
+[ [⬇️ Télécharger la v0.4.0 (.vsix)](https://github.com/divadparad-gmail/skills-rules-manager/releases/latest) ] •
 [ [🐛 Signaler un problème](https://github.com/divadparad-gmail/skills-rules-manager/issues) ] •
 [ [📖 Guide des Bonnes Pratiques IA](#4-coach-ia--alertes-de-surcharge) ]
 
@@ -123,16 +122,18 @@ Des limites connues, comme la destination absente de la fenêtre de confirmation
 ## ⚡ Installation Express (.vsix)
 
 ### Option 1 : En ligne de commande (CLI)
-Téléchargez le fichier `skills-rules-manager-0.3.5.vsix` depuis les [Releases GitHub](https://github.com/divadparad-gmail/skills-rules-manager/releases/latest) et exécutez :
+Téléchargez le fichier `skills-rules-manager-0.4.0.vsix` depuis les [Releases GitHub](https://github.com/divadparad-gmail/skills-rules-manager/releases/latest) et exécutez :
 
 ```powershell
-code --install-extension skills-rules-manager-0.3.5.vsix
+code --install-extension skills-rules-manager-0.4.0.vsix
 ```
+
+> L'identifiant de l'extension est `divadparad.skills-rules-manager` depuis la 0.4.0. Si la 0.3.0 (`antigravity.skills-rules-manager`) est installée, désinstallez-la d'abord. Les évolutions de chaque version sont décrites dans le [CHANGELOG](CHANGELOG.md).
 
 ### Option 2 : Depuis l'interface VS Code / Antigravity IDE
 1. Ouvrez l'onglet Extensions (`Ctrl+Shift+X` ou `Cmd+Shift+X`).
 2. Cliquez sur l'icône `...` (More Actions en haut à droite du panneau d'extensions).
-3. Choisissez **Install from VSIX...** et sélectionnez `skills-rules-manager-0.3.5.vsix`.
+3. Choisissez **Install from VSIX...** et sélectionnez `skills-rules-manager-0.4.0.vsix`.
 
 ---
 
@@ -189,6 +190,10 @@ Un manifeste installé est lu comme instruction par votre agent. Aucun filtre au
 
 - **Registres configurés** : la description saisie (reformulée par l'analyse d'intention lorsqu'elle est disponible), les catégories recherchées et le nombre de résultats souhaité, en paramètres `q`, `types` et `limit` de l'URL.
 - **Gemini**, si une clé est enregistrée : la description à analyser, puis les descriptions des résultats candidats pour le calcul de pertinence. La clé voyage dans l'en-tête `x-goog-api-key`, jamais dans l'URL.
+
+### Signaler une faille
+
+Ne publiez pas de faille dans une issue : la marche à suivre pour un signalement privé est décrite dans [SECURITY.md](SECURITY.md).
 
 ---
 
