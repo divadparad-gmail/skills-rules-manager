@@ -340,8 +340,8 @@ describe('Suite de Tests : Réglages des registres et du répertoire NAS', () =>
   });
 
   test("17. Chemins réseau : chaque syntaxe de plateforme est normalisée sans être dénaturée", () => {
-    assert.strictEqual(normalizeNetworkPath('\\\\Nas1\\DD2\\IA\\skills\\'), '\\\\Nas1\\DD2\\IA\\skills');
-    assert.strictEqual(normalizeNetworkPath('//Nas1/DD2/IA/skills'), '\\\\Nas1\\DD2\\IA\\skills');
+    assert.strictEqual(normalizeNetworkPath('\\\\serveur\\partage\\skills\\'), '\\\\serveur\\partage\\skills');
+    assert.strictEqual(normalizeNetworkPath('//serveur/partage/skills'), '\\\\serveur\\partage\\skills');
     assert.strictEqual(normalizeNetworkPath('Z:\\skills\\'), 'Z:\\skills');
     assert.strictEqual(normalizeNetworkPath('/Volumes/nas/skills/'), '/Volumes/nas/skills');
     assert.strictEqual(normalizeNetworkPath('/mnt//nas///skills'), '/mnt/nas/skills');
@@ -366,9 +366,9 @@ describe('Suite de Tests : Réglages des registres et du répertoire NAS', () =>
 
   test("19. Précédence du chemin NAS : l'espace de travail prime sur l'utilisateur", () => {
     const config = new FakeConfiguration();
-    config.user.set(NAS_DIRECTORY_SETTING, '\\\\Nas1\\DD2\\IA\\skills');
+    config.user.set(NAS_DIRECTORY_SETTING, '\\\\serveur\\partage\\skills');
     const service = new NasPathService(config, undefined, {} as NodeJS.ProcessEnv);
-    assert.strictEqual(service.getEffectivePath(), '\\\\Nas1\\DD2\\IA\\skills');
+    assert.strictEqual(service.getEffectivePath(), '\\\\serveur\\partage\\skills');
 
     config.workspace.set(NAS_DIRECTORY_SETTING, 'Z:\\equipe\\skills');
     assert.strictEqual(service.getEffectivePath(), 'Z:\\equipe\\skills');
@@ -454,7 +454,7 @@ describe('Suite de Tests : Réglages des registres et du répertoire NAS', () =>
   });
 
   test("22. Hôte UNC : le nom de serveur est extrait d'un chemin réseau Windows", () => {
-    assert.strictEqual(NasPathService.getUncHost('\\\\Nas1\\DD2\\IA'), 'nas1');
+    assert.strictEqual(NasPathService.getUncHost('\\\\serveur\\partage'), 'serveur');
     assert.strictEqual(NasPathService.getUncHost('//Serveur/partage'), 'serveur');
     assert.strictEqual(NasPathService.getUncHost('Z:\\skills'), null);
     assert.strictEqual(NasPathService.getUncHost(''), null);

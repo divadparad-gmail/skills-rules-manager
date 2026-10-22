@@ -97,7 +97,7 @@ code --install-extension {package-name}-{version}.vsix
 
 | Paramètre | Type | Valeur par défaut | Description |
 | :--- | :--- | :--- | :--- |
-| `skillsManager.nasPath` | `string` | `\\\\Nas1\\DD2\\IA\\Antigravity-Templates` | Chemin UNC vers le catalogue maître NAS |
+| `skillsManager.nasPath` | `string` | `""` | Chemin UNC ou local du catalogue maître NAS, par exemple `\\serveur\partage\catalogue`. Laisser vide sans catalogue |
 | `skillsManager.globalPath` | `string` | `""` (auto-détecté `~/.gemini/config`) | Emplacement des compétences globales Antigravity |
 | `skillsManager.claudeGlobalPath` | `string` | `""` (auto-détecté `~/.claude`) | Emplacement des compétences Claude Code |
 | `skillsManager.defaultProjectTool` | `enum` | `"auto-detect"` | Outil cible local (`auto-detect`, `antigravity`, `claude-code`) |

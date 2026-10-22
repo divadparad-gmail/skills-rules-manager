@@ -22,7 +22,7 @@ Il garantit le respect de trois piliers fondamentaux :
 - **Validation Interactive Obligatoire** :
   - *Cas A* : Confirmer le nom du dépôt, sa visibilité (`--public` ou `--private`) et sa description.
   - *Cas B* : Confirmer la version cible (ex: `v0.3.8`), la synthèse des nouveautés et les notes de release.
-- **Règle de Confinement N0/N1/N2/N3** : Toute modification apportée à ce workflow dans `.agents/skills/wf-github-publish/` est automatiquement synchronisée avec le catalogue global machine (`~/.gemini/config/skills/`) et le coffre-fort NAS maître (`\\Nas1\DD2\IA\Antigravity-Templates\skills\`).
+- **Règle de Confinement N0/N1/N2/N3** : Toute modification apportée à ce workflow dans `.agents/skills/wf-github-publish/` est automatiquement synchronisée avec le catalogue global machine (`~/.gemini/config/skills/`) et le coffre-fort NAS maître (`\\serveur\partage\catalogue\skills\`).
 
 ---
 

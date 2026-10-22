@@ -193,7 +193,7 @@ export class NasPathService {
     return this.validatePath();
   }
 
-  /** Extrait le nom d'hôte d'un chemin UNC, par exemple `\\Nas1\DD2` → `nas1`. */
+  /** Extrait le nom d'hôte d'un chemin UNC, par exemple `\\serveur\partage` → `serveur`. */
   public static getUncHost(targetPath: string): string | null {
     if (!targetPath) return null;
     const normalized = targetPath.replace(/\//g, '\\');

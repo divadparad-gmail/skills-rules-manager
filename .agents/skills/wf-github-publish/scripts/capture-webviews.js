@@ -60,7 +60,7 @@ const vsCodeThemeVars = `
 const realisticState = {
   nasStatus: {
     online: true,
-    path: "\\\\Nas1\\DD2\\IA\\Antigravity-Templates",
+    path: "\\\\serveur\\partage\\catalogue",
     checkedAt: Date.now()
   },
   workspace: {
@@ -94,7 +94,7 @@ const realisticState = {
       scope: "nas",
       enabled: true,
       lineCount: 45,
-      path: "\\\\Nas1\\DD2\\IA\\Antigravity-Templates\\GEMINI.md",
+      path: "\\\\serveur\\partage\\catalogue\\GEMINI.md",
       syncStatus: "synced",
       metadata: { isSoul: true, locked: true }
     },
@@ -106,7 +106,7 @@ const realisticState = {
       scope: "nas",
       enabled: true,
       lineCount: 35,
-      path: "\\\\Nas1\\DD2\\IA\\Antigravity-Templates\\rules\\01-rule-perm-standard-always-on.md",
+      path: "\\\\serveur\\partage\\catalogue\\rules\\01-rule-perm-standard-always-on.md",
       syncStatus: "synced",
       metadata: { isPermanent: true }
     },
@@ -118,7 +118,7 @@ const realisticState = {
       scope: "nas",
       enabled: true,
       lineCount: 68,
-      path: "\\\\Nas1\\DD2\\IA\\Antigravity-Templates\\skills\\skill-brainstorming\\SKILL.md",
+      path: "\\\\serveur\\partage\\catalogue\\skills\\skill-brainstorming\\SKILL.md",
       syncStatus: "synced"
     },
     {
@@ -129,19 +129,19 @@ const realisticState = {
       scope: "nas",
       enabled: true,
       lineCount: 91,
-      path: "\\\\Nas1\\DD2\\IA\\Antigravity-Templates\\skills\\wf-commit\\SKILL.md",
+      path: "\\\\serveur\\partage\\catalogue\\skills\\wf-commit\\SKILL.md",
       syncStatus: "synced",
       metadata: { isWorkflow: true }
     },
     {
       id: "wf-deploy",
       name: "wf-deploy",
-      description: "Action : Déploiement sécurisé GitHub avec webhook Coolify",
+      description: "Action : Déploiement sécurisé en production par webhook",
       type: "skill",
       scope: "nas",
       enabled: true,
       lineCount: 53,
-      path: "\\\\Nas1\\DD2\\IA\\Antigravity-Templates\\skills\\wf-deploy\\SKILL.md",
+      path: "\\\\serveur\\partage\\catalogue\\skills\\wf-deploy\\SKILL.md",
       syncStatus: "synced",
       metadata: { isWorkflow: true }
     }
@@ -311,7 +311,7 @@ function buildDashboardHtml() {
   let html = tpl
     .replace(/<meta http-equiv="Content-Security-Policy"[^>]*>/i, '')
     .replace(/<link rel="stylesheet" href="\{\{styleUri\}\}">/i, `<style>${stylesCss}\n${vsCodeThemeVars}</style>`)
-    .replace('{{version}}', 'v0.3.0');
+    .replace('{{version}}', 'v0.4.0');
 
   const injectScript = `
   <script>
@@ -345,7 +345,7 @@ function buildSidebarHtml() {
   let html = tpl
     .replace(/<meta http-equiv="Content-Security-Policy"[^>]*>/i, '')
     .replace(/<link rel="stylesheet" href="\{\{styleUri\}\}">/i, `<style>${stylesCss}\n${vsCodeThemeVars}</style>`)
-    .replace('{{version}}', 'v0.3.0');
+    .replace('{{version}}', 'v0.4.0');
 
   const injectScript = `
   <script>
@@ -379,7 +379,7 @@ function buildCheatSheetHtml() {
   let html = tpl
     .replace(/<meta http-equiv="Content-Security-Policy"[^>]*>/i, '')
     .replace(/<link rel="stylesheet" href="\{\{styleUri\}\}">/i, `<style>${stylesCss}\n${vsCodeThemeVars}</style>`)
-    .replace('{{version}}', 'v0.3.0');
+    .replace('{{version}}', 'v0.4.0');
 
   const injectScript = `
   <script>

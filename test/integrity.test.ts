@@ -531,8 +531,8 @@ describe('Suite de Tests : Intégrité & Synchronisation NAS vs Local', () => {
 
   test('17. Extraction hôte UNC : extrait correctement l\'hôte du NAS pour security.allowedUNCHosts', async () => {
     const { NasScanner } = await import('../src/services/NasScanner');
-    assert.strictEqual(NasScanner.getUncHost('\\\\Nas1\\DD2\\IA\\Templates'), 'nas1');
-    assert.strictEqual(NasScanner.getUncHost('//NAS1/share/folder'), 'nas1');
+    assert.strictEqual(NasScanner.getUncHost('\\\\serveur\\partage\\catalogue'), 'serveur');
+    assert.strictEqual(NasScanner.getUncHost('//SERVEUR/partage/dossier'), 'serveur');
     assert.strictEqual(NasScanner.getUncHost('C:\\Users\\LocalUser'), null);
   });
 
@@ -895,7 +895,7 @@ globs: "*.ts"
   });
 
   test('26. Détection et Import de l\'Âme Réseau (GEMINI.md) via NasScanner et ImportService', async () => {
-    const testNas = path.join(tempBaseDir, 'Antigravity-Templates');
+    const testNas = path.join(tempBaseDir, 'catalogue');
     const testWorkspace = path.join(tempBaseDir, 'ws-soul-test');
     const backupCerveauDir = path.join(tempBaseDir, 'backup_cerveau_ia', '.gemini');
 
@@ -2142,7 +2142,7 @@ Corps du texte.`;
     );
 
     // 3. Vérification de l'intégrité visuelle du chemin UNC
-    const sampleUnc = '\\\\Nas1\\DD2\\IA\\Antigravity-Templates';
+    const sampleUnc = '\\\\serveur\\partage\\catalogue';
     assert.strictEqual(sampleUnc.startsWith('\\\\'), true, 'Le chemin UNC doit commencer par \\\\');
     assert.strictEqual(sampleUnc.endsWith('\\\\'), false, 'Le chemin UNC ne doit pas avoir ses antislashs déplacés en fin');
   });

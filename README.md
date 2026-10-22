@@ -217,10 +217,10 @@ Le panneau latéral s'ouvre depuis son icône dans la barre d'activité. Dans la
 
 ## 🧪 Tests & Qualité de Code
 
-Le projet est couvert par une suite de 178 tests unitaires automatisés validant la synchronisation de données, l'intégrité, l'isolation bi-moteur, le Coach IA, le médiateur d'événements, la détection d'environnement, la recherche fédérée, les favoris hors ligne et le pipeline de déploiement :
+Le projet est couvert par une suite de tests unitaires automatisés validant la synchronisation de données, l'intégrité, l'isolation bi-moteur, le Coach IA, le médiateur d'événements, la détection d'environnement, la recherche fédérée, les favoris hors ligne et le pipeline de déploiement :
 
 ```bash
-npm test          # contrôle syntaxique des vues, compilation et 178 tests
+npm test          # contrôle syntaxique des vues, compilation et tests unitaires
 npm run type-check # vérification de types stricte, sans émission
 npm run bundle     # paquet de production esbuild (dist/extension.js)
 npm run package    # archive .vsix distribuable

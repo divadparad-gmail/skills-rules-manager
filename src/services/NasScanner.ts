@@ -14,7 +14,7 @@ try {
 
 export class NasScanner {
   /**
-   * Extrait le nom d'hôte d'un chemin UNC (ex: "\\Nas1\share" -> "nas1")
+   * Extrait le nom d'hôte d'un chemin UNC (ex: "\\serveur\partage" -> "serveur")
    */
   public static getUncHost(targetPath: string): string | null {
     if (!targetPath) return null;
