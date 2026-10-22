@@ -62,7 +62,7 @@ describe('Suite de Tests : Chaîne de construction et contributions du manifeste
     const views = pkg.contributes.views['skills-rules-manager-sidebar'];
     const discovery = views.find((view: any) => view.id === 'antigravityDiscoveryView');
 
-    assert.ok(discovery, 'La vue Découverte doit être déclarée.');
+    assert.ok(discovery, 'La vue Découverte doit être déclarée, même désactivée.');
     assert.strictEqual(discovery.type, 'webview');
     assert.ok(
       views.some((view: any) => view.id === 'skillsRulesManagerView'),
@@ -254,5 +254,46 @@ describe('Suite de Tests : Chaîne de construction et contributions du manifeste
       assert.ok(!content.includes('antigravity.dev'), `${file} ne doit plus viser registry.antigravity.dev.`);
       assert.ok(!content.includes('DEFAULT_REGISTRY'), `${file} ne doit plus déclarer de registre implicite.`);
     }
+  });
+
+  test('16. Vue Découverte expérimentale : désactivée par défaut, avec sa vue, ses commandes et ses raccourcis', () => {
+    const pkg = readPackageJson();
+    const condition = 'config.antigravity.discovery.enabled';
+
+    const setting = pkg.contributes.configuration.properties['antigravity.discovery.enabled'];
+    assert.ok(setting, 'Le réglage antigravity.discovery.enabled doit être déclaré.');
+    assert.strictEqual(setting.type, 'boolean');
+    assert.strictEqual(setting.default, false, 'La vue Découverte est désactivée par défaut.');
+    assert.deepStrictEqual(setting.tags, ['experimental']);
+    assert.match(setting.markdownDescription, /Expérimental/);
+
+    const view = pkg.contributes.views['skills-rules-manager-sidebar'].find(
+      (entry: any) => entry.id === 'antigravityDiscoveryView'
+    );
+    assert.strictEqual(view.when, condition, 'La vue ne doit apparaître que si le réglage est activé.');
+
+    const discoveryCommands = [
+      'antigravity.discovery.focusSearch',
+      'antigravity.discovery.quickSearch',
+      'antigravity.discovery.quickDeploy',
+      'antigravity.environment.override',
+      'antigravity.environment.diagnostics',
+      'antigravity.skills.setGeminiKey',
+    ];
+    const palette = new Map(pkg.contributes.menus.commandPalette.map((entry: any) => [entry.command, entry.when]));
+    discoveryCommands.forEach((command) => {
+      assert.strictEqual(palette.get(command), condition, `« ${command} » doit être masquée de la palette.`);
+    });
+
+    pkg.contributes.keybindings
+      .filter((entry: any) => discoveryCommands.includes(entry.command))
+      .forEach((entry: any) => {
+        assert.strictEqual(entry.when, condition, `Le raccourci de « ${entry.command} » doit être inactif.`);
+      });
+
+    // Le badge d'environnement de la barre d'état suit le même réglage
+    const extensionSource = fs.readFileSync(path.join(ROOT, 'src', 'extension.ts'), 'utf8');
+    assert.match(extensionSource, /environmentStatusBar\.activate\(isDiscoveryEnabled\(\)\)/);
+    assert.match(extensionSource, /affectsConfiguration\(DISCOVERY_ENABLED_SETTING\)/);
   });
 });

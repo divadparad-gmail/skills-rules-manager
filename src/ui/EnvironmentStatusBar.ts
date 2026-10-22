@@ -37,10 +37,19 @@ export class EnvironmentStatusBar implements vscode.Disposable {
     this.item.command = 'antigravity.environment.override';
   }
 
-  /** Affiche le badge et publie le verdict initial sur le bus. */
-  public activate(): void {
+  /** Publie le verdict initial sur le bus, puis affiche le badge s'il doit être visible. */
+  public activate(visible = true): void {
     this.refresh();
-    this.item.show();
+    this.setVisible(visible);
+  }
+
+  /** Affiche ou masque le badge, qui suit le réglage expérimental de la vue Découverte. */
+  public setVisible(visible: boolean): void {
+    if (visible) {
+      this.item.show();
+    } else {
+      this.item.hide();
+    }
   }
 
   /**

@@ -49,7 +49,8 @@
         {
           "type": "webview",
           "id": "antigravityDiscoveryView",
-          "name": "Découverte & Intégration"
+          "name": "Découverte & Intégration",
+          "when": "config.antigravity.discovery.enabled"
         }
       ]
     },
@@ -125,6 +126,32 @@
       }
     ],
     "menus": {
+      "commandPalette": [
+        {
+          "command": "antigravity.discovery.focusSearch",
+          "when": "config.antigravity.discovery.enabled"
+        },
+        {
+          "command": "antigravity.discovery.quickSearch",
+          "when": "config.antigravity.discovery.enabled"
+        },
+        {
+          "command": "antigravity.discovery.quickDeploy",
+          "when": "config.antigravity.discovery.enabled"
+        },
+        {
+          "command": "antigravity.environment.override",
+          "when": "config.antigravity.discovery.enabled"
+        },
+        {
+          "command": "antigravity.environment.diagnostics",
+          "when": "config.antigravity.discovery.enabled"
+        },
+        {
+          "command": "antigravity.skills.setGeminiKey",
+          "when": "config.antigravity.discovery.enabled"
+        }
+      ],
       "view/title": [
         {
           "command": "skillsRulesManager.openDashboard",
@@ -170,6 +197,14 @@
           "type": "boolean",
           "default": false,
           "description": "Active la mesure et le journal de performance des scans et de la tokenisation dans le canal de sortie 'Skills & Rules Manager'"
+        },
+        "antigravity.discovery.enabled": {
+          "type": "boolean",
+          "default": false,
+          "tags": [
+            "experimental"
+          ],
+          "markdownDescription": "**Expérimental.** Active la vue « Découverte & Intégration » : recherche dans des registres de ressources et installation après aperçu et confirmation. Nécessite un registre compatible (aucun registre public à ce jour), déclaré dans `#antigravity.skills.searchUrls#`. Désactivé, la vue, son badge d'environnement, ses commandes et ses raccourcis sont masqués."
         },
         "antigravity.skills.searchUrls": {
           "type": "array",
@@ -340,17 +375,20 @@
       {
         "command": "antigravity.discovery.focusSearch",
         "key": "ctrl+alt+s",
-        "mac": "cmd+alt+s"
+        "mac": "cmd+alt+s",
+        "when": "config.antigravity.discovery.enabled"
       },
       {
         "command": "antigravity.discovery.quickSearch",
         "key": "ctrl+alt+k",
-        "mac": "cmd+alt+k"
+        "mac": "cmd+alt+k",
+        "when": "config.antigravity.discovery.enabled"
       },
       {
         "command": "antigravity.environment.override",
         "key": "ctrl+alt+e",
-        "mac": "cmd+alt+e"
+        "mac": "cmd+alt+e",
+        "when": "config.antigravity.discovery.enabled"
       }
     ]
   },

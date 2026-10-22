@@ -88,14 +88,17 @@ Lorsqu'on orchestre des agents IA modernes (Google Antigravity, Claude Code), l'
 - Détection asynchrone non-bloquante avec timeout court.
 - En cas de déconnexion du NAS, l'interface affiche élégamment l'état `⚠️ NAS Hors Ligne` sans bloquer le travail sur le projet local ou global.
 
-### 5. Découverte & Intégration de Ressources Externes
+### 5. Découverte & Intégration de Ressources Externes (expérimental, désactivé par défaut)
+
+Voir [Fonctionnalités expérimentales](#-fonctionnalités-expérimentales) pour l'activer.
+
 - **Recherche sémantique** : décrivez en langage naturel ce que vous cherchez (« extraire des tableaux dynamiques derrière une authentification ») ; le moteur déconstruit l'intention, la pile technique visée et les contraintes, puis explique pourquoi chaque résultat correspond. Sans clé Gemini, une analyse lexicale locale prend le relais : la recherche reste utilisable hors ligne.
 - **Recherche fédérée multi-registres** : les registres que vous avez configurés sont interrogés en parallèle sous plafond de concurrence, les réponses agrégées, puis dédoublonnées — la source de plus haute priorité l'emporte et les autres sont citées en badge. Un registre lent ou en panne n'interrompt jamais la recherche. Aucun registre n'est interrogé implicitement : tant qu'aucun n'est configuré, la description saisie ne part vers aucun serveur.
 - **Trois cibles d'intégration** : chaque fiche porte les actions « Intégrer au projet local », « Intégrer au NAS » et « Intégrer au projet global ». La destination réelle suit l'agent détecté (`.agents/` pour Anti-Gravity, `.claude/` pour Claude Code) et la politique de conflit choisie (demander, écraser ou incrémenter). Avant toute écriture, le manifeste est affiché en lecture seule et une confirmation explicite est demandée. Un hook n'est pas installé vers Antigravity : il se déclare dans `.agents/hooks.json` et lance des commandes shell, à ajouter soi-même après avoir relu la commande.
 - **Favoris hors ligne** : les ressources mises en favori conservent leur manifeste en cache local, consultable et déployable sans réseau, avec étiquettes personnelles, export et import de collections.
 - **Historique des recherches** : requêtes conservées dans deux portées (projet et machine), éviction du moins récemment utilisé, pastilles de rappel rapide et saisie semi-automatique. Rien ne quitte la machine.
 
-### 6. Détection d'Environnement Adaptative
+### 6. Détection d'Environnement Adaptative (avec la vue Découverte)
 - **Hôte** : une matrice heuristique à cinq signaux (métadonnées applicatives, `product.json`, chemin du binaire, variables d'environnement, socket locale) attribue un score sur 120 ; au-delà de 60 points, l'extension bascule en mode natif Anti-Gravity. La sonde est bornée à moins de 50 ms et n'interrompt jamais l'amorçage.
 - **Agent** : les variables d'environnement et les marqueurs de l'espace de travail départagent Anti-Gravity de Claude Code, et les manifestes sont traduits en conséquence (frontmatter, déclarations d'outils MCP, commandes slash).
 - **Dérogation manuelle** : le badge de la barre d'état ouvre un sélecteur de mode, et la commande de diagnostics détaille chaque signal avec son score brut.
@@ -104,6 +107,16 @@ Lorsqu'on orchestre des agents IA modernes (Google Antigravity, Claude Code), l'
 - Les vues sont des composants autonomes : aucune ne détient de référence vers une autre, toutes les interactions passent par un médiateur typé (`ExtensionEventBus`) à enveloppe normalisée.
 - Une vue repliée ne perd rien : ses messages sont mis en file circulaire bornée puis rejoués à sa réapparition, après un instantané d'état qui élimine tout affichage périmé.
 - Un abonné fautif ne fait jamais tomber l'hôte d'extension : son erreur part en file de lettres mortes et la diffusion se poursuit vers les vues voisines.
+
+---
+
+## 🧪 Fonctionnalités expérimentales
+
+La vue « Découverte & Intégration » (sections 5 et 6) est **expérimentale et désactivée par défaut**. Elle recherche des ressources dans des registres et les installe après aperçu et confirmation. Elle nécessite un registre compatible, et aucun registre public n'existe à ce jour.
+
+Pour l'essayer, activez le réglage `antigravity.discovery.enabled`, puis déclarez un registre dans l'onglet Réglages de la vue. Tant que ce réglage est désactivé, la vue, son badge d'environnement dans la barre d'état, ses commandes et ses raccourcis restent masqués, et aucune requête n'est envoyée.
+
+Des limites connues, comme la destination absente de la fenêtre de confirmation, seront levées avant sa sortie de la phase expérimentale.
 
 ---
 
@@ -132,6 +145,7 @@ code --install-extension skills-rules-manager-0.3.5.vsix
 | `skillsManager.claudeGlobalPath` | `string` | `""` (auto-détecté `~/.claude`) | Emplacement des compétences Claude Code |
 | `skillsManager.defaultProjectTool` | `enum` | `"auto-detect"` | Outil cible local (`auto-detect`, `antigravity`, `claude-code`) |
 | `skillsManager.debugTiming` | `boolean` | `false` | Mesure et journal de performance des scans et de la tokenisation |
+| `antigravity.discovery.enabled` | `boolean` | `false` | **Expérimental.** Active la vue « Découverte & Intégration » ; les réglages `antigravity.*` suivants ne servent qu'à elle |
 | `antigravity.skills.searchUrls` | `array` | `[]` | Registres interrogés lors de la recherche fédérée (identifiant, nom, URL, priorité, authentification, délai, catégories servies). C'est la seule source de la recherche : aucun registre par défaut n'est interrogé |
 | `antigravity.skills.requestTimeoutMs` | `number` | `5000` | Délai d'attente de repli des requêtes de registres (1 000 à 30 000 ms) |
 | `antigravity.skills.maxParallelRegistryQueries` | `number` | `5` | Nombre maximal de registres interrogés simultanément |
@@ -149,7 +163,7 @@ code --install-extension skills-rules-manager-0.3.5.vsix
 
 ## 🔒 Sécurité
 
-La découverte de ressources fait entrer du contenu tiers dans le contexte de votre agent et envoie vos descriptions de recherche à des serveurs. Les garde-fous suivants s'appliquent.
+La découverte de ressources (vue expérimentale, désactivée par défaut) fait entrer du contenu tiers dans le contexte de votre agent et envoie vos descriptions de recherche à des serveurs. Les garde-fous suivants s'appliquent.
 
 ### Registres définis par un dépôt
 
@@ -187,6 +201,9 @@ Accessibles depuis la palette de commandes (`Ctrl+Shift+P` / `Cmd+Shift+P`) :
 - `Skills & Rules Manager: Désactiver tous les Workflows (wf-*)`
 - `Skills & Rules Manager: Activer tous les Skills`
 - `Skills & Rules Manager: Autoriser l'hôte NAS (UNC) dans la sécurité VS Code`
+
+Les commandes « Anti-Gravity » suivantes et leurs raccourcis appartiennent à la vue Découverte : ils n'apparaissent que si le réglage expérimental `antigravity.discovery.enabled` est activé.
+
 - `Anti-Gravity: Rechercher une compétence, une règle, un workflow ou un hook` — `Ctrl+Alt+S` / `Cmd+Alt+S`
 - `Anti-Gravity: Palette de recherche rapide des compétences` — `Ctrl+Alt+K` / `Cmd+Alt+K`
 - `Anti-Gravity: Déployer rapidement une compétence favorite`

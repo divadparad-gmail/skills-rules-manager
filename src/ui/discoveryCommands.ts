@@ -18,6 +18,17 @@ import { GEMINI_API_KEY_SECRET } from '../search/GeminiClient';
 import { ReviewableResource, reviewAndDeploy } from '../deploy/deployReview';
 import { createVsCodeDeployReview, currentDeployEnvironment } from './vscodeDeployReview';
 
+/**
+ * Réglage expérimental qui active la vue Découverte. Désactivé, il masque la vue et le badge
+ * d'environnement ; les commandes et raccourcis sont rendus inactifs par les clauses `when`
+ * de package.json.
+ */
+export const DISCOVERY_ENABLED_SETTING = 'antigravity.discovery.enabled';
+
+export function isDiscoveryEnabled(): boolean {
+  return vscode.workspace.getConfiguration().get<boolean>(DISCOVERY_ENABLED_SETTING, false) === true;
+}
+
 const TARGET_LABELS: Array<{ target: DeployTarget; label: string; detail: string }> = [
   {
     target: 'local',

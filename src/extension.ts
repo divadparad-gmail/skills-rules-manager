@@ -10,7 +10,12 @@ import { createDiscoveryContainer } from './common/container';
 import { extensionEventBus } from './common/ExtensionEventBus';
 import { DiscoveryViewProvider } from './ui/DiscoveryViewProvider';
 import { EnvironmentStatusBar } from './ui/EnvironmentStatusBar';
-import { registerDiscoveryCommands, refreshFavoritesContextKey } from './ui/discoveryCommands';
+import {
+  DISCOVERY_ENABLED_SETTING,
+  isDiscoveryEnabled,
+  registerDiscoveryCommands,
+  refreshFavoritesContextKey,
+} from './ui/discoveryCommands';
 import { registerManifestPreview } from './ui/vscodeDeployReview';
 import { HostEnvironmentDetector } from './environment/HostEnvironmentDetector';
 import { AgentRuntimeDetector } from './environment/AgentRuntimeDetector';
@@ -125,9 +130,17 @@ export function activate(context: vscode.ExtensionContext): void {
     )
   );
 
+  // Le module est expérimental et désactivé par défaut : son badge d'environnement suit le réglage
   const environmentStatusBar = new EnvironmentStatusBar(container.bus);
-  environmentStatusBar.activate();
-  context.subscriptions.push(environmentStatusBar);
+  environmentStatusBar.activate(isDiscoveryEnabled());
+  context.subscriptions.push(
+    environmentStatusBar,
+    vscode.workspace.onDidChangeConfiguration((event) => {
+      if (event.affectsConfiguration(DISCOVERY_ENABLED_SETTING)) {
+        environmentStatusBar.setVisible(isDiscoveryEnabled());
+      }
+    })
+  );
 
   registerDiscoveryCommands(context, container, discoveryProvider, environmentStatusBar);
   // Aperçu en lecture seule des manifestes, montré avant toute installation.
