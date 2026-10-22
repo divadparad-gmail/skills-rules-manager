@@ -14,7 +14,7 @@
 
 [ [⬇️ Télécharger la v0.3.12 (.vsix)](https://github.com/divadparad-gmail/skills-rules-manager/releases/latest) ] •
 [ [🐛 Signaler un problème](https://github.com/divadparad-gmail/skills-rules-manager/issues) ] •
-[ [📖 Guide des Bonnes Pratiques IA](#-guide--bonnes-pratiques-ia-intégré) ]
+[ [📖 Guide des Bonnes Pratiques IA](#4-coach-ia--alertes-de-surcharge) ]
 
 </div>
 
