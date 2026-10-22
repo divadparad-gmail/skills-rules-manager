@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { AntigravityParentsInfo, ResourceItem, ResourceType, TokenCategoryStat, WorkspaceContext } from '../types';
+import { AntigravityParentsInfo, ResourceItem, TokenCategoryStat, WorkspaceContext } from '../types';
 import {
   extractFrontmatter,
   extractMarkdownTitleAndSummary,
@@ -10,13 +10,15 @@ import { countTokens, countTokensForFile } from '../utils/tokenizer';
 import { measureAntigravitySoul } from '../utils/antigravityRules';
 import { ScenarioManager } from './ScenarioManager';
 import { appliesInAntigravity, buildAntigravityRuleItem, countsAtBoot, hasResourceWarning } from './antigravityRuleItem';
+import { buildAntigravitySkillItem, listSkillFolders, pluginSectionHeadersTokens } from './antigravitySkillItem';
+import { antigravityRulesBootStat, truncationSummary } from './antigravityBootCost';
 import {
   ANTIGRAVITY_AGENT_DIRS,
   collectRulesJsonFiles,
   findNestedRuleSources,
   listFlatRuleFiles,
 } from './antigravityRuleSources';
-import { findParentRuleDirs, PARENT_RULES_DIR, PARENT_SOUL_FILES } from '../antigravity/behavior';
+import { findParentRuleDirs, LEGACY_WORKSPACE_SKILLS_DIR, PARENT_RULES_DIR, PARENT_SOUL_FILES } from '../antigravity/behavior';
 
 export class LocalScanner {
   /**
@@ -55,16 +57,18 @@ export class LocalScanner {
     const targetTool = workspace.tool;
     let antigravityParents: AntigravityParentsInfo | undefined;
     const parentSoulCandidates: Array<{ file: string; tool: 'antigravity'; absolutePath: string; inheritedFrom: string }> = [];
+    /** Dossier de chaque plugin local, pour l'en-tête de sa section (F6). */
+    const pluginRoots = new Map<string, string>();
 
-    // Cumul des caractères des règles chargées au démarrage (règles ignorées et règles de dossier exclues)
+    // Cumul des caractères injectés au démarrage par les règles Antigravity (F1, F3 ; 0 pour glob
+    // et manual) ; règles ignorées et règles de dossier exclues
     const accountRule = (item: ResourceItem) => {
       if (!countsAtBoot(item) || !item.charCount) return;
+      rulesCharTotal += item.metadata?.bootCharCount ?? 0;
       if (item.metadata?.isConditional) {
-        rulesCharTotal += 80; // Métadonnées au boot
         rulesConditionalCharTotal += item.charCount;
         rulesConditionalCount++;
       } else {
-        rulesCharTotal += item.charCount;
         rulesPermanentCount++;
       }
     };
@@ -75,89 +79,22 @@ export class LocalScanner {
       const agentsDir = path.isAbsolute(agentsDirName) ? agentsDirName : path.join(rootPath, agentsDirName);
 
       if (fs.existsSync(agentsDir)) {
-        // Skills locaux
+        // Skills locaux, et l'ancien emplacement .agent/skills (documenté, chargement non vérifié)
         const skillsDir = path.join(agentsDir, 'skills');
         skillsDirFound = skillsDir;
+        const legacySkillsDir = path.join(rootPath, LEGACY_WORKSPACE_SKILLS_DIR);
+        const skillDirs = path.resolve(skillsDir) === path.resolve(legacySkillsDir) ? [legacySkillsDir] : [skillsDir, legacySkillsDir];
 
-        if (fs.existsSync(skillsDir)) {
-          try {
-            const entries = await fs.promises.readdir(skillsDir, { withFileTypes: true });
-            for (const entry of entries) {
-              if (!entry.isDirectory()) continue;
-
-              const itemFolder = path.join(skillsDir, entry.name);
-              const skillMd = path.join(itemFolder, 'SKILL.md');
-              const skillMdDisabled = path.join(itemFolder, 'SKILL.md.disabled');
-
-              const isEnabled = fs.existsSync(skillMd);
-              const isDisabled = fs.existsSync(skillMdDisabled);
-
-              if (!isEnabled && !isDisabled) continue;
-
-              const activeFile = isEnabled ? skillMd : skillMdDisabled;
-              let description = '';
-              let name = entry.name;
-              let tags: string[] = [];
-              let rawSkillContent = '';
-              let fileStat: fs.Stats | null = null;
-
-              try {
-                fileStat = await fs.promises.stat(activeFile);
-                rawSkillContent = await fs.promises.readFile(activeFile, 'utf8');
-                const { metadata } = extractFrontmatter(rawSkillContent);
-                if (metadata.name && typeof metadata.name === 'string') {
-                  name = metadata.name;
-                }
-                if (metadata.description && typeof metadata.description === 'string') {
-                  description = metadata.description;
-                }
-                if (Array.isArray(metadata.tags)) {
-                  tags = metadata.tags;
-                }
-              } catch {
-                // Lecture fallback
-              }
-
-              const lineCount = rawSkillContent ? rawSkillContent.split(/\r\n|\r|\n/).length : 0;
-              const isWarningLines = lineCount > 500;
-              const isWarningSize = rawSkillContent.length > 24000;
-              const isWarningNoDesc = !description || description.trim().length === 0;
-
-              const isWorkflow = entry.name.startsWith('wf-') || name.startsWith('wf-');
-              const type: ResourceType = isWorkflow ? 'workflow' : 'skill';
-
-              const discoverySignature = `name: ${name}\ndescription: ${description}\npath: ${activeFile}\n`;
-              const charCount = discoverySignature.length;
-              const tokenCount = countTokensForFile(activeFile, fileStat?.size, fileStat?.mtimeMs, discoverySignature);
-
-              if (isEnabled) {
-                skillsCharTotal += charCount;
-              }
-
-              items.push({
-                id: entry.name,
-                name,
-                description: description || (isWorkflow ? 'Workflow local projet' : 'Compétence locale projet'),
-                type,
-                scope: 'local',
-                enabled: isEnabled,
-                path: itemFolder,
-                targetTool: 'antigravity',
-                isFolder: true,
-                charCount,
-                tokenCount,
-                lineCount,
-                metadata: {
-                  tags,
-                  hasDisabledSuffix: isDisabled,
-                  warningLinesExceeded: isWarningLines,
-                  warningSizeExceeded: isWarningSize,
-                  warningNoDescription: isWarningNoDesc,
-                },
-              });
-            }
-          } catch {
-            // Ignorer
+        for (const dir of skillDirs) {
+          const legacy = path.resolve(dir) === path.resolve(legacySkillsDir);
+          for (const folder of await listSkillFolders(dir)) {
+            const skillItem = await buildAntigravitySkillItem(folder, {
+              scope: 'local',
+              fallbackDescription: (isWorkflow) => (isWorkflow ? 'Workflow local projet' : 'Compétence locale projet'),
+              ...(legacy ? { idPrefix: '.agent/', legacyLocation: true } : {}),
+            });
+            if (skillItem.enabled) skillsCharTotal += skillItem.charCount || 0;
+            items.push(skillItem);
           }
         }
 
@@ -222,71 +159,17 @@ export class LocalScanner {
             for (const pFolder of pluginFolders) {
               if (!pFolder.isDirectory()) continue;
               const pPath = path.join(pluginsDir, pFolder.name);
+              pluginRoots.set(pFolder.name, pPath);
 
-              // 1. Skills du plugin
-              const pSkillsDir = path.join(pPath, 'skills');
-              if (fs.existsSync(pSkillsDir)) {
-                try {
-                  const pSkillEntries = await fs.promises.readdir(pSkillsDir, { withFileTypes: true });
-                  for (const sEntry of pSkillEntries) {
-                    if (!sEntry.isDirectory()) continue;
-                    const sFolder = path.join(pSkillsDir, sEntry.name);
-                    const sMd = path.join(sFolder, 'SKILL.md');
-                    const sMdDis = path.join(sFolder, 'SKILL.md.disabled');
-                    const isEn = fs.existsSync(sMd);
-                    const isDis = fs.existsSync(sMdDis);
-                    if (!isEn && !isDis) continue;
-
-                    const actFile = isEn ? sMd : sMdDis;
-                    let desc = '';
-                    let sName = sEntry.name;
-                    let rawContent = '';
-                    let sStat: fs.Stats | null = null;
-                    try {
-                      sStat = await fs.promises.stat(actFile);
-                      rawContent = await fs.promises.readFile(actFile, 'utf8');
-                      const { metadata } = extractFrontmatter(rawContent);
-                      if (metadata.name && typeof metadata.name === 'string') sName = metadata.name;
-                      if (metadata.description && typeof metadata.description === 'string') desc = metadata.description;
-                    } catch {
-                      // Ignorer
-                    }
-
-                    const lineCount = rawContent ? rawContent.split(/\r\n|\r|\n/).length : 0;
-                    const isWarnLines = lineCount > 500;
-                    const isWarnSize = rawContent.length > 24000;
-                    const isWarnNoDesc = !desc || desc.trim().length === 0;
-
-                    const discoverySig = `name: ${sName}\ndescription: ${desc}\npath: ${actFile}\n`;
-                    const cCount = discoverySig.length;
-                    const tCount = countTokensForFile(actFile, sStat?.size, sStat?.mtimeMs, discoverySig);
-                    if (isEn) skillsCharTotal += cCount;
-
-                    items.push({
-                      id: `${pFolder.name}:${sEntry.name}`,
-                      name: `${sName} [Plugin: ${pFolder.name}]`,
-                      description: desc || `Compétence du plugin ${pFolder.name}`,
-                      type: sEntry.name.startsWith('wf-') ? 'workflow' : 'skill',
-                      scope: 'local',
-                      enabled: isEn,
-                      path: sFolder,
-                      targetTool: 'antigravity',
-                      isFolder: true,
-                      charCount: cCount,
-                      tokenCount: tCount,
-                      lineCount,
-                      metadata: {
-                        pluginName: pFolder.name,
-                        hasDisabledSuffix: isDis,
-                        warningLinesExceeded: isWarnLines,
-                        warningSizeExceeded: isWarnSize,
-                        warningNoDescription: isWarnNoDesc,
-                      },
-                    });
-                  }
-                } catch {
-                  // Ignorer
-                }
+              // 1. Skills du plugin (F5 + F6 : listés deux fois)
+              for (const sFolder of await listSkillFolders(path.join(pPath, 'skills'))) {
+                const skillItem = await buildAntigravitySkillItem(sFolder, {
+                  scope: 'local',
+                  fallbackDescription: () => `Compétence du plugin ${pFolder.name}`,
+                  pluginName: pFolder.name,
+                });
+                if (skillItem.enabled) skillsCharTotal += skillItem.charCount || 0;
+                items.push(skillItem);
               }
 
               // 2. Rules du plugin
@@ -563,14 +446,16 @@ export class LocalScanner {
           const { metadata: soulMetadata } = extractFrontmatter(rawContent);
           const parsed = extractMarkdownTitleAndSummary(rawContent);
           const isAntigravity = candidate.tool === 'antigravity';
-          // Antigravity : 24 000 octets après inclusions ; la documentation ne fixe pas de limite de lignes
-          const measured = isAntigravity ? await measureAntigravitySoul(rawContent, candidatePath) : null;
-          const tokenCount = measured?.expandedTokenCount
-            ?? countTokensForFile(candidatePath, stat.size, stat.mtimeMs, rawContent);
+          // Antigravity : enveloppe F1, corps tronqué à 24 000 octets après inclusions ; la
+          // documentation ne fixe pas de limite de lignes
+          const measured = isAntigravity ? await measureAntigravitySoul(rawContent, candidatePath, stat) : null;
+          const tokenCount = measured
+            ? measured.bootTokenCount
+            : countTokensForFile(candidatePath, stat.size, stat.mtimeMs, rawContent);
           const isWarningLines = !isAntigravity && lineCount > 200;
           const isWarningSize = measured?.warningSizeExceeded ?? false;
 
-          soulCharTotal += fileCharCount;
+          soulCharTotal += measured ? measured.bootCharCount : fileCharCount;
           if (!soulPathFound) soulPathFound = candidatePath;
 
           items.push({
@@ -593,6 +478,8 @@ export class LocalScanner {
               isSoul: true,
               locked: true,
               ...(candidate.inheritedFrom !== undefined ? { inheritedFrom: candidate.inheritedFrom } : {}),
+              ...(measured ? { byteSize: measured.byteSize, bootTokenCount: measured.bootTokenCount, bootCharCount: measured.bootCharCount } : {}),
+              ...(measured && measured.truncatedBytes > 0 ? { truncatedBytes: measured.truncatedBytes, lostTokens: measured.lostTokens } : {}),
               warningLinesExceeded: isWarningLines,
               warningSizeExceeded: isWarningSize,
             },
@@ -625,16 +512,20 @@ export class LocalScanner {
     const rulesWarningCount = allRulesList.filter((i) => i.enabled).filter(hasResourceWarning).length;
 
     // Décompte cohérent des règles :
-    // - Règles permanentes : accumulation de leur tokenCount BPE réel
-    // - Règles conditionnelles : ~20 tokens au boot (estimation de l'extension, non documentée)
+    // - Antigravity : ce que l'agent injecte au démarrage (F1 pour les permanentes, F3 pour
+    //   model_decision, 0 pour glob et manual) ; l'en-tête F2 est ajouté une fois pour toute la jauge
+    // - Claude Code : tokenCount BPE réel des permanentes, ~20 tokens par conditionnelle
+    //   (estimation de l'extension, non documentée)
     // - Règles ⛔ : aucun coût au boot ; règles héritées des dossiers parents : comptées
     // - rulesConditionalTokenTotal : somme des tokens BPE réels des cartes conditionnelles
+    const isAntigravity = targetTool === 'antigravity';
     const bootRules = activeRulesList.filter(countsAtBoot);
     const activePermanentRules = bootRules.filter((i) => !i.metadata?.isConditional);
     const activeConditionalRules = bootRules.filter((i) => i.metadata?.isConditional);
     const permanentRulesTokens = activePermanentRules.reduce((sum, i) => sum + (i.tokenCount || 0), 0);
     const conditionalRulesBootTokens = activeConditionalRules.length * 20;
-    const rulesTokenTotal = permanentRulesTokens + conditionalRulesBootTokens;
+    const agyRulesBoot = isAntigravity ? antigravityRulesBootStat(bootRules) : null;
+    const rulesTokenTotal = agyRulesBoot ? agyRulesBoot.tokenCount : permanentRulesTokens + conditionalRulesBootTokens;
     const rulesConditionalTokenTotal = activeConditionalRules.reduce((sum, i) => sum + (i.tokenCount || 0), 0);
     const isInherited = (i: ResourceItem) => i.metadata?.inheritedFrom !== undefined;
     const rulesInheritedCount = bootRules.filter(isInherited).length;
@@ -651,15 +542,20 @@ export class LocalScanner {
     // Somme directe des tokens BPE de l'Âme active
     const soulTokenTotal = activeSoulList.reduce((sum, i) => sum + (i.tokenCount || 0), 0);
 
+    // Antigravity : en-têtes des sections de plugin (F6), qui n'appartiennent à aucune carte
+    const skillsOverhead = isAntigravity ? pluginSectionHeadersTokens(allSkillsList, pluginRoots) : 0;
+    const skillsTokenWithOverhead = skillsTokenTotal + skillsOverhead;
+
     const skillsStat: TokenCategoryStat = {
       type: 'skill',
       scope: 'local',
       activeCount: activeSkillsCount,
       totalCount: allSkillsList.length,
       charCount: skillsCharTotal,
-      tokenCount: skillsTokenTotal,
+      tokenCount: skillsTokenWithOverhead,
       warningCount: skillsWarningCount,
-      percentage: Number(((skillsTokenTotal / 20000) * 100).toFixed(1)),
+      percentage: Number(((skillsTokenWithOverhead / 20000) * 100).toFixed(1)),
+      ...(isAntigravity ? { overheadTokens: skillsOverhead } : {}),
       directoryPath:
         skillsDirFound ||
         (targetTool === 'claude-code'
@@ -680,6 +576,7 @@ export class LocalScanner {
       warningCount: rulesWarningCount,
       inheritedCount: rulesInheritedCount,
       percentage: Number(((rulesTokenTotal / 20000) * 100).toFixed(1)),
+      ...(agyRulesBoot ? { conditionalIndexCount: agyRulesBoot.conditionalIndexCount, ...truncationSummary(bootRules) } : {}),
       directoryPath:
         rulesDirFound ||
         (targetTool === 'claude-code'
@@ -697,6 +594,7 @@ export class LocalScanner {
       warningCount: soulWarningCount,
       inheritedCount: soulInheritedCount,
       percentage: Number(((soulTokenTotal / 20000) * 100).toFixed(1)),
+      ...(isAntigravity ? truncationSummary(activeSoulList) : {}),
       directoryPath:
         soulPathFound ||
         (targetTool === 'claude-code'

@@ -182,9 +182,11 @@ export class DuplicateService {
 
   /**
    * Génère une clé canonique d'identification pour détecter les correspondances doublons.
+   * Un skill de plugin ou d'un ancien emplacement est comparé sur son nom brut, sans préfixe :
+   * c'est sous ce nom qu'Antigravity le liste (phase 2 de l'enquête).
    */
   private static getDuplicateKey(item: ResourceItem): string {
-    const cleanId = item.id.replace(/\.disabled$/, '').replace(/\.md$/, '').toLowerCase();
+    const cleanId = (item.metadata?.rawId ?? item.id).replace(/\.disabled$/, '').replace(/\.md$/, '').toLowerCase();
     // Normaliser types compatibles : skills et workflows partagent le même espace de noms
     const typeGroup = item.type === 'workflow' ? 'skill' : item.type;
     return `${typeGroup}:${cleanId}`;

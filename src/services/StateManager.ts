@@ -12,6 +12,7 @@ import { ImportService } from './ImportService';
 import { IntegrityService } from './IntegrityService';
 import { DeleteService } from './DeleteService';
 import { DuplicateService } from './DuplicateService';
+import { applyAntigravityIndexHeaders } from './antigravityBootCost';
 import { DashboardPanel } from '../providers/DashboardPanel';
 import { CheatSheetPanel } from '../providers/CheatSheetPanel';
 import { getUserHome } from '../utils/paths';
@@ -217,6 +218,12 @@ export class StateManager {
     const skillsLocal = localResult.skillsStat;
     const mcpGlobal = mcpGlobalStat;
     const mcpLocal = mcpLocalStat;
+
+    // Antigravity : en-têtes injectés une seule fois en tout (index des règles conditionnelles,
+    // index des skills), quelle que soit la portée des éléments qui les imposent
+    if (workspace.tool === 'antigravity') {
+      applyAntigravityIndexHeaders({ rulesGlobal, rulesLocal, skillsGlobal, skillsLocal }, budgetTotal);
+    }
 
     // Antigravity : le budget de 20 000 tokens est réservé aux règles (âmes comprises) ; les skills
     // et les MCP relèvent d'un budget de personnalisation distinct (https://antigravity.google/docs/rules/)

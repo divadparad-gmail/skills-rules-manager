@@ -126,7 +126,8 @@ describe('Suite de Tests : Règles Antigravity conformes à la documentation off
     assert.ok(!expanded.content.includes('@[Standards]'));
     const inspection = await inspectAntigravityRule(withInclude, includePath);
     assert.strictEqual(inspection.warningSizeExceeded, true, 'Le contenu inclus compte dans la limite');
-    assert.ok(inspection.expandedTokenCount! > 0);
+    assert.ok(inspection.bodyTokenCount > 0);
+    assert.ok(inspection.truncatedBytes > 0, 'Le corps développé dépasse 24 000 octets : il est tronqué');
 
     // @filename n'est pas développé
     const reference = await expandRuleIncludes('Voir @docs/standards.md', includePath);

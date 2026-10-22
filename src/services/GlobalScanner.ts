@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { ResourceItem, ResourceType, TargetTool, TokenCategoryStat } from '../types';
+import { ResourceItem, TargetTool, TokenCategoryStat } from '../types';
 import {
   extractFrontmatter,
   extractMarkdownTitleAndSummary,
@@ -14,6 +14,9 @@ import { countTokens, countTokensForFile } from '../utils/tokenizer';
 import { measureAntigravitySoul } from '../utils/antigravityRules';
 import { appliesInAntigravity, buildAntigravityRuleItem, countsAtBoot, hasResourceWarning } from './antigravityRuleItem';
 import { listFlatRuleFiles } from './antigravityRuleSources';
+import { buildAntigravitySkillItem, listSkillFolders, pluginSectionHeadersTokens } from './antigravitySkillItem';
+import { antigravityRulesBootStat, truncationSummary } from './antigravityBootCost';
+import { BUILTIN_SKILLS_DIR, LEGACY_GLOBAL_SKILLS_DIR } from '../antigravity/behavior';
 
 let vscodeModule: any = null;
 try {
@@ -70,15 +73,18 @@ export class GlobalScanner {
     let soulCharTotal = 0;
     let soulPathFound = '';
 
-    // Cumul des caractères des règles chargées au démarrage (règles ignorées par l'agent exclues)
+    /** Dossier de chaque plugin global, pour l'en-tête de sa section (F6). */
+    const pluginRoots = new Map<string, string>();
+
+    // Cumul des caractères injectés au démarrage par les règles Antigravity (F1, F3 ; 0 pour glob
+    // et manual) ; règles ignorées par l'agent exclues
     const accountRule = (item: ResourceItem) => {
       if (!countsAtBoot(item) || !item.charCount) return;
+      rulesCharTotal += item.metadata?.bootCharCount ?? 0;
       if (item.metadata?.isConditional) {
-        rulesCharTotal += 80;
         rulesConditionalCharTotal += item.charCount;
         rulesConditionalCount++;
       } else {
-        rulesCharTotal += item.charCount;
         rulesPermanentCount++;
       }
     };
@@ -86,94 +92,27 @@ export class GlobalScanner {
     const skillsDir = path.join(globalPath, 'skills');
     const claudeGlobalPath = getEffectiveGlobalClaudePath();
 
-    // 1.A. Si Antigravity : scan des skills globaux (~/.gemini/config/skills)
-    if (targetTool === 'antigravity' && fs.existsSync(skillsDir)) {
-      try {
-        const entries = await fs.promises.readdir(skillsDir, { withFileTypes: true });
-
-        for (const entry of entries) {
-          if (!entry.isDirectory()) continue;
-
-          const itemFolder = path.join(skillsDir, entry.name);
-          const skillMd = path.join(itemFolder, 'SKILL.md');
-          const skillMdDisabled = path.join(itemFolder, 'SKILL.md.disabled');
-
-          const hasEnabledFile = fs.existsSync(skillMd);
-          const hasDisabledFile = fs.existsSync(skillMdDisabled);
-
-          if (!hasEnabledFile && !hasDisabledFile) continue;
-
-          // Si le fichier physique est .disabled OU s'il est exclu dans skills.json
-          const isPhysicallyEnabled = hasEnabledFile;
-          const isExcluded = excludedSet.has(entry.name);
-          const isEnabled = isPhysicallyEnabled && !isExcluded;
-
-          const activeFile = hasEnabledFile ? skillMd : skillMdDisabled;
-          let description = '';
-          let name = entry.name;
-          let tags: string[] = [];
-          let rawContent = '';
-          let fileStat: fs.Stats | null = null;
-
-          try {
-            fileStat = await fs.promises.stat(activeFile);
-            rawContent = await fs.promises.readFile(activeFile, 'utf8');
-            const { metadata } = extractFrontmatter(rawContent);
-            if (metadata.name && typeof metadata.name === 'string') {
-              name = metadata.name;
-            }
-            if (metadata.description && typeof metadata.description === 'string') {
-              description = metadata.description;
-            }
-            if (Array.isArray(metadata.tags)) {
-              tags = metadata.tags;
-            }
-          } catch {
-            // Lecture fallback
-          }
-
-          const lineCount = rawContent ? rawContent.split(/\r\n|\r|\n/).length : 0;
-          const isWarningLines = lineCount > 500;
-          const isWarningSize = rawContent.length > 24000;
-          const isWarningNoDesc = !description || description.trim().length === 0;
-
-          const isWorkflow = entry.name.startsWith('wf-') || name.startsWith('wf-');
-          const type: ResourceType = isWorkflow ? 'workflow' : 'skill';
-
-          // Décompte réel de caractères pour la signature de découverte Tier-1
-          const discoverySignature = `name: ${name}\ndescription: ${description}\npath: ${activeFile}\n`;
-          const charCount = discoverySignature.length;
-          const tokenCount = countTokensForFile(activeFile, fileStat?.size, fileStat?.mtimeMs, discoverySignature);
-
-          if (isEnabled) {
-            skillsCharTotal += charCount;
-          }
-
-          items.push({
-            id: entry.name,
-            name,
-            description: description || (isWorkflow ? 'Workflow Antigravity' : 'Compétence Antigravity'),
-            type,
+    // 1.A. Si Antigravity : skills globaux (~/.gemini/config/skills), skills intégrés (F7,
+    // verrouillés) et ancien emplacement ~/.gemini/antigravity/skills (chargement non vérifié)
+    if (targetTool === 'antigravity') {
+      const geminiRoot = path.dirname(globalPath);
+      const skillSources = [
+        { dir: skillsDir, options: {} },
+        { dir: path.join(geminiRoot, BUILTIN_SKILLS_DIR), options: { builtin: true } },
+        { dir: path.join(geminiRoot, LEGACY_GLOBAL_SKILLS_DIR), options: { idPrefix: 'antigravity/', legacyLocation: true } },
+      ];
+      for (const source of skillSources) {
+        for (const folder of await listSkillFolders(source.dir)) {
+          const skillItem = await buildAntigravitySkillItem(folder, {
             scope: 'global',
-            enabled: isEnabled,
-            path: itemFolder,
-            targetTool: 'antigravity',
-            isFolder: true,
-            charCount,
-            tokenCount,
-            lineCount,
-            metadata: {
-              tags,
-              hasDisabledSuffix: hasDisabledFile,
-              excludedInJson: isExcluded,
-              warningLinesExceeded: isWarningLines,
-              warningSizeExceeded: isWarningSize,
-              warningNoDescription: isWarningNoDesc,
-            },
+            fallbackDescription: (isWorkflow) => (isWorkflow ? 'Workflow Antigravity' : 'Compétence Antigravity'),
+            // skills.json n'exclut que les skills de ~/.gemini/config/skills
+            ...(source.dir === skillsDir ? { excluded: excludedSet.has(path.basename(folder)) } : {}),
+            ...source.options,
           });
+          if (skillItem.enabled) skillsCharTotal += skillItem.charCount || 0;
+          items.push(skillItem);
         }
-      } catch {
-        // En cas d'erreur de lecture du répertoire
       }
     }
 
@@ -278,11 +217,11 @@ export class GlobalScanner {
             const fileCharCount = rawContent.length;
             const lineCount = rawContent.split(/\r\n|\r|\n/).length;
             const parsed = extractMarkdownTitleAndSummary(rawContent);
-            const measured = await measureAntigravitySoul(rawContent, candidate.path);
-            const ruleTokenCount = measured.expandedTokenCount
-              ?? countTokensForFile(candidate.path, stat.size, stat.mtimeMs, rawContent);
+            // Enveloppe F1, corps tronqué à 24 000 octets après inclusions
+            const measured = await measureAntigravitySoul(rawContent, candidate.path, stat);
+            const ruleTokenCount = measured.bootTokenCount;
 
-            soulCharTotal += fileCharCount;
+            soulCharTotal += measured.bootCharCount;
             if (!soulPathFound) soulPathFound = candidate.path;
 
             items.push({
@@ -302,6 +241,9 @@ export class GlobalScanner {
                 isSoul: true,
                 locked: true,
                 byteSize: measured.byteSize,
+                bootTokenCount: measured.bootTokenCount,
+                bootCharCount: measured.bootCharCount,
+                ...(measured.truncatedBytes > 0 ? { truncatedBytes: measured.truncatedBytes, lostTokens: measured.lostTokens } : {}),
                 warningSizeExceeded: measured.warningSizeExceeded,
               },
             });
@@ -392,80 +334,17 @@ export class GlobalScanner {
             if (!pFolder.isDirectory()) continue;
 
             const pluginRoot = path.join(pluginsDir, pFolder.name);
+            pluginRoots.set(pFolder.name, pluginRoot);
 
-            // Skills internes du plugin global
-            const pSkillsDir = path.join(pluginRoot, 'skills');
-            if (fs.existsSync(pSkillsDir)) {
-              try {
-                const pSkillEntries = await fs.promises.readdir(pSkillsDir, { withFileTypes: true });
-                for (const pEntry of pSkillEntries) {
-                  if (!pEntry.isDirectory()) continue;
-                  const itemFolder = path.join(pSkillsDir, pEntry.name);
-                  const skillMd = path.join(itemFolder, 'SKILL.md');
-                  const skillMdDisabled = path.join(itemFolder, 'SKILL.md.disabled');
-
-                  const isEnabled = fs.existsSync(skillMd);
-                  const isDisabled = fs.existsSync(skillMdDisabled);
-                  if (!isEnabled && !isDisabled) continue;
-
-                  const activeFile = isEnabled ? skillMd : skillMdDisabled;
-                  let description = '';
-                  let name = pEntry.name;
-                  let tags: string[] = [];
-                  let rawContent = '';
-                  let fileStat: fs.Stats | null = null;
-
-                  try {
-                    fileStat = await fs.promises.stat(activeFile);
-                    rawContent = await fs.promises.readFile(activeFile, 'utf8');
-                    const { metadata } = extractFrontmatter(rawContent);
-                    if (metadata.name && typeof metadata.name === 'string') name = metadata.name;
-                    if (metadata.description && typeof metadata.description === 'string') description = metadata.description;
-                    if (Array.isArray(metadata.tags)) tags = metadata.tags;
-                  } catch {
-                    // Ignorer
-                  }
-
-                  const lineCount = rawContent ? rawContent.split(/\r\n|\r|\n/).length : 0;
-                  const isWarnLines = lineCount > 500;
-                  const isWarnSize = rawContent.length > 24000;
-                  const isWarnNoDesc = !description || description.trim().length === 0;
-
-                  const isWorkflow = pEntry.name.startsWith('wf-') || name.startsWith('wf-');
-                  const discoverySignature = `name: ${name}\ndescription: ${description}\npath: ${activeFile}\n`;
-                  const charCount = discoverySignature.length;
-                  const tokenCount = countTokensForFile(activeFile, fileStat?.size, fileStat?.mtimeMs, discoverySignature);
-
-                  if (isEnabled) {
-                    skillsCharTotal += charCount;
-                  }
-
-                  items.push({
-                    id: `${pFolder.name}:${pEntry.name}`,
-                    name: `${name} [Plugin: ${pFolder.name}]`,
-                    description: description || `Skill du plugin global ${pFolder.name}`,
-                    type: isWorkflow ? 'workflow' : 'skill',
-                    scope: 'global',
-                    enabled: isEnabled,
-                    path: itemFolder,
-                    targetTool: 'antigravity',
-                    isFolder: true,
-                    charCount,
-                    tokenCount,
-                    lineCount,
-                    metadata: {
-                      tags,
-                      pluginName: pFolder.name,
-                      hasDisabledSuffix: isDisabled,
-                      warningLinesExceeded: isWarnLines,
-                      warningSizeExceeded: isWarnSize,
-                      warningNoDescription: isWarnNoDesc,
-                    },
-                  });
-                }
-              } catch {
-                // Ignorer
-              }
+            // Skills internes du plugin global (F5 + F6 : listés deux fois)
+            for (const itemFolder of await listSkillFolders(path.join(pluginRoot, 'skills'))) {
+              const skillItem = await buildAntigravitySkillItem(itemFolder, {
+                scope: 'global',
+                fallbackDescription: () => `Skill du plugin global ${pFolder.name}`,
+                pluginName: pFolder.name,
+              });
+              if (skillItem.enabled) skillsCharTotal += skillItem.charCount || 0;
+              items.push(skillItem);
             }
 
             // Rules internes du plugin global
@@ -608,16 +487,20 @@ export class GlobalScanner {
     const rulesWarningCount = allRulesList.filter((i) => i.enabled).filter(hasResourceWarning).length;
 
     // Décompte cohérent des règles :
-    // - Règles permanentes : accumulation de leur tokenCount BPE réel
-    // - Règles conditionnelles : ~20 tokens au boot (estimation de l'extension, non documentée)
+    // - Antigravity : ce que l'agent injecte au démarrage (F1 pour les permanentes, F3 pour
+    //   model_decision, 0 pour glob et manual) ; l'en-tête F2 est ajouté une fois pour toute la jauge
+    // - Claude Code : tokenCount BPE réel des permanentes, ~20 tokens par conditionnelle
+    //   (estimation de l'extension, non documentée)
     // - Règles ⛔ : aucun coût au boot
     // - rulesConditionalTokenTotal : somme des tokens BPE réels des cartes conditionnelles
+    const isAntigravity = targetTool === 'antigravity';
     const bootRules = activeRulesList.filter(countsAtBoot);
     const activePermanentRules = bootRules.filter((i) => !i.metadata?.isConditional);
     const activeConditionalRules = bootRules.filter((i) => i.metadata?.isConditional);
     const permanentRulesTokens = activePermanentRules.reduce((sum, i) => sum + (i.tokenCount || 0), 0);
     const conditionalRulesBootTokens = activeConditionalRules.length * 20;
-    const rulesTokenTotal = permanentRulesTokens + conditionalRulesBootTokens;
+    const agyRulesBoot = isAntigravity ? antigravityRulesBootStat(bootRules) : null;
+    const rulesTokenTotal = agyRulesBoot ? agyRulesBoot.tokenCount : permanentRulesTokens + conditionalRulesBootTokens;
     const rulesConditionalTokenTotal = activeConditionalRules.reduce((sum, i) => sum + (i.tokenCount || 0), 0);
 
     const activeSoulList = allSoulList.filter((i) => i.enabled);
@@ -634,15 +517,20 @@ export class GlobalScanner {
     const defaultSkillsDir = targetTool === 'claude-code' ? path.join(claudeGlobalPath, 'skills') : skillsDir;
     const defaultRulesDir = targetTool === 'claude-code' ? path.join(claudeGlobalPath, 'rules') : path.join(globalPath, 'rules');
 
+    // Antigravity : en-têtes des sections de plugin (F6), qui n'appartiennent à aucune carte
+    const skillsOverhead = isAntigravity ? pluginSectionHeadersTokens(allSkillsList, pluginRoots) : 0;
+    const skillsTokenWithOverhead = skillsTokenTotal + skillsOverhead;
+
     const skillsStat: TokenCategoryStat = {
       type: 'skill',
       scope: 'global',
       activeCount: activeSkillsCount,
       totalCount: allSkillsList.length,
       charCount: skillsCharTotal,
-      tokenCount: skillsTokenTotal,
+      tokenCount: skillsTokenWithOverhead,
       warningCount: skillsWarningCount,
-      percentage: Number(((skillsTokenTotal / 20000) * 100).toFixed(1)),
+      percentage: Number(((skillsTokenWithOverhead / 20000) * 100).toFixed(1)),
+      ...(isAntigravity ? { overheadTokens: skillsOverhead } : {}),
       directoryPath: defaultSkillsDir,
     };
 
@@ -658,6 +546,7 @@ export class GlobalScanner {
       tokenCount: rulesTokenTotal,
       warningCount: rulesWarningCount,
       percentage: Number(((rulesTokenTotal / 20000) * 100).toFixed(1)),
+      ...(agyRulesBoot ? { conditionalIndexCount: agyRulesBoot.conditionalIndexCount, ...truncationSummary(bootRules) } : {}),
       directoryPath: defaultRulesDir,
     };
 
@@ -675,6 +564,7 @@ export class GlobalScanner {
       tokenCount: soulTokenTotal,
       warningCount: soulWarningCount,
       percentage: Number(((soulTokenTotal / 20000) * 100).toFixed(1)),
+      ...(isAntigravity ? truncationSummary(activeSoulList) : {}),
       directoryPath: soulPathFound || defaultSoulPath,
     };
 

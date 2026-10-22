@@ -2,7 +2,6 @@ import * as fs from 'fs';
 import { ResourceItem, ResourceScope } from '../types';
 import { extractFrontmatter, extractMarkdownTitleAndSummary } from '../utils/frontmatter';
 import { AntigravityRuleInspection, inspectAntigravityRule, measureAntigravitySoul } from '../utils/antigravityRules';
-import { countTokensForFile } from '../utils/tokenizer';
 import { isAppliedStatus, SUBFOLDER_RULES_LOADED } from '../antigravity/behavior';
 
 export interface AntigravityRuleItemOptions {
@@ -40,7 +39,7 @@ export async function buildAntigravityRuleItem(filePath: string, options: Antigr
   const parsed = extractMarkdownTitleAndSummary(rawContent);
   const inspection: AntigravityRuleInspection = options.standalone
     ? {
-        ...(await measureAntigravitySoul(rawContent, filePath)),
+        ...(await measureAntigravitySoul(rawContent, filePath, fileStat)),
         trigger: 'always_on',
         ignored: false,
         isConditional: false,
@@ -49,7 +48,7 @@ export async function buildAntigravityRuleItem(filePath: string, options: Antigr
         issues: [],
         warningNoDescription: false,
       }
-    : await inspectAntigravityRule(rawContent, filePath);
+    : await inspectAntigravityRule(rawContent, filePath, fileStat);
   // R1 : une règle de sous-dossier n'est jamais chargée, quel que soit son frontmatter
   const status = options.directoryScope !== undefined && !SUBFOLDER_RULES_LOADED ? 'never-loaded' : inspection.status;
   const frontmatterDescription = typeof frontmatter.description === 'string' ? frontmatter.description.trim() : '';
@@ -66,8 +65,9 @@ export async function buildAntigravityRuleItem(filePath: string, options: Antigr
     targetTool: 'antigravity',
     isFolder: false,
     charCount: rawContent.length,
-    tokenCount: inspection.expandedTokenCount
-      ?? countTokensForFile(filePath, fileStat?.size, fileStat?.mtimeMs, rawContent),
+    // Règle permanente : ce qui est injecté au démarrage (F1, tronqué) ; règle conditionnelle ou
+    // ⛔ : le corps entier, lu quand elle s'applique (son coût au démarrage est bootTokenCount)
+    tokenCount: inspection.trigger === 'always_on' && !inspection.ignored ? inspection.bootTokenCount : inspection.bodyTokenCount,
     lineCount: rawContent ? rawContent.split(/\r\n|\r|\n/).length : 0,
     metadata: {
       ...(options.spreadFrontmatter ? frontmatter : {}),
@@ -83,10 +83,18 @@ export async function buildAntigravityRuleItem(filePath: string, options: Antigr
       ruleIssues: inspection.issues,
       ...(inspection.trigger ? { trigger: inspection.trigger } : {}),
       byteSize: inspection.byteSize,
+      bootTokenCount: inspection.bootTokenCount,
+      bootCharCount: inspection.bootCharCount,
+      ...(inspection.truncatedBytes > 0 ? { truncatedBytes: inspection.truncatedBytes, lostTokens: inspection.lostTokens } : {}),
       warningSizeExceeded: inspection.warningSizeExceeded,
       warningNoDescription: inspection.warningNoDescription,
     },
   };
+}
+
+/** Coût au démarrage d'une carte de règle ou d'âme Antigravity (formats F1 à F4). */
+export function bootTokensOf(item: ResourceItem): number {
+  return item.metadata?.bootTokenCount ?? 0;
 }
 
 /**

@@ -655,6 +655,14 @@
       updateBreakdownRow('McpGlobal', stats.mcpGlobal, 'MCP (global)');
       updateBreakdownRow('McpLocal', stats.mcpLocal, 'MCP (local)');
 
+      // Antigravity : en-têtes injectés et troncatures, cumulés
+      const sumOf = (a, b, key) => ((a && a[key]) || 0) + ((b && b[key]) || 0);
+      const agyTotals = (a, b) => ({
+        overheadTokens: sumOf(a, b, 'overheadTokens'),
+        truncatedCount: sumOf(a, b, 'truncatedCount'),
+        lostTokens: sumOf(a, b, 'lostTokens'),
+      });
+
       // Colonne 3 : Total Contexte (Global + Local)
       const soulTotalCount = (stats.soulGlobal ? stats.soulGlobal.activeCount : 0) + (stats.soulLocal ? stats.soulLocal.activeCount : 0);
       const soulTotalTokens = (stats.soulGlobal ? stats.soulGlobal.tokenCount : 0) + (stats.soulLocal ? stats.soulLocal.tokenCount : 0);
@@ -671,6 +679,7 @@
         warningCount: soulTotalWarn,
         percentage: soulTotalPct,
         directoryPath: 'Cumul Global + Local',
+        ...agyTotals(stats.soulGlobal, stats.soulLocal),
       }, 'Âme (total)');
 
       const ruleTotalCount = (stats.rulesGlobal ? stats.rulesGlobal.activeCount : 0) + (stats.rulesLocal ? stats.rulesLocal.activeCount : 0);
@@ -695,6 +704,7 @@
         warningCount: ruleTotalWarn,
         percentage: ruleTotalPct,
         directoryPath: 'Cumul Global + Local',
+        ...agyTotals(stats.rulesGlobal, stats.rulesLocal),
       }, 'Rules (total)');
 
       const skillTotalCount = (stats.skillsGlobal ? stats.skillsGlobal.activeCount : 0) + (stats.skillsLocal ? stats.skillsLocal.activeCount : 0);
@@ -712,6 +722,7 @@
         warningCount: skillTotalWarn,
         percentage: skillTotalPct,
         directoryPath: 'Cumul Global + Local',
+        ...agyTotals(stats.skillsGlobal, stats.skillsLocal),
       }, 'Skills (total)');
 
       const mcpTotalCount = (stats.mcpGlobal ? stats.mcpGlobal.activeCount : 0) + (stats.mcpLocal ? stats.mcpLocal.activeCount : 0);
@@ -755,6 +766,58 @@
     }
   }
 
+  /** Coût au démarrage d'une carte Antigravity, d'après les formats injectés (src/antigravity/behavior.ts). */
+  function describeAntigravityBootCost(item) {
+    const meta = item.metadata || {};
+    const boot = (meta.bootTokenCount || 0).toLocaleString('fr-FR');
+    const tok = (item.tokenCount || 0).toLocaleString('fr-FR');
+    if (item.type === 'skill' || item.type === 'workflow') {
+      return meta.pluginName
+        ? `Coût au démarrage : ${tok} tokens, car sa ligne est listée deux fois (index des skills et section du plugin)`
+        : `Coût au démarrage : ${tok} tokens (sa ligne dans l'index des skills : nom, chemin de SKILL.md et description)`;
+    }
+    if (meta.trigger === 'model_decision') {
+      return `Coût au démarrage : ${boot} tokens (son entrée dans l'index des règles conditionnelles : chemin file:/// et description)`;
+    }
+    if (meta.trigger === 'glob') {
+      return 'Coût au démarrage : 0 token. Son corps est ajouté au résultat d\'un outil à chaque lecture ou modification d\'un fichier correspondant';
+    }
+    if (meta.trigger === 'manual') {
+      return 'Coût au démarrage : 0 token (absente du contexte initial)';
+    }
+    return `Coût au démarrage : ${boot} tokens (corps sans frontmatter, entre deux balises <RULE[chemin]> qui portent chacune le chemin complet)`;
+  }
+
+  /** Lignes d'infobulle propres à Antigravity : en-têtes injectés, troncatures, détail des serveurs MCP. */
+  function antigravityStatNotes(stat) {
+    const lines = [];
+    const fmt = (n) => (n || 0).toLocaleString('fr-FR');
+    if (stat.overheadTokens > 0) {
+      lines.push(stat.type === 'rule'
+        ? `• En-tête de l'index des règles conditionnelles : ${fmt(stat.overheadTokens)} tok (injecté une seule fois)`
+        : `• En-têtes injectés : ${fmt(stat.overheadTokens)} tok (« Available skills: » et sections de plugin)`);
+    }
+    if (stat.truncatedCount > 0) {
+      lines.push(`✂️ ${stat.truncatedCount} fichier(s) tronqué(s) à 24 000 octets : ≈ ${fmt(stat.lostTokens)} tokens jamais lus par l'agent`);
+    }
+    if (Array.isArray(stat.mcpServers) && stat.mcpServers.length > 0) {
+      const [minPerTool, maxPerTool] = [3, 8];
+      for (const server of stat.mcpServers) {
+        if (server.status === 'unsupported') {
+          lines.push(`• ⛔ ${server.name} : non supporté par Antigravity (serverUrl requis), exclu 📄`);
+        } else if (server.status === 'disabled') {
+          lines.push(`• ${server.name} : désactivé, exclu`);
+        } else if (server.toolCount === null) {
+          lines.push(`• ${server.name} : ${fmt(server.tokenCount)} tok (titre) + ~${minPerTool} – ${maxPerTool} tokens par outil, liste inconnue`);
+        } else {
+          lines.push(`• ${server.name} : ${fmt(server.tokenCount)} tok (${server.toolCount} outil(s))`);
+        }
+      }
+      lines.push('🧪 Noms d\'outils lus dans le cache d\'Antigravity (observé, non documenté). Le coût réel dépend de la connexion du serveur : sans connexion, ses outils ne sont pas listés.');
+    }
+    return lines.length > 0 ? `\n${lines.join('\n')}` : '';
+  }
+
   function updateBreakdownRow(prefix, stat, defaultTitle) {
     if (!stat) return;
 
@@ -787,14 +850,18 @@
 
     if (tooltipEl) {
       const isClaude = currentState?.workspace?.tool === 'claude-code';
-      const warningNote = (stat.warningCount && stat.warningCount > 0)
+      const warningNote = ((stat.warningCount && stat.warningCount > 0)
         ? `\n\n⚠️ ${stat.warningCount} ressource(s) dépassent les recommandations techniques dans cette catégorie (voir badges sur les cartes).`
-        : '';
+        : '') + (isClaude ? '' : antigravityStatNotes(stat));
+      // Antigravity : model_decision coûte son entrée d'index, glob et manual rien au démarrage
+      const conditionalBootNote = isClaude
+        ? '~20 tok au boot'
+        : 'model_decision : entrée d\'index, glob et manual : 0 au boot';
 
       if (prefix.endsWith('Total')) {
         let extraInfo = '';
         if (stat.type === 'rule' && stat.conditionalCount && stat.conditionalCount > 0) {
-          extraInfo = `\n• Répartition : ${stat.permanentCount || 0} permanente(s) (${stat.tokenCount.toLocaleString()} tok au boot) + ${stat.conditionalCount} conditionnelle(s) (~20 tok au boot, +${stat.conditionalTokenCount?.toLocaleString()} tok si déclenchée(s))`;
+          extraInfo = `\n• Répartition : ${stat.permanentCount || 0} permanente(s) (${stat.tokenCount.toLocaleString()} tok au boot) + ${stat.conditionalCount} conditionnelle(s) (${conditionalBootNote}, +${stat.conditionalTokenCount?.toLocaleString()} tok si déclenchée(s))`;
         }
         tooltipEl.textContent =
           `📊 ${defaultTitle} (Cumul Global + Local) :\n` +
@@ -818,7 +885,7 @@
           `📁 Emplacement :\n${stat.directoryPath || 'Non défini'}\n\n` +
           `📊 Tokens au Boot : ${stat.tokenCount.toLocaleString()} tok (${stat.percentage}% du budget)\n` +
           `• Règles permanentes : ${stat.permanentCount || 0}\n` +
-          `• Règles conditionnelles : ${stat.conditionalCount} (~20 tok au boot, +${stat.conditionalTokenCount?.toLocaleString()} tok à l'activation)\n` +
+          `• Règles conditionnelles : ${stat.conditionalCount} (${conditionalBootNote}, +${stat.conditionalTokenCount?.toLocaleString()} tok à l'activation)\n` +
           `ℹ️ Estimation des tokens (BPE o200k / repli 1 tok ≈ 4 car.)` +
           warningNote;
       } else {
@@ -1587,9 +1654,17 @@
         `Chargée depuis un dossier parent (${item.metadata.inheritedFrom}, jusqu'à la racine Git). Elle s'ajoute au budget de 20 000 tokens.`);
     }
 
+    const isAntigravityItem = item.targetTool === 'antigravity';
     if (item.metadata && item.metadata.isConditional && (agStatus === undefined || agStatus === 'active' || agStatus === 'partial')) {
-      addBadge('pill-cond', '⚡ Conditionnel',
-        `Règle conditionnelle (trigger: ${item.metadata.trigger || 'glob'}) : contenu complet chargé seulement à l'activation (~20 tokens au boot, estimation de l'extension)`);
+      addBadge('pill-cond', '⚡ Conditionnel', isAntigravityItem
+        ? `Règle conditionnelle (trigger: ${item.metadata.trigger || 'glob'}) : ${describeAntigravityBootCost(item)}`
+        : `Règle conditionnelle (trigger: ${item.metadata.trigger || 'glob'}) : contenu complet chargé seulement à l'activation (~20 tokens au boot, estimation de l'extension)`);
+    }
+
+    // Ancien emplacement de skill, chargement non vérifié (un skill intégré porte un verrou à droite)
+    if (item.metadata && item.metadata.legacyLocation) {
+      addBadge('pill-warn-amber', '❔ Ancien emplacement',
+        'Emplacement documenté comme supporté (.agent/skills/ ou ~/.gemini/antigravity/skills/), mais dont le chargement n\'a pas été vérifié par les tests. Le skill est compté par prudence.');
     }
 
     if (item.metadata && item.metadata.fromRulesJson) {
@@ -1600,8 +1675,15 @@
       badgesLine.appendChild(jsonBadge);
     }
 
-    // Avertissement dépassement taille physique (> 24 000 octets sous Antigravity, inclusions développées)
-    if (item.metadata && item.metadata.warningSizeExceeded) {
+    // Antigravity coupe le corps (sans frontmatter) à 24 000 octets, inclusions développées ;
+    // une règle ⛔ n'est jamais lue : elle garde l'avertissement de taille
+    const isReadByAgent = agStatus === undefined || agStatus === 'active' || agStatus === 'partial';
+    const truncatedBytes = (isReadByAgent && item.metadata && item.metadata.truncatedBytes) || 0;
+    if (truncatedBytes > 0) {
+      const lost = (item.metadata.lostTokens || 0).toLocaleString('fr-FR');
+      addBadge('pill-warn', '✂️ Tronquée',
+        `Antigravity coupe le corps de ce fichier à 24 000 octets (frontmatter non compté, inclusions @[label](path) comprises) : ${truncatedBytes.toLocaleString('fr-FR')} octets coupés, soit ≈ ${lost} tokens jamais lus par l'agent.\nLe coût affiché ne compte que la partie gardée.`);
+    } else if (item.metadata && item.metadata.warningSizeExceeded) {
       const warnBadge = targetDoc.createElement('span');
       warnBadge.className = 'item-badge-pill pill-warn';
       warnBadge.textContent = '⚠️ > 24 Ko';
@@ -1678,12 +1760,19 @@
           : 'Règle ignorée par Antigravity';
       metricsEl.innerHTML = `<span>${charStr} car.</span> <span class="tok-highlight">0 tok au boot (${tokStr} plein)</span>`;
       metricsEl.title = `${why} : aucun coût.\n• Poids si corrigée : ${charStr} car. (${tokStr} tokens)`;
+    } else if (item.metadata && item.metadata.isConditional && isAntigravityItem) {
+      const bootStr = (item.metadata.bootTokenCount || 0).toLocaleString('fr-FR');
+      metricsEl.innerHTML = `<span>${charStr} car.</span> <span class="tok-highlight">${bootStr} tok au boot (${tokStr} plein)</span>`;
+      metricsEl.title = `Règle conditionnelle :\n• ${describeAntigravityBootCost(item)}\n• Corps complet, lu quand la règle s'applique : ${tokStr} tokens (frontmatter non compté)`;
     } else if (item.metadata && item.metadata.isConditional) {
       metricsEl.innerHTML = `<span>${charStr} car.</span> <span class="tok-highlight" title="Coût au boot : ~20 tokens (estimation de l'extension). Fichier complet si activé : ${tokStr} tokens">~20 tok (${tokStr} plein)</span>`;
       metricsEl.title = `Règle conditionnelle :\n• Coût au boot : ~20 tokens (estimation de l'extension, non chiffrée par la documentation)\n• Poids complet si activé : ${charStr} car. (${tokStr} tokens)`;
     } else {
       metricsEl.innerHTML = `<span>${charStr} car.</span> <span class="tok-highlight">(${tokStr} tokens)</span>`;
       let metricsTitle = `Taille réelle : ${charStr} caractères (${tokStr} tokens)\nEstimation : BPE o200k (repli 1 token ≈ 4 car.)`;
+      if (isAntigravityItem) {
+        metricsTitle = `Taille du fichier : ${charStr} caractères\n${describeAntigravityBootCost(item)}\nEstimation : BPE o200k (repli 1 token ≈ 4 car.)`;
+      }
       if (item.metadata && item.metadata.duplicateInfo && item.metadata.duplicateInfo.isIdentical) {
         metricsTitle += `\nContenu identique au doublon ${item.metadata.duplicateInfo.duplicateScope} (la légère différence de taille affichée provient du chemin de fichier).`;
       }
@@ -1698,13 +1787,17 @@
     // Contrôles droits (Switch ON / OFF + Poubelle sécurisée OU Badge Always-On)
     // Ressource héritée d'un dossier parent (R2) : fichier hors du dossier ouvert, verrouillé
     const isInherited = !!(item.metadata && item.metadata.inheritedFrom !== undefined);
-    if (item.scope !== 'nas' && isInherited) {
+    // Skill intégré d'Antigravity (F7) : ni désactivable, ni supprimable
+    const isBuiltin = !!(item.metadata && item.metadata.builtin);
+    if (item.scope !== 'nas' && (isInherited || isBuiltin)) {
       const rightControls = targetDoc.createElement('div');
       rightControls.className = 'item-right-controls';
       const lockedBadge = targetDoc.createElement('div');
       lockedBadge.className = 'soul-locked-badge';
-      lockedBadge.title = `Fichier du dossier parent ${item.metadata.inheritedFrom}, hors du dossier ouvert : modifiez-le depuis son dossier.`;
-      lockedBadge.innerHTML = '<span class="soul-locked-icon">🔒</span><span>Héritée</span>';
+      lockedBadge.title = isBuiltin
+        ? 'Skill intégré d\'Antigravity : il est toujours listé au démarrage et ne peut pas être retiré.'
+        : `Fichier du dossier parent ${item.metadata.inheritedFrom}, hors du dossier ouvert : modifiez-le depuis son dossier.`;
+      lockedBadge.innerHTML = `<span class="soul-locked-icon">🔒</span><span>${isBuiltin ? 'Intégré' : 'Héritée'}</span>`;
       rightControls.appendChild(lockedBadge);
       topRow.appendChild(rightControls);
     } else if (item.scope !== 'nas') {

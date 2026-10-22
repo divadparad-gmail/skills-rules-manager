@@ -61,8 +61,22 @@ export interface ResourceItem {
     ruleIssues?: string[];
     /** Valeur de trigger reconnue d'une règle Antigravity. */
     trigger?: string;
-    /** Taille en octets UTF-8, inclusions @[label](path) développées (Antigravity). */
+    /** Taille en octets UTF-8 du corps sans frontmatter, inclusions @[label](path) développées (Antigravity). */
     byteSize?: number;
+    /** Tokens injectés au démarrage par Antigravity (formats F1 à F4 de src/antigravity/behavior.ts). */
+    bootTokenCount?: number;
+    /** Caractères injectés au démarrage par Antigravity. */
+    bootCharCount?: number;
+    /** Octets coupés par Antigravity au-delà de 24 000 octets de corps (absent sans troncature). */
+    truncatedBytes?: number;
+    /** Tokens de la partie coupée, jamais lue par l'agent. */
+    lostTokens?: number;
+    /** Skill intégré d'Antigravity (F7), toujours présent et impossible à retirer. */
+    builtin?: boolean;
+    /** Skill d'un ancien emplacement, documenté mais dont le chargement n'a pas été vérifié. */
+    legacyLocation?: boolean;
+    /** Nom brut d'un skill (sans préfixe de plugin), utilisé pour détecter les doublons. */
+    rawId?: string;
     /** Sous-dossier (relatif au projet) d'une règle imbriquée, jamais chargée par Antigravity (R1). */
     directoryScope?: string;
     /** Statut d'une règle Antigravity vis-à-vis de l'agent (voir src/antigravity/behavior.ts). */
@@ -109,6 +123,28 @@ export interface TokenCategoryStat {
   warningCount?: number;
   /** Éléments actifs hérités des dossiers parents (Antigravity, R2), compris dans activeCount. */
   inheritedCount?: number;
+  /**
+   * Antigravity : tokens des en-têtes injectés qui n'appartiennent à aucune carte (index des
+   * règles conditionnelles, index des skills, sections de plugin), compris dans tokenCount.
+   */
+  overheadTokens?: number;
+  /** Antigravity : règles `model_decision` chargées, qui imposent l'en-tête F2 de l'index. */
+  conditionalIndexCount?: number;
+  /** Antigravity : éléments tronqués à 24 000 octets et tokens perdus. */
+  truncatedCount?: number;
+  lostTokens?: number;
+  /** Antigravity : détail par serveur MCP (infobulle de la jauge). */
+  mcpServers?: McpServerStat[];
+}
+
+/** Coût au démarrage d'un serveur MCP sous Antigravity (format F8). */
+export interface McpServerStat {
+  name: string;
+  /** `unsupported` : serveur distant sans `serverUrl` (url ou httpUrl), ignoré par Antigravity. */
+  status: 'active' | 'disabled' | 'unsupported';
+  /** Nombre d'outils listés, ou null si la liste est inconnue (pas de cache d'Antigravity). */
+  toolCount: number | null;
+  tokenCount: number;
 }
 
 /** Résultat de la remontée vers les dossiers parents (Antigravity, R2). */

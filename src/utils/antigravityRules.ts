@@ -13,11 +13,19 @@ import {
   ParsedMetadata,
 } from './frontmatter';
 import { getUserHome } from './paths';
-import { countTokens } from './tokenizer';
-import { AntigravityRuleStatus, convertClaudePaths, validateGlobs } from '../antigravity/behavior';
+import { countTokensForFile } from './tokenizer';
+import {
+  AntigravityRuleStatus,
+  convertClaudePaths,
+  formatConditionalIndexEntry,
+  formatPermanentRule,
+  RULE_BODY_MAX_BYTES,
+  splitRuleBody,
+  validateGlobs,
+} from '../antigravity/behavior';
 
-/** Antigravity tronque tout fichier de règles qui dépasse 24 000 octets, inclusions développées. */
-export const ANTIGRAVITY_RULE_MAX_BYTES = 24000;
+/** Antigravity tronque le corps (sans frontmatter) au-delà de 24 000 octets, inclusions développées. */
+export const ANTIGRAVITY_RULE_MAX_BYTES = RULE_BODY_MAX_BYTES;
 
 /** Au-delà de cette taille, un fichier inclus n'est pas lu : seule sa taille sur disque est comptée. */
 const MAX_INCLUDE_READ_BYTES = 1024 * 1024;
@@ -89,7 +97,25 @@ export async function expandRuleIncludes(content: string, ruleFilePath: string):
   };
 }
 
-export interface AntigravityRuleInspection {
+/** Coût au démarrage d'une règle ou d'une âme, d'après les formats F1 à F4 (src/antigravity/behavior.ts). */
+export interface AntigravityBootCost {
+  /** Taille en octets UTF-8 du corps sans frontmatter, inclusions développées. */
+  byteSize: number;
+  /** Corps au-delà du plafond de 24 000 octets : Antigravity le tronque. */
+  warningSizeExceeded: boolean;
+  /** Tokens injectés au démarrage : enveloppe F1, entrée d'index F3, ou 0 (F4). */
+  bootTokenCount: number;
+  /** Caractères injectés au démarrage. */
+  bootCharCount: number;
+  /** Tokens du corps entier, inclusions développées : ce que lit l'agent quand la règle s'applique. */
+  bodyTokenCount: number;
+  /** Octets coupés par Antigravity (marqueur `<truncated N bytes>`), 0 sans troncature. */
+  truncatedBytes: number;
+  /** Tokens de la partie coupée, jamais lue par l'agent. */
+  lostTokens: number;
+}
+
+export interface AntigravityRuleInspection extends AntigravityBootCost {
   trigger: AntigravityRuleTrigger | null;
   ignored: boolean;
   isConditional: boolean;
@@ -98,42 +124,70 @@ export interface AntigravityRuleInspection {
   /** Motifs `globs` qui contiennent un dossier et ne se déclencheront jamais (R3). */
   deadGlobs: string[];
   issues: AntigravityRuleIssue[];
-  byteSize: number;
-  warningSizeExceeded: boolean;
   /** Description absente du frontmatter (recommandée pour toutes les règles). */
   warningNoDescription: boolean;
-  /** Tokens du contenu développé, ou undefined si le fichier n'a aucune inclusion. */
-  expandedTokenCount?: number;
+}
+
+/** Date et taille du fichier, pour le cache de tokens. */
+type FileStamp = { size: number; mtimeMs: number } | null | undefined;
+
+/**
+ * Coût d'un corps injecté au démarrage dans l'enveloppe F1 (règle permanente, âme, règle
+ * héritée), tronqué à 24 000 octets. `injected` à faux : seul le poids du corps est mesuré.
+ */
+async function measureBody(body: string, filePath: string, stamp: FileStamp, injected: boolean): Promise<AntigravityBootCost> {
+  const expanded = await expandRuleIncludes(body, filePath);
+  const count = (text: string, variant: string) => countTokensForFile(filePath, stamp?.size, stamp?.mtimeMs, text, variant);
+  const bodyTokenCount = count(expanded.content, 'body');
+  const permanent = formatPermanentRule(filePath, expanded.content);
+  const truncatedBytes = Math.max(0, expanded.byteSize - Buffer.byteLength(permanent.truncation.kept, 'utf8'));
+  return {
+    byteSize: expanded.byteSize,
+    warningSizeExceeded: expanded.byteSize > ANTIGRAVITY_RULE_MAX_BYTES,
+    bootTokenCount: injected ? count(permanent.text, 'f1') : 0,
+    bootCharCount: injected ? permanent.text.length : 0,
+    bodyTokenCount,
+    truncatedBytes,
+    lostTokens: permanent.truncation.lost ? count(permanent.truncation.lost, 'lost') : 0,
+  };
 }
 
 /**
  * Inspecte un fichier `rules/*.md` d'Antigravity : validité du frontmatter, mode d'activation,
- * taille en octets après inclusions.
+ * taille du corps après inclusions et coût au démarrage selon le trigger.
  */
-export async function inspectAntigravityRule(rawContent: string, filePath: string): Promise<AntigravityRuleInspection> {
+export async function inspectAntigravityRule(rawContent: string, filePath: string, stamp?: FileStamp): Promise<AntigravityRuleInspection> {
   const check = checkAntigravityRuleFrontmatter(rawContent);
-  const expanded = await expandRuleIncludes(rawContent, filePath);
+  const { metadata } = extractFrontmatter(rawContent);
   const verdict = check.trigger === 'glob' && !check.issues.includes('missing-globs')
-    ? validateGlobs(globsOf(extractFrontmatter(rawContent).metadata))
+    ? validateGlobs(globsOf(metadata))
     : null;
+  const status: AntigravityRuleStatus = check.ignored ? 'ignored'
+    : verdict?.status === 'yaml-list' ? 'ignored-yaml-list'
+    : verdict?.status === 'never-triggers' ? 'never-triggers'
+    : verdict?.status === 'partial' ? 'partial'
+    : 'active';
+
+  // F1 : règle permanente, corps sans frontmatter ; F3 : entrée d'index ; F4 : glob et manual, rien
+  const cost = await measureBody(splitRuleBody(rawContent).body, filePath, stamp, check.trigger === 'always_on' && !check.ignored);
+  if (check.trigger === 'model_decision' && !check.ignored) {
+    const description = typeof metadata.description === 'string' ? metadata.description : '';
+    const entry = formatConditionalIndexEntry(filePath, description);
+    cost.bootTokenCount = countTokensForFile(filePath, stamp?.size, stamp?.mtimeMs, entry, 'f3');
+    cost.bootCharCount = entry.length;
+  }
 
   return {
+    ...cost,
     trigger: check.trigger,
     ignored: check.ignored,
     isConditional: check.trigger === 'glob' || check.trigger === 'model_decision' || check.trigger === 'manual',
-    status: check.ignored ? 'ignored'
-      : verdict?.status === 'yaml-list' ? 'ignored-yaml-list'
-      : verdict?.status === 'never-triggers' ? 'never-triggers'
-      : verdict?.status === 'partial' ? 'partial'
-      : 'active',
+    status,
     deadGlobs: verdict?.deadPatterns ?? [],
     issues: check.issues,
-    byteSize: expanded.byteSize,
-    warningSizeExceeded: expanded.byteSize > ANTIGRAVITY_RULE_MAX_BYTES,
     // Pour model_decision, l'absence de description est déjà signalée comme champ obligatoire manquant ;
     // pour une règle ignorée, le défaut de trigger prime.
     warningNoDescription: !check.ignored && !check.hasDescription && check.trigger !== 'model_decision',
-    expandedTokenCount: expanded.includes.length > 0 ? countTokens(expanded.content) : undefined,
   };
 }
 
@@ -257,17 +311,9 @@ export function ensureAntigravityTrigger(content: string): AntigravityRuleConver
 }
 
 /**
- * Taille en octets d'un fichier AGENTS.md ou GEMINI.md, inclusions développées.
+ * Coût au démarrage d'un fichier AGENTS.md ou GEMINI.md : sans frontmatter (non supporté),
+ * le fichier entier est le corps, injecté dans l'enveloppe F1 et tronqué à 24 000 octets.
  */
-export async function measureAntigravitySoul(rawContent: string, filePath: string): Promise<{
-  byteSize: number;
-  warningSizeExceeded: boolean;
-  expandedTokenCount?: number;
-}> {
-  const expanded = await expandRuleIncludes(rawContent, filePath);
-  return {
-    byteSize: expanded.byteSize,
-    warningSizeExceeded: expanded.byteSize > ANTIGRAVITY_RULE_MAX_BYTES,
-    expandedTokenCount: expanded.includes.length > 0 ? countTokens(expanded.content) : undefined,
-  };
+export async function measureAntigravitySoul(rawContent: string, filePath: string, stamp?: FileStamp): Promise<AntigravityBootCost> {
+  return measureBody(rawContent, filePath, stamp, true);
 }

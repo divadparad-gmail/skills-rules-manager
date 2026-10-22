@@ -1637,8 +1637,10 @@ Corps du texte.`;
       `rulesStat.conditionalTokenCount (${scanResult.rulesStat.conditionalTokenCount}) doit être STRICTEMENT égal à la somme des cartes conditionnelles (${expectedCondTotal})`
     );
 
-    // Vérification de concordance Règles au boot : permanentes + 20 tokens par conditionnelle
-    const expectedRulesBoot = permRuleCards.reduce((acc, i) => acc + (i.tokenCount || 0), 0) + (condRuleCards.length * 20);
+    // Vérification de concordance Règles au boot : permanentes + coût au démarrage des conditionnelles
+    // (Antigravity, lot A2 : entrée d'index pour model_decision, 0 pour glob et manual)
+    const expectedRulesBoot = permRuleCards.reduce((acc, i) => acc + (i.tokenCount || 0), 0)
+      + condRuleCards.reduce((acc, i) => acc + (i.metadata?.bootTokenCount || 0), 0);
     assert.strictEqual(
       scanResult.rulesStat.tokenCount,
       expectedRulesBoot,
@@ -1852,7 +1854,8 @@ Corps du texte.`;
     const expectedCondTotal = condRuleCards.reduce((acc, i) => acc + (i.tokenCount || 0), 0);
     assert.strictEqual(scanResult.rulesStat.conditionalTokenCount, expectedCondTotal);
 
-    const expectedRulesBoot = permRuleCards.reduce((acc, i) => acc + (i.tokenCount || 0), 0) + (condRuleCards.length * 20);
+    const expectedRulesBoot = permRuleCards.reduce((acc, i) => acc + (i.tokenCount || 0), 0)
+      + condRuleCards.reduce((acc, i) => acc + (i.metadata?.bootTokenCount || 0), 0);
     assert.strictEqual(scanResult.rulesStat.tokenCount, expectedRulesBoot);
 
     // Nettoyage de l'override de test

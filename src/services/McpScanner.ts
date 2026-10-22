@@ -1,8 +1,14 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { TokenCategoryStat, WorkspaceContext } from '../types';
+import { McpServerStat, TokenCategoryStat, WorkspaceContext } from '../types';
 import { getEffectiveGlobalAntigravityPath, getUserHome } from '../utils/paths';
 import { countTokens, countTokensForFile } from '../utils/tokenizer';
+import {
+  formatMcpServer,
+  isUnsupportedRemoteMcpServer,
+  MCP_DISABLED_SERVERS_COUNTED,
+  MCP_TOOL_CACHE_DIR,
+} from '../antigravity/behavior';
 
 let vscodeModule: any = null;
 try {
@@ -30,7 +36,12 @@ export class McpScanner {
     const globalPath = getEffectiveGlobalAntigravityPath(customGlobalPath);
     const mcpConfigPath = path.join(globalPath, 'mcp_config.json');
 
-    return this.parseMcpConfigFile(mcpConfigPath, 'global', globalPath);
+    return this.parseAntigravityMcpConfig(mcpConfigPath, 'global', globalPath, this.toolCacheDir(globalPath));
+  }
+
+  /** Cache des schémas d'outils d'Antigravity (🧪 observé, non documenté), sous `~/.gemini`. */
+  private static toolCacheDir(globalPath: string): string {
+    return path.join(path.dirname(globalPath), MCP_TOOL_CACHE_DIR);
   }
 
   /**
@@ -51,7 +62,81 @@ export class McpScanner {
     const localDir = path.join(workspace.workspacePath, agentsDir);
     const mcpConfigPath = path.join(localDir, 'mcp_config.json');
 
-    return this.parseMcpConfigFile(mcpConfigPath, 'local', localDir);
+    return this.parseAntigravityMcpConfig(mcpConfigPath, 'local', localDir, this.toolCacheDir(getEffectiveGlobalAntigravityPath()));
+  }
+
+  /**
+   * Coût au démarrage des serveurs MCP sous Antigravity (F8) : un titre par serveur actif, puis
+   * les noms de ses outils, lus dans le cache d'Antigravity moins `disabledTools`. Sans cache, la
+   * liste est inconnue : seul le titre est compté. Les serveurs `disabled: true` et les serveurs
+   * distants sans `serverUrl` sont exclus de la jauge.
+   */
+  private static async parseAntigravityMcpConfig(
+    filePath: string,
+    scope: 'global' | 'local',
+    directoryPath: string,
+    toolCacheDir: string
+  ): Promise<TokenCategoryStat> {
+    if (!fs.existsSync(filePath)) {
+      return this.emptyStat(scope, directoryPath);
+    }
+
+    try {
+      const data = JSON.parse(await fs.promises.readFile(filePath, 'utf8')) as { mcpServers?: unknown };
+      const servers = data.mcpServers && typeof data.mcpServers === 'object' ? (data.mcpServers as Record<string, unknown>) : {};
+      const mcpServers: McpServerStat[] = [];
+      let charCount = 0;
+
+      for (const [name, rawConfig] of Object.entries(servers)) {
+        const config = rawConfig && typeof rawConfig === 'object' ? (rawConfig as Record<string, unknown>) : {};
+        if (isUnsupportedRemoteMcpServer(config)) {
+          mcpServers.push({ name, status: 'unsupported', toolCount: null, tokenCount: 0 });
+          continue;
+        }
+        if (config.disabled === true && !MCP_DISABLED_SERVERS_COUNTED) {
+          mcpServers.push({ name, status: 'disabled', toolCount: null, tokenCount: 0 });
+          continue;
+        }
+        const disabledTools = Array.isArray(config.disabledTools) ? config.disabledTools.map(String) : [];
+        const cachedTools = await this.readCachedToolNames(toolCacheDir, name);
+        const tools = cachedTools ? cachedTools.filter((tool) => !disabledTools.includes(tool)) : null;
+        const block = formatMcpServer(name, tools);
+        charCount += block.length;
+        mcpServers.push({ name, status: 'active', toolCount: tools ? tools.length : null, tokenCount: countTokens(block) });
+      }
+
+      const active = mcpServers.filter((server) => server.status === 'active');
+      const tokenCount = active.reduce((sum, server) => sum + server.tokenCount, 0);
+      return {
+        type: 'mcp',
+        scope,
+        activeCount: active.length,
+        totalCount: mcpServers.length,
+        charCount,
+        tokenCount,
+        warningCount: mcpServers.filter((server) => server.status === 'unsupported').length,
+        percentage: Number(((tokenCount / 20000) * 100).toFixed(1)),
+        directoryPath,
+        mcpServers,
+      };
+    } catch {
+      return this.emptyStat(scope, directoryPath);
+    }
+  }
+
+  /**
+   * Noms des outils d'un serveur dans le cache d'Antigravity (`<serveur>/<outil>.json`), ou null
+   * si le cache n'a pas ce serveur. Le nom vient d'un fichier de configuration, éventuellement
+   * celui du dépôt ouvert : un nom qui sortirait du dossier du cache est refusé.
+   */
+  private static async readCachedToolNames(toolCacheDir: string, serverName: string): Promise<string[] | null> {
+    if (!serverName || serverName === '.' || serverName === '..' || /[\\/]/.test(serverName)) return null;
+    try {
+      const entries = await fs.promises.readdir(path.join(toolCacheDir, serverName), { withFileTypes: true });
+      return entries.filter((entry) => entry.isFile() && entry.name.endsWith('.json')).map((entry) => entry.name.slice(0, -'.json'.length));
+    } catch {
+      return null;
+    }
   }
 
   private static async parseClaudeMcpGlobal(claudeJsonPath: string): Promise<TokenCategoryStat> {

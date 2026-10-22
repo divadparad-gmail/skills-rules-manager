@@ -3,7 +3,8 @@
  * qu'annonce sa documentation (les deux divergent).
  *
  * Source unique des faits R1 à R6, vérifiés par la suite de régression
- * test/scenarios/antigravity-injection-contexte/ (voir SCENARIOS.md dans ce dossier).
+ * test/scenarios/antigravity-injection-contexte/ (voir SCENARIOS.md dans ce dossier), et des
+ * formats F1 à F8 injectés au démarrage, qui fondent le comptage des tokens (en fin de module).
  * Si la suite montre un changement de comportement, c'est ce module qu'il faut mettre à jour :
  * le scanner, l'import et le déploiement Discovery s'appuient tous sur lui.
  */
@@ -193,4 +194,157 @@ export function convertClaudePaths(paths: string[]): PathsConversion {
       ? [`Portée élargie : Antigravity ne peut pas cibler un dossier ; la règle s'appliquera à tous les fichiers ${listed} du projet.`]
       : [],
   };
+}
+
+// ---------------------------------------------------------------------------------------------
+// Ce qu'Antigravity injecte au démarrage (lot A2). Formats cités par les rapports bruts de
+// l'enquête : test/scenarios/antigravity-injection-contexte/historique/2026-10-21/.
+// Le coût affiché par la jauge est le nombre de tokens o200k de ces chaînes reconstruites.
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * Plafond d'une règle permanente ou d'une âme, en octets UTF-8 du corps sans frontmatter,
+ * inclusions développées. Mesuré (phase 1 et suite de régression) : 14 978 octets coupés sur
+ * `06-rule-warn-size-exceeded-24kb.md`, 5 957 sur `r-tronque.md`, soit exactement le corps moins
+ * 24 000 octets. Le corps commence juste après le `---` fermant : sa fin de ligne en fait partie.
+ */
+export const RULE_BODY_MAX_BYTES = 24000;
+
+/** Découpe une règle en frontmatter (jusqu'au `---` fermant, sans sa fin de ligne) et corps. */
+export function splitRuleBody(content: string): { frontmatter: string; body: string } {
+  const match = /^---[ \t]*\r?\n[\s\S]*?\r?\n---[ \t]*(?=\r?\n|$)/.exec(content);
+  return match ? { frontmatter: match[0], body: content.slice(match[0].length) } : { frontmatter: '', body: content };
+}
+
+export interface TruncatedBody {
+  /** Partie gardée par Antigravity. */
+  kept: string;
+  /** Partie coupée (vide si le corps tient dans le plafond). */
+  lost: string;
+  /** Octets coupés, tels qu'annoncés par le marqueur `<truncated N bytes>`. */
+  truncatedBytes: number;
+}
+
+/**
+ * Coupe un corps à RULE_BODY_MAX_BYTES octets sans couper un caractère UTF-8. Ce que fait
+ * Antigravity au milieu d'un caractère n'a pas été observé : on recule au caractère précédent.
+ */
+export function truncateRuleBody(body: string): TruncatedBody {
+  const bytes = Buffer.from(body, 'utf8');
+  if (bytes.length <= RULE_BODY_MAX_BYTES) return { kept: body, lost: '', truncatedBytes: 0 };
+  let end = RULE_BODY_MAX_BYTES;
+  while (end > 0 && (bytes[end] & 0xc0) === 0x80) end--;
+  const kept = bytes.subarray(0, end).toString('utf8');
+  return { kept, lost: body.slice(kept.length), truncatedBytes: bytes.length - end };
+}
+
+/**
+ * Chemin sous la forme URI qu'Antigravity affiche dans l'index des règles conditionnelles et
+ * l'en-tête des plugins (phase 3b) : `file:///`, lettre de lecteur en minuscule, barres obliques,
+ * espaces encodés en `%20`. L'encodage des autres caractères n'a pas été observé.
+ */
+export function toAntigravityUri(filePath: string): string {
+  const absolute = path.resolve(filePath).replace(/\\/g, '/');
+  const encode = (rest: string) => rest.split('/').map((segment) => encodeURIComponent(segment)).join('/');
+  const drive = /^([A-Za-z]):(\/.*)?$/.exec(absolute);
+  return drive ? `file:///${drive[1].toLowerCase()}:${encode(drive[2] ?? '/')}` : `file://${encode(absolute)}`;
+}
+
+/**
+ * F1 (phase 1) : règle permanente, âme ou règle héritée, injectée entre deux balises qui portent
+ * le chemin absolu (Windows, avec `\`) : le chemin apparaît deux fois. Le corps est injecté sans
+ * frontmatter et, au-delà du plafond, se termine par `<truncated N bytes>`. Les sauts de ligne
+ * exacts autour du corps n'ont pas été observés.
+ */
+export function formatPermanentRule(filePath: string, body: string): { text: string; truncation: TruncatedBody } {
+  const truncation = truncateRuleBody(body);
+  const marker = truncation.truncatedBytes > 0 ? `<truncated ${truncation.truncatedBytes} bytes>` : '';
+  const shown = truncation.kept.replace(/^(?:\r?\n)+/, '');
+  return { text: `<RULE[${filePath}]>\n${shown}${marker}\n</RULE[${filePath}]>\n`, truncation };
+}
+
+/**
+ * F2 (phase 1) : en-tête de l'index des règles conditionnelles. Un seul index a été observé,
+ * règles globales et locales confondues : l'en-tête compte une seule fois en tout, dès qu'une
+ * règle `model_decision` est chargée.
+ */
+export const CONDITIONAL_RULES_HEADER =
+  'The following are conditional rules, formatted as: - [absolute path]: [description].\n' +
+  'The description provides conditions under which the rule applies. If you believe a rule should apply, view the file for further instructions.\n';
+
+/** F3 (phases 1 et 2) : entrée de l'index pour une règle `model_decision`. */
+export function formatConditionalIndexEntry(filePath: string, description: string): string {
+  return `- ${toAntigravityUri(filePath)}: ${description}\n`;
+}
+
+/** F4 (phases 1, 2 et 3b) : une règle `glob` ou `manual` n'injecte rien au démarrage. */
+export const TRIGGERS_WITHOUT_BOOT_COST: readonly AntigravityRuleTrigger[] = ['glob', 'manual'];
+
+/** F5 (phase 1) : en-tête de l'index des skills, injecté une seule fois. */
+export const SKILLS_INDEX_HEADER = 'Available skills:\n';
+
+/** F5 (phases 1 et 2) : une ligne par skill, chemin absolu Windows de SKILL.md, nom sans préfixe de plugin. */
+export function formatSkillIndexLine(name: string, skillMdPath: string, description: string): string {
+  return `- ${name} (${skillMdPath}): ${description}\n`;
+}
+
+/**
+ * F6 (phase 2) : en-tête de la section d'un plugin. Ses skills y sont relistés au format F5, en
+ * plus de l'index des skills : chaque skill de plugin est donc injecté deux fois.
+ */
+export function formatPluginSectionHeader(pluginName: string, pluginRoot: string): string {
+  return `# ${pluginName} (${toAntigravityUri(pluginRoot)})\nSkills:\n`;
+}
+export const PLUGIN_SKILL_INDEX_COPIES = 2;
+
+/**
+ * F7 (phase 1) : skills intégrés, listés dans l'index F5 et impossibles à retirer. Chemin relatif
+ * au dossier `~/.gemini`. Il y en avait 3 sur le poste de test en 2.5.5.
+ */
+export const BUILTIN_SKILLS_DIR = path.join('antigravity-ide', 'builtin', 'skills');
+
+/**
+ * 📄 Anciens emplacements de skills, documentés comme supportés mais non testés : `.agent/skills/`
+ * dans le projet, `~/.gemini/antigravity/skills/` (relatif au dossier `~/.gemini`). Ils sont
+ * comptés, avec un badge « chargement non vérifié ».
+ */
+export const LEGACY_WORKSPACE_SKILLS_DIR = path.join('.agent', 'skills');
+export const LEGACY_GLOBAL_SKILLS_DIR = path.join('antigravity', 'skills');
+
+/**
+ * F8 (phase 1) : un titre par serveur MCP, puis `Eager:` et/ou `Lazy:` suivis des seuls noms
+ * d'outils, un par ligne. Aucune description, aucun schéma. Le critère qui sépare Eager et Lazy
+ * est inconnu ; seul `Lazy:` a été observé.
+ */
+export function formatMcpServer(serverName: string, toolNames: string[] | null): string {
+  const tools = toolNames && toolNames.length > 0 ? `Lazy:\n${toolNames.join('\n')}\n` : '';
+  return `# ${serverName}\n${tools}`;
+}
+
+/**
+ * 🧪 Observé, non documenté (phase 1) : Antigravity garde un fichier de schéma par outil dans
+ * `~/.gemini/antigravity-ide/mcp/<serveur>/<outil>.json` (chemin relatif au dossier `~/.gemini`).
+ * Ce cache, moins `disabledTools`, redonnait exactement les outils listés au démarrage. Un
+ * serveur qui ne se connecte pas n'affiche pas ses outils : le cache peut alors surestimer.
+ */
+export const MCP_TOOL_CACHE_DIR = path.join('antigravity-ide', 'mcp');
+
+/** Fourchette affichée par outil quand la liste des outils d'un serveur est inconnue. */
+export const MCP_TOKENS_PER_TOOL_RANGE = [3, 8] as const;
+
+/**
+ * Les serveurs `disabled: true` sont exclus de la jauge. Le fichier global lu reste
+ * `~/.gemini/config/mcp_config.json` : le recoupement de la phase 1 ne désigne aucun des deux
+ * fichiers globaux du poste (voir docs/chantier-A-ecarts-algorithme.md), non testé directement.
+ */
+export const MCP_DISABLED_SERVERS_COUNTED = false;
+
+/**
+ * 📄 Documentation, non testé : un serveur distant doit être déclaré avec `serverUrl` ;
+ * `url` et `httpUrl` ne sont pas supportés par Antigravity.
+ */
+export function isUnsupportedRemoteMcpServer(config: unknown): boolean {
+  if (!config || typeof config !== 'object') return false;
+  const server = config as Record<string, unknown>;
+  return server.serverUrl === undefined && (server.url !== undefined || server.httpUrl !== undefined);
 }

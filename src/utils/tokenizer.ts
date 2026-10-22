@@ -94,9 +94,27 @@ export function getTokenizerMetrics(): TokenizerTimingStats {
   };
 }
 
-/** Cache mémoire pour les fichiers déjà encodés (Clé = `${filePath}:${mtimeMs}:${size}`) */
+/**
+ * Cache mémoire pour les fichiers déjà encodés
+ * (Clé = `${filePath}#${variant}:${mtimeMs}:${size}:${empreinte du texte}`).
+ */
 const tokenCache = new Map<string, number>();
+/** Dernière clé connue par (fichier, variante), pour purger l'ancienne entrée. */
 const fileToKeyMap = new Map<string, string>();
+
+/**
+ * Empreinte FNV-1a 32 bits du texte compté : un même fichier peut être compté sous plusieurs
+ * formes (corps, enveloppe injectée, ligne d'index), et une inclusion peut changer sans que le
+ * fichier qui l'inclut change.
+ */
+function textFingerprint(text: string): string {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return `${text.length}.${(hash >>> 0).toString(36)}`;
+}
 
 /**
  * Vide intégralement le cache de décompte de tokens (utile pour les tests unitaires).
@@ -162,13 +180,15 @@ export function countTokens(text: string | null | undefined): number {
  * @param size Taille en octets du fichier (optionnel, calculé si omis)
  * @param mtimeMs Timestamp de dernière modification en millisecondes (optionnel, calculé si omis)
  * @param text Contenu textuel à tokenizer
+ * @param variant Forme comptée pour ce fichier (ex. `f1`, `f5`), quand un fichier en a plusieurs
  * @returns Nombre de tokens calculé ou servi du cache
  */
 export function countTokensForFile(
   filePath: string,
   size?: number,
   mtimeMs?: number,
-  text?: string | null | undefined
+  text?: string | null | undefined,
+  variant = ''
 ): number {
   if (!text) return 0;
 
@@ -186,7 +206,8 @@ export function countTokensForFile(
     }
   }
 
-  const key = `${filePath}:${finalMtime}:${finalSize}`;
+  const entry = `${filePath}#${variant}`;
+  const key = `${entry}:${finalMtime}:${finalSize}:${textFingerprint(text)}`;
   if (tokenCache.has(key)) {
     scanMetrics.cachedCount++;
     return tokenCache.get(key)!;
@@ -195,12 +216,12 @@ export function countTokensForFile(
   // Cache miss -> encodage complet et mémorisation
   const tokens = countTokens(text);
 
-  // Nettoyage de l'ancienne clé pour ce fichier s'il a été modifié
-  const prevKey = fileToKeyMap.get(filePath);
+  // Nettoyage de l'ancienne clé pour ce fichier et cette variante s'ils ont été modifiés
+  const prevKey = fileToKeyMap.get(entry);
   if (prevKey && prevKey !== key) {
     tokenCache.delete(prevKey);
   }
-  fileToKeyMap.set(filePath, key);
+  fileToKeyMap.set(entry, key);
   tokenCache.set(key, tokens);
 
   return tokens;
