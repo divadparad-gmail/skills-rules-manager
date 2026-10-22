@@ -22,8 +22,9 @@ const ANNEX_MAX_READ_BYTES = 1024 * 1024;
 
 /**
  * Fichiers annexes d'un skill à signaler, à titre d'information : plus de 300 lignes, ou plus
- * de 100 lignes sans table des matières. Ils ne coûtent rien au démarrage, et Antigravity ne
- * les lit que si SKILL.md y renvoie (phase 2 de l'enquête).
+ * de 100 lignes sans table des matières. Ils ne coûtent rien au démarrage et ne sont jamais
+ * signalés à l'agent, même à l'ouverture de SKILL.md (🧪 phase 2 de l'enquête) : ils ne sont lus
+ * que si l'agent les ouvre.
  */
 export async function collectAnnexNotes(skillFolder: string): Promise<SkillAnnexNote[]> {
   const notes: SkillAnnexNote[] = [];

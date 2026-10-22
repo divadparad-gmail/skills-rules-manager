@@ -210,10 +210,31 @@ export interface BudgetOverflow {
   pointerCandidates: Array<{ id: string; name: string; scope: ResourceScope; tokens: number }>;
 }
 
+/** Hook déclaré dans un `hooks.json` (format documenté, voir parseHooksConfig). */
+export interface AntigravityHook {
+  name: string;
+  enabled: boolean;
+  events: string[];
+  unknownKeys: string[];
+  handlerCount: number;
+  /** Événements à coût dynamique : SessionStart, PreInvocation, PostInvocation. */
+  dynamicEvents: string[];
+}
+
+/** Lecture d'un fichier de hooks d'Antigravity, sans jamais exécuter ses commandes. */
+export interface HooksFileReading {
+  scope: 'global' | 'local';
+  path: string;
+  status: 'absent' | 'invalid-json' | 'unrecognized-format' | 'ok';
+  hooks: AntigravityHook[];
+}
+
 /** Coûts qu'Antigravity ajoute en cours de session, hors jauge (lot A3). */
 export interface AntigravityDynamicCosts {
   globStacks: GlobStack[];
   budgetOverflow: BudgetOverflow | null;
+  /** Fichiers de hooks du projet et global : 0 token au démarrage, coût dynamique possible. */
+  hooks: HooksFileReading[];
   /** Session ordinaire retenue pour chiffrer le coût d'une règle `glob` sur une session. */
   ordinarySession: { reads: number; writes: number };
 }

@@ -1,4 +1,4 @@
-import { AntigravityDynamicCosts, BudgetOverflow, GlobStack, GlobStackRule, ResourceItem } from '../types';
+import { AntigravityDynamicCosts, BudgetOverflow, GlobStack, GlobStackRule, HooksFileReading, ResourceItem } from '../types';
 import { countTokens } from '../utils/tokenizer';
 import { expandBraces, GLOB_REINJECTION_HEADER, ORDINARY_SESSION, RULES_BUDGET_TOKENS } from '../antigravity/behavior';
 import { bootTokensOf, countsAtBoot } from './antigravityRuleItem';
@@ -7,10 +7,11 @@ import { bootTokensOf, countsAtBoot } from './antigravityRuleItem';
  * Coûts qu'Antigravity ajoute en cours de session (lot A3). Ils ne modifient pas la jauge, qui
  * compte ce qui est injecté au démarrage : ils sont affichés à côté.
  */
-export function computeAntigravityDynamicCosts(items: ResourceItem[]): AntigravityDynamicCosts {
+export function computeAntigravityDynamicCosts(items: ResourceItem[], hooks: HooksFileReading[] = []): AntigravityDynamicCosts {
   return {
     globStacks: computeGlobStacks(items),
     budgetOverflow: computeBudgetOverflow(items),
+    hooks,
     ordinarySession: { ...ORDINARY_SESSION },
   };
 }

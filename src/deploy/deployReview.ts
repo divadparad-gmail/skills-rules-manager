@@ -13,7 +13,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { ConflictPolicy, DeploymentResult } from '../common/discoveryTypes';
 import { DeployTarget, DiscoveryResourceType } from '../common/eventTypes';
-import { DeployContext, MultiTargetDeployService } from './MultiTargetDeployService';
+import { antigravityHookRefusal, DeployContext, MultiTargetDeployService } from './MultiTargetDeployService';
 import { ensureAntigravityTrigger } from '../utils/antigravityRules';
 
 /** Ressource proposée à l'installation, avec son registre d'origine. */
@@ -63,6 +63,14 @@ export async function reviewAndDeploy(
   options: DeployReviewOptions,
   ui: DeployReviewPort
 ): Promise<DeploymentResult | undefined> {
+  // Un hook ne peut pas être installé dans Antigravity sous forme de fichier : refus avant
+  // l'aperçu et toute écriture
+  const hookRefusal = antigravityHookRefusal(options.context.runtime, original.type, original.name);
+  if (hookRefusal) {
+    ui.report('error', hookRefusal);
+    return { success: false, target: options.target, error: hookRefusal };
+  }
+
   // Une règle destinée à Antigravity reçoit un trigger valide et des motifs qui se déclenchent
   // vraiment, avant l'aperçu : l'utilisateur relit exactement ce qui sera écrit.
   let resource = original;

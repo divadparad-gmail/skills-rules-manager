@@ -21,13 +21,24 @@ import {
   DeploymentResult,
   ManifestProvenance,
 } from '../common/discoveryTypes';
-import { AgentRuntime, DeployTarget } from '../common/eventTypes';
+import { AgentRuntime, DeployTarget, DiscoveryResourceType } from '../common/eventTypes';
 import { ExtensionEventBus } from '../common/ExtensionEventBus';
 import { SkillProtocolAdapter } from '../environment/SkillProtocolAdapter';
 import { NasPathService } from '../settings/NasPathService';
 
 /** Taille maximale admise pour un manifeste, garde-fou anti-charge utile. */
 export const MAX_MANIFEST_BYTES = 512 * 1024;
+
+/**
+ * Antigravity ne lit pas un hook écrit dans `hooks/<id>.md` : un hook se déclare dans
+ * `.agents/hooks.json` et lance des commandes shell. Le déploiement d'un hook vers Antigravity est
+ * donc refusé, plutôt que de fusionner du JSON exécutable sans test du format réel (lot A3).
+ * Retourne le message de refus, ou null si le déploiement est permis.
+ */
+export function antigravityHookRefusal(runtime: AgentRuntime, type: DiscoveryResourceType, name: string): string | null {
+  if (runtime !== 'antigravity' || type !== 'hooks') return null;
+  return `Le hook « ${name} » n'a pas été installé : Antigravity ne lit pas les hooks sous forme de fichier .md. Un hook se déclare dans .agents/hooks.json et lance des commandes shell : ajoutez-le vous-même après avoir relu la commande.`;
+}
 
 export interface DeployContext {
   runtime: AgentRuntime;
@@ -82,6 +93,12 @@ export class MultiTargetDeployService {
       skillId: request.skillId,
       target: request.target,
     });
+
+    // Défense en profondeur : le parcours deployReview refuse déjà un hook avant l'aperçu
+    const hookRefusal = antigravityHookRefusal(context.runtime, request.type, request.name);
+    if (hookRefusal) {
+      return this.finish(request, { success: false, target: request.target, error: hookRefusal });
+    }
 
     const verdict = MultiTargetDeployService.validateManifest(request.manifest);
     if (!verdict.safe) {

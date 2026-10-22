@@ -445,3 +445,89 @@ export const ORDINARY_SESSION = { reads: 15, writes: 5 } as const;
  */
 export const RULES_BUDGET_TOKENS = 20000;
 export const RULES_BUDGET_POINTERS_TESTED = false;
+
+// ---------------------------------------------------------------------------------------------
+// Hooks et workflows (lot A3). Format des hooks : skill intégré `agy-customizations`
+// (`docs/hooks.md`, Antigravity IDE 2.5.5) 📄, non testé.
+// ---------------------------------------------------------------------------------------------
+
+/** 📄 Fichier de hooks du projet, relatif à la racine du dossier ouvert. */
+export const WORKSPACE_HOOKS_FILE = path.join('.agents', 'hooks.json');
+/** 📄 Fichier de hooks global, relatif au dossier `~/.gemini/config`. */
+export const GLOBAL_HOOKS_FILE = 'hooks.json';
+
+/** 📄 Événements de la documentation intégrée à l'IDE 2.5.5 (`agy-customizations`). */
+export const HOOK_EVENTS_BUILTIN_DOC = ['PreToolUse', 'PostToolUse', 'PreInvocation', 'PostInvocation', 'Stop'] as const;
+/** 📄 Documentation web seulement ; absent de la documentation intégrée à l'IDE 2.5.5 ❔. */
+export const HOOK_EVENTS_WEB_DOC_ONLY = ['SessionStart'] as const;
+export const HOOK_EVENTS: readonly string[] = [...HOOK_EVENTS_WEB_DOC_ONLY, ...HOOK_EVENTS_BUILTIN_DOC];
+
+/** 📄 `PreToolUse` et `PostToolUse` regroupent leurs gestionnaires sous un `matcher` ; les autres les listent directement. */
+const GROUPED_HOOK_EVENTS = ['PreToolUse', 'PostToolUse'];
+
+/**
+ * ❔ / 📄 La configuration JSON n'est pas dans le contexte : un hook ne coûte rien au démarrage.
+ * Seul ce que son script injecte coûte : une fois (`SessionStart`), à chaque appel au modèle
+ * (`PreInvocation`) ou après chaque série d'appels d'outils (`PostInvocation`). Non mesurable sans
+ * exécuter le hook, ce que l'extension ne fait jamais.
+ */
+export const HOOK_DYNAMIC_EVENTS: readonly string[] = ['SessionStart', 'PreInvocation', 'PostInvocation'];
+
+export interface HookSpec {
+  name: string;
+  /** `enabled: false` désactive tous les gestionnaires du hook (vrai par défaut). */
+  enabled: boolean;
+  /** Événements reconnus, dans l'ordre du fichier. */
+  events: string[];
+  /** Clés inconnues : ni `enabled`, ni un événement documenté. */
+  unknownKeys: string[];
+  handlerCount: number;
+  /** Événements dont le script peut injecter du texte en cours de session (HOOK_DYNAMIC_EVENTS). */
+  dynamicEvents: string[];
+}
+
+export type HooksConfigParse =
+  | { status: 'ok'; hooks: HookSpec[] }
+  | { status: 'unrecognized-format' };
+
+const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+/**
+ * Lit un `hooks.json` au format documenté : un objet dont chaque clé est le nom d'un hook, qui
+ * associe à chaque événement une liste de gestionnaires. Tout autre format (par exemple un
+ * tableau sous une clé `hooks`) est signalé comme non reconnu : Antigravity l'ignore
+ * probablement (non testé). Les commandes ne sont ni lues ni exécutées.
+ */
+export function parseHooksConfig(config: unknown): HooksConfigParse {
+  if (!isPlainObject(config)) return { status: 'unrecognized-format' };
+  const hooks: HookSpec[] = [];
+  for (const [name, spec] of Object.entries(config)) {
+    if (!isPlainObject(spec)) return { status: 'unrecognized-format' };
+    const events: string[] = [];
+    const unknownKeys: string[] = [];
+    let handlerCount = 0;
+    for (const [key, value] of Object.entries(spec)) {
+      if (key === 'enabled') continue;
+      if (!HOOK_EVENTS.includes(key) || !Array.isArray(value)) {
+        unknownKeys.push(key);
+        continue;
+      }
+      events.push(key);
+      for (const entry of value) {
+        const grouped = GROUPED_HOOK_EVENTS.includes(key) && isPlainObject(entry) && Array.isArray(entry.hooks);
+        handlerCount += grouped ? (entry.hooks as unknown[]).length : 1;
+      }
+    }
+    const dynamicEvents = events.filter((event) => HOOK_DYNAMIC_EVENTS.includes(event));
+    hooks.push({ name, enabled: spec.enabled !== false, events, unknownKeys, handlerCount, dynamicEvents });
+  }
+  return { status: 'ok', hooks };
+}
+
+/**
+ * 📄 / 🧪 Workflows : hors service depuis le 19 octobre 2026, et `/migrate-workflows` est absent
+ * de l'IDE 2.5.5. La catégorie « Workflows » de l'extension regroupe en réalité des skills dont le
+ * nom commence par `wf-` : Antigravity les liste comme des skills, ils restent comptés.
+ */
+export const WORKFLOWS_RETIRED_ON = '2026-10-19';

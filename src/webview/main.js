@@ -400,11 +400,11 @@
     const antigravitySummaryHtml = `
       <ul class="cheat-sheet-list">
         <li><span class="cs-icon">📏</span><span><strong>Tailles :</strong> Âme &amp; règles permanentes &lt; 200 li. • Règles <code>glob</code> &lt; 30 li. • Skills &lt; 500 li. • Plafond 24 Ko par fichier</span></li>
-        <li><span class="cs-icon">⚡</span><span><strong>Âme (GEMINI.md / AGENTS.md) :</strong> 100 % à chaque tour • Dossiers parents chargés, sous-dossiers jamais</span></li>
+        <li><span class="cs-icon">⚡</span><span><strong>Âme (GEMINI.md / AGENTS.md) :</strong> Une seule copie, présente en permanence • Dossiers parents chargés, sous-dossiers jamais</span></li>
         <li><span class="cs-icon">🎯</span><span><strong>Règles :</strong> <code>trigger</code> obligatoire • Budget de 20 000 tokens partagé avec l'Âme • <code>glob</code> : nom de fichier seul, réinjectée à chaque lecture ou modification</span></li>
         <li><span class="cs-icon">🧠</span><span><strong>Skills :</strong> Une ligne par skill au démarrage (nom, chemin, description) • Corps lu à la demande</span></li>
         <li><span class="cs-icon">🔌</span><span><strong>MCP &amp; Plugins :</strong> Noms des outils MCP seuls au démarrage • Skills de plugin listés deux fois, sans préfixe</span></li>
-        <li><span class="cs-icon">⏹️</span><span><strong>Workflows :</strong> Hors service depuis le 19 octobre 2026 • Migrer vers des skills</span></li>
+        <li><span class="cs-icon">⏹️</span><span><strong>Workflows :</strong> Hors service depuis le 19 octobre 2026 • Migrer vers des skills • Les <code>wf-*</code> de l'extension sont déjà des skills</span></li>
         <li><span class="cs-icon">🏛️</span><span><strong>Hiérarchie :</strong> N0 (Global) → N1 (Projet) → N2 (PC) → N3 (NAS)</span></li>
       </ul>
     `;
@@ -790,6 +790,9 @@
     return `Coût au démarrage : ${boot} tokens (corps sans frontmatter, entre deux balises <RULE[chemin]> qui portent chacune le chemin complet)`;
   }
 
+  /** Antigravity : ce que la catégorie « Workflows » contient réellement (src/antigravity/behavior.ts). */
+  const WF_SKILL_NOTE = 'Skill dont le nom commence par wf- : Antigravity le liste comme un skill, et il reste compté. Ce n\'est pas un workflow, format retiré le 19 octobre 2026.';
+
   /** Badge et infobulle d'un dépassement de taille recommandée (Antigravity, lot A3). */
   function describeSizeAdvice(advice) {
     const fmt = (n) => (n || 0).toLocaleString('fr-FR');
@@ -830,7 +833,7 @@
       return `• ${note.file} : ${note.lines.toLocaleString('fr-FR')} lignes, ${reasons.join(', ')}`;
     });
     return 'Fichiers annexes à surveiller (information) :\n' + lines.join('\n') +
-      '\n\nRecommandé : moins de 300 lignes, et une table des matières au-delà de 100 lignes. Les annexes ne coûtent rien au démarrage : l\'agent ne les lit que si SKILL.md y renvoie. La détection de la table des matières est approximative.';
+      '\n\nRecommandé : moins de 300 lignes, et une table des matières au-delà de 100 lignes. Les annexes ne coûtent rien au démarrage : elles ne sont lues que si l\'agent les ouvre. La détection de la table des matières est approximative.';
   }
 
   /** « fichier .ts » ou « fichier app.ts » pour un motif de nom de fichier. */
@@ -874,7 +877,13 @@
     const session = costs.ordinarySession || { reads: 15, writes: 5 };
     const operations = session.reads + session.writes;
 
-    summary.textContent = `⏱️ Coûts dynamiques : ${plural(stacks.length, 'motif')} glob${overflow ? ' · ⚠️ budget dépassé' : ''}`;
+    const hookFiles = costs.hooks || [];
+    const activeHooks = hookFiles.reduce((sum, file) => sum + file.hooks.filter((hook) => hook.enabled).length, 0);
+    const unreadableHooks = hookFiles.some((file) => file.status === 'invalid-json' || file.status === 'unrecognized-format');
+    summary.textContent = `⏱️ Coûts dynamiques : ${plural(stacks.length, 'motif')} glob` +
+      (activeHooks > 0 ? ` · ${plural(activeHooks, 'hook')}` : '') +
+      (unreadableHooks ? ' · ❔ hooks.json' : '') +
+      (overflow ? ' · ⚠️ budget dépassé' : '');
     body.innerHTML = '';
 
     if (overflow) {
@@ -924,7 +933,58 @@
       body.appendChild(block);
     });
 
+    if (hookFiles.length > 0) appendHooksSection(body, hookFiles, el, plural);
+
     body.appendChild(el('div', 'dynamic-costs-note', 'Ces coûts ne figurent pas dans la jauge, qui ne compte que ce qui est injecté au démarrage. Chaque copie réinjectée reste dans l\'historique de la conversation : c\'est déduit, non mesuré.'));
+  }
+
+  /** Quand le script d'un hook peut injecter du texte (src/antigravity/behavior.ts, HOOK_DYNAMIC_EVENTS). */
+  const HOOK_EVENT_TIMING = {
+    SessionStart: 'une fois, au démarrage de la session (SessionStart : 📄 documentation web ; absent de la documentation intégrée à l\'IDE 2.5.5 ❔)',
+    PreInvocation: 'à chaque appel au modèle (PreInvocation)',
+    PostInvocation: 'après chaque série d\'appels d\'outils (PostInvocation)',
+  };
+
+  /**
+   * Antigravity : hooks du projet et globaux. Leur configuration ne coûte rien au démarrage ;
+   * seul ce que leur script injecte coûte. L'extension ne lance jamais un hook.
+   */
+  function appendHooksSection(body, hookFiles, el, plural) {
+    body.appendChild(el('div', 'dynamic-costs-heading', 'Hooks (0 token au démarrage : la configuration n\'est pas dans le contexte)'));
+    hookFiles.forEach((file) => {
+      const label = file.scope === 'local' ? 'Projet, .agents/hooks.json' : 'Global, ~/.gemini/config/hooks.json';
+      if (file.status === 'absent') {
+        body.appendChild(el('div', 'dynamic-costs-note', `${label} : aucun fichier.`));
+        return;
+      }
+      if (file.status === 'invalid-json') {
+        body.appendChild(el('div', 'dynamic-costs-warning', `❔ ${label} : JSON invalide. Antigravity ne peut pas lire ce fichier.`));
+        return;
+      }
+      if (file.status === 'unrecognized-format') {
+        body.appendChild(el('div', 'dynamic-costs-warning', `❔ ${label} : format non reconnu. Antigravity attend un objet dont chaque clé est le nom d'un hook (📄 documentation intégrée agy-customizations) ; ce fichier est probablement ignoré (non testé).`));
+        return;
+      }
+      if (file.hooks.length === 0) {
+        body.appendChild(el('div', 'dynamic-costs-note', `${label} : aucun hook déclaré.`));
+        return;
+      }
+
+      const block = el('div', 'dynamic-costs-stack');
+      block.appendChild(el('div', 'dynamic-costs-stack-title', `${label} : ${plural(file.hooks.length, 'hook')}`));
+      const list = el('ul', 'dynamic-costs-rules');
+      file.hooks.forEach((hook) => {
+        const events = hook.events.length > 0 ? hook.events.join(', ') : 'aucun événement reconnu';
+        const unknown = hook.unknownKeys.length > 0 ? ` · clés inconnues : ${hook.unknownKeys.join(', ')}` : '';
+        list.appendChild(el('li', '', `${hook.name} : ${events} (${plural(hook.handlerCount, 'gestionnaire')})${hook.enabled ? '' : ' · désactivé'}${unknown}`));
+      });
+      block.appendChild(list);
+      file.hooks.filter((hook) => hook.enabled && hook.dynamicEvents.length > 0).forEach((hook) => {
+        const timings = hook.dynamicEvents.map((event) => HOOK_EVENT_TIMING[event]).filter(Boolean).join(' ; ');
+        block.appendChild(el('div', 'dynamic-costs-warning', `⚠️ ${hook.name} : coût dynamique, ce que le script injecte ${timings}. Non mesurable sans exécution.`));
+      });
+      body.appendChild(block);
+    });
   }
 
   /** Session ordinaire retenue pour chiffrer une règle glob (src/antigravity/behavior.ts). */
@@ -1403,6 +1463,15 @@
     const countEl = document.getElementById(`count${prefix}${scopeSuffix}`);
     const controlEl = document.getElementById(`bulk${prefix}${scopeSuffix}`);
 
+    // Antigravity : les « workflows » de l'extension sont des skills wf-*, listés comme des skills
+    if (controlEl && type === 'workflow') {
+      if (controlEl.dataset.defaultTitle === undefined) controlEl.dataset.defaultTitle = controlEl.title;
+      const isClaudeMode = !!(currentState && currentState.workspace && currentState.workspace.tool === 'claude-code');
+      controlEl.title = isClaudeMode
+        ? controlEl.dataset.defaultTitle
+        : `${WF_SKILL_NOTE}\nCliquez pour basculer ces skills ON/OFF.`;
+    }
+
     if (countEl) {
       countEl.textContent = `${active}/${total}`;
     }
@@ -1710,6 +1779,7 @@
     const badgeEl = targetDoc.createElement('span');
     badgeEl.className = `item-type-badge ${typeClass}`;
     badgeEl.textContent = typeLabel;
+    if (item.type === 'workflow' && item.targetTool === 'antigravity') badgeEl.title = WF_SKILL_NOTE;
     badgesLine.appendChild(badgeEl);
 
     // Badges enrichis
