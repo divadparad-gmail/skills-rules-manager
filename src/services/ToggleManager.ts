@@ -10,7 +10,38 @@ try {
   // Hors hôte VS Code (environnement de test unitaire)
 }
 
+/** Message renvoyé quand une règle de sous-dossier (R1) est visée par une bascule ou une suppression. */
+export const NEVER_LOADED_REFUSAL =
+  'Règle de sous-dossier jamais chargée par Antigravity : elle est sans effet, activée ou non, et ne peut être ni basculée ni supprimée depuis le tableau de bord.';
+
+/** Antigravity (R1) : une règle de sous-dossier n'a aucun effet, activée ou non. */
+export function isNeverLoaded(item: ResourceItem): boolean {
+  return item.metadata?.antigravityStatus === 'never-loaded';
+}
+
+/**
+ * Vrai si la ressource peut basculer en masse et compter dans les compteurs ON/OFF : ni verrouillée
+ * (héritée d'un dossier parent, intégrée), ni jamais chargée (R1).
+ */
+export function isBulkToggleable(item: ResourceItem): boolean {
+  return !item.metadata?.locked && !isNeverLoaded(item);
+}
+
 export class ToggleManager {
+  /**
+   * Bascule une ressource connue de l'état chargé. Refuse une règle jamais chargée (R1), même si
+   * la demande arrive : la renommer en `.md.disabled` n'aurait aucun effet sur l'agent.
+   */
+  public static async toggleItem(
+    item: ResourceItem,
+    targetState: boolean
+  ): Promise<{ success: boolean; newState: boolean; error?: string }> {
+    if (isNeverLoaded(item)) {
+      return { success: false, newState: item.enabled, error: NEVER_LOADED_REFUSAL };
+    }
+    return await this.toggle(item.path, targetState, item.type, item.scope, item.id);
+  }
+
   /**
    * Bascule l'état ON/OFF d'une ressource (renommage physique + sync JSON).
    */
@@ -156,8 +187,9 @@ export class ToggleManager {
     type: 'workflow' | 'skill' | 'rule',
     targetState?: boolean
   ): Promise<{ modifiedCount: number; targetState: boolean; totalItems: number }> {
-    // Les ressources verrouillées (héritées d'un dossier parent, hors du dossier ouvert) ne basculent jamais
-    const matchingItems = items.filter((i) => i.scope === scope && i.type === type && !i.metadata?.locked);
+    // Les ressources verrouillées (héritées d'un dossier parent, hors du dossier ouvert) et les règles
+    // de sous-dossier jamais chargées (R1) ne basculent jamais
+    const matchingItems = items.filter((i) => i.scope === scope && i.type === type && isBulkToggleable(i));
     if (matchingItems.length === 0) {
       return { modifiedCount: 0, targetState: targetState ?? false, totalItems: 0 };
     }
@@ -169,7 +201,7 @@ export class ToggleManager {
     let count = 0;
 
     for (const item of itemsToModify) {
-      const res = await this.toggle(item.path, finalState, type, scope, item.id);
+      const res = await this.toggleItem(item, finalState);
       if (res.success) {
         count++;
       }

@@ -297,7 +297,16 @@ export class StateManager {
   public static async deleteResource(
     item: ResourceItem
   ): Promise<{ success: boolean; error?: string }> {
-    return await DeleteService.deleteResource(item);
+    // Les métadonnées venues du webview ne font pas foi : on reprend la carte de l'état chargé
+    const loaded = await this.findLoadedItem(item.path);
+    return await DeleteService.deleteResource(loaded ?? item);
+  }
+
+  /** Retrouve une ressource de l'état chargé par son chemin (état en cache, puis rechargé). */
+  private static async findLoadedItem(itemPath: string): Promise<ResourceItem | undefined> {
+    const find = (state: ManagerFullState) =>
+      [...state.globalResources, ...state.localResources].find((i) => i.path === itemPath);
+    return find(await this.loadFullState()) ?? find(await this.loadFullState(true));
   }
 
   public static broadcastState(state: ManagerFullState): void {
@@ -318,7 +327,12 @@ export class StateManager {
     type: ResourceType,
     itemPath: string
   ): Promise<{ success: boolean; newState: boolean; error?: string }> {
-    const result = await ToggleManager.toggle(itemPath, targetState, type, scope, id);
+    // La demande du webview ne fait pas foi : seule une ressource de l'état chargé peut basculer,
+    // et ToggleManager refuse une règle jamais chargée (R1)
+    const loaded = await this.findLoadedItem(itemPath);
+    const result = loaded
+      ? await ToggleManager.toggleItem(loaded, targetState)
+      : { success: false, newState: !targetState, error: "ressource introuvable dans l'état chargé" };
 
     let vscodeModule: any = null;
     try {

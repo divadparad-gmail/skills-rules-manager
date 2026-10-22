@@ -69,18 +69,26 @@ export function computeGlobStacks(items: ResourceItem[]): GlobStack[] {
 
   const headerTokens = byPattern.size > 0 ? countTokens(GLOB_REINJECTION_HEADER) : 0;
   const patterns = [...byPattern.keys()];
-  return patterns
-    .map((pattern) => {
-      const rules = byPattern.get(pattern)!.sort((a, b) => b.tokensPerFile - a.tokensPerFile);
-      return {
-        pattern,
-        rules,
-        tokensPerFile: rules.reduce((sum, rule) => sum + rule.tokensPerFile, 0),
-        headerTokens,
-        alsoMatchedBy: patterns.filter((other) => isCoveredBy(pattern, other)),
-      };
-    })
-    .sort((a, b) => b.tokensPerFile - a.tokensPerFile || a.pattern.localeCompare(b.pattern));
+  // Les motifs qui déclenchent exactement les mêmes règles (et sont couverts par les mêmes motifs
+  // plus larges) forment une seule pile : leurs coûts ne s'additionnent pas
+  const groups = new Map<string, { patterns: string[]; rules: GlobStackRule[]; alsoMatchedBy: string[] }>();
+  for (const pattern of patterns) {
+    const rules = byPattern.get(pattern)!.sort((a, b) => b.tokensPerFile - a.tokensPerFile);
+    const alsoMatchedBy = patterns.filter((other) => isCoveredBy(pattern, other));
+    const key = JSON.stringify([rules.map((rule) => `${rule.scope}:${rule.id}`).sort(), alsoMatchedBy]);
+    const group = groups.get(key);
+    if (group) group.patterns.push(pattern);
+    else groups.set(key, { patterns: [pattern], rules, alsoMatchedBy });
+  }
+  return [...groups.values()]
+    .map((group) => ({
+      patterns: group.patterns.sort((a, b) => a.localeCompare(b)),
+      rules: group.rules,
+      tokensPerFile: group.rules.reduce((sum, rule) => sum + rule.tokensPerFile, 0),
+      headerTokens,
+      alsoMatchedBy: group.alsoMatchedBy,
+    }))
+    .sort((a, b) => b.tokensPerFile - a.tokensPerFile || a.patterns[0].localeCompare(b.patterns[0]));
 }
 
 /**

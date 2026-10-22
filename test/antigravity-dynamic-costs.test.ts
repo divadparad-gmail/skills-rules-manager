@@ -304,17 +304,17 @@ describe('Suite de Tests : alertes et coûts dynamiques d\'Antigravity (lot A3a)
 
     const result = await LocalScanner.scan(workspaceFor(dir));
     const stacks = computeGlobStacks(result.items);
-    const ts = stacks.find((s) => s.pattern === '*.ts')!;
+    const ts = stacks.find((s) => s.patterns.includes('*.ts'))!;
     assert.deepStrictEqual(ts.rules.map((r) => r.id.split('/').pop()).sort(), ['a', 'b', 'c', 'parent-glob']);
     assert.strictEqual(ts.rules.find((r) => r.id.endsWith('parent-glob'))?.inheritedFrom, '..');
     assert.strictEqual(ts.tokensPerFile, ts.rules.reduce((sum, r) => sum + r.tokensPerFile, 0));
     assert.strictEqual(ts.headerTokens, countTokens(GLOB_REINJECTION_HEADER));
-    assert.deepStrictEqual(stacks.find((s) => s.pattern === 'app.ts')?.alsoMatchedBy, ['*.ts']);
-    assert.deepStrictEqual(stacks.find((s) => s.pattern === '*.md')?.rules.map((r) => r.id), ['partielle']);
-    assert.deepStrictEqual(stacks.find((s) => s.pattern === '*.tsx')?.rules.map((r) => r.id), ['c']);
-    assert.deepStrictEqual(stacks.find((s) => s.pattern === '*.tsx')?.alsoMatchedBy, [], '*.tsx n\'est pas couvert par *.ts');
-    assert.ok(!stacks.some((s) => s.pattern.includes('src/')), 'Un motif mort ne s\'empile pas');
-    assert.deepStrictEqual(stacks.map((s) => s.pattern).sort(), ['*.md', '*.ts', '*.tsx', 'app.ts']);
+    assert.deepStrictEqual(stacks.find((s) => s.patterns.includes('app.ts'))?.alsoMatchedBy, ['*.ts']);
+    assert.deepStrictEqual(stacks.find((s) => s.patterns.includes('*.md'))?.rules.map((r) => r.id), ['partielle']);
+    assert.deepStrictEqual(stacks.find((s) => s.patterns.includes('*.tsx'))?.rules.map((r) => r.id), ['c']);
+    assert.deepStrictEqual(stacks.find((s) => s.patterns.includes('*.tsx'))?.alsoMatchedBy, [], '*.tsx n\'est pas couvert par *.ts');
+    assert.ok(!stacks.some((s) => s.patterns.some((p) => p.includes('src/'))), 'Un motif mort ne s\'empile pas');
+    assert.deepStrictEqual(stacks.flatMap((s) => s.patterns).sort(), ['*.md', '*.ts', '*.tsx', 'app.ts']);
   });
 
   const permanentItem = (id: string, tokens: number, overrides: Partial<ResourceItem> = {}): ResourceItem => ({
@@ -470,5 +470,21 @@ describe('Suite de Tests : alertes et coûts dynamiques d\'Antigravity (lot A3a)
     assert.ok(text.includes(' : 1 règle, 100 tok injectés à chaque fichier .ts lu ou modifié'));
     assert.ok(text.includes(`Ces fichiers correspondent aussi à *.ts : 2 règles et ${150 + header} tok à chaque opération`));
     assert.ok(text.includes(`≈ ${100 + header} × 20 = ${((100 + header) * 20).toLocaleString('fr-FR')} tokens sur une session ordinaire`));
+  });
+
+  test('16. Coûts dynamiques : les motifs qui déclenchent les mêmes règles forment une seule pile', () => {
+    const items = [
+      permanentItem('c', 132, { metadata: { trigger: 'glob', bootTokenCount: 0, globPatterns: ['*.ts', '**/*.tsx'] } }),
+      permanentItem('m', 40, { metadata: { trigger: 'glob', bootTokenCount: 0, globPatterns: ['*.md'] } }),
+    ];
+    const stacks = computeGlobStacks(items);
+    assert.deepStrictEqual(stacks.map((s) => s.patterns), [['*.ts', '*.tsx'], ['*.md']]);
+    assert.strictEqual(stacks[0].tokensPerFile, 132, 'Les coûts des motifs regroupés ne s\'additionnent pas');
+
+    const nodes: Record<string, MockEl> = {};
+    main.renderDynamicCosts({ workspace: { tool: 'antigravity' }, stats: { dynamicCosts: computeAntigravityDynamicCosts(items) } }, mockDoc(nodes));
+    assert.strictEqual(nodes.dynamicCostsSummary.textContent, '⏱️ Coûts dynamiques : 3 motifs glob');
+    const text = allText(nodes.dynamicCostsBody);
+    assert.ok(text.includes('*.ts\n · \n*.tsx\n : 1 règle, 132 tok injectés à chaque fichier .ts ou .tsx lu ou modifié'));
   });
 });

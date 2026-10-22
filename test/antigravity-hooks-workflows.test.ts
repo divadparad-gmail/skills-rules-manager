@@ -216,7 +216,7 @@ describe('Suite de Tests : hooks et workflows d\'Antigravity (lot A3b)', () => {
     main.renderDynamicCosts({ workspace: { tool: 'antigravity' }, stats: { dynamicCosts: costs } }, mockDoc(nodes));
     assert.strictEqual(nodes.dynamicCostsSummary.textContent, '⏱️ Coûts dynamiques : 0 motif glob · 2 hooks · ❔ hooks.json');
     const text = allText(nodes.dynamicCostsBody);
-    assert.ok(text.includes('Hooks (0 token au démarrage'));
+    assert.ok(text.includes('Hooks : 0 token au démarrage ❔ (non vérifié)'));
     assert.ok(text.includes('❔ Projet, .agents/hooks.json : format non reconnu'));
     assert.ok(text.includes('Global, ~/.gemini/config/hooks.json : 3 hooks'));
     assert.ok(text.includes('lint-checker : PostToolUse (2 gestionnaires)'));

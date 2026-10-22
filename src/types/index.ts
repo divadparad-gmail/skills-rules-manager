@@ -191,8 +191,11 @@ export interface GlobStackRule {
 
 /** Règles `glob` actives qui s'empilent sur un même motif de nom de fichier. */
 export interface GlobStack {
-  /** Motif sans préfixe `**\/` (`**\/*.ts` et `*.ts` désignent les mêmes fichiers, R3). */
-  pattern: string;
+  /**
+   * Motifs sans préfixe `**\/` (`**\/*.ts` et `*.ts` désignent les mêmes fichiers, R3), triés.
+   * Plusieurs motifs quand ils déclenchent exactement les mêmes règles.
+   */
+  patterns: string[];
   rules: GlobStackRule[];
   /** Somme des corps des règles du motif. */
   tokensPerFile: number;

@@ -837,10 +837,12 @@
   }
 
   /** « fichier .ts » ou « fichier app.ts » pour un motif de nom de fichier. */
-  function describePatternFiles(pattern) {
-    const extension = /^\*(\.[^*?\\/]+)$/.exec(pattern);
-    if (extension) return `fichier ${extension[1]}`;
-    return /[*?]/.test(pattern) ? `fichier qui correspond à ${pattern}` : `fichier ${pattern}`;
+  // Plusieurs motifs regroupés (mêmes règles) : « fichier .ts ou .tsx »
+  function describePatternFiles(patterns) {
+    const extensions = patterns.map((pattern) => /^\*(\.[^*?\\/]+)$/.exec(pattern));
+    if (extensions.every(Boolean)) return `fichier ${extensions.map((match) => match[1]).join(' ou ')}`;
+    if (patterns.length > 1) return 'fichier qui correspond à l\'un de ces motifs';
+    return /[*?]/.test(patterns[0]) ? `fichier qui correspond à ${patterns[0]}` : `fichier ${patterns[0]}`;
   }
 
   /**
@@ -880,7 +882,8 @@
     const hookFiles = costs.hooks || [];
     const activeHooks = hookFiles.reduce((sum, file) => sum + file.hooks.filter((hook) => hook.enabled).length, 0);
     const unreadableHooks = hookFiles.some((file) => file.status === 'invalid-json' || file.status === 'unrecognized-format');
-    summary.textContent = `⏱️ Coûts dynamiques : ${plural(stacks.length, 'motif')} glob` +
+    const patternCount = stacks.reduce((sum, stack) => sum + stack.patterns.length, 0);
+    summary.textContent = `⏱️ Coûts dynamiques : ${plural(patternCount, 'motif')} glob` +
       (activeHooks > 0 ? ` · ${plural(activeHooks, 'hook')}` : '') +
       (unreadableHooks ? ' · ❔ hooks.json' : '') +
       (overflow ? ' · ⚠️ budget dépassé' : '');
@@ -902,12 +905,16 @@
     if (stacks.length === 0) {
       body.appendChild(el('div', 'dynamic-costs-note', 'Aucune règle glob active.'));
     }
-    const stackByPattern = new Map(stacks.map((stack) => [stack.pattern, stack]));
+    const stackByPattern = new Map(stacks.flatMap((stack) => stack.patterns.map((pattern) => [pattern, stack])));
     stacks.forEach((stack) => {
       const block = el('div', 'dynamic-costs-stack');
       const title = el('div', 'dynamic-costs-stack-title');
-      title.appendChild(el('code', '', stack.pattern));
-      title.appendChild(el('span', '', ` : ${plural(stack.rules.length, 'règle')}, ${fmt(stack.tokensPerFile)} tok injectés à chaque ${describePatternFiles(stack.pattern)} lu ou modifié (+ ${fmt(stack.headerTokens)} tok d'en-tête)`));
+      // Motifs regroupés (« *.ts · *.tsx ») : mêmes règles, un seul coût par fichier
+      stack.patterns.forEach((pattern, index) => {
+        if (index > 0) title.appendChild(el('span', '', ' · '));
+        title.appendChild(el('code', '', pattern));
+      });
+      title.appendChild(el('span', '', ` : ${plural(stack.rules.length, 'règle')}, ${fmt(stack.tokensPerFile)} tok injectés à chaque ${describePatternFiles(stack.patterns)} lu ou modifié (+ ${fmt(stack.headerTokens)} tok d'en-tête)`));
       block.appendChild(title);
 
       // Un fichier qui correspond à un motif plus large reçoit aussi les règles de ce motif
@@ -950,7 +957,7 @@
    * seul ce que leur script injecte coûte. L'extension ne lance jamais un hook.
    */
   function appendHooksSection(body, hookFiles, el, plural) {
-    body.appendChild(el('div', 'dynamic-costs-heading', 'Hooks (0 token au démarrage : la configuration n\'est pas dans le contexte)'));
+    body.appendChild(el('div', 'dynamic-costs-heading', 'Hooks : 0 token au démarrage ❔ (non vérifié) : la configuration n\'est pas dans le contexte.'));
     hookFiles.forEach((file) => {
       const label = file.scope === 'local' ? 'Projet, .agents/hooks.json' : 'Global, ~/.gemini/config/hooks.json';
       if (file.status === 'absent') {
@@ -1451,17 +1458,21 @@
     updateBulkControl('local', 'rule', state.localResources);
   }
 
-  function updateBulkControl(scope, type, items) {
-    // Les ressources verrouillées (héritées d'un dossier parent) ne basculent pas en masse
-    const matching = (items || []).filter((i) => i.type === type && !(i.metadata && i.metadata.locked));
+  function updateBulkControl(scope, type, items, doc) {
+    const targetDoc = doc || document;
+    // Les ressources verrouillées (héritées d'un dossier parent) et les règles de sous-dossier
+    // jamais chargées (R1) ne basculent pas en masse et ne comptent pas (miroir de isBulkToggleable)
+    const matching = (items || []).filter((i) => i.type === type && !(i.metadata && (
+      i.metadata.locked || i.metadata.antigravityStatus === 'never-loaded'
+    )));
     const total = matching.length;
     const active = matching.filter((i) => i.enabled).length;
 
     const prefix = type === 'workflow' ? 'Wf' : type === 'skill' ? 'Skill' : 'Rule';
     const scopeSuffix = scope === 'global' ? 'Global' : 'Local';
 
-    const countEl = document.getElementById(`count${prefix}${scopeSuffix}`);
-    const controlEl = document.getElementById(`bulk${prefix}${scopeSuffix}`);
+    const countEl = targetDoc.getElementById(`count${prefix}${scopeSuffix}`);
+    const controlEl = targetDoc.getElementById(`bulk${prefix}${scopeSuffix}`);
 
     // Antigravity : les « workflows » de l'extension sont des skills wf-*, listés comme des skills
     if (controlEl && type === 'workflow') {
@@ -2022,15 +2033,20 @@
     const isInherited = !!(item.metadata && item.metadata.inheritedFrom !== undefined);
     // Skill intégré d'Antigravity (F7) : ni désactivable, ni supprimable
     const isBuiltin = !!(item.metadata && item.metadata.builtin);
-    if (item.scope !== 'nas' && (isInherited || isBuiltin)) {
+    // Règle de sous-dossier (R1) : sans effet, activée ou non ; ni interrupteur ni corbeille
+    const isWithoutEffect = agStatus === 'never-loaded';
+    if (item.scope !== 'nas' && (isInherited || isBuiltin || isWithoutEffect)) {
       const rightControls = targetDoc.createElement('div');
       rightControls.className = 'item-right-controls';
       const lockedBadge = targetDoc.createElement('div');
       lockedBadge.className = 'soul-locked-badge';
-      lockedBadge.title = isBuiltin
-        ? 'Skill intégré d\'Antigravity : il est toujours listé au démarrage et ne peut pas être retiré.'
-        : `Fichier du dossier parent ${item.metadata.inheritedFrom}, hors du dossier ouvert : modifiez-le depuis son dossier.`;
-      lockedBadge.innerHTML = `<span class="soul-locked-icon">🔒</span><span>${isBuiltin ? 'Intégré' : 'Héritée'}</span>`;
+      lockedBadge.title = isWithoutEffect
+        ? 'Règle de sous-dossier : Antigravity ne la charge jamais, activée ou non. Déplacez-la dans .agents/rules/ du dossier ouvert pour l\'appliquer.'
+        : isBuiltin
+          ? 'Skill intégré d\'Antigravity : il est toujours listé au démarrage et ne peut pas être retiré.'
+          : `Fichier du dossier parent ${item.metadata.inheritedFrom}, hors du dossier ouvert : modifiez-le depuis son dossier.`;
+      const [lockIcon, lockLabel] = isWithoutEffect ? ['🚫', 'Sans effet'] : ['🔒', isBuiltin ? 'Intégré' : 'Héritée'];
+      lockedBadge.innerHTML = `<span class="soul-locked-icon">${lockIcon}</span><span>${lockLabel}</span>`;
       rightControls.appendChild(lockedBadge);
       topRow.appendChild(rightControls);
     } else if (item.scope !== 'nas') {
@@ -2647,6 +2663,7 @@
       describeSizeAdvice,
       renderDynamicCosts,
       localRulesHeaderCount,
+      updateBulkControl,
       setFilterState: (state) => {
         if ('showDuplicatesOnly' in state) showDuplicatesOnly = state.showDuplicatesOnly;
         if ('currentFilter' in state) currentFilter = state.currentFilter;
