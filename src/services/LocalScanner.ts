@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { ResourceItem, ResourceType, TokenCategoryStat, WorkspaceContext } from '../types';
+import { AntigravityParentsInfo, ResourceItem, ResourceType, TokenCategoryStat, WorkspaceContext } from '../types';
 import {
   extractFrontmatter,
   extractMarkdownTitleAndSummary,
@@ -9,13 +9,14 @@ import {
 import { countTokens, countTokensForFile } from '../utils/tokenizer';
 import { measureAntigravitySoul } from '../utils/antigravityRules';
 import { ScenarioManager } from './ScenarioManager';
-import { buildAntigravityRuleItem, countsAtBoot, hasResourceWarning } from './antigravityRuleItem';
+import { appliesInAntigravity, buildAntigravityRuleItem, countsAtBoot, hasResourceWarning } from './antigravityRuleItem';
 import {
   ANTIGRAVITY_AGENT_DIRS,
   collectRulesJsonFiles,
   findNestedRuleSources,
   listFlatRuleFiles,
 } from './antigravityRuleSources';
+import { findParentRuleDirs, PARENT_RULES_DIR, PARENT_SOUL_FILES } from '../antigravity/behavior';
 
 export class LocalScanner {
   /**
@@ -26,6 +27,8 @@ export class LocalScanner {
     soulStat: TokenCategoryStat;
     rulesStat: TokenCategoryStat;
     skillsStat: TokenCategoryStat;
+    /** Remontée vers les dossiers parents (mode Antigravity seulement). */
+    antigravityParents?: AntigravityParentsInfo;
   }> {
     if (!workspace.hasWorkspace || !workspace.workspacePath) {
       return {
@@ -50,6 +53,8 @@ export class LocalScanner {
     let skillsDirFound = '';
     let rulesDirFound = '';
     const targetTool = workspace.tool;
+    let antigravityParents: AntigravityParentsInfo | undefined;
+    const parentSoulCandidates: Array<{ file: string; tool: 'antigravity'; absolutePath: string; inheritedFrom: string }> = [];
 
     // Cumul des caractères des règles chargées au démarrage (règles ignorées et règles de dossier exclues)
     const accountRule = (item: ResourceItem) => {
@@ -307,8 +312,7 @@ export class LocalScanner {
         }
       }
 
-      // Règles limitées à un sous-dossier : chargées seulement quand l'agent lit ou modifie
-      // un fichier de ce dossier, donc sans coût au démarrage
+      // Règles des sous-dossiers : affichées, mais jamais chargées par Antigravity (R1)
       const nestedRules = new Map<string, ResourceItem>();
       for (const source of await findNestedRuleSources(rootPath)) {
         const relativeFile = path.relative(path.join(rootPath, source.directoryScope), source.path).split(path.sep).join('/');
@@ -327,6 +331,37 @@ export class LocalScanner {
         }
       }
       items.push(...nestedRules.values());
+
+      // Règles des dossiers parents, jusqu'à la racine du dépôt Git : chargées avec leur
+      // trigger habituel (R2), donc comptées. Sans dépôt Git, aucun parent n'est retenu.
+      const parentScan = findParentRuleDirs(rootPath);
+      antigravityParents = { gitRootFound: parentScan.gitRoot !== null, parentDirs: parentScan.parentDirs };
+      const parentRules = new Map<string, ResourceItem>();
+      for (const parentDir of parentScan.parentDirs) {
+        const inheritedFrom = path.relative(rootPath, parentDir).split(path.sep).join('/');
+        for (const file of PARENT_SOUL_FILES) {
+          parentSoulCandidates.push({ file, tool: 'antigravity', absolutePath: path.join(parentDir, file), inheritedFrom });
+        }
+        for (const rulePath of await listFlatRuleFiles(path.join(parentDir, PARENT_RULES_DIR))) {
+          const cleanId = path.basename(rulePath).replace(/\.disabled$/, '').replace(/\.md$/, '');
+          const parentItem = await buildAntigravityRuleItem(rulePath, {
+            id: `${inheritedFrom}/.agents/rules/${cleanId}`,
+            scope: 'local',
+            fallbackDescription: `Règle héritée du dossier parent ${inheritedFrom}`,
+            nameSuffix: `[${inheritedFrom}/]`,
+            inheritedFrom,
+          });
+          // Un .md et son .md.disabled désignent la même règle : le fichier actif est prioritaire
+          const existing = parentRules.get(parentItem.id);
+          if (!existing || (!existing.enabled && parentItem.enabled)) {
+            parentRules.set(parentItem.id, parentItem);
+          }
+        }
+      }
+      for (const parentItem of parentRules.values()) {
+        accountRule(parentItem);
+        items.push(parentItem);
+      }
     }
 
     // 2. Scan Claude Code (.claude/rules et .claude/skills) uniquement si targetTool === 'claude-code'
@@ -500,7 +535,12 @@ export class LocalScanner {
     }
 
     // 3. Scan des fichiers maîtres d'Âme locale selon targetTool
-    const soulCandidates: Array<{ file: string; tool: 'antigravity' | 'claude-code' }> =
+    const soulCandidates: Array<{
+      file: string;
+      tool: 'antigravity' | 'claude-code';
+      absolutePath?: string;
+      inheritedFrom?: string;
+    }> =
       targetTool === 'claude-code'
         ? [{ file: 'CLAUDE.md', tool: 'claude-code' }]
         : [
@@ -508,10 +548,12 @@ export class LocalScanner {
             { file: 'AGENTS.md', tool: 'antigravity' },
             { file: '.agents/AGENTS.md', tool: 'antigravity' },
             { file: '.agents/GEMINI.md', tool: 'antigravity' },
+            ...parentSoulCandidates,
           ];
 
     for (const candidate of soulCandidates) {
-      const candidatePath = path.join(rootPath, candidate.file);
+      const candidatePath = candidate.absolutePath ?? path.join(rootPath, candidate.file);
+      const soulId = candidate.inheritedFrom !== undefined ? `${candidate.inheritedFrom}/${candidate.file}` : candidate.file;
       if (fs.existsSync(candidatePath) && fs.statSync(candidatePath).isFile()) {
         try {
           const stat = await fs.promises.stat(candidatePath);
@@ -532,9 +574,11 @@ export class LocalScanner {
           if (!soulPathFound) soulPathFound = candidatePath;
 
           items.push({
-            id: candidate.file,
-            name: candidate.file,
-            description: parsed.summary || `Instructions fondamentales locales de l'agent (${candidate.file} racine)`,
+            id: soulId,
+            name: soulId,
+            description: parsed.summary || (candidate.inheritedFrom !== undefined
+              ? `Instructions héritées du dossier parent ${candidate.inheritedFrom}`
+              : `Instructions fondamentales locales de l'agent (${candidate.file} racine)`),
             type: 'soul',
             scope: 'local',
             enabled: true,
@@ -548,6 +592,7 @@ export class LocalScanner {
               ...soulMetadata,
               isSoul: true,
               locked: true,
+              ...(candidate.inheritedFrom !== undefined ? { inheritedFrom: candidate.inheritedFrom } : {}),
               warningLinesExceeded: isWarningLines,
               warningSizeExceeded: isWarningSize,
             },
@@ -573,14 +618,16 @@ export class LocalScanner {
     // Somme directe des tokens réels de chaque élément actif (concordance absolue avec les cartes)
     const skillsTokenTotal = activeSkillsList.reduce((sum, i) => sum + (i.tokenCount || 0), 0);
 
-    const activeRulesList = allRulesList.filter((i) => i.enabled);
+    // Les règles ⛔ (jamais chargées, ignorées, ne se déclenchant jamais) ne sont pas actives,
+    // mais restent comptées dans les avertissements
+    const activeRulesList = allRulesList.filter((i) => i.enabled && appliesInAntigravity(i));
     const activeRulesCount = activeRulesList.length;
-    const rulesWarningCount = activeRulesList.filter(hasResourceWarning).length;
+    const rulesWarningCount = allRulesList.filter((i) => i.enabled).filter(hasResourceWarning).length;
 
     // Décompte cohérent des règles :
     // - Règles permanentes : accumulation de leur tokenCount BPE réel
     // - Règles conditionnelles : ~20 tokens au boot (estimation de l'extension, non documentée)
-    // - Règles ignorées par l'agent et règles limitées à un dossier : aucun coût au boot
+    // - Règles ⛔ : aucun coût au boot ; règles héritées des dossiers parents : comptées
     // - rulesConditionalTokenTotal : somme des tokens BPE réels des cartes conditionnelles
     const bootRules = activeRulesList.filter(countsAtBoot);
     const activePermanentRules = bootRules.filter((i) => !i.metadata?.isConditional);
@@ -589,8 +636,11 @@ export class LocalScanner {
     const conditionalRulesBootTokens = activeConditionalRules.length * 20;
     const rulesTokenTotal = permanentRulesTokens + conditionalRulesBootTokens;
     const rulesConditionalTokenTotal = activeConditionalRules.reduce((sum, i) => sum + (i.tokenCount || 0), 0);
+    const isInherited = (i: ResourceItem) => i.metadata?.inheritedFrom !== undefined;
+    const rulesInheritedCount = bootRules.filter(isInherited).length;
 
     const activeSoulList = allSoulList.filter((i) => i.enabled);
+    const soulInheritedCount = activeSoulList.filter(isInherited).length;
     const activeSoulCount = activeSoulList.length;
     const soulWarningCount = activeSoulList.filter((i) => (
       i.metadata?.warningSizeExceeded ||
@@ -628,6 +678,7 @@ export class LocalScanner {
       charCount: rulesCharTotal,
       tokenCount: rulesTokenTotal,
       warningCount: rulesWarningCount,
+      inheritedCount: rulesInheritedCount,
       percentage: Number(((rulesTokenTotal / 20000) * 100).toFixed(1)),
       directoryPath:
         rulesDirFound ||
@@ -644,6 +695,7 @@ export class LocalScanner {
       charCount: soulCharTotal,
       tokenCount: soulTokenTotal,
       warningCount: soulWarningCount,
+      inheritedCount: soulInheritedCount,
       percentage: Number(((soulTokenTotal / 20000) * 100).toFixed(1)),
       directoryPath:
         soulPathFound ||
@@ -668,6 +720,7 @@ export class LocalScanner {
       soulStat,
       rulesStat,
       skillsStat,
+      ...(antigravityParents ? { antigravityParents } : {}),
     };
   }
 

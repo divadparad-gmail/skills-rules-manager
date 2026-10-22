@@ -156,7 +156,8 @@ export class ToggleManager {
     type: 'workflow' | 'skill' | 'rule',
     targetState?: boolean
   ): Promise<{ modifiedCount: number; targetState: boolean; totalItems: number }> {
-    const matchingItems = items.filter((i) => i.scope === scope && i.type === type);
+    // Les ressources verrouillées (héritées d'un dossier parent, hors du dossier ouvert) ne basculent jamais
+    const matchingItems = items.filter((i) => i.scope === scope && i.type === type && !i.metadata?.locked);
     if (matchingItems.length === 0) {
       return { modifiedCount: 0, targetState: targetState ?? false, totalItems: 0 };
     }

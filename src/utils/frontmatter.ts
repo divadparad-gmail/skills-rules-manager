@@ -2,6 +2,7 @@
  * Utilitaires d'extraction de métadonnées pour les Skills et Rules Markdown.
  * Ne nécessite aucune dépendance externe lourde.
  */
+import { ANTIGRAVITY_RULE_TRIGGERS, AntigravityRuleTrigger } from '../antigravity/behavior';
 
 export interface ParsedMetadata {
   name?: string;
@@ -103,18 +104,15 @@ function cleanYamlValue(val: string): any {
   return cleaned;
 }
 
-/**
- * Valeurs de `trigger` reconnues par Antigravity, à la casse près.
- * Source : https://antigravity.google/docs/rules/
- */
-export const ANTIGRAVITY_RULE_TRIGGERS = ['always_on', 'model_decision', 'glob', 'manual'] as const;
-export type AntigravityRuleTrigger = (typeof ANTIGRAVITY_RULE_TRIGGERS)[number];
+/** Valeurs de `trigger` reconnues par Antigravity, à la casse près (fait R6 du module central). */
+export { ANTIGRAVITY_RULE_TRIGGERS };
+export type { AntigravityRuleTrigger };
 
 /**
  * Défauts de frontmatter d'une règle Antigravity (`rules/*.md`) :
  * - missing-frontmatter, missing-trigger, invalid-trigger : Antigravity ignore la règle en silence ;
  * - missing-description (model_decision), missing-globs (glob) : champ obligatoire absent ;
- * - globs-not-string : `globs` écrit autrement qu'en chaîne séparée par des virgules (format non documenté).
+ * - globs-not-string : `globs` écrit en liste YAML, rejeté silencieusement par Antigravity (R4).
  */
 export type AntigravityRuleIssue =
   | 'missing-frontmatter'

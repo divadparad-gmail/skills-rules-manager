@@ -63,8 +63,14 @@ export interface ResourceItem {
     trigger?: string;
     /** Taille en octets UTF-8, inclusions @[label](path) développées (Antigravity). */
     byteSize?: number;
-    /** Dossier (relatif au projet) auquel une règle imbriquée est limitée ; aucun coût au démarrage. */
+    /** Sous-dossier (relatif au projet) d'une règle imbriquée, jamais chargée par Antigravity (R1). */
     directoryScope?: string;
+    /** Statut d'une règle Antigravity vis-à-vis de l'agent (voir src/antigravity/behavior.ts). */
+    antigravityStatus?: 'active' | 'partial' | 'never-loaded' | 'never-triggers' | 'ignored-yaml-list' | 'ignored';
+    /** Motifs `globs` qui contiennent un dossier et ne se déclencheront jamais (R3). */
+    deadGlobs?: string[];
+    /** Dossier parent (relatif au projet, ex. « ../.. ») d'où la règle est héritée (R2). */
+    inheritedFrom?: string;
     /** Règle déclarée par .agents/rules.json plutôt que trouvée dans .agents/rules/. */
     fromRulesJson?: boolean;
     pluginName?: string;
@@ -101,6 +107,15 @@ export interface TokenCategoryStat {
   conditionalCount?: number;
   conditionalTokenCount?: number;
   warningCount?: number;
+  /** Éléments actifs hérités des dossiers parents (Antigravity, R2), compris dans activeCount. */
+  inheritedCount?: number;
+}
+
+/** Résultat de la remontée vers les dossiers parents (Antigravity, R2). */
+export interface AntigravityParentsInfo {
+  /** Faux sans dépôt Git : l'héritage des dossiers parents n'est alors pas vérifié. */
+  gitRootFound: boolean;
+  parentDirs: string[];
 }
 
 export interface ManagerStats {
@@ -139,6 +154,10 @@ export interface ManagerFullState {
   stats: ManagerStats;
   isDashboardOpen: boolean;
   isCheatSheetOpen?: boolean;
+  /** Remontée vers les dossiers parents (mode Antigravity seulement). */
+  antigravityParents?: AntigravityParentsInfo;
+  /** Version d'Antigravity et date des tests qui fondent les badges (src/antigravity/behavior.ts). */
+  antigravityBehavior?: { version: string; testedOn: string };
   userHome?: string;
   isDebugTiming?: boolean;
   lastTimingLog?: string | null;

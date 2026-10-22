@@ -14,6 +14,7 @@ import * as path from 'path';
 import { ConflictPolicy, DeploymentResult } from '../common/discoveryTypes';
 import { DeployTarget, DiscoveryResourceType } from '../common/eventTypes';
 import { DeployContext, MultiTargetDeployService } from './MultiTargetDeployService';
+import { ensureAntigravityTrigger } from '../utils/antigravityRules';
 
 /** Ressource proposée à l'installation, avec son registre d'origine. */
 export interface ReviewableResource {
@@ -58,10 +59,31 @@ const TARGET_DESCRIPTIONS: Record<DeployTarget, string> = {
  */
 export async function reviewAndDeploy(
   deploy: MultiTargetDeployService,
-  resource: ReviewableResource,
+  original: ReviewableResource,
   options: DeployReviewOptions,
   ui: DeployReviewPort
 ): Promise<DeploymentResult | undefined> {
+  // Une règle destinée à Antigravity reçoit un trigger valide et des motifs qui se déclenchent
+  // vraiment, avant l'aperçu : l'utilisateur relit exactement ce qui sera écrit.
+  let resource = original;
+  let ruleNotes: string[] = [];
+  if (options.context.runtime === 'antigravity' && original.type === 'rules') {
+    try {
+      const prepared = ensureAntigravityTrigger(original.manifest);
+      resource = { ...original, manifest: prepared.content };
+      ruleNotes = [
+        ...(prepared.addedTrigger
+          ? [`Le frontmatter a été complété avec « trigger: ${prepared.addedTrigger} », sans quoi Antigravity ignorerait la règle.`]
+          : []),
+        ...prepared.warnings,
+      ];
+    } catch (err) {
+      const error = `Le manifeste de « ${original.name} » a été refusé : ${err instanceof Error ? err.message : String(err)}`;
+      ui.report('error', error);
+      return { success: false, target: options.target, error };
+    }
+  }
+
   const verdict = MultiTargetDeployService.validateManifest(resource.manifest);
   if (!verdict.safe) {
     const error = `Le manifeste de « ${resource.name} » a été refusé : ${verdict.issues.join(' ')}`;
@@ -76,8 +98,8 @@ export async function reviewAndDeploy(
     `Destination : ${TARGET_DESCRIPTIONS[options.target]}`,
     '',
     "Ce fichier sera lu comme instruction par votre agent. Relisez le contenu affiché dans l'éditeur avant de l'installer.",
-    ...(verdict.warnings.length > 0
-      ? ['', 'Points à vérifier :', ...verdict.warnings.map((warning) => `• ${warning}`)]
+    ...(verdict.warnings.length + ruleNotes.length > 0
+      ? ['', 'Points à vérifier :', ...[...ruleNotes, ...verdict.warnings].map((warning) => `• ${warning}`)]
       : []),
   ].join('\n');
 

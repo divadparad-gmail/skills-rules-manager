@@ -12,7 +12,7 @@ import {
 } from '../utils/paths';
 import { countTokens, countTokensForFile } from '../utils/tokenizer';
 import { measureAntigravitySoul } from '../utils/antigravityRules';
-import { buildAntigravityRuleItem, countsAtBoot, hasResourceWarning } from './antigravityRuleItem';
+import { appliesInAntigravity, buildAntigravityRuleItem, countsAtBoot, hasResourceWarning } from './antigravityRuleItem';
 import { listFlatRuleFiles } from './antigravityRuleSources';
 
 let vscodeModule: any = null;
@@ -601,14 +601,16 @@ export class GlobalScanner {
     // Somme directe des tokens réels de chaque élément actif (concordance absolue avec les cartes)
     const skillsTokenTotal = activeSkillsList.reduce((sum, i) => sum + (i.tokenCount || 0), 0);
 
-    const activeRulesList = allRulesList.filter((i) => i.enabled);
+    // Les règles ⛔ (ignorées, ne se déclenchant jamais) ne sont pas actives,
+    // mais restent comptées dans les avertissements
+    const activeRulesList = allRulesList.filter((i) => i.enabled && appliesInAntigravity(i));
     const activeRulesCount = activeRulesList.length;
-    const rulesWarningCount = activeRulesList.filter(hasResourceWarning).length;
+    const rulesWarningCount = allRulesList.filter((i) => i.enabled).filter(hasResourceWarning).length;
 
     // Décompte cohérent des règles :
     // - Règles permanentes : accumulation de leur tokenCount BPE réel
     // - Règles conditionnelles : ~20 tokens au boot (estimation de l'extension, non documentée)
-    // - Règles ignorées par l'agent : aucun coût au boot
+    // - Règles ⛔ : aucun coût au boot
     // - rulesConditionalTokenTotal : somme des tokens BPE réels des cartes conditionnelles
     const bootRules = activeRulesList.filter(countsAtBoot);
     const activePermanentRules = bootRules.filter((i) => !i.metadata?.isConditional);

@@ -765,10 +765,14 @@
 
     if (titleEl) {
       const warnSuffix = (stat.warningCount && stat.warningCount > 0) ? ' ⚠️' : '';
+      // Antigravity : part héritée des dossiers parents (R2), comprise dans le total local
+      const inheritedSuffix = stat.inheritedCount && stat.inheritedCount > 0
+        ? `, dont ${stat.inheritedCount} héritée${stat.inheritedCount > 1 ? 's' : ''}`
+        : '';
       if (stat.type === 'rule' && stat.conditionalCount && stat.conditionalCount > 0) {
-        titleEl.textContent = `${defaultTitle} (${stat.permanentCount || 0} perm. + ${stat.conditionalCount} cond.)${warnSuffix}`;
+        titleEl.textContent = `${defaultTitle} (${stat.permanentCount || 0} perm. + ${stat.conditionalCount} cond.${inheritedSuffix})${warnSuffix}`;
       } else {
-        titleEl.textContent = `${defaultTitle} (${stat.activeCount})${warnSuffix}`;
+        titleEl.textContent = `${defaultTitle} (${stat.activeCount}${inheritedSuffix})${warnSuffix}`;
       }
     }
 
@@ -856,10 +860,66 @@
     }
 
     listContainer.innerHTML = '';
-    sorted.forEach((item) => {
-      const card = createItemCard(item, false);
-      listContainer.appendChild(card);
-    });
+    appendGroupedCards(listContainer, sorted, false, state);
+  }
+
+  // État d'ouverture de la section repliée « Non chargées », conservé entre deux rendus
+  let neverLoadedGroupOpen = false;
+
+  /**
+   * Mode Antigravity : les ressources héritées des dossiers parents (R2) forment un groupe
+   * distinct, et les règles de sous-dossier jamais chargées (R1) une section repliée par
+   * défaut. Les autres règles ⛔ restent des cartes normales : ce sont des erreurs à corriger.
+   */
+  function appendGroupedCards(container, items, isDetailed, state) {
+    const parentsNote = createParentsNote(state);
+    if (parentsNote) container.appendChild(parentsNote);
+
+    const isNeverLoaded = (i) => !!(i.metadata && i.metadata.antigravityStatus === 'never-loaded');
+    const isInheritedItem = (i) => !!(i.metadata && i.metadata.inheritedFrom !== undefined);
+    const neverLoaded = items.filter(isNeverLoaded);
+    const inherited = items.filter((i) => isInheritedItem(i) && !isNeverLoaded(i));
+    const regular = items.filter((i) => !isInheritedItem(i) && !isNeverLoaded(i));
+
+    regular.forEach((item) => container.appendChild(createItemCard(item, isDetailed)));
+
+    if (inherited.length > 0) {
+      const header = document.createElement('div');
+      header.className = 'resource-group-header';
+      header.textContent = `⬆️ Dossiers parents (${inherited.length})`;
+      header.title = 'Ressources chargées par Antigravity depuis les dossiers parents, jusqu\'à la racine du dépôt Git. Elles comptent dans la jauge et sont verrouillées.';
+      container.appendChild(header);
+      inherited.forEach((item) => container.appendChild(createItemCard(item, isDetailed)));
+    }
+
+    if (neverLoaded.length > 0) {
+      const behavior = (state && state.antigravityBehavior) || { version: 'Antigravity IDE', testedOn: '' };
+      const details = document.createElement('details');
+      details.className = 'resource-group-collapsed';
+      details.open = neverLoadedGroupOpen;
+      details.addEventListener('toggle', () => {
+        neverLoadedGroupOpen = details.open;
+      });
+      const summary = document.createElement('summary');
+      summary.textContent = `⛔ Non chargées par Antigravity (${neverLoaded.length})`;
+      summary.title = `${behavior.version} ne charge jamais les règles des sous-dossiers du dossier ouvert (testé le ${behavior.testedOn}). Elles ne comptent pas dans la jauge, mais restent comptées dans les avertissements.`;
+      details.appendChild(summary);
+      neverLoaded.forEach((item) => details.appendChild(createItemCard(item, isDetailed)));
+      container.appendChild(details);
+    }
+  }
+
+  /** Sans dépôt Git, on ne sait pas jusqu'où Antigravity remonte : aucun parent n'est lu. */
+  function createParentsNote(state) {
+    const parents = state && state.antigravityParents;
+    if (!state || !state.workspace || state.workspace.tool !== 'antigravity' || !parents || parents.gitRootFound) {
+      return null;
+    }
+    const note = document.createElement('div');
+    note.className = 'resource-group-note';
+    note.textContent = 'ℹ️ Pas de dépôt Git : héritage des dossiers parents non vérifié';
+    note.title = 'Antigravity charge les règles des dossiers parents jusqu\'à la racine du dépôt Git. Sans dépôt, son comportement n\'a pas été testé : aucun dossier parent n\'est compté.';
+    return note;
   }
 
   function renderDashboard(state) {
@@ -1115,10 +1175,7 @@
             </div>
           `;
         } else {
-          sortedLocal.forEach((item) => {
-            const card = createItemCard(item, true);
-            localContainer.appendChild(card);
-          });
+          appendGroupedCards(localContainer, sortedLocal, true, state);
         }
       }
     }
@@ -1134,7 +1191,8 @@
   }
 
   function updateBulkControl(scope, type, items) {
-    const matching = (items || []).filter((i) => i.type === type);
+    // Les ressources verrouillées (héritées d'un dossier parent) ne basculent pas en masse
+    const matching = (items || []).filter((i) => i.type === type && !(i.metadata && i.metadata.locked));
     const total = matching.length;
     const active = matching.filter((i) => i.enabled).length;
 
@@ -1466,48 +1524,72 @@
       badgesLine.appendChild(fixtureBadge);
     }
 
-    // Règle Antigravity écartée par l'agent : frontmatter absent ou trigger non reconnu
+    // Statut Antigravity (src/antigravity/behavior.ts) : ce que l'agent charge réellement
+    const agStatus = item.metadata && item.metadata.antigravityStatus;
+    const behavior = (currentState && currentState.antigravityBehavior) || { version: 'Antigravity IDE', testedOn: '' };
+    const deadGlobs = (item.metadata && item.metadata.deadGlobs) || [];
+    const addBadge = (className, text, title) => {
+      const badge = targetDoc.createElement('span');
+      badge.className = `item-badge-pill ${className}`;
+      badge.textContent = text;
+      badge.title = title;
+      badgesLine.appendChild(badge);
+    };
+
+    // R6 : frontmatter absent ou trigger non reconnu
     if (item.metadata && item.metadata.ignoredByAgent) {
-      const ignoredBadge = targetDoc.createElement('span');
-      ignoredBadge.className = 'item-badge-pill pill-warn';
-      ignoredBadge.textContent = '⛔ Ignorée par Antigravity';
       const issue = (item.metadata.ruleIssues || [])[0];
       const reason = issue === 'missing-frontmatter'
         ? 'le fichier ne commence pas par un frontmatter YAML'
         : issue === 'invalid-trigger'
           ? 'la valeur de trigger n\'est pas reconnue (casse exacte requise)'
           : 'le frontmatter ne déclare pas de trigger';
-      ignoredBadge.title = `Antigravity ignore cette règle en silence : ${reason}.\nAjoutez « trigger: » avec always_on, model_decision, glob ou manual.`;
-      badgesLine.appendChild(ignoredBadge);
+      addBadge('pill-warn', '⛔ Ignorée par Antigravity',
+        `Antigravity ignore silencieusement ce fichier : ${reason}.\nAjoutez « trigger: » avec always_on, model_decision, glob ou manual.`);
     }
 
-    // Champs de frontmatter manquants ou mal formés (règle tout de même chargée)
-    const frontmatterIssues = (item.metadata && !item.metadata.ignoredByAgent && item.metadata.ruleIssues) || [];
+    // R4 : globs en liste YAML
+    if (agStatus === 'ignored-yaml-list') {
+      addBadge('pill-warn', '⛔ Ignorée : liste YAML', 'Écrivez globs: "*.ts, *.js" (une chaîne).');
+    }
+
+    // R3 : motifs qui contiennent un dossier
+    if (agStatus === 'never-triggers') {
+      addBadge('pill-warn', '⛔ Ne se déclenchera jamais',
+        `Antigravity compare le motif au nom de fichier seul. Utilisez *.ts au lieu de src/**/*.ts.\nMotifs concernés : ${deadGlobs.join(', ')}`);
+    }
+    if (agStatus === 'partial') {
+      addBadge('pill-warn-amber', '⚠️ Partiellement active',
+        `Ces motifs ne se déclencheront jamais : ${deadGlobs.join(', ')}\nAntigravity compare le motif au nom de fichier seul.`);
+    }
+
+    // Champs de frontmatter manquants (règle tout de même chargée) ; la liste YAML a son propre badge
+    const frontmatterIssues = ((item.metadata && !item.metadata.ignoredByAgent && item.metadata.ruleIssues) || [])
+      .filter((code) => code !== 'globs-not-string');
     if (frontmatterIssues.length > 0) {
       const issueLabels = {
         'missing-description': '« description » est obligatoire avec trigger: model_decision',
         'missing-globs': '« globs » est obligatoire avec trigger: glob',
-        'globs-not-string': '« globs » doit être une chaîne de motifs séparés par des virgules (ex. "*.ts, *.tsx")',
       };
-      const issueBadge = targetDoc.createElement('span');
-      issueBadge.className = 'item-badge-pill pill-warn-amber';
-      issueBadge.textContent = '⚠️ Frontmatter';
-      issueBadge.title = 'Frontmatter à corriger :\n' + frontmatterIssues.map((code) => `• ${issueLabels[code] || code}`).join('\n');
-      badgesLine.appendChild(issueBadge);
+      addBadge('pill-warn-amber', '⚠️ Frontmatter',
+        'Frontmatter à corriger :\n' + frontmatterIssues.map((code) => `• ${issueLabels[code] || code}`).join('\n'));
     }
 
-    if (item.metadata && item.metadata.directoryScope !== undefined) {
-      const scopeBadge = targetDoc.createElement('span');
-      scopeBadge.className = 'item-badge-pill pill-cond';
-      scopeBadge.textContent = `📂 ${item.metadata.directoryScope}/`;
-      scopeBadge.title = `Règle limitée au dossier ${item.metadata.directoryScope}/ : Antigravity la charge seulement quand l'agent lit ou modifie un fichier de ce dossier. Aucun coût au démarrage.`;
-      badgesLine.appendChild(scopeBadge);
-    } else if (item.metadata && item.metadata.isConditional) {
-      const condBadge = targetDoc.createElement('span');
-      condBadge.className = 'item-badge-pill pill-cond';
-      condBadge.textContent = '⚡ Conditionnel';
-      condBadge.title = `Règle conditionnelle (trigger: ${item.metadata.trigger || 'glob'}) : contenu complet chargé seulement à l'activation (~20 tokens au boot, estimation de l'extension)`;
-      badgesLine.appendChild(condBadge);
+    // R1 : règle d'un sous-dossier du dossier ouvert
+    if (agStatus === 'never-loaded') {
+      addBadge('pill-warn', '⛔ Jamais chargée',
+        `${behavior.version} ne charge jamais les règles des sous-dossiers du dossier ouvert (testé le ${behavior.testedOn}). Déplacez-la dans .agents/rules/ à la racine.`);
+    }
+
+    // R2 : ressource héritée d'un dossier parent
+    if (item.metadata && item.metadata.inheritedFrom !== undefined) {
+      addBadge('pill-plugin', '⬆️ Héritée',
+        `Chargée depuis un dossier parent (${item.metadata.inheritedFrom}, jusqu'à la racine Git). Elle s'ajoute au budget de 20 000 tokens.`);
+    }
+
+    if (item.metadata && item.metadata.isConditional && (agStatus === undefined || agStatus === 'active' || agStatus === 'partial')) {
+      addBadge('pill-cond', '⚡ Conditionnel',
+        `Règle conditionnelle (trigger: ${item.metadata.trigger || 'glob'}) : contenu complet chargé seulement à l'activation (~20 tokens au boot, estimation de l'extension)`);
     }
 
     if (item.metadata && item.metadata.fromRulesJson) {
@@ -1587,11 +1669,15 @@
     const charStr = charCount.toLocaleString('fr-FR');
     const tokStr = tokenCount.toLocaleString('fr-FR');
 
-    if (item.metadata && (item.metadata.ignoredByAgent || item.metadata.directoryScope !== undefined)) {
+    // Règles ⛔ : l'agent ne les lit jamais, elles ne coûtent rien
+    if (agStatus !== undefined && agStatus !== 'active' && agStatus !== 'partial') {
+      const why = agStatus === 'never-loaded'
+        ? 'Règle de sous-dossier, jamais chargée par Antigravity'
+        : agStatus === 'never-triggers'
+          ? 'Règle qui ne se déclenchera jamais'
+          : 'Règle ignorée par Antigravity';
       metricsEl.innerHTML = `<span>${charStr} car.</span> <span class="tok-highlight">0 tok au boot (${tokStr} plein)</span>`;
-      metricsEl.title = item.metadata.ignoredByAgent
-        ? `Règle ignorée par Antigravity : aucun coût, car elle n'est jamais chargée.\n• Poids si corrigée : ${charStr} car. (${tokStr} tokens)`
-        : `Règle de dossier : aucun coût au démarrage.\n• Poids à l'activation : ${charStr} car. (${tokStr} tokens)`;
+      metricsEl.title = `${why} : aucun coût.\n• Poids si corrigée : ${charStr} car. (${tokStr} tokens)`;
     } else if (item.metadata && item.metadata.isConditional) {
       metricsEl.innerHTML = `<span>${charStr} car.</span> <span class="tok-highlight" title="Coût au boot : ~20 tokens (estimation de l'extension). Fichier complet si activé : ${tokStr} tokens">~20 tok (${tokStr} plein)</span>`;
       metricsEl.title = `Règle conditionnelle :\n• Coût au boot : ~20 tokens (estimation de l'extension, non chiffrée par la documentation)\n• Poids complet si activé : ${charStr} car. (${tokStr} tokens)`;
@@ -1610,7 +1696,18 @@
     topRow.appendChild(titleWrap);
 
     // Contrôles droits (Switch ON / OFF + Poubelle sécurisée OU Badge Always-On)
-    if (item.scope !== 'nas') {
+    // Ressource héritée d'un dossier parent (R2) : fichier hors du dossier ouvert, verrouillé
+    const isInherited = !!(item.metadata && item.metadata.inheritedFrom !== undefined);
+    if (item.scope !== 'nas' && isInherited) {
+      const rightControls = targetDoc.createElement('div');
+      rightControls.className = 'item-right-controls';
+      const lockedBadge = targetDoc.createElement('div');
+      lockedBadge.className = 'soul-locked-badge';
+      lockedBadge.title = `Fichier du dossier parent ${item.metadata.inheritedFrom}, hors du dossier ouvert : modifiez-le depuis son dossier.`;
+      lockedBadge.innerHTML = '<span class="soul-locked-icon">🔒</span><span>Héritée</span>';
+      rightControls.appendChild(lockedBadge);
+      topRow.appendChild(rightControls);
+    } else if (item.scope !== 'nas') {
       const rightControls = targetDoc.createElement('div');
       rightControls.className = 'item-right-controls';
 

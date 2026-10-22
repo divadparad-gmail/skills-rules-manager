@@ -343,7 +343,8 @@ describe('Suite de Tests : Intégrité & Synchronisation NAS vs Local', () => {
     const { LocalScanner } = await import('../src/services/LocalScanner');
     const agentsRulesDir = path.join(localDir, '.agents', 'rules');
     await fs.promises.mkdir(agentsRulesDir, { recursive: true });
-    await fs.promises.writeFile(path.join(agentsRulesDir, 'my-modular-rule.md'), '# Rule\nSome content', 'utf8');
+    // Frontmatter valide : sans lui, Antigravity ignorerait la règle (R6) et elle ne serait pas active
+    await fs.promises.writeFile(path.join(agentsRulesDir, 'my-modular-rule.md'), '---\ntrigger: always_on\n---\n# Rule\nSome content', 'utf8');
 
     const fakeWorkspace = {
       hasWorkspace: true,

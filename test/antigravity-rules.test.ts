@@ -215,17 +215,22 @@ describe('Suite de Tests : Règles Antigravity conformes à la documentation off
     const soul = result.items.find((i) => i.type === 'soul' && i.id === '.agents/AGENTS.md');
     assert.ok(soul, '.agents/AGENTS.md est une âme du projet');
 
+    // R1 : les règles des sous-dossiers restent visibles mais ne sont jamais chargées
     const api = result.items.find((i) => i.id === 'src/api/AGENTS')!;
     assert.ok(api, 'src/api/AGENTS.md doit être trouvé');
     assert.strictEqual(api.metadata?.directoryScope, 'src/api');
     assert.strictEqual(api.metadata?.ignoredByAgent, false, 'AGENTS.md n\'utilise pas de frontmatter');
+    assert.strictEqual(api.metadata?.antigravityStatus, 'never-loaded');
 
     const ui = result.items.find((i) => i.id === 'src/web/.agents/rules/ui')!;
     assert.ok(ui);
     assert.strictEqual(ui.metadata?.directoryScope, 'src/web');
+    assert.strictEqual(ui.metadata?.antigravityStatus, 'never-loaded', 'Même avec un frontmatter valide');
 
     assert.ok(!result.items.some((i) => i.path.includes('node_modules')));
     assert.strictEqual(result.rulesStat.tokenCount, 0, 'Les règles de dossier ne coûtent rien au démarrage');
+    assert.strictEqual(result.rulesStat.activeCount, 0, 'Les règles de dossier ne sont pas actives');
+    assert.strictEqual(result.rulesStat.warningCount, 2, 'Elles restent comptées dans les avertissements');
   });
 
   test('10. GlobalScanner : quatre âmes globales cumulées et ~/.gemini/rules ignoré', async () => {
@@ -250,11 +255,13 @@ describe('Suite de Tests : Règles Antigravity conformes à la documentation off
     assert.strictEqual(plain.addedTrigger, 'always_on');
     assert.strictEqual(checkAntigravityRuleFrontmatter(plain.content).ignored, false);
 
+    // R3 : seul le nom de fichier compte ; le dossier est perdu, d'où l'avertissement
     const claude = ensureAntigravityTrigger('---\npaths:\n  - "src/**/*.{ts,tsx}"\n  - "package.json"\n---\n# Règle Claude');
     assert.strictEqual(claude.addedTrigger, 'glob');
     const fm = extractFrontmatter(claude.content).metadata;
     assert.strictEqual(fm.trigger, 'glob');
-    assert.strictEqual(fm.globs, 'src/**/*.ts, src/**/*.tsx, package.json');
+    assert.strictEqual(fm.globs, '*.ts, *.tsx, package.json');
+    assert.match(claude.warnings.join(' '), /Portée élargie/);
 
     const valid = '---\ntrigger: manual\n---\n# Valide';
     assert.strictEqual(ensureAntigravityTrigger(valid).content, valid, 'Une règle valide est copiée telle quelle');

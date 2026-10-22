@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { DuplicateInfo, DuplicateStats, ResourceItem } from '../types';
 import { areContentsIdentical } from './IntegrityService';
+import { appliesInAntigravity } from './antigravityRuleItem';
 
 export class DuplicateService {
   /**
@@ -48,7 +49,8 @@ export class DuplicateService {
 
       if (gItem) {
         totalDuplicates++;
-        const bothEnabled = lItem.enabled && gItem.enabled;
+        // Une règle ⛔ (jamais chargée, ignorée, ne se déclenchant jamais) ne fait pas un doublon actif
+        const bothEnabled = lItem.enabled && gItem.enabled && appliesInAntigravity(lItem) && appliesInAntigravity(gItem);
         const isIdentical = this.checkIfIdentical(lItem, gItem);
         const wastedTokens = bothEnabled ? (gItem.tokenCount || 0) : 0;
         const localMtime = this.getMtimeMs(lItem);

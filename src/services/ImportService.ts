@@ -228,15 +228,20 @@ export class ImportService {
 
   /**
    * Copie une règle vers un dossier rules/ d'Antigravity en garantissant un trigger valide
-   * (sans trigger, Antigravity ignorerait la règle). Retourne un message si le frontmatter a été complété.
+   * (sans trigger, Antigravity ignorerait la règle). Retourne un message si le frontmatter a été
+   * complété ou si les motifs `globs` posent problème (portée élargie, motifs morts, liste YAML).
    */
   private static async copyRuleForAntigravity(sourcePath: string, targetFile: string): Promise<string | undefined> {
     const content = await fs.promises.readFile(sourcePath, 'utf8');
     const prepared = ensureAntigravityTrigger(content);
     await fs.promises.writeFile(targetFile, prepared.content, 'utf8');
-    return prepared.addedTrigger
-      ? `Le frontmatter a été complété avec « trigger: ${prepared.addedTrigger} », sans quoi Antigravity ignorerait la règle.`
-      : undefined;
+    const notices = [
+      ...(prepared.addedTrigger
+        ? [`Le frontmatter a été complété avec « trigger: ${prepared.addedTrigger} », sans quoi Antigravity ignorerait la règle.`]
+        : []),
+      ...prepared.warnings.map((warning) => `⚠️ ${warning}`),
+    ];
+    return notices.length > 0 ? notices.join(' ') : undefined;
   }
 
   /**

@@ -811,4 +811,75 @@ describe('Suite de Tests : Favoris hors ligne et déploiement multi-cible', () =
       assert.doesNotMatch(source, /\.deploy\.deploy\(/, `${file} ne doit plus écrire sans aperçu.`);
     }
   });
+
+  // Lot A1 : une règle déployée vers Antigravity doit se déclencher vraiment (R3, R4, R6)
+  const deployRule = async (runtime: 'antigravity' | 'claude-code', manifest: string) => {
+    const files = new MemoryFileSystem();
+    const service = new MultiTargetDeployService(
+      new NasPathService(new FakeConfiguration(), CONNECTED_NAS, {} as NodeJS.ProcessEnv),
+      files
+    );
+    const shown: string[] = [];
+    const details: string[] = [];
+    const errors: string[] = [];
+    const ui: DeployReviewPort = {
+      showManifest: async (resource) => {
+        shown.push(resource.manifest);
+      },
+      confirmInstall: async (_message, detail) => {
+        details.push(detail);
+        return true;
+      },
+      resolveConflict: async () => undefined,
+      report: (level, message) => {
+        if (level === 'error') errors.push(message);
+      },
+    };
+    const resource: ReviewableResource = {
+      id: 'hub:regles-api',
+      name: 'Règles API',
+      type: 'rules',
+      manifest,
+      registryId: 'hub',
+      registryName: 'Hub interne',
+    };
+    const result = await reviewAndDeploy(service, resource, {
+      target: 'local',
+      conflictPolicy: 'overwrite',
+      context: { runtime, workspaceRoot: path.join('/projet'), agentsDirName: '.agents' },
+      now: () => new Date('2026-10-22T12:00:00.000Z'),
+    }, ui);
+    const written = files.files.get(result?.targetPath ?? '') ?? '';
+    return { result, shown, details, errors, written };
+  };
+
+  test('32. Règle Discovery vers Antigravity : convertie avant l\'aperçu, avertissement visible', async () => {
+    const manifest = '---\npaths:\n  - "src/**/*.ts"\n---\n# Règles API\n- Valider les entrées.\n';
+    const run = await deployRule('antigravity', manifest);
+
+    assert.strictEqual(run.result?.success, true);
+    const previewed = extractFrontmatter(run.shown[0]).metadata;
+    assert.strictEqual(previewed.trigger, 'glob', "L'aperçu montre le contenu converti, celui qui sera écrit.");
+    assert.strictEqual(previewed.globs, '*.ts');
+    assert.strictEqual(previewed.description, 'Règles API');
+    assert.match(run.details[0], /Portée élargie/);
+    assert.strictEqual(extractFrontmatter(run.written).metadata.globs, '*.ts');
+
+    const invalid = await deployRule('antigravity', '---\ntrigger: alwaysOn\n---\n# R\n');
+    assert.strictEqual(invalid.result?.success, false, 'Un trigger invalide est refusé avant tout aperçu.');
+    assert.deepStrictEqual(invalid.shown, []);
+    assert.match(invalid.errors[0], /trigger/);
+  });
+
+  test('33. Non-régression Claude Code : une règle déployée pour Claude Code n\'est pas convertie', async () => {
+    const manifest = '---\npaths:\n  - "src/**/*.ts"\n---\n# Règles API\n';
+    const run = await deployRule('claude-code', manifest);
+
+    assert.strictEqual(run.result?.success, true);
+    assert.deepStrictEqual(run.shown, [manifest], 'Le manifeste est montré tel quel.');
+    const written = extractFrontmatter(run.written).metadata;
+    assert.deepStrictEqual(written.paths, ['src/**/*.ts']);
+    assert.strictEqual(written.trigger, undefined);
+    assert.strictEqual(written.globs, undefined);
+  });
 });

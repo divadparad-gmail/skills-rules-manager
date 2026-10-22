@@ -17,6 +17,7 @@ import { CheatSheetPanel } from '../providers/CheatSheetPanel';
 import { getUserHome } from '../utils/paths';
 import { resetTokenizerMetrics, getTokenizerMetrics } from '../utils/tokenizer';
 import { debounce } from '../utils/debounce';
+import { ANTIGRAVITY_TESTED_ON, ANTIGRAVITY_TESTED_VERSION } from '../antigravity/behavior';
 
 export class StateManager {
   private static cachedState: ManagerFullState | null = null;
@@ -260,6 +261,8 @@ export class StateManager {
       stats,
       isDashboardOpen: this._isDashboardOpen,
       isCheatSheetOpen: this._isCheatSheetOpen,
+      ...(localResult.antigravityParents ? { antigravityParents: localResult.antigravityParents } : {}),
+      antigravityBehavior: { version: ANTIGRAVITY_TESTED_VERSION, testedOn: ANTIGRAVITY_TESTED_ON },
       userHome: getUserHome(),
     };
 
@@ -334,7 +337,9 @@ export class StateManager {
 
     if (result.success) {
       const destLabel = destinationScope === 'global' ? 'Global PC' : 'Projet Local';
-      vscode.window.showInformationMessage(
+      // Une portée élargie ou des motifs morts doivent rester visibles : avertissement plutôt qu'information
+      const show = result.notice?.includes('⚠️') ? vscode.window.showWarningMessage : vscode.window.showInformationMessage;
+      show(
         `Import réussi ! "${item.name || item.id}" a été copié vers ${destLabel}.` +
           (result.notice ? ` ${result.notice}` : '')
       );
