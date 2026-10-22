@@ -368,318 +368,477 @@
            =================================================================== -->
       <div id="contentAntigravity" class="modal-tab-content" style="display: none;">
 
-        <!-- 1. Limites de Tailles & Budget Contexte -->
+        <!-- 1. Composants, tailles & comportement -->
         <div class="cs-section">
           <div class="cs-section-title">
-            <span>📏 1. Limites de Tailles & Budget Contexte</span>
+            <span>📏 1. Composants, Tailles &amp; Comportement</span>
           </div>
           <div class="cs-callout cs-callout-info">
-            <span>💡</span>
-            <div>
-              <strong>Budget des règles : 20 000 tokens.</strong> Selon la documentation d'Antigravity, toutes les règles actives globales et <code>always_on</code> (âmes <code>AGENTS.md</code> / <code>GEMINI.md</code> comprises) partagent un budget de 20 000 tokens, distinct du budget de personnalisation (skills et MCP). Au-delà, Antigravity remplace les plus gros fichiers par de simples pointeurs. La jauge de l'extension suit ce budget et affiche les skills et les MCP à part.
+            <span>🔬</span>
+            <div class="ag-header-body">
+              <div><strong>Portée :</strong> Antigravity IDE 2.5.5, Windows. Comportements vérifiés par une suite de régression (2026-10-21) ; tokens mesurés avec o200k (2026-10-22).</div>
+              <div><strong>Légende des sources :</strong> <span class="ag-legend-item">📏 mesuré (o200k)</span> · <span class="ag-legend-item">📰 recommandation Google (blog)</span> · <span class="ag-legend-item">📘 recommandation Anthropic pour Claude</span> · <span class="ag-legend-item">🧪 testé</span> · <span class="ag-legend-item">📄 documentation Antigravity</span> · <span class="ag-legend-item">🧮 calculé à partir des mesures</span> · <span class="ag-legend-item">❔ non vérifié</span></div>
+              <div><strong>Réserve :</strong> o200k est le découpage d'OpenAI. Gemini et Claude découpent un peu différemment : les chiffres sont de bonnes approximations, pas des valeurs exactes par modèle.</div>
             </div>
           </div>
           <div class="cs-table-wrap">
-            <table class="cs-table">
+            <table class="cs-table ag-table">
+              <colgroup>
+                <col class="ag-col-comp">
+                <col class="ag-col-files">
+                <col class="ag-col-size">
+                <col class="ag-col-behavior">
+              </colgroup>
               <thead>
                 <tr>
-                  <th style="white-space: nowrap;">Composant</th>
-                  <th style="white-space: nowrap;">Fichier (global / local)</th>
-                  <th style="white-space: nowrap;">Taille Max &amp; Tokens</th>
+                  <th>Composant</th>
+                  <th>Fichiers (global / local)</th>
+                  <th>Taille &amp; tokens</th>
                   <th>Comportement</th>
                 </tr>
               </thead>
               <tbody>
                 <tr>
-                  <td><strong>Âme</strong></td>
-                  <td style="white-space: nowrap;">
-                    <code>~/.gemini/AGENTS.md, ~/.gemini/GEMINI.md (global)</code><br>
-                    <code>~/.gemini/config/AGENTS.md, ~/.gemini/config/GEMINI.md (global)</code><br>
-                    <code>/AGENTS.md, /GEMINI.md (local projet)</code><br>
-                    <code>/.agents/AGENTS.md, /.agents/GEMINI.md (local projet)</code>
+                  <td class="ag-comp"><strong>Âme</strong></td>
+                  <td data-label="Fichiers (global / local)">
+                    <ul class="ag-points">
+                      <li>Global : <code>~/.gemini/AGENTS.md</code>, <code>~/.gemini/GEMINI.md</code>, <code>~/.gemini/config/AGENTS.md</code>, <code>~/.gemini/config/GEMINI.md</code></li>
+                      <li>Projet : <code>/AGENTS.md</code>, <code>/GEMINI.md</code>, <code>/.agents/AGENTS.md</code>, <code>/.agents/GEMINI.md</code></li>
+                      <li>Dossiers parents, jusqu'à la racine du dépôt Git : mêmes noms</li>
+                    </ul>
                   </td>
-                  <td style="white-space: nowrap;">
-                    <div>Max 24 Ko (24 000 octets)</div>
-                    <div style="color: var(--muted-fg); font-size: 10px;">Inclusions @[label](path) comprises</div>
+                  <td data-label="Taille &amp; tokens">
+                    <ul class="ag-points">
+                      <li class="ag-reco"><strong>Recommandé : &lt; 200 lignes · ~1 800 – 2 800 tokens</strong> <span class="ag-src">📰📘🧮</span></li>
+                      <li>À chaque tour : 100 % de chaque fichier trouvé <span class="ag-src">🧪</span></li>
+                      <li>Cumul : tous les fichiers trouvés s'additionnent <span class="ag-src">🧪</span></li>
+                      <li>Plafond par fichier : 24 Ko, inclusions <code>@[label](path)</code> comprises ≈ 5 100 – 6 000 tokens <span class="ag-src">📄📏</span></li>
+                      <li>Budget commun : 20 000 tokens, partagés avec les règles permanentes <span class="ag-src">📄</span></li>
+                    </ul>
                   </td>
-                  <td>Sans frontmatter, toujours actif (<code>always_on</code>) : contenu entier injecté à chaque tour. Tous les fichiers trouvés sont cumulés. Compte dans le budget de 20 000 tokens des règles. Fichiers placés en sous-dossier : chargés quand l'agent lit ou modifie un fichier de ce dossier.</td>
+                  <td data-label="Comportement">
+                    <ul class="ag-points">
+                      <li>Jamais de frontmatter : toujours actif, contenu complet à chaque tour <span class="ag-src">🧪</span></li>
+                      <li>Aussi chargé depuis les dossiers parents, jusqu'à la racine du dépôt Git <span class="ag-src">🧪</span></li>
+                      <li>Jamais chargé depuis un sous-dossier du dossier ouvert <span class="ag-src">🧪</span></li>
+                    </ul>
+                  </td>
                 </tr>
                 <tr>
-                  <td><strong>Règles Permanentes</strong></td>
-                  <td style="white-space: nowrap;">
-                    <code>~/.gemini/config/rules/*.md (global)</code><br>
-                    <code>/.agents/rules/*.md (local projet)</code><br>
-                    <code>/.agent/rules/*.md (ancien emplacement, toujours lu)</code><br>
-                    <span style="color: var(--muted-fg); font-size: 10px;">(avec trigger: always_on)</span>
+                  <td class="ag-comp"><strong>Règles permanentes</strong></td>
+                  <td data-label="Fichiers (global / local)">
+                    <ul class="ag-points">
+                      <li>Global : <code>~/.gemini/config/rules/*.md</code></li>
+                      <li>Projet : <code>/.agents/rules/*.md</code>, <code>/.agent/rules/*.md</code> (ancien emplacement)</li>
+                      <li>Frontmatter : <code>trigger: always_on</code></li>
+                    </ul>
                   </td>
-                  <td style="white-space: nowrap;">
-                    <div>Max 24 Ko (24 000 octets)</div>
-                    <div style="color: var(--muted-fg); font-size: 10px;">Inclusions @[label](path) comprises</div>
+                  <td data-label="Taille &amp; tokens">
+                    <ul class="ag-points">
+                      <li class="ag-reco"><strong>Recommandé : &lt; 200 lignes · ~1 800 – 2 800 tokens par fichier</strong> <span class="ag-src">📰📘🧮</span></li>
+                      <li>À chaque tour : 100 % du corps de chaque fichier, sans le frontmatter <span class="ag-src">🧪</span></li>
+                      <li>Plafond par fichier : 24 Ko ≈ 5 100 – 6 000 tokens, le surplus est coupé <span class="ag-src">🧪📏</span></li>
+                      <li>Budget commun : 20 000 tokens partagés avec l'Âme, soit environ 7 à 11 fichiers de 200 lignes <span class="ag-src">📄🧮</span></li>
+                      <li>Au-delà du budget : les plus gros fichiers deviennent des pointeurs <code>- &lt;chemin&gt;: &lt;description&gt;</code> <span class="ag-src">📄</span></li>
+                    </ul>
                   </td>
-                  <td>Contenu entier injecté à chaque tour. Les règles globales et <code>always_on</code> partagent un budget de 20 000 tokens ; au-delà, Antigravity remplace les plus gros fichiers par de simples pointeurs (<code>- &lt;chemin&gt;: &lt;description&gt;</code>) que l'agent lit à la demande.</td>
+                  <td data-label="Comportement">
+                    <ul class="ag-points">
+                      <li>Corps injecté dans une balise <code>&lt;RULE[chemin]&gt;</code>, coupé avec un marqueur <code>&lt;truncated N bytes&gt;</code> au-delà de 24 Ko <span class="ag-src">🧪</span></li>
+                      <li>Frontmatter <strong>obligatoire</strong> : sans frontmatter, ou avec un <code>trigger</code> invalide (ex. <code>alwaysOn</code>), la règle est ignorée <strong>silencieusement</strong> <span class="ag-src">🧪</span></li>
+                      <li>Seuls les <code>.md</code> directement sous <code>rules/</code> sont lus, sauf déclaration dans <code>.agents/rules.json</code> <span class="ag-src">📄</span></li>
+                      <li><code>description</code> recommandée : elle sert de repli si la règle devient un pointeur <span class="ag-src">📄</span></li>
+                    </ul>
+                  </td>
                 </tr>
                 <tr>
-                  <td><strong>Règles Conditionnelles (avec Trigger)</strong></td>
-                  <td style="white-space: nowrap;">
-                    <code>/.agents/rules/*.md</code><br>
-                    <span style="color: var(--muted-fg); font-size: 10px;">(avec trigger: glob, model_decision ou manual)</span>
+                  <td class="ag-comp"><strong>Règles conditionnelles</strong></td>
+                  <td data-label="Fichiers (global / local)">
+                    <ul class="ag-points">
+                      <li>Global : <code>~/.gemini/config/rules/*.md</code></li>
+                      <li>Projet : <code>/.agents/rules/*.md</code></li>
+                      <li>Frontmatter : <code>trigger: glob</code>, <code>model_decision</code> ou <code>manual</code></li>
+                    </ul>
                   </td>
-                  <td style="white-space: nowrap;">
-                    <div>~20 tokens au boot (estimation)</div>
-                    <div style="color: var(--muted-fg); font-size: 10px;">Taille complète à l'activation</div>
+                  <td data-label="Taille &amp; tokens">
+                    <ul class="ag-points">
+                      <li class="ag-reco"><strong>Recommandé <code>glob</code> : &lt; 30 lignes · ~270 – 420 tokens</strong> ⚠️ voir <a href="#ag-piege-glob">« Le piège <code>glob</code> »</a> <span class="ag-src">🧪🧮</span></li>
+                      <li class="ag-reco"><strong>Recommandé <code>model_decision</code> : &lt; 200 lignes · ~1 800 – 2 800 tokens</strong>, plus une description d'une phrase <span class="ag-src">📘🧮</span></li>
+                      <li>Au démarrage, <code>glob</code> : 0 token <span class="ag-src">🧪</span></li>
+                      <li>Au démarrage, <code>manual</code> : 0 token <span class="ag-src">🧪</span></li>
+                      <li>Au démarrage, <code>model_decision</code> : ≈ 40 – 90 tokens (chemin <code>file:///</code> + description) <span class="ag-src">🧮</span></li>
+                      <li>Par activation, <code>glob</code> : 100 % <strong>à chaque</strong> lecture, modification ou création d'un fichier correspondant <span class="ag-src">🧪</span></li>
+                      <li>Par activation, <code>model_decision</code> : 100 % quand l'agent lit la règle <span class="ag-src">📄</span></li>
+                      <li>Par activation, <code>manual</code> : 100 % par mention <code>@</code> <span class="ag-src">❔</span></li>
+                      <li>Plafond par fichier : 24 Ko <span class="ag-src">📄</span></li>
+                    </ul>
                   </td>
-                  <td>Le contenu complet n'est injecté dans le contexte que si les fichiers ciblés (directive <code>globs:</code>) sont manipulés, si le modèle décide de l'activer à partir de sa <code>description</code> (<code>model_decision</code>) ou si l'utilisateur la mentionne (<code>manual</code>). Le coût au démarrage d'environ 20 tokens est une estimation de l'extension : la documentation d'Antigravity ne le chiffre pas.</td>
+                  <td data-label="Comportement">
+                    <ul class="ag-points">
+                      <li><code>glob</code> : la règle est ajoutée à la fin du résultat de l'outil, après le préambule <code>The following text is not part of the file, it is a list of user-defined rules that you MUST follow:</code>, lors d'une lecture, modification ou création. Jamais lors d'un listing de dossier <span class="ag-src">🧪</span></li>
+                      <li>Le motif est comparé au <strong>nom de fichier seul</strong> : <code>*.ts</code>, <code>**/*.ts</code> et <code>app.ts</code> fonctionnent. Tout motif avec un dossier (<code>src/**/*.ts</code>, <code>dossier/*.ts</code>) ne se déclenche <strong>jamais</strong> <span class="ag-src">🧪</span></li>
+                      <li><code>globs</code> doit être une <strong>chaîne</strong> : <code>"*.ts, *.js"</code>. Une liste YAML est rejetée <strong>silencieusement</strong> <span class="ag-src">🧪</span></li>
+                      <li>Une clé <code>paths:</code> (format Claude Code) ajoutée en plus est ignorée sans casser la règle <span class="ag-src">🧪</span></li>
+                      <li><code>model_decision</code> : chemin et description dans un index au démarrage, corps lu par l'agent à la demande <span class="ag-src">🧪📄</span></li>
+                      <li><code>manual</code> : activée par une mention <code>@</code> dans le chat <span class="ag-src">❔</span></li>
+                    </ul>
+                  </td>
                 </tr>
                 <tr>
-                  <td><strong>Règles de Dossier (Imbriquées)</strong></td>
-                  <td style="white-space: nowrap;">
-                    <code>/sous-dossier/AGENTS.md</code><br>
-                    <code>/sous-dossier/GEMINI.md</code><br>
-                    <code>/sous-dossier/.agents/rules/*.md</code>
+                  <td class="ag-comp"><strong>Règles de dossier</strong></td>
+                  <td data-label="Fichiers (global / local)">
+                    <ul class="ag-points">
+                      <li><code>/sous-dossier/AGENTS.md</code>, <code>/sous-dossier/GEMINI.md</code>, <code>/sous-dossier/.agents/rules/*.md</code></li>
+                    </ul>
                   </td>
-                  <td style="white-space: nowrap;">
-                    <div>Max 24 Ko (24 000 octets)</div>
-                    <div style="color: var(--muted-fg); font-size: 10px;">Limitées au dossier</div>
+                  <td data-label="Taille &amp; tokens">
+                    <ul class="ag-points">
+                      <li class="ag-reco"><strong>Recommandé, sous-dossiers : ne pas utiliser · 0 token</strong>, mais aussi aucun effet <span class="ag-src">🧪</span></li>
+                      <li class="ag-reco"><strong>Recommandé, dossiers parents : &lt; 200 lignes · ~1 800 – 2 800 tokens</strong> <span class="ag-src">📰📘🧮</span></li>
+                      <li>Dossiers parents : chargés à chaque tour, comme l'Âme, et ils entament le même budget <span class="ag-src">🧪</span></li>
+                    </ul>
                   </td>
-                  <td>N'occupe aucun token au démarrage. Contenu injecté automatiquement uniquement quand l'agent explore ou modifie des fichiers de ce sous-dossier.</td>
+                  <td data-label="Comportement">
+                    <ul class="ag-points">
+                      <li>Sous-dossiers du dossier ouvert : <strong>jamais chargés</strong>, ni à la lecture d'un fichier, ni à la modification, ni au listing, contrairement à la documentation <span class="ag-src">🧪</span></li>
+                      <li>Dossiers parents, jusqu'à la racine du dépôt Git : chargés <span class="ag-src">🧪</span></li>
+                    </ul>
+                  </td>
                 </tr>
                 <tr>
-                  <td><strong>Skills Déclarés</strong></td>
-                  <td style="white-space: nowrap;">
-                    <code>~/.gemini/config/skills/&lt;nom&gt;/SKILL.md (global)</code><br>
-                    <code>/.agents/skills/&lt;nom&gt;/SKILL.md (local projet)</code>
+                  <td class="ag-comp"><strong>Skills</strong></td>
+                  <td data-label="Fichiers (global / local)">
+                    <ul class="ag-points">
+                      <li>Global : <code>~/.gemini/config/skills/&lt;nom&gt;/SKILL.md</code></li>
+                      <li>Projet : <code>/.agents/skills/&lt;nom&gt;/SKILL.md</code></li>
+                      <li>Anciens emplacements : <code>/.agent/skills/</code>, <code>~/.gemini/antigravity/skills/</code> <span class="ag-src">📄</span></li>
+                      <li>Intégrés, en lecture seule : <code>~/.gemini/antigravity-ide/builtin/skills/</code> <span class="ag-src">🧪</span></li>
+                    </ul>
                   </td>
-                  <td style="white-space: nowrap;">
-                    <div>Recommandé &lt; 500 lignes</div>
-                    <div style="color: var(--muted-fg); font-size: 10px;">~3 750 – 7 500 tokens</div>
+                  <td data-label="Taille &amp; tokens">
+                    <ul class="ag-points">
+                      <li class="ag-reco"><strong>Recommandé, corps : &lt; 500 lignes · ~4 500 – 7 000 tokens</strong> (Anthropic vise moins de 5 000) <span class="ag-src">📘🧮</span></li>
+                      <li class="ag-reco"><strong>Recommandé, description : 1 à 2 phrases</strong> <span class="ag-src">📘</span></li>
+                      <li>Au démarrage : une ligne par skill ≈ 50 – 110 tokens (nom + chemin absolu + description) <span class="ag-src">🧪🧮</span></li>
+                      <li>Exemple : 20 skills ≈ 1 000 – 2 200 tokens à chaque tour <span class="ag-src">🧮</span></li>
+                      <li>Skills intégrés : 2 skills toujours présents, impossibles à retirer <span class="ag-src">🧪</span></li>
+                      <li>Par activation : 100 % du corps, lu une fois <span class="ag-src">🧪</span></li>
+                      <li>Plafond : aucun documenté <span class="ag-src">📄</span></li>
+                    </ul>
                   </td>
-                  <td>Seuls le nom et la description sont injectés au démarrage (~20 à 50 tokens). Le corps n'est jamais chargé au boot : lu sur disque à la demande si l'agent juge la compétence utile, ou sur commande explicite (<code>/nom-du-skill</code>).</td>
+                  <td data-label="Comportement">
+                    <ul class="ag-points">
+                      <li>Index au démarrage : <code>- &lt;nom&gt; (&lt;chemin absolu de SKILL.md&gt;): &lt;description&gt;</code> <span class="ag-src">🧪</span></li>
+                      <li>Corps chargé seulement quand l'agent lit le <code>SKILL.md</code> <span class="ag-src">🧪</span></li>
+                      <li><code>name</code> facultatif (nom du dossier par défaut), <code>description</code> obligatoire <span class="ag-src">📄</span></li>
+                      <li>Commande <code>/nom-du-skill</code> : documentée pour l'App et le CLI, non vérifiée dans l'IDE <span class="ag-src">❔</span></li>
+                    </ul>
+                  </td>
                 </tr>
                 <tr>
-                  <td><strong>Fichiers Annexes de Skill</strong></td>
-                  <td style="white-space: nowrap;">
-                    <code>Sous-dossiers conventionnels</code><br>
-                    <span style="color: var(--muted-fg); font-size: 10px;">(scripts/, examples/, resources/, references/)</span>
+                  <td class="ag-comp"><strong>Fichiers annexes de skill</strong></td>
+                  <td data-label="Fichiers (global / local)">
+                    <ul class="ag-points">
+                      <li><code>scripts/</code>, <code>examples/</code>, <code>resources/</code> <span class="ag-src">📄</span></li>
+                      <li><code>references/</code> : toléré, mais absent de la documentation</li>
+                    </ul>
                   </td>
-                  <td style="white-space: nowrap;">
-                    <div>Taille libre</div>
-                    <div style="color: var(--muted-fg); font-size: 10px;">Fichiers autonomes</div>
+                  <td data-label="Taille &amp; tokens">
+                    <ul class="ag-points">
+                      <li class="ag-reco"><strong>Recommandé : un sujet par fichier, &lt; 300 lignes · ~2 700 – 4 200 tokens</strong> <span class="ag-src">🧮</span></li>
+                      <li>Structure : table des matières au-delà de 100 lignes <span class="ag-src">📘</span></li>
+                      <li>Au démarrage : 0 token <span class="ag-src">🧪</span></li>
+                      <li>Par activation : 100 % du fichier, seulement s'il est lu <span class="ag-src">🧪</span></li>
+                      <li>Scripts : seule la sortie coûte des tokens, pas le code <span class="ag-src">📄</span></li>
+                      <li>Plafond : aucun documenté <span class="ag-src">📄</span></li>
+                    </ul>
                   </td>
-                  <td>Jamais chargés au démarrage ; lus par l'agent uniquement si le corps du <code>SKILL.md</code> contient un lien explicite invitant à les consulter.</td>
+                  <td data-label="Comportement">
+                    <ul class="ag-points">
+                      <li>Jamais chargés ni signalés, même à l'ouverture du <code>SKILL.md</code> <span class="ag-src">🧪</span></li>
+                      <li>Lecture « seulement si le SKILL.md y renvoie » : non prouvé <span class="ag-src">❔</span></li>
+                      <li>La documentation conseille d'exécuter les scripts avec <code>--help</code> plutôt que de lire leur code <span class="ag-src">📄</span></li>
+                    </ul>
+                  </td>
                 </tr>
                 <tr>
-                  <td><strong>Serveurs MCP (Outils &amp; Connecteurs)</strong></td>
-                  <td style="white-space: nowrap;">
-                    <code>~/.gemini/config/mcp_config.json (global)</code><br>
-                    <code>/.agents/mcp_config.json (local projet)</code>
+                  <td class="ag-comp"><strong>Serveurs MCP</strong></td>
+                  <td data-label="Fichiers (global / local)">
+                    <ul class="ag-points">
+                      <li>Global : <code>~/.gemini/config/mcp_config.json</code></li>
+                      <li>Projet : <code>/.agents/mcp_config.json</code></li>
+                    </ul>
                   </td>
-                  <td style="white-space: nowrap;">
-                    <div>Illimité</div>
-                    <div style="color: var(--muted-fg); font-size: 10px;">Pas de cap à 2 048 car.</div>
+                  <td data-label="Taille &amp; tokens">
+                    <ul class="ag-points">
+                      <li class="ag-reco"><strong>Recommandé : n'activer que les serveurs utiles, et masquer le reste avec <code>disabledTools</code></strong> <span class="ag-src">📄</span></li>
+                      <li>Au démarrage : noms des outils seulement ≈ 3 – 8 tokens par outil, plus un titre par serveur <span class="ag-src">🧪🧮</span></li>
+                      <li>Exemple : 10 outils ≈ 30 – 80 tokens, plus les titres <span class="ag-src">🧮</span></li>
+                      <li>Par utilisation, schéma : ≈ 100 – 500 tokens par outil, lu à la demande <span class="ag-src">❔</span></li>
+                      <li>Par utilisation, résultat : variable, souvent le poste le plus coûteux <span class="ag-src">🧮</span></li>
+                      <li>Outils <code>Eager</code> : coût au démarrage inconnu <span class="ag-src">❔</span></li>
+                      <li>Plafond : aucun documenté <span class="ag-src">📄</span></li>
+                    </ul>
                   </td>
-                  <td>Pas de coupure de description. Antigravity optimise automatiquement : les outils légers sont <strong>préchargés au démarrage</strong>, et <strong>les gros serveurs (GitHub, Coolify...) sont chargés sur disque à la demande</strong> sans saturer le prompt.</td>
+                  <td data-label="Comportement">
+                    <ul class="ag-points">
+                      <li>Au démarrage : noms des outils classés <code>Eager:</code> / <code>Lazy:</code>, aucune description <span class="ag-src">🧪</span></li>
+                      <li>Schéma lu sur disque à la demande, puis appel via <code>call_mcp_tool</code> <span class="ag-src">🧪</span></li>
+                      <li>Critère qui sépare <code>Eager</code> et <code>Lazy</code> : inconnu <span class="ag-src">❔</span></li>
+                      <li>Serveur distant : <code>serverUrl</code> obligatoire, <code>url</code> et <code>httpUrl</code> non supportés <span class="ag-src">📄</span></li>
+                      <li>Outils MCP en mode « Ask » (approbation) par défaut <span class="ag-src">📄</span></li>
+                    </ul>
+                  </td>
                 </tr>
                 <tr>
-                  <td><strong>Plugins (Packs Tout-en-Un)</strong></td>
-                  <td style="white-space: nowrap;">
-                    <code>~/.gemini/config/plugins/&lt;nom&gt;/ (global)</code><br>
-                    <code>/.agents/plugins/&lt;nom&gt;/ (local projet)</code>
+                  <td class="ag-comp"><strong>Plugins</strong></td>
+                  <td data-label="Fichiers (global / local)">
+                    <ul class="ag-points">
+                      <li>Global : <code>~/.gemini/config/plugins/&lt;nom&gt;/</code></li>
+                      <li>Projet : <code>/.agents/plugins/&lt;nom&gt;/</code></li>
+                      <li><code>plugin.json</code> obligatoire ; contenu possible : <code>skills/</code>, <code>rules/</code>, <code>agents/</code>, <code>mcp_config.json</code>, <code>hooks.json</code> <span class="ag-src">📄</span></li>
+                    </ul>
                   </td>
-                  <td style="white-space: nowrap;">
-                    <div>Dossier kit autonome</div>
-                    <div style="color: var(--muted-fg); font-size: 10px;">(contient rules, skills, mcp)</div>
+                  <td data-label="Taille &amp; tokens">
+                    <ul class="ag-points">
+                      <li class="ag-reco"><strong>Recommandé : somme de ses composants, chacun suit sa propre ligne</strong> <span class="ag-src">📄</span></li>
+                      <li>Au démarrage, par skill de plugin : listé <strong>deux fois</strong> (liste des skills + section <code>&lt;plugins&gt;</code>) ≈ 100 – 220 tokens <span class="ag-src">🧪🧮</span></li>
+                      <li>Au démarrage, par plugin : ≈ 20 – 40 tokens d'en-tête <span class="ag-src">🧮</span></li>
+                      <li>Règles, MCP, hooks du plugin : comme leur ligne respective <span class="ag-src">📄</span></li>
+                    </ul>
                   </td>
-                  <td>Kit regroupant plusieurs règles, skills et MCP dans un dossier unique pour les partager facilement. <strong>Ses éléments internes sont chargés au démarrage avec un préfixe (ex: <code>nom-pack:skill</code>)</strong> pour éviter tout conflit avec vos propres fichiers.</td>
+                  <td data-label="Comportement">
+                    <ul class="ag-points">
+                      <li>Skills d'un plugin listés <strong>sans préfixe</strong> (<code>nom-du-skill</code>, pas <code>plugin:skill</code>), avec une section <code>&lt;plugins&gt;</code> séparée <span class="ag-src">🧪</span></li>
+                    </ul>
+                  </td>
                 </tr>
                 <tr>
-                  <td><strong>Lifecycle Hooks</strong></td>
-                  <td style="white-space: nowrap;">
-                    <code>~/.gemini/config/hooks.json (global)</code><br>
-                    <code>/.agents/hooks.json (local projet)</code>
+                  <td class="ag-comp"><strong>Lifecycle Hooks</strong></td>
+                  <td data-label="Fichiers (global / local)">
+                    <ul class="ag-points">
+                      <li>Global : <code>~/.gemini/config/hooks.json</code></li>
+                      <li>Projet : <code>/.agents/hooks.json</code></li>
+                    </ul>
                   </td>
-                  <td style="white-space: nowrap;">
-                    <div>JSON déclaratif</div>
-                    <div style="color: var(--muted-fg); font-size: 10px;">5 points de contrôle</div>
+                  <td data-label="Taille &amp; tokens">
+                    <ul class="ag-points">
+                      <li class="ag-reco"><strong>Recommandé : messages injectés &lt; 10 lignes · ~90 – 140 tokens</strong> <span class="ag-src">🧮</span></li>
+                      <li>Au démarrage : 0 token, la configuration JSON n'est pas dans le contexte <span class="ag-src">❔</span></li>
+                      <li><code>SessionStart</code> : ce qu'il injecte, une seule fois <span class="ag-src">📄</span></li>
+                      <li><code>PreInvocation</code> : ce qu'il injecte, <strong>à chaque appel au modèle</strong> (ex. 100 tokens × 30 appels = 3 000) <span class="ag-src">📄🧮</span></li>
+                      <li><code>PreToolUse</code> : la <code>reason</code> renvoyée <span class="ag-src">📄</span></li>
+                    </ul>
                   </td>
-                  <td>Intercepte les actions en direct (<code>PreToolUse</code>, <code>PostToolUse</code>, <code>Stop</code>, etc.). Permet de bloquer des commandes sensibles ou d'exiger une confirmation utilisateur.</td>
+                  <td data-label="Comportement">
+                    <ul class="ag-points">
+                      <li>JSON qui lance des <strong>commandes shell</strong> (entrée et sortie en JSON), délai de 30 s par défaut <span class="ag-src">📄</span></li>
+                      <li><strong>6 événements</strong> : SessionStart, PreToolUse, PostToolUse, PreInvocation, PostInvocation, Stop <span class="ag-src">📄</span></li>
+                      <li>PreToolUse peut bloquer (<code>deny</code>) ou exiger une confirmation (<code>ask</code>, <code>force_ask</code>) <span class="ag-src">📄</span></li>
+                    </ul>
+                  </td>
+                </tr>
+                <tr>
+                  <td class="ag-comp"><strong>Workflows (obsolètes)</strong></td>
+                  <td data-label="Fichiers (global / local)">
+                    <ul class="ag-points">
+                      <li>Panneau Customizations de l'IDE</li>
+                    </ul>
+                  </td>
+                  <td data-label="Taille &amp; tokens">
+                    <ul class="ag-points">
+                      <li class="ag-reco"><strong>Recommandé : migrer vers des skills · 0 token aujourd'hui</strong> (hors service) <span class="ag-src">📄</span></li>
+                      <li>Ancien plafond : 12 000 caractères ≈ 2 600 – 3 000 tokens <span class="ag-src">📄🧮</span></li>
+                    </ul>
+                  </td>
+                  <td data-label="Comportement">
+                    <ul class="ag-points">
+                      <li><strong>Hors service depuis le 19 octobre 2026</strong> <span class="ag-src">📄</span></li>
+                      <li><code>/migrate-workflows</code>, annoncé par la documentation, est <strong>absent</strong> de l'IDE 2.5.5 <span class="ag-src">🧪</span></li>
+                      <li>Migrer manuellement vers des skills</li>
+                    </ul>
+                  </td>
                 </tr>
               </tbody>
             </table>
           </div>
-          <div style="font-size: 11px; color: var(--muted-fg); margin-top: 4px; line-height: 1.45;">
-            <em>ℹ️ Note MCP Antigravity : Contrairement à Claude Code qui tronque à 2 048 caractères, Antigravity conserve l'intégralité des descriptions et schémas d'outils grâce à son architecture hybride transparente (préchargement léger ou lecture à la demande).</em>
+        </div>
+
+        <!-- 2. Tableau de conversion -->
+        <div class="cs-section">
+          <div class="cs-section-title">
+            <span>🧮 2. Conversion Ko, Lignes &amp; Tokens (prose française, o200k)</span>
+          </div>
+          <div class="cs-table-wrap">
+            <table class="cs-table ag-simple-table">
+              <thead>
+                <tr>
+                  <th>Unité</th>
+                  <th>Tokens</th>
+                  <th>Source</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>1 Ko (1 000 octets)</td>
+                  <td><strong>≈ 215 – 250 tokens</strong> (médiane 240) : l'unité <strong>fiable</strong>, très stable</td>
+                  <td class="ag-src-cell">📏</td>
+                </tr>
+                <tr>
+                  <td>1 ligne, rédaction en puces et lignes courtes</td>
+                  <td><strong>≈ 9 – 14 tokens</strong></td>
+                  <td class="ag-src-cell">📏</td>
+                </tr>
+                <tr>
+                  <td>1 ligne, rédaction en longs paragraphes</td>
+                  <td><strong>jusqu'à ≈ 28 tokens</strong></td>
+                  <td class="ag-src-cell">📏</td>
+                </tr>
+                <tr>
+                  <td>200 lignes courtes</td>
+                  <td>≈ 1 800 – 2 800 tokens</td>
+                  <td class="ag-src-cell">🧮</td>
+                </tr>
+                <tr>
+                  <td>24 Ko (plafond par fichier)</td>
+                  <td>≈ 5 100 – 6 000 tokens</td>
+                  <td class="ag-src-cell">📏🧮</td>
+                </tr>
+                <tr>
+                  <td>Budget de 20 000 tokens</td>
+                  <td>≈ 80 – 94 Ko, soit ≈ 1 400 – 2 200 lignes courtes, ou ≈ 720 lignes denses</td>
+                  <td class="ag-src-cell">🧮</td>
+                </tr>
+                <tr>
+                  <td>Frontmatter d'une règle</td>
+                  <td>≈ 20 – 57 tokens, <strong>non injecté</strong> par Antigravity</td>
+                  <td class="ag-src-cell">📏🧪</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="ag-note">
+            Les lignes sont trompeuses. Une règle rédigée en longs paragraphes coûte jusqu'à 3 fois plus par ligne qu'une règle en puces. Pour estimer une règle, <strong>les Ko sont plus fiables que les lignes</strong>.
           </div>
         </div>
 
-        <!-- 2. Injection session & stratégies d'activation -->
-        <div class="cs-section">
+        <!-- 3. Le piège glob -->
+        <div class="cs-section" id="ag-piege-glob">
           <div class="cs-section-title">
-            <span>⚡ 2. Injection de Session & Stratégies d'Activation</span>
+            <span>⚠️ 3. Le Piège <code>glob</code></span>
           </div>
-
-          <!-- Partie 2.A : GEMINI.md / AGENTS.md -->
-          <div
-            style="background: rgba(0, 0, 0, 0.2); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 5px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px;">
-            <div
-              style="font-weight: 700; color: #f59e0b; display: flex; align-items: center; gap: 6px; font-size: 11.5px;">
-              <span>🧬 Partie 2.A : GEMINI.md & AGENTS.md — L'Âme Fondamentale (Injection Continue & Imbrication)</span>
-            </div>
-            <div class="cs-callout cs-callout-warning" style="margin: 2px 0;">
-              <span>🔄</span>
-              <div>
-                <strong>Injection Continue :</strong> Ces fichiers n'ont pas de frontmatter et restent toujours actifs (<code>always_on</code>) dans la portée de leur dossier : Antigravity injecte leur contenu entier dans l'invite système à chaque tour.
-              </div>
-            </div>
-            <ul style="margin: 0; padding-left: 20px; line-height: 1.5; color: var(--fg-color); font-size: 11px;">
-              <li><strong>Emplacements globaux :</strong> <code>~/.gemini/AGENTS.md</code>, <code>~/.gemini/GEMINI.md</code>, <code>~/.gemini/config/AGENTS.md</code> et <code>~/.gemini/config/GEMINI.md</code>. Tous ceux qui existent sont chargés et cumulés.</li>
-              <li><strong>Emplacements du projet :</strong> <code>AGENTS.md</code> ou <code>GEMINI.md</code> à la racine, ainsi que <code>.agents/AGENTS.md</code> ou <code>.agents/GEMINI.md</code>.</li>
-              <li><strong>Taille :</strong> 24 000 octets maximum par fichier, inclusions <code>@[label](path)</code> comprises ; ils comptent dans le budget de 20 000 tokens des règles. La documentation ne fixe pas de limite de lignes.</li>
-              <li><strong>Imbrication Hiérarchique (Directory Walking) :</strong> Chaque fois que l'agent lit ou modifie un fichier, il remonte l'arborescence depuis le dossier de ce fichier jusqu'à la racine de l'espace de travail et charge, à chaque niveau, <code>AGENTS.md</code> / <code>GEMINI.md</code>, <code>.agents/AGENTS.md</code> / <code>.agents/GEMINI.md</code> et <code>.agents/rules/*.md</code>.</li>
-              <li><strong>Priorité :</strong> Les règles sont cumulatives. En cas de conflit, la règle du dossier le plus spécifique l'emporte, puis celles de l'espace de travail, puis les règles globales.</li>
-              <li><strong>Inclusions :</strong> <code>@[label](path)</code> intègre le contenu du fichier cible (chemin relatif au fichier de règles, <code>~/</code> pour le dossier personnel, frontmatter du fichier inclus retiré). <code>@filename</code> n'intègre rien : Antigravity le réécrit seulement en chemin absolu de l'espace de travail.</li>
-            </ul>
-          </div>
-
-          <!-- Partie 2.B : Les Règles -->
-          <div
-            style="background: rgba(0, 0, 0, 0.2); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 5px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; margin-top: 4px;">
-            <div
-              style="font-weight: 700; color: #60a5fa; display: flex; align-items: center; gap: 6px; font-size: 11.5px;">
-              <span>📋 Partie 2.B : Les Règles — Permanentes, Conditionnelles &amp; Dossiers Imbriqués</span>
-            </div>
-            <div style="display: flex; flex-direction: column; gap: 8px; line-height: 1.5; font-size: 11px;">
-              <div>
-                <strong>1. Règles Permanentes (Dossier <code>rules/</code> avec <code>trigger: always_on</code>) :</strong>
-                <div style="color: var(--muted-fg); margin-top: 2px;">
-                  Situées dans <code>.agents/rules/*.md</code> (et l'ancien <code>.agent/rules/*.md</code>, toujours lu) pour le projet, ou dans <code>~/.gemini/config/rules/*.md</code> pour le global. Contenu entier injecté à chaque tour.
-                  <br>• <strong>Limite physique stricte :</strong> 24 000 octets max par fichier, mesurés après développement des inclusions <code>@[label](path)</code>. Au-delà, Antigravity tronque le fichier.
-                  <br>• <strong>Budget partagé :</strong> Les règles globales et <code>always_on</code> partagent <strong>20 000 tokens</strong>, distincts du budget de personnalisation (skills, MCP). Au-delà, Antigravity remplace les plus gros fichiers par des pointeurs (<code>- &lt;chemin&gt;: &lt;description&gt;</code>) que l'agent lit à la demande.
-                  <br>• <strong>Frontmatter obligatoire :</strong> chaque fichier de <code>rules/</code> doit déclarer un <code>trigger</code> valide (<code>always_on</code>, <code>model_decision</code>, <code>glob</code> ou <code>manual</code>). Un <code>trigger</code> absent ou invalide (par exemple <code>alwaysOn</code>) fait écarter la règle sans avertissement. La <code>description</code> est recommandée pour toutes les règles.
-                  <br>• <strong>Analyse plate :</strong> seuls les fichiers <code>.md</code> placés directement dans <code>.agents/rules/</code> sont lus ; un sous-dossier comme <code>.agents/rules/frontend/</code> est ignoré, sauf s'il est déclaré dans <code>.agents/rules.json</code>.
-                  <br><em>Usage :</em> Lois transversales (langue, encodage, sécurité de base, style de code). La documentation conseille de placer les règles <code>always_on</code> directement dans <code>AGENTS.md</code> quand le frontmatter n'est pas utile.
-                </div>
-              </div>
-              <div>
-                <strong>2. Règles Conditionnelles (<code>glob</code>, <code>model_decision</code>, <code>manual</code>) :</strong>
-                <div style="color: var(--muted-fg); margin-top: 2px;">
-                  • <strong><code>trigger: glob</code> :</strong> s'active quand l'agent interagit avec un fichier correspondant à l'un des motifs de <code>globs</code> (obligatoire ; <code>glob:</code> au singulier est aussi accepté).
-                  <br>• <strong><code>trigger: model_decision</code> :</strong> Antigravity injecte d'emblée seulement le chemin et la <code>description</code> (obligatoire) ; l'agent lit la règle complète quand la tâche correspond à la description.
-                  <br>• <strong><code>trigger: manual</code> :</strong> jamais chargée automatiquement ; l'agent l'injecte seulement quand vous la mentionnez avec <code>@</code> dans la discussion.
-                  <br>• <strong>Format de <code>globs</code> :</strong> une chaîne de motifs séparés par des virgules, entre guillemets (<code>globs: "*.ts, *.tsx"</code>). Les motifs qui commencent par <code>*</code> doivent être entre guillemets. La documentation ne décrit ni la liste YAML ni les accolades <code>{a,b}</code>.
-                  <br>• <strong>Coût au démarrage :</strong> environ 20 tokens selon l'estimation de l'extension (la documentation d'Antigravity ne chiffre pas ce coût).
-                  <br><em>Attention :</em> Antigravity utilise <code>trigger: glob</code> et <code>globs:</code> (et non <code>paths:</code> qui est réservé à Claude Code).
-                </div>
-              </div>
-              <div>
-                <strong>3. Règles de Dossier Imbriquées (<code>AGENTS.md</code>, <code>GEMINI.md</code> ou <code>.agents/rules/</code> en sous-dossier) :</strong>
-                <div style="color: var(--muted-fg); margin-top: 2px;">
-                  En plaçant un fichier <code>AGENTS.md</code> (ou un dossier <code>.agents/rules/</code>) dans un sous-dossier spécifique (ex: <code>src/api/AGENTS.md</code>), ces consignes ne sont chargées que lorsque l'agent lit ou modifie un fichier de cette zone. L'extension les affiche avec le badge <code>📂 dossier/</code> et ne les compte pas au démarrage.
-                  <br>• <strong>Règles partagées :</strong> <code>.agents/rules.json</code> déclare des dossiers de règles situés hors de <code>.agents/rules/</code> ou des sous-dossiers imbriqués (<code>entries</code> avec <code>path</code>, <code>exclude</code>, <code>include_only</code>, et <code>inherits</code> pour réutiliser un autre <code>rules.json</code>), en conservant leur frontmatter et leurs triggers.
-                </div>
-              </div>
-
-              <!-- Note explicative sur le calcul du total de tokens des règles -->
-              <div class="cs-callout cs-callout-info" style="margin-top: 6px;">
-                <span>📊</span>
-                <div>
-                  <strong>Comment se calcule le total de tokens des règles (Antigravity) :</strong>
-                  <ul style="margin: 4px 0 0 0; padding-left: 18px; line-height: 1.5;">
-                    <li><strong>Règles permanentes (<code>trigger: always_on</code>) :</strong> Comptées pour la totalité de leur contenu, inclusions comprises (estimation BPE o200k).</li>
-                    <li><strong>Règles conditionnelles (<code>trigger: glob</code>, <code>model_decision</code> ou <code>manual</code>) :</strong> Ne comptent que pour <strong>≈ 20 tokens</strong> chacune dans le total affiché au démarrage. Ce chiffre est une estimation de l'extension : la documentation d'Antigravity ne le précise pas. Leur coût complet en cas d'activation est affiché à part (dans l'info-bulle et sur la carte).</li>
-                    <li><strong>Règles ignorées et règles de dossier :</strong> 0 token au démarrage. Une règle sans <code>trigger</code> valide porte le badge <code>⛔ Ignorée par Antigravity</code> ; un champ obligatoire manquant ou un <code>globs</code> mal formé porte le badge <code>⚠️ Frontmatter</code>.</li>
-                    <li><strong>Conséquence sur la jauge :</strong> Additionner les tokens affichés sur les cartes des règles conditionnelles ne redonne pas le total des règles. C'est normal et voulu — le total reflète la consommation au démarrage, pas la consommation maximale si toutes les règles conditionnelles étaient déclenchées en même temps.</li>
-                    <li><strong>Skills et Âme :</strong> À l'inverse des règles, les totaux des compétences (skills/workflows) et de l'Âme (<code>GEMINI.md</code> / <code>AGENTS.md</code>) correspondent exactement à la somme des cartes actives. Sous Antigravity, la jauge de 20 000 tokens ne compte que l'âme et les règles : les skills et les MCP sont affichés hors de ce budget.</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 3. Skills : Découverte au Démarrage & Lecture à la Demande -->
-        <div class="cs-section">
-          <div class="cs-section-title">
-            <span>🧠 3. Compétences (Skills : SKILL.md) : Découverte au Démarrage & Lecture à la Demande</span>
-          </div>
-          <div class="cs-callout cs-callout-success">
-            <span>🚀</span>
-            <div>
-              <strong>Économie massive de mémoire :</strong> Seuls ~20 à 50 tokens sont consommés par skill au démarrage !
-            </div>
-          </div>
-          <ul style="margin: 0; padding-left: 20px; line-height: 1.6; color: var(--fg-color); font-size: 11px;">
-            <li><strong>Au démarrage (Boot) :</strong> Seuls le <code>name</code> et la <code>description</code> dans le frontmatter YAML sont scannés au boot. Le corps du fichier <code>SKILL.md</code> n'est <strong>jamais</strong> chargé par défaut.</li>
-            <li><strong>À l'exécution (À la demande) :</strong> L'agent lit le fichier complet avec son outil de lecture uniquement s'il juge la compétence pertinente pour la tâche en cours, ou lors d'une commande explicite de votre part (ex: <code>/wf-commit</code> ou <code>/skill-dev</code>).</li>
-            <li><strong>Pas de directive <code>paths:</code> en frontmatter :</strong> Contrairement à Claude Code, la spécification <code>SKILL.md</code> d'Antigravity repose exclusivement sur l'évaluation sémantique de sa description ou sur l'appel direct.</li>
+          <div class="ag-subtitle">Ce qu'on a observé <span class="ag-src">🧪</span></div>
+          <ul class="ag-list">
+            <li><strong>Réinjection</strong> : la règle est recollée à la fin de <strong>chaque</strong> résultat d'outil qui lit, modifie ou crée un fichier dont le <strong>nom</strong> correspond. Elle n'est pas chargée une seule fois pour la conversation : une même règle est revenue 6 fois dans une seule conversation de test.</li>
+            <li><strong>Empilement</strong> : toutes les règles correspondantes arrivent ensemble. Une seule lecture de fichier en a injecté 5.</li>
+            <li><strong>Persistance</strong> : chaque injection reste dans l'historique de la conversation (déduit, non mesuré directement).</li>
+            <li><strong>Ce qui est injecté</strong> : le corps de la règle, sans le frontmatter.</li>
           </ul>
-
-          <!-- Encadré Fichiers Annexes dans les Skills -->
-          <div
-            style="background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 5px; padding: 10px 12px; margin-top: 4px; display: flex; flex-direction: column; gap: 6px;">
-            <div
-              style="font-weight: 700; color: #4ade80; display: flex; align-items: center; gap: 6px; font-size: 11.5px;">
-              <span>📁 Les 4 Sous-Dossiers Conventionnels d'un Skill Antigravity :</span>
-            </div>
-            <div style="display: flex; flex-direction: column; gap: 6px; font-size: 11px; line-height: 1.5;">
-              <div>
-                <strong>Structure d'un Skill complet :</strong>
-                <div style="font-family: monospace; font-size: 10.5px; color: var(--muted-fg); margin-top: 2px;">
-                  skills/&lt;nom&gt;/<br>
-                  ├── SKILL.md &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# Instructions maîtresses (seul fichier lu à l'activation)<br>
-                  ├── scripts/ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# Utilitaires exécutables (PowerShell, Bash, Node, Python)<br>
-                  ├── examples/ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# Snippets et implémentations de référence<br>
-                  ├── resources/ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# Gabarits de documents, assets, templates<br>
-                  └── references/ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# Manuels complets et documentations volumineuses
-                </div>
-              </div>
-              <div style="color: var(--muted-fg); margin-top: 2px;">
-                <strong>Comportement contextuel :</strong> Ces sous-dossiers ne sont <strong>jamais injectés au boot</strong>. L'agent ne consulte un fichier dans <code>references/</code> ou <code>scripts/</code> que si <code>SKILL.md</code> contient un lien Markdown explicite (ex: <code>[Guide CLI](references/guide.md)</code>), lui conférant un mandat précis.
-              </div>
-            </div>
+          <div class="ag-subtitle">La formule</div>
+          <div class="ag-formula">
+            Coût d'une session = (somme des tokens des règles <code>glob</code> correspondantes) × (nombre d'opérations sur des fichiers correspondants)
           </div>
+          <div class="ag-subtitle">Les règles d'or</div>
+          <ul class="ag-list">
+            <li>Moins de 30 lignes courtes, soit environ 270 à 420 tokens.</li>
+            <li>Une seule règle <code>glob</code> par extension de fichier, pour éviter l'empilement.</li>
+            <li>Motifs sur le nom de fichier uniquement (<code>*.ts</code>), jamais sur un chemin.</li>
+            <li>Si le contenu est long, utiliser <code>model_decision</code>, dont le corps n'est payé qu'une fois, ou le déplacer dans un skill.</li>
+          </ul>
         </div>
 
-        <!-- 4. Serveurs MCP, Plugins & Lifecycle Hooks -->
+        <!-- 4. Exemples mesurés -->
         <div class="cs-section">
           <div class="cs-section-title">
-            <span>🔌 4. Serveurs MCP, Plugins (Kits) & Lifecycle Hooks</span>
+            <span>📐 4. Exemples Mesurés</span>
           </div>
-          <div class="cs-callout cs-callout-info">
-            <span>🛡️</span>
-            <div>
-              <strong>Exclusivités Antigravity :</strong> Aucun cap destructeur à 2 048 caractères, isolation par plugins et contrôle total du cycle de vie via des Hooks synchrones.
-            </div>
-          </div>
-          <div
-            style="color: var(--fg-color); line-height: 1.5; font-size: 11px; display: flex; flex-direction: column; gap: 8px;">
-            <div>
-              <strong>1. Serveurs MCP (Outils & Connecteurs) :</strong>
-              <div style="color: var(--muted-fg); margin-top: 2px;">
-                Antigravity élimine la troncature arbitraire à 2 048 caractères. Les outils légers sont préchargés au démarrage pour une réactivité maximale, tandis que les gros serveurs (GitHub, Google Drive, Coolify...) sont chargés sur disque à la demande via <code>call_mcp_tool</code>, préservant 100% de la documentation des arguments sans saturer le prompt.
-              </div>
-            </div>
-            <div>
-              <strong>2. Plugins (Packs Tout-en-Un) :</strong>
-              <div style="color: var(--muted-fg); margin-top: 2px;">
-                Regroupe des règles, skills et MCP dans un dossier unique (<code>plugins/&lt;nom&gt;/</code>). Très pratique pour installer ou partager un kit complet réutilisable sans mélanger ses fichiers avec vos règles de base. Chaque élément est préfixé automatiquement pour éviter tout conflit.
-              </div>
-            </div>
-            <div>
-              <strong>3. Lifecycle Hooks (<code>hooks.json</code>) :</strong>
-              <div style="color: var(--muted-fg); margin-top: 2px;">
-                Intercepte en direct l'agent à des moments clés de son cycle d'exécution :<br>
-                • <code>PreToolUse</code> : Bloquer une commande à risque, demander une confirmation ou réécrire les paramètres.<br>
-                • <code>PostToolUse</code> : Analyser des logs ou exécuter automatiquement un vérificateur.<br>
-                • <code>Stop</code> : Empêcher l'agent de s'arrêter si des vérifications ou des tâches de fond sont encore en cours.
-              </div>
-            </div>
+          <div class="ag-subtitle">Exemple 1 — Le fichier trop gros</div>
+          <ul class="ag-list">
+            <li>Une règle permanente de 39 Ko est coupée à 24 Ko.</li>
+            <li>Elle injecte ≈ <strong>5 250 tokens à chaque tour</strong>, soit <strong>26 % du budget</strong> de 20 000 tokens à elle seule.</li>
+            <li>Et ≈ <strong>3 100 tokens de fin sont perdus</strong>, coupés au milieu d'un titre : l'agent ne voit jamais la fin de la règle.</li>
+            <li>Leçon : double peine. Rester sous 24 Ko, et idéalement sous 200 lignes.</li>
+          </ul>
+          <div class="ag-subtitle">Exemple 2 — Le coût d'une règle <code>glob</code> sur une session</div>
+          <div class="cs-table-wrap">
+            <table class="cs-table ag-simple-table">
+              <thead>
+                <tr>
+                  <th>Scénario</th>
+                  <th>Calcul</th>
+                  <th>Tokens</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Règle courte (130 tokens), session ordinaire : 15 lectures + 5 modifications</td>
+                  <td class="ag-nowrap">130 × 20</td>
+                  <td class="ag-nowrap">≈ 2 600</td>
+                </tr>
+                <tr>
+                  <td>Règle courte (130 tokens), relecture de 50 fichiers correspondants</td>
+                  <td class="ag-nowrap">130 × 50</td>
+                  <td class="ag-nowrap">≈ 6 500</td>
+                </tr>
+                <tr>
+                  <td>Règle longue en paragraphes (2 000 tokens), même session ordinaire</td>
+                  <td class="ag-nowrap">2 000 × 20</td>
+                  <td class="ag-nowrap"><strong>≈ 40 000</strong> 🚨</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
+
+        <!-- 5. Exemples prêts à copier -->
+        <div class="cs-section">
+          <div class="cs-section-title">
+            <span>💻 5. Exemples Concrets Prêts à l'Emploi</span>
+          </div>
+
+          <div class="ag-example-title">Exemple A — Règle <code>glob</code> courte (&lt; 30 lignes)</div>
+          <div class="cs-code-box"><button type="button" class="btn-copy-code"
+              data-code="---&#10;trigger: glob&#10;globs: &quot;*.ts, *.tsx&quot;&#10;description: Conventions TypeScript du projet&#10;---&#10;# Conventions TypeScript&#10;- Typage strict : pas de `any`.&#10;- Une fonction exportée = un commentaire JSDoc.">Copier</button>---
+trigger: glob
+globs: "*.ts, *.tsx"
+description: Conventions TypeScript du projet
+---
+# Conventions TypeScript
+- Typage strict : pas de `any`.
+- Une fonction exportée = un commentaire JSDoc.</div>
+
+          <div class="ag-example-title">Exemple B — Règle <code>model_decision</code> (pour un contenu long)</div>
+          <div class="cs-code-box"><button type="button" class="btn-copy-code"
+              data-code="---&#10;trigger: model_decision&#10;description: Appliquer lors de l'écriture ou de la revue de migrations de base de données.&#10;---&#10;# Migrations de base de données&#10;1. Ne jamais supprimer ni renommer une colonne en un seul déploiement.&#10;2. Toujours tester la migration inverse.">Copier</button>---
+trigger: model_decision
+description: Appliquer lors de l'écriture ou de la revue de migrations de base de données.
+---
+# Migrations de base de données
+1. Ne jamais supprimer ni renommer une colonne en un seul déploiement.
+2. Toujours tester la migration inverse.</div>
+
+          <div class="ag-example-title">Exemple C — Règle permanente</div>
+          <div class="cs-code-box"><button type="button" class="btn-copy-code"
+              data-code="---&#10;trigger: always_on&#10;description: Règles générales du projet&#10;---&#10;# Règles générales&#10;- Répondre en français.&#10;- Ne jamais commiter de secret.">Copier</button>---
+trigger: always_on
+description: Règles générales du projet
+---
+# Règles générales
+- Répondre en français.
+- Ne jamais commiter de secret.</div>
+
+          <div class="ag-note">
+            Format validé dans Antigravity IDE 2.5.5. Rappels : <code>globs</code> est une chaîne, jamais une liste ; les motifs portent sur le nom de fichier, jamais sur un dossier.
+          </div>
+        </div>
+
+        <!-- Sections conservées : organisation du poste et fonctionnement de l'extension -->
+        <div class="ag-part-divider">🧰 Organisation du poste &amp; fonctionnement de l'extension</div>
 
         <!-- 5. Hiérarchie 4 Niveaux & Confinement -->
         <div class="cs-section">
           <div class="cs-section-title">
-            <span>🏛️ 5. Architecture & Hiérarchie Globale (Niveaux 0 à 3) & Confinement</span>
+            <span>🏛️ 6. Architecture & Hiérarchie Globale (Niveaux 0 à 3) & Confinement</span>
           </div>
           <div class="cs-callout cs-callout-warning">
             <span>📐</span>
@@ -687,6 +846,7 @@
               <strong>Organisation des emplacements :</strong> Antigravity cumule les règles de toutes les portées (globale, espace de travail, dossier). En cas de conflit d'instructions, la règle du dossier le plus spécifique l'emporte, puis celle de l'espace de travail, puis la règle globale.
             </div>
           </div>
+          <div class="cs-callout cs-callout-warning ag-revoir"><span>⚠️</span><div><strong>À revoir</strong> — contredit par les tests (2026-10-21) : Sous-dossiers du dossier ouvert : <strong>jamais chargés</strong>, ni à la lecture d'un fichier, ni à la modification, ni au listing, contrairement à la documentation 🧪<br>Dossiers parents, jusqu'à la racine du dépôt Git : chargés 🧪</div></div>
           <div class="cs-table-wrap">
             <table class="cs-table">
               <thead>
@@ -735,7 +895,7 @@
         <!-- 6. Doublons Global vs Local & Décryptage des Alertes du Coach IA -->
         <div class="cs-section">
           <div class="cs-section-title">
-            <span>♊ 6. Doublons Global vs Local & Décryptage des Alertes du Coach IA</span>
+            <span>♊ 7. Doublons Global vs Local & Décryptage des Alertes du Coach IA</span>
           </div>
           <div class="cs-callout cs-callout-warning">
             <span>🛡️</span>
@@ -754,7 +914,8 @@
               <strong>2. Les 5 Alertes du Coach IA Proactif :</strong>
               <div style="color: var(--muted-fg); margin-top: 2px;">
                 • <strong style="color: #ef4444;">⚠️ &gt; 24 Ko :</strong> Le fichier dépasse la limite physique absolue d'Antigravity (24 000 octets). Risque de troncature silencieuse.<br>
-                • <strong style="color: #f59e0b;">⚠️ &gt; 200 li. :</strong> Règle ou Âme trop longue. Risque de dilution de l'attention (<em>Lost in the Middle</em>). Scindez en sous-règles conditionnelles.<br>
+                • <strong style="color: #f59e0b;">⚠️ &gt; 200 li. :</strong> Règle ou Âme trop longue. Risque de dilution de l'attention (<em>Lost in the Middle</em>). Scindez en sous-règles conditionnelles.
+                <div class="cs-callout cs-callout-warning ag-revoir"><span>⚠️</span><div><strong>À revoir</strong> — contredit par les tests (2026-10-21) : une règle <code>glob</code> est réinjectée à chaque fichier correspondant ; découper une grosse règle en plusieurs règles <code>glob</code> peut multiplier son coût. Préférer <code>model_decision</code> ou un skill.</div></div>
                 • <strong style="color: #f59e0b;">⚠️ &gt; 500 li. :</strong> Skill volumineux. Déplacez la documentation détaillée dans <code>references/</code> et les scripts dans <code>scripts/</code>.<br>
                 • <strong style="color: #ef4444;">⚠️ MCP &gt; 2 Ko :</strong> Dépassement du cap de 2 048 car. par outil sous Claude Code.<br>
                 • <strong style="color: #f59e0b;">⚠️ Sans description :</strong> L'IA ne dispose d'aucun indice sémantique pour savoir quand invoquer cette ressource.
@@ -769,74 +930,24 @@
           </div>
         </div>
 
-        <!-- 7. Exemples concrets -->
+        <!-- 8. Calcul de la jauge de l'extension -->
         <div class="cs-section">
           <div class="cs-section-title">
-            <span>💻 7. Exemples Concrets Prêts à l'Emploi</span>
+            <span>📊 8. Calcul de la Jauge de l'Extension</span>
           </div>
-
-          <div style="font-size: 11px; font-weight: 600; color: var(--fg-color); margin-top: 2px;">
-            Exemple 1 : Skill Antigravity canonique avec frontmatter minimal et fichiers annexes
+          <div class="cs-callout cs-callout-info" style="margin-top: 6px;">
+            <span>📊</span>
+            <div>
+              <strong>Comment se calcule le total de tokens des règles (Antigravity) :</strong>
+              <ul style="margin: 4px 0 0 0; padding-left: 18px; line-height: 1.5;">
+                <li><strong>Règles permanentes (<code>trigger: always_on</code>) :</strong> Comptées pour la totalité de leur contenu, inclusions comprises (estimation BPE o200k).<div class="cs-callout cs-callout-warning ag-revoir"><span>⚠️</span><div><strong>À revoir</strong> — contredit par les tests (2026-10-21) : À chaque tour : 100 % du corps de chaque fichier, sans le frontmatter 🧪<br>Frontmatter d'une règle : ≈ 20 – 57 tokens, <strong>non injecté</strong> par Antigravity 📏🧪</div></div></li>
+                <li><strong>Règles conditionnelles (<code>trigger: glob</code>, <code>model_decision</code> ou <code>manual</code>) :</strong> Ne comptent que pour <strong>≈ 20 tokens</strong> chacune dans le total affiché au démarrage. Ce chiffre est une estimation de l'extension : la documentation d'Antigravity ne le précise pas. Leur coût complet en cas d'activation est affiché à part (dans l'info-bulle et sur la carte).<div class="cs-callout cs-callout-warning ag-revoir"><span>⚠️</span><div><strong>À revoir</strong> — contredit par les tests (2026-10-21) : Au démarrage, <code>glob</code> : 0 token 🧪<br>Au démarrage, <code>manual</code> : 0 token 🧪<br>Au démarrage, <code>model_decision</code> : ≈ 40 – 90 tokens (chemin <code>file:///</code> + description) 🧮</div></div></li>
+                <li><strong>Règles ignorées et règles de dossier :</strong> 0 token au démarrage. Une règle sans <code>trigger</code> valide porte le badge <code>⛔ Ignorée par Antigravity</code> ; un champ obligatoire manquant ou un <code>globs</code> mal formé porte le badge <code>⚠️ Frontmatter</code>.</li>
+                <li><strong>Conséquence sur la jauge :</strong> Additionner les tokens affichés sur les cartes des règles conditionnelles ne redonne pas le total des règles. C'est normal et voulu — le total reflète la consommation au démarrage, pas la consommation maximale si toutes les règles conditionnelles étaient déclenchées en même temps.</li>
+                <li><strong>Skills et Âme :</strong> À l'inverse des règles, les totaux des compétences (skills/workflows) et de l'Âme (<code>GEMINI.md</code> / <code>AGENTS.md</code>) correspondent exactement à la somme des cartes actives. Sous Antigravity, la jauge de 20 000 tokens ne compte que l'âme et les règles : les skills et les MCP sont affichés hors de ce budget.</li>
+              </ul>
+            </div>
           </div>
-          <div class="cs-code-box"><button type="button" class="btn-copy-code"
-              data-code="---&#10;name: skill-database&#10;description: Expert PostgreSQL et migrations Prisma. S'active pour les schémas, requêtes et optimisations SQL.&#10;---&#10;&#10;# Expertise Base de Données&#10;&#10;## Documentation Complète &amp; Scripts&#10;- Consulter le guide d'optimisation dans [guide](references/guide-optimisation.md).&#10;- Exécuter les scripts de maintenance dans `scripts/db-check.ps1`.&#10;&#10;## Règles d'Exécution&#10;1. Toujours vérifier les index sur les colonnes filtrées.&#10;2. Encapsuler les mutations critiques dans des transactions.">Copier</button>---
-name: skill-database
-description: Expert PostgreSQL et migrations Prisma. S'active pour les schémas, requêtes et optimisations SQL.
----
-
-# Expertise Base de Données
-
-## Documentation Complète & Scripts
-- Consulter le guide d'optimisation dans [guide](references/guide-optimisation.md).
-- Exécuter les scripts de maintenance dans `scripts/db-check.ps1`.
-
-## Règles d'Exécution
-1. Toujours vérifier les index sur les colonnes filtrées.
-2. Encapsuler les mutations critiques dans des transactions.</div>
-
-          <div style="font-size: 11px; font-weight: 600; color: var(--fg-color); margin-top: 10px;">
-            Exemple 2 : Règle permanente standard (.agents/rules/securite-api.md)
-          </div>
-          <div class="cs-code-box"><button type="button" class="btn-copy-code"
-              data-code="# Sécurité Applicative API&#10;- Toujours valider les payloads entrants avec Zod ou un schéma d'encadrement strict.&#10;- Ne jamais logger de jetons JWT, clés API ou mots de passe en clair.&#10;- Utiliser des requêtes préparées pour toute interaction avec la base de données.">Copier</button># Sécurité Applicative API
-- Toujours valider les payloads entrants avec Zod ou un schéma d'encadrement strict.
-- Ne jamais logger de jetons JWT, clés API ou mots de passe en clair.
-- Utiliser des requêtes préparées pour toute interaction avec la base de données.</div>
-
-          <div style="font-size: 11px; font-weight: 600; color: var(--fg-color); margin-top: 10px;">
-            Exemple 3 : Lifecycle Hook dans hooks.json pour intercepter et sécuriser run_command
-          </div>
-          <div class="cs-code-box"><button type="button" class="btn-copy-code"
-              data-code="{&#10;  &quot;hooks&quot;: [&#10;    {&#10;      &quot;event&quot;: &quot;PreToolUse&quot;,&#10;      &quot;matcher&quot;: {&#10;        &quot;tool&quot;: &quot;run_command&quot;,&#10;        &quot;commandMatches&quot;: &quot;(rm -rf|git push --force|Drop-Database)&quot;&#10;      },&#10;      &quot;action&quot;: {&#10;        &quot;decision&quot;: &quot;force_ask&quot;,&#10;        &quot;message&quot;: &quot;Commande à haut risque détectée. Confirmation requise.&quot;&#10;      }&#10;    }&#10;  ]&#10;}">Copier</button>{
-  "hooks": [
-    {
-      "event": "PreToolUse",
-      "matcher": {
-        "tool": "run_command",
-        "commandMatches": "(rm -rf|git push --force|Drop-Database)"
-      },
-      "action": {
-        "decision": "force_ask",
-        "message": "Commande à haut risque détectée. Confirmation requise."
-      }
-    }
-  ]
-}</div>
-
-          <div style="font-size: 11px; font-weight: 600; color: var(--fg-color); margin-top: 10px;">
-            Exemple 4 : Règle conditionnelle Antigravity (.agents/rules/regles-frontend.md)
-          </div>
-          <div class="cs-code-box"><button type="button" class="btn-copy-code"
-              data-code="---&#10;description: Normes de composants React et CSS modulaire pour le frontend.&#10;trigger: glob&#10;globs: &quot;src/components/**/*.tsx, src/components/**/*.jsx, src/styles/**/*.css&quot;&#10;---&#10;&#10;# Normes Composants Frontend&#10;- Utiliser des composants fonctionnels avec typage TypeScript explicite des Props.&#10;- Aucun style en ligne : toujours utiliser des classes CSS préexistantes ou des modules.&#10;- Gérer systématiquement les états d'erreur et de chargement.">Copier</button>---
-description: Normes de composants React et CSS modulaire pour le frontend.
-trigger: glob
-globs: "src/components/**/*.tsx, src/components/**/*.jsx, src/styles/**/*.css"
----
-
-# Normes Composants Frontend
-- Utiliser des composants fonctionnels avec typage TypeScript explicite des Props.
-- Aucun style en ligne : toujours utiliser des classes CSS préexistantes ou des modules.
-- Gérer systématiquement les états d'erreur et de chargement.</div>
         </div>
 
       </div>

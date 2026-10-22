@@ -571,6 +571,20 @@ describe('Suite de Tests : Intégrité & Synchronisation NAS vs Local', () => {
     assert.ok(cheatsheetHtml.includes('Comment se calcule le total de tokens des règles (Antigravity)'), 'cheatsheet.html doit expliquer le calcul tokens Antigravity');
     assert.ok(cheatsheetHtml.includes('workspace-tool-pills'), 'cheatsheet.html doit utiliser le style pilules workspace-tool-pills');
 
+    // Guide Antigravity (chantier B) : contenu vérifié par la suite de régression du 2026-10-21
+    const antigravityHtml = cheatsheetHtml.slice(cheatsheetHtml.indexOf('id="contentAntigravity"'));
+    assert.ok(antigravityHtml.includes('Antigravity IDE 2.5.5, Windows'), 'le guide Antigravity doit indiquer sa portée');
+    assert.ok(antigravityHtml.includes('❔ non vérifié'), 'le guide Antigravity doit contenir la légende des sources');
+    assert.ok(antigravityHtml.includes('id="ag-piege-glob"'), 'le guide Antigravity doit contenir la section « Le piège glob »');
+    assert.ok(antigravityHtml.includes('Workflows (obsolètes)'), 'le tableau Antigravity doit contenir la ligne Workflows');
+    assert.ok(antigravityHtml.includes('globs: "*.ts, *.tsx"'), 'le guide Antigravity doit proposer un exemple glob sur le nom de fichier');
+    assert.ok(antigravityHtml.includes('À revoir</strong> — contredit par les tests (2026-10-21)'), 'les phrases conservées contredites doivent être signalées');
+    assert.ok(!antigravityHtml.includes('architecture hybride transparente'), 'la note MCP infondée doit être supprimée');
+    assert.ok(!antigravityHtml.includes('src/components/**/*.tsx'), "l'exemple glob avec dossier (jamais déclenché) doit être supprimé");
+    assert.ok(!antigravityHtml.includes('nom-pack:skill'), 'le préfixe de plugin infondé doit être supprimé');
+    assert.ok(!mainJs.includes('MCP illimité'), 'la carte résumée Antigravity ne doit plus annoncer MCP illimité');
+    assert.ok(!mainJs.includes('Imbrication en sous-dossier'), 'la carte résumée Antigravity ne doit plus annoncer les sous-dossiers');
+
     // Vérification du script cheatsheet.js
     assert.ok(cheatsheetJs.includes('switchTab'), 'cheatsheet.js doit gérer switchTab');
     assert.ok(cheatsheetJs.includes('btn-copy-code'), 'cheatsheet.js doit gérer btn-copy-code');

@@ -2017,6 +2017,237 @@ input:checked + .slider:before {
   border-radius: var(--radius-sm);
 }
 
+/* --------------------------------------------------------------------------
+   Guide Antigravity (#contentAntigravity) : un point par ligne dans les cellules
+   -------------------------------------------------------------------------- */
+.ag-header-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ag-legend-item {
+  white-space: nowrap;
+}
+
+.ag-table {
+  table-layout: fixed;
+}
+
+.ag-col-comp {
+  width: 12%;
+}
+
+.ag-col-files {
+  width: 26%;
+}
+
+.ag-col-size {
+  width: 31%;
+}
+
+.ag-col-behavior {
+  width: 31%;
+}
+
+.ag-table td,
+.ag-simple-table td {
+  vertical-align: top;
+  white-space: normal;
+}
+
+#contentAntigravity code {
+  overflow-wrap: anywhere;
+}
+
+.ag-points {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ag-points li {
+  line-height: 1.4;
+}
+
+.ag-points li.ag-reco {
+  padding-left: 6px;
+  border-left: 2px solid var(--success-color);
+}
+
+.ag-src,
+.ag-src-cell,
+.ag-nowrap {
+  white-space: nowrap;
+}
+
+.ag-src {
+  margin-left: 2px;
+}
+
+.ag-points a,
+.ag-note a {
+  color: var(--vscode-textLink-foreground, #3794ff);
+}
+
+.ag-subtitle {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--fg-color);
+  margin-top: 4px;
+}
+
+.ag-list {
+  margin: 0;
+  padding-left: 20px;
+  line-height: 1.5;
+  font-size: 11px;
+  color: var(--fg-color);
+}
+
+.ag-formula {
+  padding: 8px 12px;
+  border-left: 3px solid var(--accent-color);
+  border-radius: 0 4px 4px 0;
+  background: color-mix(in srgb, var(--fg-color) 7%, transparent);
+  font-size: 11px;
+  line-height: 1.45;
+  font-weight: 600;
+}
+
+.ag-note {
+  font-size: 11px;
+  color: var(--muted-fg);
+  line-height: 1.45;
+}
+
+.ag-example-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--fg-color);
+  margin-top: 6px;
+}
+
+.ag-revoir {
+  margin-top: 6px;
+}
+
+.ag-part-divider {
+  margin-top: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid color-mix(in srgb, var(--fg-color) 18%, transparent);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted-fg);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+/* Panneau étroit : chaque ligne du tableau principal devient une carte */
+@media (max-width: 760px) {
+  .ag-table,
+  .ag-table tbody,
+  .ag-table tr,
+  .ag-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .ag-table colgroup,
+  .ag-table thead {
+    display: none;
+  }
+
+  .ag-table tr {
+    padding: 6px 0;
+    border-bottom: 1px solid color-mix(in srgb, var(--fg-color) 15%, transparent);
+  }
+
+  .ag-table tr:last-child {
+    border-bottom: none;
+  }
+
+  .ag-table td {
+    border-bottom: none;
+    padding: 4px 10px;
+  }
+
+  .ag-table td.ag-comp {
+    font-size: 12px;
+    padding-top: 8px;
+  }
+
+  .ag-table td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 3px;
+    font-size: 9.5px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    color: var(--muted-fg);
+  }
+}
+
+/* Thème clair : surcharges limitées à l'onglet Antigravity */
+body.vscode-light #contentAntigravity .cs-callout-info,
+body.vscode-high-contrast-light #contentAntigravity .cs-callout-info {
+  background: rgba(0, 122, 204, 0.08);
+  border-color: rgba(0, 122, 204, 0.35);
+  color: #0b4a7a;
+}
+
+body.vscode-light #contentAntigravity .cs-callout-warning,
+body.vscode-high-contrast-light #contentAntigravity .cs-callout-warning {
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(180, 83, 9, 0.4);
+  color: #7a4100;
+}
+
+body.vscode-light #contentAntigravity .cs-callout-success,
+body.vscode-high-contrast-light #contentAntigravity .cs-callout-success {
+  background: rgba(34, 197, 94, 0.1);
+  border-color: rgba(22, 101, 52, 0.35);
+  color: #166534;
+}
+
+body.vscode-light #contentAntigravity .cs-table-wrap,
+body.vscode-high-contrast-light #contentAntigravity .cs-table-wrap {
+  border-color: rgba(0, 0, 0, 0.14);
+}
+
+body.vscode-light #contentAntigravity .cs-table th,
+body.vscode-high-contrast-light #contentAntigravity .cs-table th {
+  background: rgba(0, 0, 0, 0.05);
+  border-bottom-color: rgba(0, 0, 0, 0.14);
+}
+
+body.vscode-light #contentAntigravity .cs-table td,
+body.vscode-high-contrast-light #contentAntigravity .cs-table td {
+  border-bottom-color: rgba(0, 0, 0, 0.08);
+}
+
+body.vscode-light #contentAntigravity .cs-table tr:hover td,
+body.vscode-high-contrast-light #contentAntigravity .cs-table tr:hover td {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+body.vscode-light #contentAntigravity .cs-code-box,
+body.vscode-high-contrast-light #contentAntigravity .cs-code-box {
+  background: var(--vscode-textCodeBlock-background, rgba(0, 0, 0, 0.05));
+  border-color: rgba(0, 0, 0, 0.14);
+  color: var(--fg-color);
+}
+
+body.vscode-light #contentAntigravity .btn-copy-code,
+body.vscode-high-contrast-light #contentAntigravity .btn-copy-code {
+  background: rgba(0, 0, 0, 0.05);
+  border-color: rgba(0, 0, 0, 0.2);
+}
+
 /* Badges enrichis (Conditionnel, Limite 24Ko, Plugins) */
 .item-badge-pill {
   display: inline-flex;

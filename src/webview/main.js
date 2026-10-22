@@ -399,12 +399,13 @@
 
     const antigravitySummaryHtml = `
       <ul class="cheat-sheet-list">
-        <li><span class="cs-icon">📏</span><span><strong>Tailles max :</strong> Âme &amp; Règles &lt; 200 li. • Skills &lt; 500 li. • MCP illimité</span></li>
-        <li><span class="cs-icon">⚡</span><span><strong>Âme (GEMINI.md / AGENTS.md) :</strong> Injecté en continu • Imbrication en sous-dossier</span></li>
-        <li><span class="cs-icon">🎯</span><span><strong>Règles :</strong> Permanentes au démarrage • Imbriquées à la demande</span></li>
-        <li><span class="cs-icon">🧠</span><span><strong>Skills :</strong> Seuls nom + description au boot • Corps lu sur disque si utile</span></li>
-        <li><span class="cs-icon">🔌</span><span><strong>MCP &amp; Plugins :</strong> Aucun cap à 2 048 car. • Packs isolés &amp; Hooks de contrôle</span></li>
-        <li><span class="cs-icon">🏛️</span><span><strong>Hiérarchie :</strong> N0 (Global) → N1 (Projet) → N2 (PC) → N3 (NAS) • Auto-promotion</span></li>
+        <li><span class="cs-icon">📏</span><span><strong>Tailles :</strong> Âme &amp; règles permanentes &lt; 200 li. • Règles <code>glob</code> &lt; 30 li. • Skills &lt; 500 li. • Plafond 24 Ko par fichier</span></li>
+        <li><span class="cs-icon">⚡</span><span><strong>Âme (GEMINI.md / AGENTS.md) :</strong> 100 % à chaque tour • Dossiers parents chargés, sous-dossiers jamais</span></li>
+        <li><span class="cs-icon">🎯</span><span><strong>Règles :</strong> <code>trigger</code> obligatoire • Budget de 20 000 tokens partagé avec l'Âme • <code>glob</code> : nom de fichier seul, réinjectée à chaque lecture ou modification</span></li>
+        <li><span class="cs-icon">🧠</span><span><strong>Skills :</strong> Une ligne par skill au démarrage (nom, chemin, description) • Corps lu à la demande</span></li>
+        <li><span class="cs-icon">🔌</span><span><strong>MCP &amp; Plugins :</strong> Noms des outils MCP seuls au démarrage • Skills de plugin listés deux fois, sans préfixe</span></li>
+        <li><span class="cs-icon">⏹️</span><span><strong>Workflows :</strong> Hors service depuis le 19 octobre 2026 • Migrer vers des skills</span></li>
+        <li><span class="cs-icon">🏛️</span><span><strong>Hiérarchie :</strong> N0 (Global) → N1 (Projet) → N2 (PC) → N3 (NAS)</span></li>
       </ul>
     `;
 
