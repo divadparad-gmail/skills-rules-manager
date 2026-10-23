@@ -44,6 +44,7 @@ import {
   formatPermanentRule,
   formatPluginSectionHeader,
   formatSkillIndexLine,
+  RULE_BODY_MAX_BYTES,
   SKILLS_INDEX_HEADER,
   splitRuleBody,
   toAntigravityUri,
@@ -114,23 +115,41 @@ describe('Suite de Tests : comptage des tokens au démarrage d\'Antigravity (lot
     assert.deepStrictEqual(splitRuleBody('# Sans frontmatter'), { frontmatter: '', body: '# Sans frontmatter' });
   });
 
-  test('3. Troncature : exactement les octets coupés mesurés par Antigravity (5 957 et 14 978)', async () => {
+  // Observation datée : le 2026-10-21, Antigravity a affiché <truncated 14978 bytes> pour la règle 06,
+  // sur une copie de 39 106 octets en CRLF (3 CR dans le corps). Les CR ont été perdus le 2026-10-22,
+  // lors d'une réécriture de l'arbre de travail. La fixture actuelle, en LF, ne reproduit pas cet état :
+  // le test vérifie donc la règle pour la règle 06, et non cette valeur.
+  test('3. Troncature : corps moins 24 000 octets (5 957 observés pour r-tronque.md, règle vérifiée sur la règle 06)', async () => {
     const cases = [
       { file: path.join(ROOT, 'test', 'scenarios', 'antigravity-injection-contexte', '.agents', 'rules', 'r-tronque.md'), cut: 5957 },
-      { file: path.join(ROOT, 'test', 'scenarios', 'antigravity', '.agents', 'rules', '06-rule-warn-size-exceeded-24kb.md'), cut: 14978 },
+      { file: path.join(ROOT, 'test', 'scenarios', 'antigravity', '.agents', 'rules', '06-rule-warn-size-exceeded-24kb.md'), cut: null },
     ];
     for (const { file, cut } of cases) {
       const content = await fs.promises.readFile(file, 'utf8');
       const inspection = await inspectAntigravityRule(content, file);
-      assert.strictEqual(inspection.truncatedBytes, cut, path.basename(file));
+      const body = splitRuleBody(content).body;
+      const bodyBytes = Buffer.from(body, 'utf8');
+      assert.ok(bodyBytes.length > RULE_BODY_MAX_BYTES, path.basename(file));
+      if (cut !== null) {
+        assert.strictEqual(inspection.truncatedBytes, cut, path.basename(file));
+      } else {
+        // Recul UTF-8 de l'extension (test 4) : 0 à 3 octets au-delà de corps − 24 000
+        const backoff = inspection.truncatedBytes - (bodyBytes.length - RULE_BODY_MAX_BYTES);
+        assert.ok(backoff >= 0 && backoff <= 3, `${path.basename(file)} : recul de ${backoff} octets`);
+      }
+      const keptBytes = bodyBytes.subarray(0, bodyBytes.length - inspection.truncatedBytes);
+      assert.doesNotThrow(() => new TextDecoder('utf-8', { fatal: true }).decode(keptBytes), 'La partie gardée est de l\'UTF-8 valide');
       assert.ok(inspection.lostTokens > 0);
-      const kept = truncateRuleBody(splitRuleBody(content).body).kept;
-      const text = `<RULE[${file}]>\n${kept.replace(/^(?:\r?\n)+/, '')}<truncated ${cut} bytes>\n</RULE[${file}]>\n`;
+      const { kept, lost } = truncateRuleBody(body);
+      assert.strictEqual(kept + lost, body);
+      const text = `<RULE[${file}]>\n${kept.replace(/^(?:\r?\n)+/, '')}<truncated ${inspection.truncatedBytes} bytes>\n</RULE[${file}]>\n`;
       assert.strictEqual(inspection.bootTokenCount, countTokens(text), 'Seule la partie gardée et le marqueur sont comptés');
     }
   });
 
-  test('4. Troncature : un caractère UTF-8 n\'est jamais coupé', () => {
+  // Choix de l'extension, non observé dans Antigravity : une coupe qui tombe au milieu d'un caractère
+  // UTF-8 recule au caractère précédent (1 à 3 octets).
+  test('4. Troncature : recul au caractère UTF-8 précédent (choix de l\'extension, non observé dans Antigravity)', () => {
     const even = truncateRuleBody('é'.repeat(13000));
     assert.strictEqual(Buffer.byteLength(even.kept, 'utf8'), 24000);
     assert.strictEqual(even.truncatedBytes, 2000);
@@ -138,6 +157,10 @@ describe('Suite de Tests : comptage des tokens au démarrage d\'Antigravity (lot
     assert.strictEqual(Buffer.byteLength(odd.kept, 'utf8'), 23999, 'La coupe recule au caractère précédent');
     assert.strictEqual(odd.truncatedBytes, 2002);
     assert.strictEqual(odd.kept + odd.lost, 'a' + 'é'.repeat(13000));
+    const fourBytes = truncateRuleBody('a' + '😀'.repeat(6001));
+    assert.strictEqual(Buffer.byteLength(fourBytes.kept, 'utf8'), 23997, 'Recul maximal : 3 octets');
+    assert.strictEqual(fourBytes.truncatedBytes, 8);
+    assert.strictEqual(fourBytes.kept + fourBytes.lost, 'a' + '😀'.repeat(6001));
   });
 
   test('5. F3 : entrée d\'index en URI (file:///, lettre minuscule, %20) ; F4 : glob et manual à 0', async () => {

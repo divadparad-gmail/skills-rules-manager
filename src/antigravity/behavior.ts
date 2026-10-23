@@ -205,9 +205,14 @@ export function convertClaudePaths(paths: string[]): PathsConversion {
 
 /**
  * Plafond d'une règle permanente ou d'une âme, en octets UTF-8 du corps sans frontmatter,
- * inclusions développées. Mesuré (phase 1 et suite de régression) : 14 978 octets coupés sur
- * `06-rule-warn-size-exceeded-24kb.md`, 5 957 sur `r-tronque.md`, soit exactement le corps moins
- * 24 000 octets. Le corps commence juste après le `---` fermant : sa fin de ligne en fait partie.
+ * inclusions développées. Le corps commence juste après le `---` fermant : sa fin de ligne en fait
+ * partie. Mesuré par la suite de régression : 5 957 octets coupés sur `r-tronque.md`, soit exactement
+ * le corps moins 24 000 octets. Observé en phase 1 : 14 978 octets coupés sur
+ * `06-rule-warn-size-exceeded-24kb.md`, alors une copie de 39 106 octets en CRLF (3 CR dans le
+ * corps) ; la fixture actuelle, en LF, ne reproduit pas cet état.
+ * Antigravity compte les CR comme des octets du corps (déduit de l'enquête L1b, non testé directement).
+ * Le recul au caractère précédent quand la coupe tombe au milieu d'un caractère UTF-8 n'a pas été
+ * observé : c'est un choix de l'extension (voir truncateRuleBody).
  */
 export const RULE_BODY_MAX_BYTES = 24000;
 
