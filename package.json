@@ -404,6 +404,7 @@
     "test:clean": "tsc -p tsconfig.test.json && node test/scenarios/scripts/runner.js clean",
     "test:injection": "tsc -p tsconfig.test.json && node test/scenarios/scripts/compare-injection-contexte.js",
     "test:injection-reset": "node test/scenarios/scripts/reset-injection-contexte.js",
+    "prepare": "node scripts/activer-hooks.js",
     "package": "vsce package --no-git-tag-version",
     "bundle": "node esbuild.js --production",
     "bundle:dev": "node esbuild.js",

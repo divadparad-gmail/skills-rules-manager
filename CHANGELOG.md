@@ -3,6 +3,13 @@
 Toutes les évolutions notables de l'extension sont consignées ici.
 Le format s'inspire de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et la numérotation suit [SemVer](https://semver.org/lang/fr/).
 
+## [Non publié]
+
+### Développement
+
+- Les fixtures du banc d'essai ne sont plus suivies par Git : la racine du dépôt n'en contient plus par défaut. `npm run test:deploy-*` les déploie et `npm run test:clean` les retire.
+- Un test de `npm test` et un hook `pre-commit` (activé par `npm install` via le script `prepare`, qui règle `core.hooksPath`) refusent de commiter une fixture.
+
 ## [0.4.0] — 2026-10-22
 
 ### Changement d'identifiant
@@ -38,5 +45,6 @@ Le format s'inspire de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) 
 
 Première version publique : prise en charge des profils utilisateurs, suivi des tokens au démarrage, détection des doublons entre les niveaux global et local, alertes du Coach IA et synchronisation avec le catalogue NAS.
 
+[Non publié]: https://github.com/divadparad-gmail/skills-rules-manager/compare/v0.4.0...HEAD
 [0.4.0]: https://github.com/divadparad-gmail/skills-rules-manager/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/divadparad-gmail/skills-rules-manager/releases/tag/v0.3.0

@@ -17,6 +17,8 @@ CLAUDE.md
 GEMINI.md
 .scenario-manifest.json
 .banc-essai-sauvegarde/**
+.githooks/**
+scripts/**
 .mcp.json
 out/**
 esbuild.js

@@ -1,0 +1,13 @@
+#!/bin/sh
+# Refuse un commit qui indexerait une fixture du banc d'essai.
+# La règle est dans scripts/garde-fou-fixtures.js, partagée avec le test de npm test.
+# Activation : npm install (script « prepare », qui règle core.hooksPath = .githooks).
+
+racine=$(git rev-parse --show-toplevel) || exit 1
+
+if ! command -v node >/dev/null 2>&1; then
+  echo "[garde-fou] node est introuvable : le garde-fou des fixtures ne peut pas s'exécuter, commit refusé." >&2
+  exit 1
+fi
+
+exec node "$(dirname "$0")/../scripts/garde-fou-fixtures.js" "$racine"
