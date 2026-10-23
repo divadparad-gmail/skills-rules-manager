@@ -1121,7 +1121,7 @@ globs: "*.ts"
     assert.strictEqual(fs.existsSync(manifestPath), false, 'Le manifeste doit être retiré');
   });
 
-  test('31. Banc d\'essai : GEMINI.md fixture a une description propre, isScenarioFixture=true et est supprimable', async () => {
+  test('31. Banc d\'essai : GEMINI.md fixture a une description propre, n\'est une fixture que s\'il est identique à sa source, et est supprimable', async () => {
     const ws = path.join(tempBaseDir, 'scenario-soul-test');
     await fs.promises.mkdir(ws, { recursive: true });
 
@@ -1132,21 +1132,23 @@ globs: "*.ts"
       'utf8'
     );
 
-    const scanResult = await LocalScanner.scan({
-      hasWorkspace: true,
-      workspacePath: ws,
-      tool: 'antigravity',
-      agentsDir: '.agents',
-      claudeDir: null,
-      hasClaudeMd: false,
-    });
+    const scanner = () =>
+      LocalScanner.scan({
+        hasWorkspace: true,
+        workspacePath: ws,
+        tool: 'antigravity',
+        agentsDir: '.agents',
+        claudeDir: null,
+        hasClaudeMd: false,
+      });
+    const scanResult = await scanner();
 
     const soulItem = scanResult.items.find((i: ResourceItem) => i.id === 'GEMINI.md');
     assert.ok(soulItem, 'GEMINI.md doit être scanné');
     assert.strictEqual(
       soulItem.metadata?.isScenarioFixture,
-      true,
-      'GEMINI.md contenant scenario_fixture: true doit avoir isScenarioFixture: true'
+      false,
+      'Le marqueur scenario_fixture ne suffit plus : sans source identique, GEMINI.md n\'est pas une fixture'
     );
     assert.ok(
       !soulItem.description.includes('scenario_fixture'),
@@ -1164,6 +1166,8 @@ globs: "*.ts"
 
     // Identique à sa fixture sous test/scenarios/ : c'est une copie du banc d'essai, supprimée
     await ecrireFixtureSource(ws, 'GEMINI.md', await fs.promises.readFile(geminiPath, 'utf8'));
+    const reconnu = (await scanner()).items.find((i: ResourceItem) => i.id === 'GEMINI.md');
+    assert.strictEqual(reconnu?.metadata?.isScenarioFixture, true, 'Identique à sa source, GEMINI.md est une fixture');
     const avecSource = await ScenarioManager.clean(ws, bancIsole(ws));
     assert.strictEqual(fs.existsSync(geminiPath), false, 'GEMINI.md de scénario doit être nettoyé');
     assert.deepStrictEqual(avecSource.supprimes, ['GEMINI.md']);

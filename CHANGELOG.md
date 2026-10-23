@@ -13,6 +13,10 @@ Le format s'inspire de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) 
 - Le bouton « Nettoyer » et `npm run test:clean` suivent la même règle : seuls les fichiers identiques à la fixture déployée sont supprimés. Le critère « identique au catalogue NAS » est abandonné, et un vrai `CLAUDE.md` ou `.mcp.json` n'est plus supprimé.
 - Une fixture modifiée pendant le test n'est jamais écrasée sans accord : les scripts refusent (code de sortie 2), sauf avec `-- --ecraser`. Un banc déjà déployé n'est pas redéployé sans être vidé d'abord.
 
+### Corrections
+
+- Un vrai `CLAUDE.md` ou `GEMINI.md`, ou tout fichier dont le frontmatter porte `scenario_fixture` ou `isScenarioFixture`, n'est plus présenté comme « 🧪 Test Scénario » ni supprimable par la corbeille sans copie dans le catalogue NAS. Une fixture du banc d'essai se reconnaît désormais à son contenu, identique à la fixture déployée ou à sa source, et non plus à son chemin, à son nom ou à un marqueur.
+
 ## [0.4.0] — 2026-10-22
 
 ### Changement d'identifiant

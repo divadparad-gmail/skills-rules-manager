@@ -55,10 +55,17 @@ describe('Suite de Tests : sauvegarde et restauration du banc d\'essai (L2b)', (
 
   const source = (outil: string, rel: string) => fs.readFileSync(path.join(repoRoot, 'test', 'scenarios', outil, ...rel.split('/')));
 
-  /** Empreinte de chaque fichier de l'espace (hors sources) et du profil personnel. */
+  /**
+   * Empreinte de chaque fichier de l'espace (hors sources) et du profil personnel.
+   * Exception unique : sous node --test, un pilote de filtrage d'un antivirus du poste crée et
+   * supprime aussitôt ce fichier à la racine quand le manifeste change (cause déduite, notre code
+   * ne crée jamais ce nom). Tout autre fichier qui disparaît entre le listage et la lecture fait
+   * échouer le test.
+   */
+  const PASSAGER_ANTIVIRUS = '.SCENARIO-MANIFEST.JSON.tmp';
   function instantane(espace: Espace): Record<string, string> {
     const resultat: Record<string, string> = {};
-    for (const rel of listerFichiers(espace.ws).filter((r) => !r.startsWith('test/'))) {
+    for (const rel of listerFichiers(espace.ws).filter((r) => !r.startsWith('test/') && r !== PASSAGER_ANTIVIRUS)) {
       resultat[rel] = empreinte(fs.readFileSync(path.join(espace.ws, rel))).sha256;
     }
     for (const rel of listerFichiers(espace.home)) {

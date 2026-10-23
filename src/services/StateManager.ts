@@ -12,6 +12,7 @@ import { ImportService } from './ImportService';
 import { IntegrityService } from './IntegrityService';
 import { DeleteService } from './DeleteService';
 import { DuplicateService } from './DuplicateService';
+import { ScenarioManager } from './ScenarioManager';
 import { applyAntigravityIndexHeaders } from './antigravityBootCost';
 import { computeAntigravityDynamicCosts } from './antigravityDynamicCosts';
 import { readAntigravityHooks } from './antigravityHooks';
@@ -191,6 +192,15 @@ export class StateManager {
       McpScanner.scanGlobal(undefined, workspace.tool),
       McpScanner.scanLocal(workspace),
     ]);
+
+    // Fixtures du banc d'essai dans le profil global (règle doublon), reconnues à leur contenu
+    const fixtures = ScenarioManager.reconnaitreFixtures(workspace.workspacePath ?? '');
+    for (const item of globalResult.items) {
+      item.metadata = {
+        ...item.metadata,
+        isScenarioFixture: ScenarioManager.isScenarioFixture(workspace.workspacePath ?? '', item, fixtures),
+      };
+    }
 
     // Enrichissement du statut d'intégrité vis-à-vis du Catalogue NAS pour Global et Local
     const enrichedGlobal = await IntegrityService.enrichResourcesWithSyncStatus(

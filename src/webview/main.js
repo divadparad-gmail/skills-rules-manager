@@ -1813,14 +1813,9 @@
     badgesLine.appendChild(badgeEl);
 
     // Badges enrichis
-    const isScenarioFixture = !!(
-      item.metadata && (
-        item.metadata.isScenarioFixture === true ||
-        item.metadata.isScenarioFixture === 'true' ||
-        item.metadata.scenario_fixture === true ||
-        item.metadata.scenario_fixture === 'true'
-      )
-    );
+    // Seul l'indicateur calculé par les scanners (contenu identique à une fixture) fait foi :
+    // le marqueur scenario_fixture d'un frontmatter ne suffit pas
+    const isScenarioFixture = !!(item.metadata && item.metadata.isScenarioFixture === true);
     if (isScenarioFixture) {
       const fixtureBadge = targetDoc.createElement('span');
       fixtureBadge.className = 'item-badge-pill pill-fixture';

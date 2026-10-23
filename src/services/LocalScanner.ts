@@ -604,15 +604,14 @@ export class LocalScanner {
           : path.join(rootPath, 'GEMINI.md')),
     };
 
-    // Marquage des fixtures issues du Banc d'Essai pour permettre leur manipulation et nettoyage
-    const scenarioFiles = ScenarioManager.getScenarioFiles(rootPath);
+    // Marquage des fixtures du Banc d'Essai, reconnues à leur contenu. L'indicateur est toujours
+    // posé (vrai ou faux) : il remplace un marqueur que le frontmatter du fichier aurait recopié.
+    const fixtures = ScenarioManager.reconnaitreFixtures(rootPath);
     for (const item of items) {
-      if (ScenarioManager.isScenarioFixture(rootPath, item, scenarioFiles)) {
-        item.metadata = {
-          ...item.metadata,
-          isScenarioFixture: true,
-        };
-      }
+      item.metadata = {
+        ...item.metadata,
+        isScenarioFixture: ScenarioManager.isScenarioFixture(rootPath, item, fixtures),
+      };
     }
 
     return {

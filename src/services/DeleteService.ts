@@ -22,7 +22,9 @@ export class DeleteService {
       }
 
       const rootPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
-      const isScenarioFixture = item.metadata?.isScenarioFixture === true || (rootPath ? ScenarioManager.isScenarioFixture(rootPath, item) : false);
+      // Fixture reconnue à son contenu sur le disque, jamais aux métadonnées : un marqueur que le
+      // fichier porterait lui-même ne doit pas lever la protection d'un vrai fichier
+      const isScenarioFixture = ScenarioManager.isScenarioFixture(rootPath, item);
 
       // 1. Double sécurité : re-vérification du statut de synchronisation (sauf fixtures de test)
       if (item.syncStatus !== 'synced' && !isScenarioFixture) {
@@ -87,7 +89,9 @@ export class DeleteService {
       }
 
       vscode.window.showInformationMessage(
-        `"${item.name || item.id}" a été supprimé ${scopeLabel}. Réimportable depuis le NAS à tout moment.`
+        isScenarioFixture
+          ? `"${item.name || item.id}" a été supprimé ${scopeLabel} (élément de test du Banc d'Essai).`
+          : `"${item.name || item.id}" a été supprimé ${scopeLabel}. Réimportable depuis le NAS à tout moment.`
       );
 
       // 4. Rechargement immédiat de l'état

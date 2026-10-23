@@ -73,6 +73,12 @@ export interface EtatBanc {
   nbFixtures: number;
 }
 
+/** Reconnaissance des fixtures par leur contenu, préparée une fois par scan. */
+export interface ReconnaissanceFixtures {
+  fichier: (absolu: string) => boolean;
+  dossier: (absolu: string) => boolean;
+}
+
 export interface PlanDeploiement {
   cible: ScenarioTarget;
   /** Vrais fichiers qui seront sauvegardés, puis restaurés au vidage. */
@@ -225,33 +231,55 @@ export class ScenarioManager {
   }
 
   /**
-   * Vérifie si un élément ou un chemin fait partie des fixtures du Banc d'Essai (scénarios).
+   * Prépare la reconnaissance des fixtures du banc d'essai, à réutiliser pour tous les éléments
+   * d'un même scan : les sources et le manifeste ne sont lus qu'une fois.
+   */
+  public static reconnaitreFixtures(rootPath: string, options: OptionsBanc = {}): ReconnaissanceFixtures {
+    if (!rootPath || !fs.existsSync(rootPath)) return { fichier: () => false, dossier: () => false };
+    const ctx = this.contexte(rootPath, options);
+    const { attendus } = this.fixturesAttendues(ctx, lireManifeste(ctx.manifeste));
+    const parAbsolu = new Map([...attendus.values()].map((a) => [cle(path.resolve(this.resoudre(a.chemin, ctx))), a]));
+
+    // Un fichier est une fixture s'il est identique à la fixture attendue à son chemin ou à sa
+    // variante de bascule (.md ↔ .md.disabled), et seulement dans ce cas
+    const fichier = (absolu: string): boolean => {
+      const candidats = [absolu, varianteDeBascule(absolu)]
+        .map((p) => parAbsolu.get(cle(path.resolve(p))))
+        .filter((a): a is Attendu => !!a);
+      if (candidats.length === 0) return false;
+      let octets: Buffer | null;
+      try {
+        octets = lireSiPresent(absolu);
+      } catch {
+        return false;
+      }
+      if (!octets) return false;
+      const contenu = octets;
+      return candidats.some((a) =>
+        a.exact ? memeEmpreinte(empreinte(contenu), a.exact) : !!a.source && memeContenuNormalise(contenu, a.source)
+      );
+    };
+    // Un dossier (skill) est une fixture si tous ses fichiers en sont : un fichier ajouté le protège
+    const dossier = (absolu: string): boolean => {
+      const fichiers = listerFichiers(absolu);
+      return fichiers.length > 0 && fichiers.every((rel) => fichier(path.join(absolu, ...rel.split('/'))));
+    };
+    return { fichier, dossier };
+  }
+
+  /**
+   * Vérifie si un élément est une fixture du banc d'essai : son contenu doit être identique à la
+   * fixture déployée (manifeste) ou, sans manifeste, à sa source sous test/scenarios/. Ni un
+   * marqueur porté par le fichier lui-même, ni son nom, ni son seul chemin ne suffisent.
    */
   public static isScenarioFixture(
     rootPath: string,
     item: ResourceItem,
-    cachedScenarioFiles?: Set<string>
+    reconnaissance?: ReconnaissanceFixtures
   ): boolean {
-    const meta = item.metadata as Record<string, any> | undefined;
-    if (
-      meta?.isScenarioFixture === true ||
-      meta?.isScenarioFixture === 'true' ||
-      meta?.scenario_fixture === true ||
-      meta?.scenario_fixture === 'true'
-    ) {
-      return true;
-    }
-
-    // Fichier de test spécifique doublon
-    if (item.id === 'rule-test-doublon' || item.name === 'rule-test-doublon' || item.name === 'rule-test-doublon.md') {
-      return true;
-    }
-
-    const filesSet = cachedScenarioFiles || this.getScenarioFiles(rootPath);
-    const itemRelPath = path.relative(rootPath, item.path).replace(/\\/g, '/');
-    const cleanRelPath = itemRelPath.replace(/\.disabled$/, '');
-
-    return filesSet.has(itemRelPath) || filesSet.has(cleanRelPath);
+    if (!rootPath || !item.path) return false;
+    const fixtures = reconnaissance ?? this.reconnaitreFixtures(rootPath);
+    return item.isFolder ? fixtures.dossier(item.path) : fixtures.fichier(item.path);
   }
 
   // ==========================================================================
@@ -745,17 +773,15 @@ export class ScenarioManager {
     };
   }
 
-  private static planifierVidageInterne(ctx: Contexte): PlanVidageInterne {
-    const journal = lireManifeste(ctx.manifeste);
+  /**
+   * Contenu attendu à chaque chemin de fixture : l'empreinte exacte du manifeste pour une fixture
+   * déployée, sinon la source sous test/scenarios/. Sert au vidage comme à la reconnaissance.
+   */
+  private static fixturesAttendues(
+    ctx: Contexte,
+    journal: LectureManifeste
+  ): { attendus: Map<string, Attendu>; profilNote: string | null; signales: string[] } {
     const v2 = journal.type === 'v2' ? journal.manifeste : null;
-    const sauvegardePresente = fs.existsSync(ctx.sauvegarde);
-    const lectureIndex = sauvegardePresente ? lireIndex(ctx.index) : ({ type: 'absent' } as const);
-    if (lectureIndex.type === 'illisible') {
-      throw new BancEssaiRefus('sauvegarde-invalide', 'L\'index de la sauvegarde est illisible : rien n\'a été modifié.', [
-        `${DOSSIER_SAUVEGARDE}/${FICHIER_INDEX}`,
-      ]);
-    }
-
     const signales: string[] = [];
     // Profil global du déploiement (manifeste), s'il est admis : celui du réglage courant, ou le
     // profil par défaut qu'utilisent les scripts npm. Un autre profil n'est jamais pris du manifeste.
@@ -768,7 +794,6 @@ export class ScenarioManager {
           ? v2.profilGlobal
           : ctx.profilNote;
 
-    // 1. Contenu attendu à chaque chemin de fixture
     const attendus = new Map<string, Attendu>();
     for (const [rel, source] of this.sources(ctx.racine, OUTILS)) {
       attendus.set(cle(rel), { chemin: rel, source: fs.readFileSync(source), deploye: false, original: false });
@@ -796,6 +821,22 @@ export class ScenarioManager {
         if (!attendus.has(cle(fichier)) && fs.existsSync(this.resoudre(fichier, ctx))) signales.push(fichier);
       }
     }
+    return { attendus, profilNote, signales };
+  }
+
+  private static planifierVidageInterne(ctx: Contexte): PlanVidageInterne {
+    const journal = lireManifeste(ctx.manifeste);
+    const v2 = journal.type === 'v2' ? journal.manifeste : null;
+    const sauvegardePresente = fs.existsSync(ctx.sauvegarde);
+    const lectureIndex = sauvegardePresente ? lireIndex(ctx.index) : ({ type: 'absent' } as const);
+    if (lectureIndex.type === 'illisible') {
+      throw new BancEssaiRefus('sauvegarde-invalide', 'L\'index de la sauvegarde est illisible : rien n\'a été modifié.', [
+        `${DOSSIER_SAUVEGARDE}/${FICHIER_INDEX}`,
+      ]);
+    }
+
+    // 1. Contenu attendu à chaque chemin de fixture
+    const { attendus, profilNote, signales } = this.fixturesAttendues(ctx, journal);
 
     // 2. Originaux sauvegardés : chaque entrée doit viser un chemin de fixture connu
     const entrees = lectureIndex.type === 'ok' ? lectureIndex.index.fichiers : [];

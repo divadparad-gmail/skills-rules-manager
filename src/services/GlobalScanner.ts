@@ -570,16 +570,8 @@ export class GlobalScanner {
       directoryPath: soulPathFound || defaultSoulPath,
     };
 
-    // Marquage des fixtures de test de scénario (ex: règle doublon de test)
-    for (const item of items) {
-      if (item.id === 'rule-test-doublon' || item.name === 'rule-test-doublon' || item.name === 'rule-test-doublon.md') {
-        item.metadata = {
-          ...item.metadata,
-          isScenarioFixture: true,
-        };
-      }
-    }
-
+    // Les fixtures du banc d'essai (règle doublon) sont reconnues à leur contenu par StateManager,
+    // qui connaît l'espace de travail et ses sources de test
     return {
       items,
       soulStat,
