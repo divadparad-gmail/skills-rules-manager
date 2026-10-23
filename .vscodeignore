@@ -16,6 +16,7 @@ tsconfig.test.json
 CLAUDE.md
 GEMINI.md
 .scenario-manifest.json
+.banc-essai-sauvegarde/**
 .mcp.json
 out/**
 esbuild.js

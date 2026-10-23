@@ -13,3 +13,58 @@ Thumbs.db
 *.bak
 *.bak.*
 scripts/hooks/*.log
+
+# Banc d'essai : copies déployées à la racine par test:deploy-* (sources sous test/scenarios/).
+# Entrées ancrées, fichier par fichier, avec la variante de désactivation (.md <-> .md.disabled).
+# Les 5 chemins canoniques (CLAUDE.md, GEMINI.md, .mcp.json, .agents/hooks.json,
+# .agents/mcp_config.json) ne sont pas ignorés : de vrais fichiers peuvent y vivre. Le garde-fou
+# (npm test et hook pre-commit) refuse leur version indexée si elle est identique à la fixture.
+/.scenario-manifest.json
+/.banc-essai-sauvegarde/
+/.agents/plugins/pack-audit-pro/rules/rule-audit-standards.md
+/.agents/plugins/pack-audit-pro/rules/rule-audit-standards.md.disabled
+/.agents/plugins/pack-audit-pro/skills/skill-profiler/SKILL.md
+/.agents/plugins/pack-audit-pro/skills/skill-profiler/SKILL.md.disabled
+/.agents/rules/01-rule-perm-no-frontmatter.md
+/.agents/rules/01-rule-perm-no-frontmatter.md.disabled
+/.agents/rules/02-rule-perm-standard-always-on.md
+/.agents/rules/02-rule-perm-standard-always-on.md.disabled
+/.agents/rules/03-rule-cond-trigger-glob.md
+/.agents/rules/03-rule-cond-trigger-glob.md.disabled
+/.agents/rules/04-rule-cond-trigger-globs-list.md
+/.agents/rules/04-rule-cond-trigger-globs-list.md.disabled
+/.agents/rules/05-rule-cond-trigger-model-decision.md
+/.agents/rules/05-rule-cond-trigger-model-decision.md.disabled
+/.agents/rules/06-rule-warn-size-exceeded-24kb.md
+/.agents/rules/06-rule-warn-size-exceeded-24kb.md.disabled
+/.agents/rules/07-rule-disabled-suffix.md
+/.agents/rules/07-rule-disabled-suffix.md.disabled
+/.agents/rules/08-rule-dedup-active.md
+/.agents/rules/08-rule-dedup-active.md.disabled
+/.agents/rules/rule-test-doublon.md
+/.agents/rules/rule-test-doublon.md.disabled
+/.agents/skills/skill-disabled/SKILL.md
+/.agents/skills/skill-disabled/SKILL.md.disabled
+/.agents/skills/skill-standard/SKILL.md
+/.agents/skills/skill-standard/SKILL.md.disabled
+/.agents/skills/skill-with-annexes/SKILL.md
+/.agents/skills/skill-with-annexes/SKILL.md.disabled
+/.agents/skills/skill-with-annexes/references/api-spec.md
+/.agents/skills/skill-with-annexes/references/api-spec.md.disabled
+/.agents/skills/skill-with-annexes/scripts/backup.ps1
+/.agents/skills/wf-action-deploy/SKILL.md
+/.agents/skills/wf-action-deploy/SKILL.md.disabled
+/.claude/rules/01-rule-claude-perm-standard.md
+/.claude/rules/01-rule-claude-perm-standard.md.disabled
+/.claude/rules/02-rule-claude-cond-paths-string.md
+/.claude/rules/02-rule-claude-cond-paths-string.md.disabled
+/.claude/rules/03-rule-claude-cond-paths-list.md
+/.claude/rules/03-rule-claude-cond-paths-list.md.disabled
+/.claude/rules/04-rule-claude-disabled.md
+/.claude/rules/04-rule-claude-disabled.md.disabled
+/.claude/rules/05-rule-claude-warn-lines.md
+/.claude/rules/05-rule-claude-warn-lines.md.disabled
+/.claude/skills/skill-claude-disabled/SKILL.md
+/.claude/skills/skill-claude-disabled/SKILL.md.disabled
+/.claude/skills/skill-claude-traduction/SKILL.md
+/.claude/skills/skill-claude-traduction/SKILL.md.disabled

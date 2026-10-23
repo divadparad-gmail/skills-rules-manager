@@ -1,8 +1,0 @@
----
-description: Règle de déduplication (version inactive)
-trigger: always_on
----
-
-# Règle Déduplication (Version Inactive)
-
-Cette version `.disabled` doit être ignorée au profit de la version active `.md`.

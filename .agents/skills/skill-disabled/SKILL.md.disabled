@@ -1,9 +1,0 @@
----
-name: skill-disabled
-description: Compétence temporairement désactivée pour tester la bascule de toggle.
----
-
-# Compétence Désactivée
-
-Ce skill est désactivé via le suffixe physique `SKILL.md.disabled`.
-Il doit apparaître avec son interrupteur à l'état **OFF**.
