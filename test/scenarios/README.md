@@ -58,10 +58,10 @@ La procédure complète est décrite dans son [README.md](antigravity-injection-
 
 ### Via l'Interface VS Code (Sidebar)
 Dans la boîte **🧪 Banc d'Essai (Scénarios)** sous le guide complet :
-- **🌌 Antigravity** : Nettoie et déploie l'arborescence Antigravity complète.
-- **🤖 Claude Code** : Nettoie et déploie l'arborescence Claude Code complète.
-- **⚡ Tous** : Déploie les deux environnements pour tester le commutateur d'outil.
-- **🧹 Vider** : Réinitialise et supprime tous les fichiers temporaires de test.
+- **🌌 Antigravity** : Déploie l'arborescence Antigravity complète.
+- **🤖 Claude Code** : Déploie l'arborescence Claude Code complète.
+- **⚡ Tous** : Déploie les deux environnements pour tester le commutateur d'outil, ainsi que la règle `rule-test-doublon.md` dans le profil global d'Antigravity.
+- **🧹 Vider** : Supprime les fixtures intactes et restaure les vrais fichiers sauvegardés.
 
 ### En Ligne de Commande (CLI)
 ```bash
@@ -70,3 +70,16 @@ npm run test:deploy-claude
 npm run test:deploy-all
 npm run test:clean
 ```
+
+Les boutons et les scripts passent par le même module, `src/services/ScenarioManager.ts`.
+
+### Sauvegarde des vrais fichiers
+
+- **Avant un déploiement**, chaque vrai fichier qu'une fixture remplacerait (par exemple un vrai `CLAUDE.md` ou un vrai `.agents/hooks.json`) est copié dans `.banc-essai-sauvegarde/`, puis vérifié (SHA-256 et taille). Les copies sont rangées sous `racine/` et `profil-global/`, avec `_agents` et `_claude` à la place de `.agents` et `.claude`, et le suffixe `.sauvegarde` : aucun agent ne les lit. Leur liste est dans `index.json`.
+- **Un fichier déjà identique à sa fixture** n'est pas sauvegardé : il est traité comme une fixture et supprimé au vidage. Le déploiement le signale.
+- **Le manifeste `.scenario-manifest.json` sert de journal** (`deploiement-en-cours`, `deploye`, `restauration-en-cours`) et garde l'empreinte de chaque fixture déployée. Une opération interrompue est reprise au vidage suivant.
+- **Au vidage**, seuls les fichiers identiques à leur fixture sont supprimés. Les originaux sont restaurés à l'identique, date comprise, puis la sauvegarde et le manifeste sont retirés. Un fichier différent de sa fixture, mais qui n'a pas été déployé, est conservé et signalé.
+- **Un banc déjà déployé** n'est pas redéployé : videz-le d'abord. Avec `npm run test:deploy-* -- --ecraser`, le script vide, restaure puis redéploie, sauf si une fixture a été modifiée pendant le test.
+- **Une fixture modifiée pendant le test** n'est jamais écrasée sans accord : `npm run test:clean` refuse et liste les fichiers en cause, et `npm run test:clean -- --ecraser` les écrase avant de restaurer les originaux.
+- **Codes de sortie des scripts** : 0 en cas de succès, 1 en cas d'erreur, 2 en cas de refus (rien n'a été modifié).
+- **Ne supprimez jamais `.banc-essai-sauvegarde/` à la main**, et n'utilisez jamais `git clean -x` ou `git clean -X` : ce dossier est ignoré par Git, et il contient les seules copies des originaux.

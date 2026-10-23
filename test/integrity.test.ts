@@ -53,6 +53,7 @@ import { McpScanner } from '../src/services/McpScanner';
 import { NasScanner } from '../src/services/NasScanner';
 import { ImportService } from '../src/services/ImportService';
 import { ScenarioManager } from '../src/services/ScenarioManager';
+import { empreinte } from '../src/services/bancEssaiFichiers';
 import { DuplicateService } from '../src/services/DuplicateService';
 import { ResourceItem } from '../src/types';
 
@@ -936,67 +937,46 @@ globs: "*.ts"
     assert.strictEqual(importedContent, soulContent, 'Le contenu importé doit être identique mot pour mot');
   });
 
-  test('27. Protection lors du "Vider" : préserve les fichiers modifiés ou locaux et supprime les synchronisés', async () => {
+  // Banc d'essai : profil personnel isolé (jamais le vrai ~/.gemini) et manifeste v2 avec empreintes
+  const bancIsole = (ws: string) => ({ dossierPersonnel: `${ws}-home` });
+  const ecrireFixtureSource = async (ws: string, rel: string, contenu: string) => {
+    const source = path.join(ws, 'test', 'scenarios', 'antigravity', ...rel.split('/'));
+    await fs.promises.mkdir(path.dirname(source), { recursive: true });
+    await fs.promises.writeFile(source, contenu, 'utf8');
+  };
+  const manifesteV2 = (fixtures: Array<[string, string]>) =>
+    JSON.stringify({
+      version: 2,
+      etat: 'deploye',
+      cible: 'antigravity',
+      debut: new Date().toISOString(),
+      maj: new Date().toISOString(),
+      profilGlobal: null,
+      fixtures: fixtures.map(([chemin, contenu]) => ({ chemin, ...empreinte(Buffer.from(contenu, 'utf8')), original: false })),
+      dossiersCrees: [],
+    });
+
+  test('27. Vider ne supprime plus un fichier identique au catalogue NAS : seules les copies de fixtures partent', async () => {
     const ws = path.join(tempBaseDir, 'ws-smart-clean');
     const rulesDir = path.join(ws, '.agents', 'rules');
     await fs.promises.mkdir(rulesDir, { recursive: true });
 
     const syncedFile = path.join(rulesDir, 'rule-synced.md');
     const modifiedFile = path.join(rulesDir, 'rule-modified.md');
-    const localOnlyFile = path.join(rulesDir, 'rule-custom.md');
+    const fixtureFile = path.join(rulesDir, 'fixture.md');
 
+    // Un fichier identique au catalogue NAS reste un vrai fichier : le critère « synced » est abandonné
     await fs.promises.writeFile(syncedFile, 'Content A', 'utf8');
     await fs.promises.writeFile(modifiedFile, 'Content B Modified', 'utf8');
-    await fs.promises.writeFile(localOnlyFile, 'Content C Custom', 'utf8');
+    await ecrireFixtureSource(ws, '.agents/rules/fixture.md', '# Fixture');
+    await fs.promises.writeFile(fixtureFile, '# Fixture', 'utf8');
 
-    const localItems: ResourceItem[] = [
-      {
-        id: 'rule-synced',
-        name: 'rule-synced',
-        description: '',
-        type: 'rule',
-        scope: 'local',
-        enabled: true,
-        path: syncedFile,
-        targetTool: 'antigravity',
-        isFolder: false,
-        syncStatus: 'synced',
-      },
-      {
-        id: 'rule-modified',
-        name: 'rule-modified',
-        description: '',
-        type: 'rule',
-        scope: 'local',
-        enabled: true,
-        path: modifiedFile,
-        targetTool: 'antigravity',
-        isFolder: false,
-        syncStatus: 'modified',
-      },
-      {
-        id: 'rule-custom',
-        name: 'rule-custom',
-        description: '',
-        type: 'rule',
-        scope: 'local',
-        enabled: true,
-        path: localOnlyFile,
-        targetTool: 'antigravity',
-        isFolder: false,
-        syncStatus: 'local_only',
-      },
-    ];
+    const rapport = await ScenarioManager.clean(ws, bancIsole(ws));
 
-    const cleanResult = await ScenarioManager.clean(ws, 'all', localItems);
-
-    assert.strictEqual(cleanResult.deletedCount, 1, 'Exactement 1 fichier synchronisé doit être supprimé');
-    assert.strictEqual(cleanResult.preservedCount, 2, '2 fichiers non synchronisés doivent être préservés');
-    assert.deepStrictEqual(cleanResult.preservedNames, ['rule-modified', 'rule-custom']);
-
-    assert.strictEqual(fs.existsSync(syncedFile), false, 'Le fichier synchronisé doit être supprimé du disque');
+    assert.deepStrictEqual(rapport.supprimes, ['.agents/rules/fixture.md'], 'Seule la copie de la fixture est supprimée');
+    assert.strictEqual(fs.existsSync(fixtureFile), false);
+    assert.strictEqual(fs.existsSync(syncedFile), true, 'Le fichier identique au NAS doit TOUJOURS exister sur le disque');
     assert.strictEqual(fs.existsSync(modifiedFile), true, 'Le fichier modifié doit TOUJOURS exister sur le disque');
-    assert.strictEqual(fs.existsSync(localOnlyFile), true, 'Le fichier purement local doit TOUJOURS exister sur le disque');
   });
 
   test('28. Détection des doublons Global vs Local et calcul des tokens gaspillés (DuplicateService)', async () => {
@@ -1080,127 +1060,65 @@ globs: "*.ts"
     assert.strictEqual(globalSolo?.metadata?.duplicateInfo, undefined, 'La ressource sans jumeau ne doit pas avoir duplicateInfo');
   });
 
-  test('29. Banc d\'essai (Doublon) : rule-test-doublon est supprimé par clean() même sous statut local_only', async () => {
+  test('29. Banc d\'essai (Doublon) : rule-test-doublon n\'est supprimé que s\'il est identique à sa fixture', async () => {
     const ws = path.join(tempBaseDir, 'ws-dup-clean');
     const agentsRules = path.join(ws, '.agents', 'rules');
     await fs.promises.mkdir(agentsRules, { recursive: true });
 
     const dupFile = path.join(agentsRules, 'rule-test-doublon.md');
     const protectedFile = path.join(agentsRules, 'rule-custom-perso.md');
+    await ecrireFixtureSource(ws, '.agents/rules/rule-test-doublon.md', '# Doublon test\nConsigne de test.');
     await fs.promises.writeFile(dupFile, '# Doublon test\nConsigne de test.', 'utf8');
     await fs.promises.writeFile(protectedFile, '# Règle perso non synchro', 'utf8');
 
-    const localItems: ResourceItem[] = [
-      {
-        id: 'rule-test-doublon',
-        name: 'rule-test-doublon',
-        description: '',
-        type: 'rule',
-        scope: 'local',
-        enabled: true,
-        path: dupFile,
-        targetTool: 'antigravity',
-        isFolder: false,
-        syncStatus: 'local_only', // Bien que local_only, c'est le fichier du banc d'essai
-      },
-      {
-        id: 'rule-custom-perso',
-        name: 'rule-custom-perso',
-        description: '',
-        type: 'rule',
-        scope: 'local',
-        enabled: true,
-        path: protectedFile,
-        targetTool: 'antigravity',
-        isFolder: false,
-        syncStatus: 'local_only', // Vraie règle locale non synchronisée -> doit être préservée
-      },
-    ];
-
-    const cleanResult = await ScenarioManager.clean(ws, 'all', localItems);
-
-    assert.strictEqual(fs.existsSync(dupFile), false, 'rule-test-doublon doit avoir été supprimé par le nettoyage du banc d\'essai');
+    const rapport = await ScenarioManager.clean(ws, bancIsole(ws));
+    assert.strictEqual(fs.existsSync(dupFile), false, 'rule-test-doublon identique à sa fixture doit être supprimé');
     assert.strictEqual(fs.existsSync(protectedFile), true, 'rule-custom-perso doit impérativement être préservé');
-    assert.strictEqual(cleanResult.preservedCount, 1);
-    assert.deepStrictEqual(cleanResult.preservedNames, ['rule-custom-perso']);
+    assert.deepStrictEqual(rapport.supprimes, ['.agents/rules/rule-test-doublon.md']);
+
+    // Le nom ne suffit plus : un vrai fichier rule-test-doublon.md est conservé et signalé
+    await fs.promises.writeFile(dupFile, '# Vraie règle qui porte ce nom', 'utf8');
+    const second = await ScenarioManager.clean(ws, bancIsole(ws));
+    assert.strictEqual(fs.existsSync(dupFile), true, 'Un vrai rule-test-doublon.md ne doit pas être supprimé');
+    assert.deepStrictEqual(second.supprimes, []);
+    assert.deepStrictEqual(second.signales, ['.agents/rules/rule-test-doublon.md']);
   });
 
-  test('30. Banc d\'essai : Détection étanche des scénarios (manifeste & fixtures) et protection d\'un vrai fichier contenant "test"', async () => {
+  test('30. Banc d\'essai : le manifeste (empreintes) désigne les fixtures, un vrai fichier contenant "test" est protégé', async () => {
     const ws = path.join(tempBaseDir, 'ws-scenario-manifest-clean');
     const agentsRules = path.join(ws, '.agents', 'rules');
     await fs.promises.mkdir(agentsRules, { recursive: true });
 
-    // 1. Déploiement d'un scénario via ScenarioManager
-    // On simule des fixtures présentes dans le manifeste
+    const contenu1 = '---\nscenario_fixture: true\n---\n# Fixture 1';
+    const contenu2 = '# Fixture 2';
     const fixture1 = path.join(agentsRules, '02-rule-perm-standard-always-on.md');
     const fixture2 = path.join(agentsRules, '03-rule-cond-trigger-glob.md');
     const userTestRule = path.join(agentsRules, 'rule-test-unitaire-critique.md');
 
-    await fs.promises.writeFile(fixture1, '---\nscenario_fixture: true\n---\n# Fixture 1', 'utf8');
-    await fs.promises.writeFile(fixture2, '# Fixture 2', 'utf8');
+    await ecrireFixtureSource(ws, '.agents/rules/02-rule-perm-standard-always-on.md', contenu1);
+    await ecrireFixtureSource(ws, '.agents/rules/03-rule-cond-trigger-glob.md', contenu2);
+    await fs.promises.writeFile(fixture1, contenu1, 'utf8');
+    await fs.promises.writeFile(fixture2, contenu2, 'utf8');
     await fs.promises.writeFile(userTestRule, '# Règle de test unitaire personnelle de l\'utilisateur', 'utf8');
 
-    // On écrit le manifeste du scénario contenant fixture1 et fixture2, mais PAS userTestRule
+    // Le manifeste contient fixture1 et fixture2 avec leurs empreintes, mais PAS userTestRule
     const manifestPath = path.join(ws, ScenarioManager.MANIFEST_FILE);
     await fs.promises.writeFile(
       manifestPath,
-      JSON.stringify({
-        target: 'all',
-        deployedAt: new Date().toISOString(),
-        files: ['.agents/rules/02-rule-perm-standard-always-on.md', '.agents/rules/03-rule-cond-trigger-glob.md'],
-      }),
+      manifesteV2([
+        ['.agents/rules/02-rule-perm-standard-always-on.md', contenu1],
+        ['.agents/rules/03-rule-cond-trigger-glob.md', contenu2],
+      ]),
       'utf8'
     );
 
-    const localItems: ResourceItem[] = [
-      {
-        id: '02-rule-perm-standard-always-on',
-        name: '02-rule-perm-standard-always-on',
-        description: '',
-        type: 'rule',
-        scope: 'local',
-        enabled: true,
-        path: fixture1,
-        targetTool: 'antigravity',
-        isFolder: false,
-        syncStatus: 'local_only',
-        metadata: { scenario_fixture: true },
-      },
-      {
-        id: '03-rule-cond-trigger-glob',
-        name: '03-rule-cond-trigger-glob',
-        description: '',
-        type: 'rule',
-        scope: 'local',
-        enabled: true,
-        path: fixture2,
-        targetTool: 'antigravity',
-        isFolder: false,
-        syncStatus: 'local_only',
-      },
-      {
-        id: 'rule-test-unitaire-critique',
-        name: 'rule-test-unitaire-critique',
-        description: 'Vrai fichier portant le mot test',
-        type: 'rule',
-        scope: 'local',
-        enabled: true,
-        path: userTestRule,
-        targetTool: 'antigravity',
-        isFolder: false,
-        syncStatus: 'local_only', // NON présent sur le NAS, et NON issu du scénario -> DOIT ÊTRE PROTÉGÉ !
-      },
-    ];
+    const rapport = await ScenarioManager.clean(ws, bancIsole(ws));
 
-    const cleanResult = await ScenarioManager.clean(ws, 'all', localItems);
-
-    // Assertions
     assert.strictEqual(fs.existsSync(fixture1), false, 'La fixture 1 du scénario doit être nettoyée');
     assert.strictEqual(fs.existsSync(fixture2), false, 'La fixture 2 listée au manifeste doit être nettoyée');
     assert.strictEqual(fs.existsSync(userTestRule), true, 'Le vrai fichier portant "test" doit être STRICTEMENT PROTÉGÉ');
-    assert.strictEqual(cleanResult.deletedCount, 2, 'Exactement 2 fixtures doivent avoir été supprimées');
-    assert.strictEqual(cleanResult.preservedCount, 1, '1 vrai fichier utilisateur doit être préservé');
-    assert.deepStrictEqual(cleanResult.preservedNames, ['rule-test-unitaire-critique']);
+    assert.strictEqual(rapport.supprimes.length, 2, 'Exactement 2 fixtures doivent avoir été supprimées');
+    assert.strictEqual(fs.existsSync(manifestPath), false, 'Le manifeste doit être retiré');
   });
 
   test('31. Banc d\'essai : GEMINI.md fixture a une description propre, isScenarioFixture=true et est supprimable', async () => {
@@ -1239,12 +1157,16 @@ globs: "*.ts"
       "Ce fichier représente l'Âme locale du projet pour Google Antigravity IDE."
     );
 
-    // Test de suppression via clean()
-    soulItem.syncStatus = 'modified'; // Simule la différence avec le NAS
-    const cleanResult = await ScenarioManager.clean(ws, 'antigravity', [soulItem]);
+    // Le marqueur ne suffit plus à supprimer : sans fixture identique, GEMINI.md est conservé
+    const sansSource = await ScenarioManager.clean(ws, bancIsole(ws));
+    assert.strictEqual(fs.existsSync(geminiPath), true, 'Un GEMINI.md marqué mais sans fixture identique est conservé');
+    assert.deepStrictEqual(sansSource.supprimes, []);
+
+    // Identique à sa fixture sous test/scenarios/ : c'est une copie du banc d'essai, supprimée
+    await ecrireFixtureSource(ws, 'GEMINI.md', await fs.promises.readFile(geminiPath, 'utf8'));
+    const avecSource = await ScenarioManager.clean(ws, bancIsole(ws));
     assert.strictEqual(fs.existsSync(geminiPath), false, 'GEMINI.md de scénario doit être nettoyé');
-    assert.strictEqual(cleanResult.deletedCount, 1, 'GEMINI.md doit être comptabilisé dans deletedCount');
-    assert.strictEqual(cleanResult.preservedCount, 0, 'Aucun fichier ne doit être préservé');
+    assert.deepStrictEqual(avecSource.supprimes, ['GEMINI.md']);
   });
 
   // --------------------------------------------------------------------------
@@ -1268,7 +1190,7 @@ globs: "*.ts"
     await fs.promises.writeFile(realGeminiMd, '# Vrai GEMINI.md du projet sans fixture', 'utf8');
 
     // Appel de clean sans manifest et sans localItems (le cas qui détruisait tout avant la correction !)
-    const cleanResult = await ScenarioManager.clean(ws, 'all');
+    const rapport = await ScenarioManager.clean(ws, bancIsole(ws));
 
     // Vérification de survie absolue
     assert.strictEqual(fs.existsSync(userRule), true, 'La règle utilisateur doit TOUJOURS exister');
@@ -1276,37 +1198,32 @@ globs: "*.ts"
     assert.strictEqual(fs.existsSync(userScript), true, 'Le script annexe utilisateur doit TOUJOURS exister');
     assert.strictEqual(fs.existsSync(realGeminiMd), true, 'Le GEMINI.md utilisateur doit TOUJOURS exister');
     assert.strictEqual(fs.existsSync(path.join(ws, '.agents')), true, 'Le dossier .agents doit TOUJOURS exister');
-    assert.strictEqual(cleanResult.deletedCount, 0, 'Aucun fichier utilisateur ne doit être supprimé');
+    assert.deepStrictEqual(rapport.supprimes, [], 'Aucun fichier utilisateur ne doit être supprimé');
   });
 
   // --------------------------------------------------------------------------
   // Test 33 : Nettoyage ciblé du scénario sans localItems via le manifeste
   // --------------------------------------------------------------------------
-  test('33. Nettoyage ciblé du scénario sans localItems : supprime uniquement les fichiers du manifeste', async () => {
+  test('33. Nettoyage ciblé par le manifeste : supprime uniquement les fichiers identiques à leur empreinte', async () => {
     const ws = path.join(tempBaseDir, 'ws-manifest-targeted-clean');
     const rulesDir = path.join(ws, '.agents', 'rules');
     await fs.promises.mkdir(rulesDir, { recursive: true });
 
     const fixtureRule = path.join(rulesDir, 'fixture-rule.md');
     const userRule = path.join(rulesDir, 'user-rule.md');
+    await ecrireFixtureSource(ws, '.agents/rules/fixture-rule.md', '# Fixture');
     await fs.promises.writeFile(fixtureRule, '# Fixture', 'utf8');
     await fs.promises.writeFile(userRule, '# Vrai travail', 'utf8');
 
     const manifestPath = path.join(ws, ScenarioManager.MANIFEST_FILE);
-    const manifestData = {
-      target: 'antigravity',
-      deployedAt: new Date().toISOString(),
-      files: ['.agents/rules/fixture-rule.md'],
-    };
-    await fs.promises.writeFile(manifestPath, JSON.stringify(manifestData), 'utf8');
+    await fs.promises.writeFile(manifestPath, manifesteV2([['.agents/rules/fixture-rule.md', '# Fixture']]), 'utf8');
 
-    // Exécution du nettoyage sans localItems
-    const cleanResult = await ScenarioManager.clean(ws, 'antigravity');
+    const rapport = await ScenarioManager.clean(ws, bancIsole(ws));
 
     assert.strictEqual(fs.existsSync(fixtureRule), false, 'La fixture listée au manifeste doit être supprimée');
     assert.strictEqual(fs.existsSync(userRule), true, 'Le fichier utilisateur hors manifeste doit être préservé');
     assert.strictEqual(fs.existsSync(manifestPath), false, 'Le manifeste doit être nettoyé');
-    assert.strictEqual(cleanResult.deletedCount, 1, 'Exactement 1 fichier de manifeste supprimé');
+    assert.deepStrictEqual(rapport.supprimes, ['.agents/rules/fixture-rule.md'], 'Exactement 1 fixture supprimée');
   });
 
   // --------------------------------------------------------------------------
@@ -1503,7 +1420,7 @@ Corps du texte.`;
     await fs.promises.mkdir(scenariosBaseDir, { recursive: true });
 
     // Appel de ScenarioManager.clean() SANS localItems
-    await ScenarioManager.clean(ws, 'antigravity');
+    await ScenarioManager.clean(ws, bancIsole(ws));
 
     // Vérification absolue : les dossiers et fichiers utilisateur sont 100% préservés
     assert.strictEqual(fs.existsSync(userFile), true, 'Le fichier utilisateur ne doit jamais être supprimé');

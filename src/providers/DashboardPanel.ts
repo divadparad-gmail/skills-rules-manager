@@ -186,7 +186,7 @@ export class DashboardPanel {
             if (rootPath) {
               try {
                 const choice = await vscode.window.showWarningMessage(
-                  "Êtes-vous sûr de vouloir réinitialiser les scénarios d'essai du Banc d'Essai ? Vos règles et compétences personnelles seront préservées.",
+                  "Êtes-vous sûr de vouloir réinitialiser les scénarios d'essai du Banc d'Essai ? Les fixtures intactes seront supprimées et les vrais fichiers sauvegardés seront restaurés.",
                   { modal: true },
                   'Nettoyer'
                 );
@@ -194,21 +194,15 @@ export class DashboardPanel {
                   break;
                 }
 
-                const state = await StateManager.loadFullState(false);
-                const result = await ScenarioManager.clean(rootPath, 'all', state.localResources);
-
-                if (result.preservedCount > 0) {
-                  vscode.window.showWarningMessage(
-                    `🧹 Nettoyage terminé : ${result.deletedCount} élément(s) de test supprimé(s).\n` +
-                    `🛡️ ${result.preservedCount} élément(s) de projet protégé(s) (${result.preservedNames.join(', ')}).`
-                  );
+                const rapport = await ScenarioManager.clean(rootPath);
+                if (rapport.signales.length > 0) {
+                  vscode.window.showWarningMessage(ScenarioManager.resumerVidage(rapport));
                 } else {
-                  vscode.window.showInformationMessage(`🧹 Espace de travail réinitialisé (${result.deletedCount} éléments de scénario supprimés).`);
+                  vscode.window.showInformationMessage(ScenarioManager.resumerVidage(rapport));
                 }
                 await StateManager.loadFullState(true);
               } catch (err: unknown) {
-                const msg = err instanceof Error ? err.message : String(err);
-                vscode.window.showErrorMessage(`Erreur de nettoyage : ${msg}`);
+                vscode.window.showErrorMessage(`Erreur de nettoyage : ${ScenarioManager.decrireErreur(err)}`);
               }
             }
             break;
