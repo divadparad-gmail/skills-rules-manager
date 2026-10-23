@@ -93,3 +93,5 @@ Les boutons et les scripts passent par le même module, `src/services/ScenarioMa
 - **Une fixture modifiée pendant le test** n'est jamais écrasée sans accord : `npm run test:clean` refuse et liste les fichiers en cause, et `npm run test:clean -- --ecraser` les écrase avant de restaurer les originaux.
 - **Codes de sortie des scripts** : 0 en cas de succès, 1 en cas d'erreur, 2 en cas de refus (rien n'a été modifié).
 - **Ne supprimez jamais `.banc-essai-sauvegarde/` à la main**, et n'utilisez jamais `git clean -x` ou `git clean -X` : ce dossier est ignoré par Git, et il contient les seules copies des originaux.
+
+Le test manuel du banc d'essai, dans l'hôte de développement de VS Code, est décrit dans [TEST-MANUEL.md](TEST-MANUEL.md).
