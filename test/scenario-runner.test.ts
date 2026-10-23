@@ -147,9 +147,37 @@ describe('Suite de Tests : banc d\'essai en ligne de commande (runner.js)', () =
     assertUserFilesIntact('test:clean -- --ecraser');
   });
 
-  test('7. Une option inconnue est refusée (code 1)', () => {
-    const resultat = runStatut('clean', '--force');
-    assert.strictEqual(resultat.status, 1);
-    assert.match(resultat.stderr, /Option inconnue/);
+  // Une erreur d'usage est signalée avant toute action : message clair, ligne d'usage, pas de pile
+  const assertErreurUsage = (resultat: ReturnType<typeof spawnSync>, message: RegExp) => {
+    const stderr = String(resultat.stderr);
+    assert.strictEqual(resultat.status, 1, stderr);
+    assert.match(stderr, message);
+    assert.match(stderr, /\[Scenarios Runner\] Usage : node test\/scenarios\/scripts\/runner\.js/);
+    assert.ok(!/\n\s+at /.test(stderr), `Aucune pile d'appels attendue :\n${stderr}`);
+    assert.ok(!String(resultat.stdout).includes('Action:'), 'Aucune action n\'a commencé');
+  };
+
+  test('7. Une option inconnue est refusée (code 1), sans pile d\'appels', () => {
+    assertErreurUsage(runStatut('clean', '--force'), /Option inconnue : « --force »/);
+    assertErreurUsage(runStatut('all', '--ecrase'), /Option inconnue : « --ecrase »\. Seule l'option --ecraser est reconnue\./);
+    assert.ok(!fs.existsSync(path.join(workspace, '.scenario-manifest.json')), 'Rien n\'a été déployé');
+  });
+
+  test('8. Une commande collée deux fois : arguments en trop et racine introuvable, chacun nommé', () => {
+    // « npm run test:deploy-all npm run test:deploy-all » transmet « npm run test:deploy-all » au script
+    const resultat = spawnSync(process.execPath, [runner, 'all', 'npm', 'run', 'test:deploy-all'], {
+      encoding: 'utf8',
+      env: env(),
+      cwd: tempBaseDir,
+    });
+    assertErreurUsage(resultat, /Argument\(s\) en trop : « run », « test:deploy-all »\./);
+    assert.match(resultat.stderr, /Racine introuvable : « npm » n'est pas un dossier existant \(résolue en /);
+    assert.ok(!fs.existsSync(path.join(tempBaseDir, 'npm')));
+  });
+
+  test('9. Une racine sans test/scenarios/ est refusée (code 1)', () => {
+    const resultat = spawnSync(process.execPath, [runner, 'clean', home], { encoding: 'utf8', env: env() });
+    assertErreurUsage(resultat, /ne contient pas test\/scenarios\/ : ce n'est pas la racine du dépôt\./);
+    assertErreurUsage(spawnSync(process.execPath, [runner, 'deploy', workspace], { encoding: 'utf8', env: env() }), /Cible inconnue : « deploy »/);
   });
 });

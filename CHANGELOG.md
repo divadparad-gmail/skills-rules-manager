@@ -16,6 +16,8 @@ Le format s'inspire de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) 
 
 ### Corrections
 
+- Le banc d'essai restaure la date de dernière écriture exacte de chaque original : elle était arrondie à la milliseconde la plus proche. Les originaux sont désormais sauvegardés et restaurés par copie, et `index.json` note la date tronquée (`date`) ainsi que sa valeur exacte en nanosecondes (`dateNs`).
+- `npm run test:deploy-*` et `npm run test:clean` refusent une option inconnue, un argument en trop, une cible inconnue ou une racine invalide avec un message qui nomme l'argument en cause, sans pile d'appels (code de sortie 1).
 - Un vrai `CLAUDE.md` ou `GEMINI.md`, ou tout fichier dont le frontmatter porte `scenario_fixture` ou `isScenarioFixture`, n'est plus présenté comme « 🧪 Test Scénario » ni supprimable par la corbeille sans copie dans le catalogue NAS. Une fixture du banc d'essai se reconnaît désormais à son contenu, identique à la fixture déployée ou à sa source, et non plus à son chemin, à son nom ou à un marqueur.
 
 ## [0.4.0] — 2026-10-22

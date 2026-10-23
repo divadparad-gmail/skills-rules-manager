@@ -159,8 +159,9 @@ describe('Suite de Tests : sauvegarde et restauration du banc d\'essai (L2b)', (
     assert.deepStrictEqual([...vidage.restaures].sort(), Object.keys(ORIGINAUX).sort());
     const { [identique]: _supprime, ...attendu } = avant;
     assert.deepStrictEqual(instantane(espace), attendu, 'Originaux à l\'identique ; le fichier identique à sa fixture est parti');
-    for (const chemin of Object.keys(ORIGINAUX).filter((c) => !c.startsWith('~/'))) {
-      assert.strictEqual(Math.floor(fs.statSync(path.join(espace.ws, chemin)).mtimeMs), DATE.getTime(), `Date de ${chemin}`);
+    for (const chemin of Object.keys(ORIGINAUX)) {
+      const absolu = chemin.startsWith('~/') ? path.join(espace.home, ...chemin.slice(2).split('/')) : path.join(espace.ws, chemin);
+      assert.strictEqual(fs.statSync(absolu, { bigint: true }).mtimeNs, BigInt(DATE.getTime()) * 1000000n, `Date de ${chemin}`);
     }
     assert.ok(!fs.existsSync(sauvegarde(espace)));
     assert.ok(!fs.existsSync(path.join(espace.ws, ScenarioManager.MANIFEST_FILE)));
@@ -536,6 +537,14 @@ describe('Suite de Tests : sauvegarde et restauration du banc d\'essai (L2b)', (
       assert.ok(!fs.existsSync(path.join(espace.ws, '.agents', 'rules', 'injectee.md')));
     }
 
+    // Une date exacte (dateNs) qui n'est pas une chaîne de chiffres rend l'index illisible
+    for (const dateNs of ['1e9', '-1', 1767323073556712000]) {
+      const brut = JSON.parse(index(DOUBLON, 'profil-global/rules/rule-test-doublon.md.sauvegarde'));
+      brut.fichiers[0].dateNs = dateNs;
+      ecrire(espace, '.banc-essai-sauvegarde/index.json', JSON.stringify(brut));
+      await assert.rejects(ScenarioManager.clean(espace.ws, espace.opts), refus('sauvegarde-invalide'), `dateNs ${JSON.stringify(dateNs)}`);
+    }
+
     // Appartenance exacte : toute autre forme d'un chemin, même résolue vers une fixture, est refusée
     const parent = path.dirname(espace.ws);
     for (const forme of FORMES_INTERDITES(espace)) {
@@ -623,5 +632,38 @@ describe('Suite de Tests : sauvegarde et restauration du banc d\'essai (L2b)', (
     await ScenarioManager.clean(espace.ws, espace.opts);
     assert.ok(fs.readdirSync(espace.ws).includes('claude.md'));
     assert.ok(!fs.readdirSync(espace.ws).includes('CLAUDE.md'));
+  });
+
+  test('19. La date de dernière écriture est restaurée exactement, fraction de milliseconde comprise', async () => {
+    const espace = await creerEspace();
+    // Une date réelle (écriture du système) et une date dont la fraction (,5567) s'arrondirait vers le haut
+    const claudeMd = path.join(espace.ws, 'CLAUDE.md');
+    fs.mkdirSync(espace.ws, { recursive: true });
+    fs.writeFileSync(claudeMd, ORIGINAUX['CLAUDE.md']);
+    const mcpJson = path.join(espace.ws, '.mcp.json');
+    fs.writeFileSync(mcpJson, ORIGINAUX['.mcp.json']);
+    fs.utimesSync(mcpJson, 1767323073.5567123, 1767323073.5567123);
+    const avant = new Map([claudeMd, mcpJson].map((f) => [f, fs.statSync(f, { bigint: true }).mtimeNs]));
+
+    await ScenarioManager.deploy(espace.ws, 'claude-code', espace.opts);
+    const index = lireJson(sauvegarde(espace, 'index.json'));
+    for (const [fichier, ns] of avant) {
+      const entree = index.fichiers.find((e: { chemin: string }) => e.chemin === path.basename(fichier));
+      assert.strictEqual(entree.dateNs, ns.toString(), `dateNs de ${entree.chemin}`);
+      assert.strictEqual(entree.date, new Date(Number(ns / 1000000n)).toISOString(), `date tronquée de ${entree.chemin}`);
+      if (process.platform === 'win32') {
+        const copie = sauvegarde(espace, 'racine', `${path.basename(fichier)}.sauvegarde`);
+        assert.strictEqual(fs.statSync(copie, { bigint: true }).mtimeNs, ns, `La copie de ${entree.chemin} garde la date de l'original`);
+      }
+    }
+    assert.strictEqual(lireJson(sauvegarde(espace, 'index.json')).fichiers.find((e: { chemin: string }) => e.chemin === '.mcp.json').date.slice(-5), '.556Z');
+
+    await ScenarioManager.clean(espace.ws, espace.opts);
+    for (const [fichier, ns] of avant) {
+      const apres = fs.statSync(fichier, { bigint: true }).mtimeNs;
+      const ecart = apres > ns ? apres - ns : ns - apres;
+      // Sous Windows, la copie conserve la date au pas de 100 ns ; ailleurs, utimes la rétablit à 1 µs près
+      assert.ok(process.platform === 'win32' ? ecart === 0n : ecart <= 1000n, `${path.basename(fichier)} : ${ns} attendu, ${apres} obtenu`);
+    }
   });
 });

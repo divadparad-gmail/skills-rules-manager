@@ -154,17 +154,26 @@ async function renommerAvecReprises(de: string, vers: string, options: OptionsEc
   }
 }
 
-export async function ecrireSur(destination: string, octets: Buffer, options: OptionsEcriture): Promise<void> {
-  const attendu = empreinte(octets);
+/**
+ * Remplit un fichier temporaire (`remplir`), le synchronise, vérifie son empreinte, puis le renomme
+ * sur la destination et vérifie le résultat.
+ */
+async function remplacerSur(
+  destination: string,
+  attendu: Empreinte,
+  options: OptionsEcriture,
+  remplir: (temp: string) => Promise<void>
+): Promise<void> {
   await fs.promises.mkdir(options.dossierTemp, { recursive: true });
   const temp = path.join(
     options.dossierTemp,
     `.${path.basename(destination)}.${process.pid}-${crypto.randomBytes(4).toString('hex')}${SUFFIXE_TEMP}`
   );
   try {
-    const fd = await fs.promises.open(temp, 'wx');
+    await remplir(temp);
+    // Synchroniser sans écrire : la date de dernière écriture n'est pas modifiée
+    const fd = await fs.promises.open(temp, 'r+');
     try {
-      await fd.writeFile(octets);
       await fd.sync();
     } finally {
       await fd.close();
@@ -180,6 +189,23 @@ export async function ecrireSur(destination: string, octets: Buffer, options: Op
   if (!memeEmpreinte(empreinte(await fs.promises.readFile(destination)), attendu)) {
     throw new Error(`Le fichier écrit ne correspond pas à l'original : ${destination}`);
   }
+}
+
+export async function ecrireSur(destination: string, octets: Buffer, options: OptionsEcriture): Promise<void> {
+  await remplacerSur(destination, empreinte(octets), options, (temp) =>
+    fs.promises.writeFile(temp, octets, { flag: 'wx' })
+  );
+}
+
+/**
+ * Copie sûre d'un fichier existant. Sous Windows, `fs.copyFile` (CopyFileW) conserve la date de
+ * dernière écriture au pas de 100 ns, ce que `fs.utimes` ne garantit pas (écart jusqu'à 1 µs).
+ * La copie doit avoir l'empreinte `attendu`, sinon rien n'est remplacé.
+ */
+export async function copierSur(source: string, destination: string, attendu: Empreinte, options: OptionsEcriture): Promise<void> {
+  await remplacerSur(destination, attendu, options, (temp) =>
+    fs.promises.copyFile(source, temp, fs.constants.COPYFILE_EXCL)
+  );
 }
 
 // --------------------------------------------------------------------------
@@ -257,7 +283,10 @@ export function lireManifeste(fichier: string): LectureManifeste {
 export interface EntreeIndex extends Empreinte {
   chemin: string;
   copie: string;
+  /** Date de dernière écriture, tronquée à la milliseconde comme l'affiche Windows. */
   date: string;
+  /** La même date, exacte, en nanosecondes (chaîne de chiffres). Absente des index antérieurs. */
+  dateNs?: string;
 }
 
 export interface IndexSauvegarde {
@@ -289,7 +318,8 @@ export function lireIndex(fichier: string): LectureIndex {
           !(f.copie as string).startsWith(PREFIXE_PERSONNEL) &&
           estEmpreinte(f) &&
           typeof f.date === 'string' &&
-          !Number.isNaN(Date.parse(f.date as string))
+          !Number.isNaN(Date.parse(f.date as string)) &&
+          (f.dateNs === undefined || (typeof f.dateNs === 'string' && /^\d{1,25}$/.test(f.dateNs)))
       );
     return valide ? { type: 'ok', index: donnees as IndexSauvegarde } : { type: 'illisible' };
   } catch {

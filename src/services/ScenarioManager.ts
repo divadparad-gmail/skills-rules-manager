@@ -17,6 +17,7 @@ import {
   SOUS_DOSSIER_RACINE,
   SUFFIXE_TEMP,
   cheminDepuisSauvegarde,
+  copierSur,
   ecrireSur,
   empreinte,
   lireIndex,
@@ -128,7 +129,7 @@ interface ElementDeploiement {
   absolu: string;
   octets: Buffer;
   statut: 'absent' | 'identique' | 'original';
-  original?: { octets: Buffer; empreinte: Empreinte; date: string; chemin: string };
+  original?: { octets: Buffer; empreinte: Empreinte; date: string; dateNs: string; chemin: string };
 }
 
 interface Attendu {
@@ -393,8 +394,15 @@ export class ScenarioManager {
         const copie = this.nomCopie(element.chemin, ctx);
         const copieAbsolue = path.join(ctx.sauvegarde, ...copie.split('/'));
         await fs.promises.mkdir(path.dirname(copieAbsolue), { recursive: true });
-        await ecrireSur(copieAbsolue, actuel, { dossierTemp: ctx.temp });
-        entrees.push({ chemin: element.original.chemin, copie, ...element.original.empreinte, date: element.original.date });
+        // Copie et non réécriture : la sauvegarde garde la date exacte de l'original
+        await copierSur(element.absolu, copieAbsolue, element.original.empreinte, { dossierTemp: ctx.temp });
+        entrees.push({
+          chemin: element.original.chemin,
+          copie,
+          ...element.original.empreinte,
+          date: element.original.date,
+          dateNs: element.original.dateNs,
+        });
       }
 
       options.panne?.('index', FICHIER_INDEX);
@@ -507,9 +515,10 @@ export class ScenarioManager {
         throw new BancEssaiRefus('sauvegarde-invalide', `La copie de ${action.chemin} est absente ou corrompue.`, [action.chemin]);
       }
       await fs.promises.mkdir(path.dirname(action.absolu), { recursive: true });
-      await ecrireSur(action.absolu, octets, { dossierTemp: this.dossierTempPour(action.chemin, action.absolu, ctx) });
-      const date = new Date(entree.date);
-      await fs.promises.utimes(action.absolu, date, date).catch(() => undefined);
+      await copierSur(action.copie as string, action.absolu, entree, {
+        dossierTemp: this.dossierTempPour(action.chemin, action.absolu, ctx),
+      });
+      await this.retablirDate(action.absolu, entree);
       rapport.restaures.push(action.chemin);
       if (action.modifiee) rapport.ecrases.push(action.chemin);
     }
@@ -647,6 +656,21 @@ export class ScenarioManager {
     return chemin.startsWith(PREFIXE_PERSONNEL) ? path.dirname(absolu) : ctx.temp;
   }
 
+  /**
+   * La copie conserve déjà la date sous Windows. Ailleurs, ou pour un index sans `dateNs`, la date
+   * notée est rétablie par `utimes`, à la microseconde près.
+   */
+  private static async retablirDate(absolu: string, entree: EntreeIndex): Promise<void> {
+    const attendue = entree.dateNs !== undefined ? BigInt(entree.dateNs) : BigInt(Date.parse(entree.date)) * 1000000n;
+    try {
+      if (fs.statSync(absolu, { bigint: true }).mtimeNs === attendue) return;
+      const secondes = Number(attendue) / 1e9;
+      await fs.promises.utimes(absolu, secondes, secondes);
+    } catch {
+      // La date est un confort : le contenu, lui, est vérifié par son empreinte
+    }
+  }
+
   private static async ecrireJournal(ctx: Contexte, manifeste: ManifesteBanc): Promise<void> {
     await ecrireSur(ctx.manifeste, Buffer.from(JSON.stringify(manifeste, null, 2), 'utf8'), { dossierTemp: ctx.temp });
   }
@@ -722,6 +746,9 @@ export class ScenarioManager {
       }
       // La casse réelle du nom est conservée : un vrai « claude.md » revient sous ce nom
       const dossierNote = destination.chemin.includes('/') ? destination.chemin.slice(0, destination.chemin.lastIndexOf('/') + 1) : '';
+      // stats.mtime arrondit à la milliseconde la plus proche : la date est lue en nanosecondes,
+      // puis tronquée pour l'affichage, comme le fait Windows
+      const dateNs = fs.lstatSync(destination.absolu, { bigint: true }).mtimeNs;
       elements.push({
         chemin: destination.chemin,
         absolu: destination.absolu,
@@ -730,7 +757,8 @@ export class ScenarioManager {
         original: {
           octets: actuel,
           empreinte: empreinte(actuel),
-          date: stat.mtime.toISOString(),
+          date: new Date(Number(dateNs / 1000000n)).toISOString(),
+          dateNs: dateNs.toString(),
           chemin: `${dossierNote}${nomReel(destination.absolu)}`,
         },
       });
