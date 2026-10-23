@@ -37,6 +37,7 @@ Il reproduit l'ensemble des cas réels supportés par **Antigravity IDE (Gemini)
 | `.claude/rules/02-rule-claude-cond-paths-string.md` | **Règle Conditionnelle** | `paths: "src/**/*.js"` | • Badge **`⚡ Conditionnel`**<br>• ~20 tokens au boot |
 | `.claude/rules/03-rule-claude-cond-paths-list.md` | **Règle Conditionnelle** | `paths: ["src/**", "tests/**"]` (liste YAML) | • Badge **`⚡ Conditionnel`**<br>• Filtrage sur plusieurs motifs |
 | `.claude/rules/04-rule-claude-disabled.md.disabled` | **Règle Désactivée** | Extension `.disabled` | • Switch à l'état **OFF** |
+| `.claude/rules/05-rule-claude-warn-lines.md` | **Règle Permanente Longue** | 229 lignes (> 200), générée par `scripts/generate-claude-code-05-warn-lines.js` | • Alerte de longueur (> 200 lignes)<br>• Environ 4 600 tokens comptés au démarrage : c'est de loin la fixture la plus coûteuse du banc |
 | `.claude/skills/skill-claude-traduction/SKILL.md` | **Skill Claude** | Compétence locale Claude Code | • Répertorié dans les skills locaux Claude Code |
 | `.claude/skills/skill-claude-disabled/SKILL.md.disabled` | **Skill Désactivé** | Skill désactivé Claude Code | • Switch à l'état **OFF** |
 

@@ -18,6 +18,7 @@ Le format s'inspire de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) 
 
 ### Corrections
 
+- La fixture Claude Code `05-rule-claude-warn-lines.md` du banc d'essai contenait l'expression JavaScript `Array.from({ length: 215 } …` écrite telle quelle, au lieu des 215 lignes attendues : elle ne déclenchait donc pas l'alerte « plus de 200 lignes » qu'elle doit tester. Elle est désormais générée par `test/scenarios/scripts/generate-claude-code-05-warn-lines.js` (229 lignes, environ 4 600 tokens au démarrage du banc), et un test vérifie qu'elle est identique à la sortie du générateur.
 - Le banc d'essai restaure la date de dernière écriture exacte de chaque original : elle était arrondie à la milliseconde la plus proche. Les originaux sont désormais sauvegardés et restaurés par copie, et `index.json` note la date tronquée (`date`) ainsi que sa valeur exacte en nanosecondes (`dateNs`).
 - `npm run test:deploy-*` et `npm run test:clean` refusent une option inconnue, un argument en trop, une cible inconnue ou une racine invalide avec un message qui nomme l'argument en cause, sans pile d'appels (code de sortie 1).
 - Un vrai `CLAUDE.md` ou `GEMINI.md`, ou tout fichier dont le frontmatter porte `scenario_fixture` ou `isScenarioFixture`, n'est plus présenté comme « 🧪 Test Scénario » ni supprimable par la corbeille sans copie dans le catalogue NAS. Une fixture du banc d'essai se reconnaît désormais à son contenu, identique à la fixture déployée ou à sa source, et non plus à son chemin, à son nom ou à un marqueur.
