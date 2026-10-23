@@ -13,6 +13,7 @@ Le format s'inspire de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) 
 - Le bouton « Nettoyer » et `npm run test:clean` suivent la même règle : seuls les fichiers identiques à la fixture déployée sont supprimés. Le critère « identique au catalogue NAS » est abandonné, et un vrai `CLAUDE.md` ou `.mcp.json` n'est plus supprimé.
 - Une fixture modifiée pendant le test n'est jamais écrasée sans accord : les scripts refusent (code de sortie 2), sauf avec `-- --ecraser`. Un banc déjà déployé n'est pas redéployé sans être vidé d'abord.
 - Un banc d'essai actif ou interrompu est signalé dans la barre d'état, par un bandeau dans la barre latérale et le Grand Dashboard (bouton « Vider et restaurer ») et au démarrage de l'extension. Avant un déploiement, une fenêtre liste les vrais fichiers qui seront sauvegardés et les fichiers identiques à leur fixture ; une fixture modifiée n'est écrasée qu'après la fenêtre « Écraser et restaurer ». Nouvelle commande : « Vider le banc d'essai et restaurer les originaux ».
+- Les fichiers de test sont classés par outil, avec les préfixes `antigravity-`, `claude-` et `common-`. Les scripts `npm run test:antigravity` et `npm run test:common` lancent un seul groupe, et `npm test` les lance tous en une seule exécution. Les scripts de test vident `out-test/` avant de compiler et demandent Node 22 ou plus récent (`engines.node`).
 
 ### Corrections
 

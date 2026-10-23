@@ -10,7 +10,8 @@
     "url": "https://github.com/divadparad-gmail/skills-rules-manager"
   },
   "engines": {
-    "vscode": "^1.85.0"
+    "vscode": "^1.85.0",
+    "node": ">=22"
   },
   "capabilities": {
     "untrustedWorkspaces": {
@@ -403,7 +404,10 @@
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "type-check": "tsc --noEmit",
-    "test": "node -c src/webview/main.js && node -c src/webview/cheatsheet.js && node -c src/webview/discovery.js && tsc -p tsconfig.test.json && node --test out-test/test/**/*.test.js",
+    "test": "node -c src/webview/main.js && node -c src/webview/cheatsheet.js && node -c src/webview/discovery.js && npm run test:compile && node --test \"out-test/test/**/*.test.js\"",
+    "test:compile": "node scripts/vider-out-test.js && tsc -p tsconfig.test.json",
+    "test:antigravity": "npm run test:compile && node --test \"out-test/test/antigravity-*.test.js\"",
+    "test:common": "npm run test:compile && node --test \"out-test/test/common-*.test.js\"",
     "test:deploy-antigravity": "tsc -p tsconfig.test.json && node test/scenarios/scripts/runner.js antigravity",
     "test:deploy-claude": "tsc -p tsconfig.test.json && node test/scenarios/scripts/runner.js claude-code",
     "test:deploy-all": "tsc -p tsconfig.test.json && node test/scenarios/scripts/runner.js all",
