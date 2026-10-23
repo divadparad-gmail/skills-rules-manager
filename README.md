@@ -228,13 +228,13 @@ Le projet est couvert par une suite de tests unitaires automatisés validant la 
 npm test          # contrôle syntaxique des vues, compilation et tests unitaires
 npm run test:antigravity # seulement les tests propres à Antigravity (test/antigravity-*.test.ts)
 npm run test:claude      # seulement les tests propres à Claude Code (test/claude-*.test.ts)
-npm run test:common      # seulement les tests communs aux deux outils (test/common-*.test.ts)
+npm run test:common      # seulement les tests communs aux deux outils (test/common-*.test.ts et .test.js)
 npm run type-check # vérification de types stricte, sans émission
 npm run bundle     # paquet de production esbuild (dist/extension.js)
 npm run package    # archive .vsix distribuable
 ```
 
-Les scripts de test demandent Node 22 ou plus récent (`engines.node`), car `node --test` ne développe les motifs de fichiers que depuis Node 21. Cette exigence ne concerne que le développement : l'extension s'exécute avec le Node intégré à VS Code. Chaque script de test vide `out-test/` avant de compiler, pour qu'un test renommé ne laisse pas d'ancienne copie exécutée en double.
+Les scripts de test demandent Node 22 ou plus récent (`engines.node`), car `node --test` ne développe les motifs de fichiers que depuis Node 21. Cette exigence ne concerne que le développement : l'extension s'exécute avec le Node intégré à VS Code. Chaque script de test vide `out-test/` avant de compiler, pour qu'un test renommé ne laisse pas d'ancienne copie exécutée en double. Les tests écrits en JavaScript (`test/*.test.js`, ceux du skill wf-hook) ne sont pas compilés : ils sont lancés depuis `test/`, et ils demandent Windows et Git Bash.
 
 ---
 

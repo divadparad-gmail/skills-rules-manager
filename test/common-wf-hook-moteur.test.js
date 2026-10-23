@@ -16,6 +16,7 @@
  */
 
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const assert = require('assert');
 const { execSync, spawnSync } = require('child_process');
@@ -36,7 +37,8 @@ const {
   removeManagedHook
 } = require(path.join(SKILL_SCRIPTS, 'hook-manager'));
 
-const TEST_DIR = path.join(__dirname, 'temp_hooks_unified_test');
+// Dossier de travail dans le dossier temporaire du système, jamais dans le dépôt
+const TEST_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'wf-hook-moteur-'));
 
 function setup() {
   if (fs.existsSync(TEST_DIR)) {
@@ -78,10 +80,25 @@ function getShellPath() {
   return 'sh';
 }
 
+// Ces épreuves exigent Windows (runner-antigravity.cmd) et Git Bash (shell des hooks de Claude Code) :
+// ailleurs, le test est ignoré avec sa raison au lieu d'échouer.
+const raisonAbandon =
+  process.platform !== 'win32'
+    ? 'Windows requis : l\'épreuve du runner-antigravity.cmd ne s\'exécute que sous Windows.'
+    : getShellPath() === 'sh'
+      ? 'Git Bash introuvable : la commande installée dans settings.json est lancée par le shell des hooks de Claude Code.'
+      : null;
+if (raisonAbandon) {
+  fs.rmSync(TEST_DIR, { recursive: true, force: true });
+  require('node:test').test('Skill wf-hook : tests unifiés du moteur', { skip: raisonAbandon }, () => {});
+  return;
+}
+
 console.log('--- 🧪 Démarrage des tests unifiés du skill wf-hook ---');
-setup();
 
 try {
+  setup();
+
   // =========================================================================
   // 1. Tests de rule-synthesizer : Les 4 types de règles
   // =========================================================================

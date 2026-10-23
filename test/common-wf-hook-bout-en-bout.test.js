@@ -20,6 +20,7 @@
  */
 
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const assert = require('assert');
 const { execSync, spawnSync } = require('child_process');
@@ -34,7 +35,8 @@ const {
   removeManagedHook
 } = require(path.join(SKILL_SCRIPTS, 'hook-manager'));
 
-const SANDBOX_DIR = path.join(__dirname, 'sandbox-e2e');
+// Bac à sable dans le dossier temporaire du système, jamais dans le dépôt
+const SANDBOX_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'wf-hook-e2e-'));
 
 function setupSandbox() {
   if (fs.existsSync(SANDBOX_DIR)) {
@@ -57,13 +59,47 @@ function cleanSandbox() {
   }
 }
 
+function getShellPath() {
+  const standardPaths = [
+    'C:\\Program Files\\Git\\bin\\bash.exe',
+    'C:\\Program Files\\Git\\bin\\sh.exe',
+    'C:\\Program Files\\Git\\usr\\bin\\bash.exe'
+  ];
+  for (const p of standardPaths) {
+    if (fs.existsSync(p)) return p;
+  }
+  try {
+    const gitExec = execSync('git --exec-path', { encoding: 'utf8' }).trim();
+    const gitRoot = gitExec.replace(/[\/\\](ucrt64|mingw64|usr|libexec)[\s\S]*$/i, '');
+    const b = path.join(gitRoot, 'bin', 'bash.exe');
+    if (fs.existsSync(b)) return b;
+    const s = path.join(gitRoot, 'bin', 'sh.exe');
+    if (fs.existsSync(s)) return s;
+  } catch {}
+  return 'sh';
+}
+
+// Ces épreuves exigent Windows (runner-antigravity.cmd) et Git Bash (shell des hooks de Claude Code) :
+// ailleurs, le test est ignoré avec sa raison au lieu d'échouer.
+const raisonAbandon =
+  process.platform !== 'win32'
+    ? 'Windows requis : l\'épreuve du runner-antigravity.cmd ne s\'exécute que sous Windows.'
+    : getShellPath() === 'sh'
+      ? 'Git Bash introuvable : la commande installée dans settings.json est lancée par le shell des hooks de Claude Code.'
+      : null;
+if (raisonAbandon) {
+  fs.rmSync(SANDBOX_DIR, { recursive: true, force: true });
+  require('node:test').test('Skill wf-hook : banc d\'essai de bout en bout (jalon 3)', { skip: raisonAbandon }, () => {});
+  return;
+}
+
 console.log('=================================================================');
 console.log('🚀 DÉMARRAGE DU BANC D\'ESSAI RÉEL JALON 3 (Preuves de Bout en Bout)');
 console.log('=================================================================\n');
 
-setupSandbox();
-
 try {
+  setupSandbox();
+
   // ---------------------------------------------------------------------------
   // ÉTAPE 1 : Synthèse des scripts validateurs dans le bac à sable
   // ---------------------------------------------------------------------------
@@ -168,26 +204,6 @@ try {
   }
   assert.strictEqual(cleanSuccess, true, 'Le commit propre et conforme DOIT réussir');
   console.log('  ✅ Épreuve 2.3 réussie : git commit propre et conventionnel autorisé sans encombre.\n');
-
-function getShellPath() {
-  const standardPaths = [
-    'C:\\Program Files\\Git\\bin\\bash.exe',
-    'C:\\Program Files\\Git\\bin\\sh.exe',
-    'C:\\Program Files\\Git\\usr\\bin\\bash.exe'
-  ];
-  for (const p of standardPaths) {
-    if (fs.existsSync(p)) return p;
-  }
-  try {
-    const gitExec = execSync('git --exec-path', { encoding: 'utf8' }).trim();
-    const gitRoot = gitExec.replace(/[\/\\](ucrt64|mingw64|usr|libexec)[\s\S]*$/i, '');
-    const b = path.join(gitRoot, 'bin', 'bash.exe');
-    if (fs.existsSync(b)) return b;
-    const s = path.join(gitRoot, 'bin', 'sh.exe');
-    if (fs.existsSync(s)) return s;
-  } catch {}
-  return 'sh';
-}
 
   // ---------------------------------------------------------------------------
   // ÉTAPE 3 : Épreuve Claude Code de bout en bout (Commande installée dans settings.json)
