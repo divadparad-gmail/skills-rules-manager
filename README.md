@@ -227,6 +227,7 @@ Le projet est couvert par une suite de tests unitaires automatisés validant la 
 ```bash
 npm test          # contrôle syntaxique des vues, compilation et tests unitaires
 npm run test:antigravity # seulement les tests propres à Antigravity (test/antigravity-*.test.ts)
+npm run test:claude      # seulement les tests propres à Claude Code (test/claude-*.test.ts)
 npm run test:common      # seulement les tests communs aux deux outils (test/common-*.test.ts)
 npm run type-check # vérification de types stricte, sans émission
 npm run bundle     # paquet de production esbuild (dist/extension.js)
