@@ -10,6 +10,7 @@ import { createDiscoveryContainer } from './common/container';
 import { extensionEventBus } from './common/ExtensionEventBus';
 import { DiscoveryViewProvider } from './ui/DiscoveryViewProvider';
 import { EnvironmentStatusBar } from './ui/EnvironmentStatusBar';
+import { registerBancEssai } from './ui/bancEssaiCommandes';
 import {
   DISCOVERY_ENABLED_SETTING,
   isDiscoveryEnabled,
@@ -106,6 +107,10 @@ export function activate(context: vscode.ExtensionContext): void {
   soulWatcher.onDidCreate(() => StateManager.requestDebouncedReload(350));
   soulWatcher.onDidDelete(() => StateManager.requestDebouncedReload(350));
   context.subscriptions.push(soulWatcher);
+
+  // 6b. Banc d'essai : commande « Vider et restaurer », barre d'état, observateur du manifeste et
+  // de la sauvegarde, avertissement au démarrage tant qu'un banc est déployé ou inachevé
+  registerBancEssai(context);
 
   // 7. Module « Découverte & Intégration » : conteneur d'injection de
   // dépendances, vue dédiée, badge d'environnement et accélérateurs clavier.

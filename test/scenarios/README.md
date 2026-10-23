@@ -63,6 +63,16 @@ Dans la boîte **🧪 Banc d'Essai (Scénarios)** sous le guide complet :
 - **⚡ Tous** : Déploie les deux environnements pour tester le commutateur d'outil, ainsi que la règle `rule-test-doublon.md` dans le profil global d'Antigravity.
 - **🧹 Vider** : Supprime les fixtures intactes et restaure les vrais fichiers sauvegardés.
 
+Avant de déployer, une fenêtre liste les vrais fichiers qui seront sauvegardés puis remplacés, et les fichiers déjà identiques à leur fixture. Si un banc est déjà déployé, l'extension propose « Vider et redéployer ». Une fixture modifiée pendant le test n'est jamais écrasée sans la fenêtre « Écraser et restaurer », qui en donne la liste.
+
+Tant que le banc est déployé, ou qu'une opération est inachevée, l'extension l'indique :
+
+- dans la barre d'état (« ⚠️ Banc d'essai actif » ou « ⛔ Banc d'essai interrompu ») ;
+- par un bandeau en haut de la barre latérale et du Grand Dashboard, avec un bouton « Vider et restaurer » ;
+- par un avertissement au démarrage, qui propose de vider le banc.
+
+La commande « Skills & Rules Manager: Vider le banc d'essai et restaurer les originaux » fait la même chose depuis la palette.
+
 ### En Ligne de Commande (CLI)
 ```bash
 npm run test:deploy-antigravity

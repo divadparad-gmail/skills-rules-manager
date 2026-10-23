@@ -281,6 +281,16 @@
     });
   }
 
+  // Bouton « Vider et restaurer » du bandeau (barre latérale et Grand Dashboard)
+  const btnBancEssaiVider = document.getElementById('btnBancEssaiVider');
+  if (btnBancEssaiVider) {
+    btnBancEssaiVider.addEventListener('click', () => {
+      vscode.postMessage({
+        type: 'cleanScenarios',
+      });
+    });
+  }
+
   // =========================================================================
   // Contrôle Chronomètre & Diagnostic Anti-Lag (Banc d'Essai)
   // =========================================================================
@@ -333,6 +343,7 @@
 
     renderHeaderStats(currentState);
     renderTimingConsole(currentState);
+    renderBancEssaiBanner(currentState);
 
     // La barre latérale reste un résumé (statistiques d'en-tête) : seules les colonnes du Grand
     // Dashboard affichent les cartes
@@ -340,6 +351,27 @@
     if (isDashboard) {
       renderDashboard(currentState);
     }
+  }
+
+  // Bandeau du banc d'essai : textes calculés par l'extension (src/ui/bancEssaiPresentation.ts)
+  function renderBancEssaiBanner(state, doc) {
+    const targetDoc = doc || (typeof document !== 'undefined' ? document : null);
+    if (!targetDoc) return;
+    const banner = targetDoc.getElementById('bancEssaiBanner');
+    const titre = targetDoc.getElementById('bancEssaiBannerTitre');
+    const detail = targetDoc.getElementById('bancEssaiBannerDetail');
+    if (!banner || !titre || !detail) return;
+
+    const banc = state && state.bancEssai;
+    if (!banc || !banc.visible) {
+      banner.style.display = 'none';
+      return;
+    }
+    banner.className = `status-banner ${banc.niveau === 'interrompu' ? 'status-danger' : 'status-warning'} banc-essai-banner`;
+    banner.title = banc.infobulle || '';
+    titre.textContent = banc.titre;
+    detail.textContent = banc.detail;
+    banner.style.display = 'flex';
   }
 
   function renderTimingConsole(state) {
@@ -2687,6 +2719,7 @@
       createItemCard,
       describeSizeAdvice,
       renderDynamicCosts,
+      renderBancEssaiBanner,
       localRulesHeaderCount,
       updateBulkControl,
       setFilterState: (state) => {

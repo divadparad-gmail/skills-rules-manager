@@ -1359,6 +1359,23 @@ input:checked + .slider:before {
   color: #e57373;
 }
 
+/* Bandeau du banc d'essai (barre latérale et Grand Dashboard) */
+.banc-essai-banner {
+  justify-content: space-between;
+  margin-top: 8px;
+}
+
+.banc-essai-banner-texte {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.banc-essai-banner .btn {
+  flex-shrink: 0;
+}
+
 /* Empty states */
 .empty-state {
   display: flex;

@@ -13,6 +13,7 @@ import { IntegrityService } from './IntegrityService';
 import { DeleteService } from './DeleteService';
 import { DuplicateService } from './DuplicateService';
 import { ScenarioManager } from './ScenarioManager';
+import { presenterBanc } from '../ui/bancEssaiPresentation';
 import { applyAntigravityIndexHeaders } from './antigravityBootCost';
 import { computeAntigravityDynamicCosts } from './antigravityDynamicCosts';
 import { readAntigravityHooks } from './antigravityHooks';
@@ -287,6 +288,7 @@ export class StateManager {
       ...(localResult.antigravityParents ? { antigravityParents: localResult.antigravityParents } : {}),
       antigravityBehavior: { version: ANTIGRAVITY_TESTED_VERSION, testedOn: ANTIGRAVITY_TESTED_ON },
       userHome: getUserHome(),
+      ...(workspace.workspacePath ? { bancEssai: presenterBanc(ScenarioManager.lireEtat(workspace.workspacePath)) } : {}),
     };
 
     const scanTotalMs = Math.round(performance.now() - scanStartTime);

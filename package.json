@@ -89,6 +89,12 @@
         "category": "Skills & Rules Manager"
       },
       {
+        "command": "skillsRulesManager.viderBancEssai",
+        "title": "Vider le banc d'essai et restaurer les originaux",
+        "category": "Skills & Rules Manager",
+        "icon": "$(beaker)"
+      },
+      {
         "command": "antigravity.discovery.focusSearch",
         "title": "Rechercher une compétence, une règle, un workflow ou un hook",
         "category": "Anti-Gravity",

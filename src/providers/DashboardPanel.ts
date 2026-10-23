@@ -5,7 +5,7 @@ import { WebviewMessage } from '../types';
 import { StateManager } from '../services/StateManager';
 import { WorkspaceDetector } from '../services/WorkspaceDetector';
 import { NasScanner } from '../services/NasScanner';
-import { ScenarioManager } from '../services/ScenarioManager';
+import { COMMANDE_VIDER_BANC } from '../ui/bancEssaiVsCode';
 import { CheatSheetPanel } from './CheatSheetPanel';
 
 export class DashboardPanel {
@@ -182,29 +182,8 @@ export class DashboardPanel {
           }
 
           case 'cleanScenarios': {
-            const rootPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-            if (rootPath) {
-              try {
-                const choice = await vscode.window.showWarningMessage(
-                  "Êtes-vous sûr de vouloir réinitialiser les scénarios d'essai du Banc d'Essai ? Les fixtures intactes seront supprimées et les vrais fichiers sauvegardés seront restaurés.",
-                  { modal: true },
-                  'Nettoyer'
-                );
-                if (choice !== 'Nettoyer') {
-                  break;
-                }
-
-                const rapport = await ScenarioManager.clean(rootPath);
-                if (rapport.signales.length > 0) {
-                  vscode.window.showWarningMessage(ScenarioManager.resumerVidage(rapport));
-                } else {
-                  vscode.window.showInformationMessage(ScenarioManager.resumerVidage(rapport));
-                }
-                await StateManager.loadFullState(true);
-              } catch (err: unknown) {
-                vscode.window.showErrorMessage(`Erreur de nettoyage : ${ScenarioManager.decrireErreur(err)}`);
-              }
-            }
+            // Bandeau du banc d'essai : même commande que la barre latérale et la barre d'état
+            await vscode.commands.executeCommand(COMMANDE_VIDER_BANC);
             break;
           }
 

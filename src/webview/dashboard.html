@@ -34,6 +34,15 @@
     </div>
   </div>
 
+  <!-- Bandeau du banc d'essai : visible tant que le banc est déployé ou qu'une opération est inachevée -->
+  <div id="bancEssaiBanner" class="status-banner status-warning banc-essai-banner" role="alert" style="display: none; margin: 0 10px 8px 10px;">
+    <div class="banc-essai-banner-texte">
+      <strong id="bancEssaiBannerTitre"></strong>
+      <span id="bancEssaiBannerDetail"></span>
+    </div>
+    <button type="button" id="btnBancEssaiVider" class="btn btn-secondary btn-sm" title="Supprime les fixtures intactes et restaure les vrais fichiers sauvegardés">Vider et restaurer</button>
+  </div>
+
   <!-- Grand Cadre : Budget Mémoire Contexte (Pleine Largeur) -->
   <div class="token-gauge-container dashboard-gauge-full">
     <div class="token-gauge-header">

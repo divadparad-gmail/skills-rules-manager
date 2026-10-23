@@ -3,6 +3,8 @@
  * Aucune utilisation de 'any' n'est autorisée.
  */
 
+import type { PresentationBanc } from '../ui/bancEssaiPresentation';
+
 export type ResourceType = 'soul' | 'skill' | 'workflow' | 'rule';
 
 export type ResourceScope = 'nas' | 'global' | 'local';
@@ -297,6 +299,8 @@ export interface ManagerFullState {
   isDebugTiming?: boolean;
   lastTimingLog?: string | null;
   timingHistory?: string[];
+  /** Bandeau du banc d'essai, affiché tant que le banc est déployé ou qu'une opération est inachevée. */
+  bancEssai?: PresentationBanc;
 }
 
 // --------------------------------------------------------------------------

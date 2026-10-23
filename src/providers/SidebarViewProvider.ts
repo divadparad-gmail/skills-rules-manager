@@ -6,7 +6,9 @@ import { StateManager } from '../services/StateManager';
 import { WorkspaceDetector } from '../services/WorkspaceDetector';
 import { NasScanner } from '../services/NasScanner';
 import { CheatSheetPanel } from './CheatSheetPanel';
-import { ScenarioManager, ScenarioTarget } from '../services/ScenarioManager';
+import { ScenarioTarget } from '../services/ScenarioManager';
+import { deployerBancEssai } from '../ui/bancEssaiParcours';
+import { COMMANDE_VIDER_BANC, interfaceVsCode } from '../ui/bancEssaiVsCode';
 
 export class SidebarViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'skillsRulesManagerView';
@@ -173,18 +175,15 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
           const target = (message.payload?.target as ScenarioTarget) || 'all';
           const rootPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
           if (rootPath) {
-            try {
-              const rapport = await ScenarioManager.deploy(rootPath, target);
-              vscode.window.showInformationMessage(ScenarioManager.resumerDeploiement(rapport));
+            // Banc actif, fixtures modifiées et vrais fichiers remplacés : chaque cas passe par sa fenêtre
+            if (await deployerBancEssai(rootPath, target, interfaceVsCode)) {
               if (target === 'antigravity') {
                 WorkspaceDetector.setOverriddenTool('antigravity');
               } else if (target === 'claude-code') {
                 WorkspaceDetector.setOverriddenTool('claude-code');
               }
-              await StateManager.loadFullState(true);
-            } catch (err: unknown) {
-              vscode.window.showErrorMessage(`Erreur de déploiement : ${ScenarioManager.decrireErreur(err)}`);
             }
+            await StateManager.loadFullState(true);
           } else {
             vscode.window.showWarningMessage("Veuillez ouvrir un dossier d'espace de travail.");
           }
@@ -192,29 +191,7 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
         }
 
         case 'cleanScenarios': {
-          const rootPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-          if (rootPath) {
-            try {
-              const choice = await vscode.window.showWarningMessage(
-                "Êtes-vous sûr de vouloir réinitialiser les scénarios d'essai du Banc d'Essai ? Les fixtures intactes seront supprimées et les vrais fichiers sauvegardés seront restaurés.",
-                { modal: true },
-                'Nettoyer'
-              );
-              if (choice !== 'Nettoyer') {
-                break;
-              }
-
-              const rapport = await ScenarioManager.clean(rootPath);
-              if (rapport.signales.length > 0) {
-                vscode.window.showWarningMessage(ScenarioManager.resumerVidage(rapport));
-              } else {
-                vscode.window.showInformationMessage(ScenarioManager.resumerVidage(rapport));
-              }
-              await StateManager.loadFullState(true);
-            } catch (err: unknown) {
-              vscode.window.showErrorMessage(`Erreur de nettoyage : ${ScenarioManager.decrireErreur(err)}`);
-            }
-          }
+          await vscode.commands.executeCommand(COMMANDE_VIDER_BANC);
           break;
         }
 
