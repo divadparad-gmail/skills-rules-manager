@@ -71,8 +71,18 @@ const CANARY_PATTERN = /CANARI-[A-Z0-9][A-Z0-9-]*/g;
 const CANARY_REPORT_PATTERN = /CANARI-[A-Z0-9-]+/gi;
 /** Guillemets droits et typographiques, apostrophes et accents graves retirés de S11. */
 const QUOTES_PATTERN = /["'`“”«»‘’]/g;
-/** Chemins absolus vers un dossier utilisateur (Windows, macOS, Linux) : à caviarder avant tout commit. */
-const CHEMINS_UTILISATEUR = [/[A-Za-z]:[\\/]+Users[\\/]+[^\\/<\s]+/i, /\/(home|Users)\/[^\/<\s]+/];
+/**
+ * Chemins à caviarder avant tout commit : tout chemin de lecteur (`C:\…`, `file:///c:/…`), tout chemin
+ * réseau (`\\serveur\…`, qui révèle un nom d'hôte), tout dossier utilisateur macOS ou Linux, et tout
+ * chemin du dossier personnel (`~`, `<HOME>`, `%USERPROFILE%`, `$HOME`) hors de la liste blanche
+ * `.gemini` et `.claude`. Les antislashs peuvent être doublés, comme dans un fichier JSON.
+ */
+const CHEMINS_UTILISATEUR = [
+  /(?:^|[^A-Za-z0-9])[A-Za-z]:(?:\\|\/)/,
+  /(?:^|[\s"'`(])(?:\\\\){1,2}[A-Za-z0-9][\w.-]*\\{1,2}\S/,
+  /\/(home|Users)\/[^\/<\s]+/,
+  /(?:~|<HOME>|%USERPROFILE%|\$HOME|\$\{HOME\}|\$env:USERPROFILE)(?:\\{1,2}|\/)(?!\.(?:gemini|claude)(?:[\\/"'\s`]|$))[^\s"'`]/i,
+];
 /** Seuls les rapports nommés AAAA-MM-JJ-HHMM.json sont sélectionnés automatiquement. */
 const RAPPORT_NOM = /^\d{4}-\d{2}-\d{2}-\d{4}\.json$/;
 const ETAPES = ['E0', 'E1', 'E2', 'E3', 'E4', 'E5', 'E6', 'E7', 'E8', 'E9'];
@@ -225,7 +235,7 @@ const choisirRapport = (dir: string): { rapport: string | null; ignores: string[
   };
 };
 
-/** Numéros des lignes qui contiennent un chemin absolu vers un dossier utilisateur. */
+/** Numéros des lignes qui contiennent un chemin à caviarder (voir CHEMINS_UTILISATEUR). */
 const lignesAvecCheminUtilisateur = (texte: string): number[] =>
   texte.split(/\r?\n/).flatMap((ligne, i) => (CHEMINS_UTILISATEUR.some((re) => re.test(ligne)) ? [i + 1] : []));
 
@@ -417,7 +427,8 @@ describe('Suite de Tests : Injection de contexte Antigravity (intégrité des fi
     versionRenseignee.meta!.version_antigravity = '2.5.5';
     assert.deepStrictEqual(avertissementsRapport(versionRenseignee), [], 'Une vraie version ne donne aucun avertissement');
 
-    // Point 6 : chemins absolus vers un dossier utilisateur, détectés quelle que soit leur forme
+    // Point 6 : chemins personnels, de lecteur ou réseau, détectés quelle que soit leur forme ;
+    // dans le dossier personnel, seuls .gemini et .claude sont permis (liste blanche)
     const fuite = [
       '{ "S12": "C:\\\\Users\\\\jdupont\\\\.gemini\\\\builtin" }',
       'aucun chemin ici',
@@ -425,21 +436,38 @@ describe('Suite de Tests : Injection de contexte Antigravity (intégrité des fi
       'D:\\Users\\jdupont',
       '/home/jdupont/.gemini',
       'Chemin : /Users/jdupont/Documents',
+      '"~/Documents/projet-fictif/.agents/rules/regle.md",',
+      '~\\Documents\\projet-fictif',
+      '<HOME>/Desktop/notes.md',
+      '"\\\\\\\\serveur\\\\partage\\\\catalogue"',
+      '\\\\serveur\\partage\\catalogue',
+      'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
+      'C:\\Users\\<HOME>',
+      'E:/sauvegardes/rapport.json',
+      '%USERPROFILE%\\Documents\\projet-fictif',
+      '$HOME/projets/fictif',
+      '~/.geminifictif/x',
     ].join('\n');
-    assert.deepStrictEqual(lignesAvecCheminUtilisateur(fuite), [1, 3, 4, 5, 6]);
+    assert.deepStrictEqual(lignesAvecCheminUtilisateur(fuite), [1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]);
     const propre = [
       '<HOME>\\.gemini\\antigravity-ide\\builtin\\skills\\',
       '<PROJET>/sandbox-enquete/app.ts',
       'file:///<PROJET>/.agents/rules/zz-model.md',
       '~/.gemini/antigravity-ide/builtin/skills/',
+      '"S12": "~/.gemini/antigravity/builtin/skills"',
+      '~\\.gemini\\config\\rules\\regle.md',
+      '~/.claude/rules/regle.md',
+      '"~/.gemini/GEMINI.md",',
       'sandbox-enquete/sous/module.ts',
-      'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
-      'C:\\Users\\<HOME>',
+      '"sandbox-enquete\\\\sous\\\\module.ts"',
+      '"date": "2026-10-28T13:41"',
+      'Voir https://antigravity.google/docs/rules',
+      '≈ ~20 tokens au démarrage',
     ].join('\n');
     assert.deepStrictEqual(lignesAvecCheminUtilisateur(propre), []);
   });
 
-  test('8. Confidentialité : aucun chemin absolu vers un dossier utilisateur dans resultats/ ni historique/', () => {
+  test('8. Confidentialité : aucun chemin personnel, de lecteur ou réseau dans resultats/ ni historique/', () => {
     const fuites: string[] = [];
     for (const dossier of ['resultats', 'historique']) {
       const abs = path.join(SUITE, dossier);
@@ -453,7 +481,7 @@ describe('Suite de Tests : Injection de contexte Antigravity (intégrité des fi
     assert.deepStrictEqual(
       fuites,
       [],
-      `Chemin absolu vers un dossier utilisateur : caviarder avant de commiter.\n${fuites.map((f) => `- ${f}`).join('\n')}`
+      `Chemin personnel, de lecteur ou réseau : caviarder avant de commiter.\n${fuites.map((f) => `- ${f}`).join('\n')}`
     );
   });
 });
