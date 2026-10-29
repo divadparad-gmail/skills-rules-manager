@@ -154,6 +154,7 @@ describe('Suite de Tests : profil de comportement d\'Antigravity (chantier 2.6.0
       pluginSectionHeader: true,
       truncation: 'byte',
       globInjected: true,
+      workspaceAgentRuleDirs: ['.agents', '.agent'],
     });
     assert.deepStrictEqual(PROFIL_260, {
       id: '2.6.0',
@@ -167,6 +168,7 @@ describe('Suite de Tests : profil de comportement d\'Antigravity (chantier 2.6.0
       pluginSectionHeader: false,
       truncation: 'line-end',
       globInjected: false,
+      workspaceAgentRuleDirs: ['.agents', '.agent', '_agent', '_agents'],
     });
     assert.strictEqual(ANTIGRAVITY_TESTED_VERSION, 'Antigravity IDE 2.5.5');
     assert.strictEqual(ANTIGRAVITY_TESTED_ON, '2026-10-21');
@@ -271,7 +273,7 @@ describe('Suite de Tests : profil de comportement d\'Antigravity (chantier 2.6.0
     assert.strictEqual(reglage.scope, 'machine', 'Portée machine : un dépôt ne peut pas fixer le profil');
   });
 
-  test('8. Neutralité du défaut : sans profil = profil 2.5.5 ; le profil 2.6.0 ne change que les points des lots L4, L6 et L7', async () => {
+  test('8. Neutralité du défaut : sans profil = profil 2.5.5 ; le profil 2.6.0 ne change que les points des lots L4, L6, L7 et L8', async () => {
     const gemini = path.join(tempBaseDir, 'neutralite', '.gemini');
     const globalDir = path.join(gemini, 'config');
     const skill = (nom: string) => `---\nname: ${nom}\ndescription: Skill ${nom}.\n---\n# ${nom}\n`;
@@ -313,7 +315,8 @@ describe('Suite de Tests : profil de comportement d\'Antigravity (chantier 2.6.0
     assert.deepStrictEqual(await McpScanner.scanLocal(workspace, PROFIL_255), reference.mcpLocal, 'McpScanner local, profil 2.5.5');
 
     // Profil 2.6.0 : seuls les skills intégrés, l'ancien emplacement global et le cache MCP (lot L4),
-    // le skill de plugin, compté une seule fois (lot L6), et la règle glob, sans effet (lot L7), changent
+    // le skill de plugin, compté une seule fois (lot L6), la règle glob, sans effet (lot L7), et les
+    // règles des variantes comme _agents/rules/ (lot L8) changent
     const global260 = await GlobalScanner.scan(globalDir, 'antigravity', PROFIL_260);
     const sansL4L6 = (items: typeof global260.items) =>
       items.filter((i) => !i.metadata?.builtin && i.metadata?.rawId !== 'ancien-global' && !i.metadata?.pluginName && i.metadata?.trigger !== 'glob');
@@ -327,7 +330,16 @@ describe('Suite de Tests : profil de comportement d\'Antigravity (chantier 2.6.0
     assert.strictEqual(reference.global.items.find((i) => i.id === 'motif')?.metadata?.antigravityStatus, 'active');
     assert.strictEqual(global260.rulesStat.tokenCount, reference.global.rulesStat.tokenCount, 'Le coût des règles au démarrage ne change pas');
     assert.deepStrictEqual(global260.soulStat, reference.global.soulStat, 'Les âmes ne changent pas');
-    assert.deepStrictEqual(await LocalScanner.scan(workspace, PROFIL_260), reference.local, 'LocalScanner ne lit pas encore le profil');
+    const local260 = await LocalScanner.scan(workspace, PROFIL_260);
+    assert.ok(!reference.local.items.some((i) => i.id === '_agents/variante'), 'Profil 2.5.5 : _agents/ ignoré (D-8)');
+    assert.deepStrictEqual(
+      local260.items.filter((i) => i.id !== '_agents/variante'),
+      reference.local.items,
+      'Les autres éléments locaux ne changent pas'
+    );
+    const variante260 = local260.items.find((i) => i.id === '_agents/variante')!;
+    assert.ok(variante260, 'Profil 2.6.0 : _agents/rules/ lu (lot L8)');
+    assert.strictEqual(variante260.metadata?.unverifiedVariantRule, 'cohabitation');
     const mcp260 = await McpScanner.scanGlobal(globalDir, 'antigravity', PROFIL_260);
     assert.deepStrictEqual(mcp260.mcpServers!.map((s) => s.toolCount), [2], 'Cache antigravity/mcp');
     assert.deepStrictEqual(reference.mcpGlobal.mcpServers!.map((s) => s.toolCount), [1], 'Cache antigravity-ide/mcp');

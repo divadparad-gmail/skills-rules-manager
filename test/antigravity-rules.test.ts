@@ -346,4 +346,164 @@ describe('Suite de Tests : Règles Antigravity conformes à la documentation off
     assert.match(copie.warnings.join(' '), /ne l'injecte jamais/);
     assert.deepStrictEqual(ensureAntigravityTrigger(dejaGlob, ANTIGRAVITY_PROFILES['2.5.5']).warnings, []);
   });
+
+  // Chantier 2.6.0, lot L8 : variantes .agent, _agent et _agents (D-8, D-9, D-20, phase 2c)
+  test('14. Lot L8 : variantes .agent, _agent et _agents par profil, ordre observé, cohabitation et D-9', async () => {
+    const skillContent = (nom: string) => `---\nname: ${nom}\ndescription: Skill ${nom}.\n---\n# ${nom}\n`;
+
+    // 1a. Seulement .agent/ (agentsDir = '.agent') : en 2.5.5 ET en 2.6.0, même ordre, mêmes
+    // identifiants sans préfixe pour .agent/rules/ (comme avant L8), mêmes statuts, sans badge
+    const seulPointAgent = path.join(tempBaseDir, 'variantes-seul-point-agent');
+    await writeFile(path.join(seulPointAgent, '.agent', 'rules', 'r-un.md'), '---\ntrigger: always_on\ndescription: R1\n---\n# R1');
+    const pointAgent255 = await LocalScanner.scan(workspaceFor(seulPointAgent, '.agent'), ANTIGRAVITY_PROFILES['2.5.5']);
+    const pointAgent260 = await LocalScanner.scan(workspaceFor(seulPointAgent, '.agent'), ANTIGRAVITY_PROFILES['2.6.0']);
+    assert.deepStrictEqual(pointAgent255.items.map((i) => i.id), ['r-un'], 'En 2.5.5, .agent/ seul donne l\'identifiant sans préfixe');
+    assert.deepStrictEqual(pointAgent260.items.map((i) => i.id), ['r-un'], 'En 2.6.0, l\'identifiant reste stable');
+    assert.strictEqual(pointAgent255.items[0].metadata?.antigravityStatus, 'active');
+    assert.strictEqual(pointAgent260.items[0].metadata?.antigravityStatus, 'active');
+    assert.strictEqual(pointAgent255.items[0].metadata?.unverifiedVariantRule, undefined);
+    assert.strictEqual(pointAgent260.items[0].metadata?.unverifiedVariantRule, undefined);
+    assert.deepStrictEqual(pointAgent260, pointAgent255, 'Projet n\'ayant que .agent/ : résultat identique dans les deux profils');
+
+    // 1b. Seulement _agent/ et _agents/ (agentsDir = null) : en 2.5.5, rien n'est lu (D-8) ;
+    // en 2.6.0, les deux sont lus dans l'ordre _agent, _agents, sans badge pour les règles always_on
+    const sansAgents = path.join(tempBaseDir, 'variantes-sans-agents');
+    await writeFile(path.join(sansAgents, '_agents', 'rules', 'r-trois.md'), '---\ntrigger: always_on\ndescription: R3\n---\n# R3');
+    await writeFile(path.join(sansAgents, '_agent', 'rules', 'r-deux.md'), '---\ntrigger: always_on\ndescription: R2\n---\n# R2');
+    await writeFile(path.join(sansAgents, '_agent', 'skills', 's-ignore-1', 'SKILL.md'), skillContent('s-ignore-1'));
+    await writeFile(path.join(sansAgents, '_agents', 'skills', 's-ignore-2', 'SKILL.md'), skillContent('s-ignore-2'));
+
+    const sans255 = await LocalScanner.scan(workspaceFor(sansAgents, null), ANTIGRAVITY_PROFILES['2.5.5']);
+    assert.deepStrictEqual(sans255.items.filter((i) => i.type === 'rule'), [], 'Profil 2.5.5 : aucune règle lue sous _agent/ ni _agents/ (D-8)');
+    assert.deepStrictEqual(sans255.items.filter((i) => i.type === 'skill'), [], 'Profil 2.5.5 : aucun skill sous _agent/ ou _agents/ (D-9)');
+
+    const sans260 = await LocalScanner.scan(workspaceFor(sansAgents, null), ANTIGRAVITY_PROFILES['2.6.0']);
+    const reglesSans260 = sans260.items.filter((i) => i.type === 'rule');
+    assert.deepStrictEqual(
+      reglesSans260.map((i) => i.id),
+      ['_agent/r-deux', '_agents/r-trois'],
+      'Ordre observé en phase 2c : _agent, _agents'
+    );
+    assert.ok(
+      reglesSans260.every((i) => i.metadata?.unverifiedVariantRule === undefined),
+      'Sans .agents/, les règles always_on des variantes sont observées en 2.6.0 : aucune marque non vérifiée'
+    );
+    assert.strictEqual(sans260.rulesStat.permanentCount, 2);
+    assert.strictEqual(sans260.rulesStat.activeCount, 2);
+    assert.deepStrictEqual(sans260.items.filter((i) => i.type === 'skill'), [], 'D-9 : aucun skill lu sous _agent/skills/ ni _agents/skills/');
+
+    // Avec les trois variantes (.agent, _agent, _agents) sans .agents/ : ordre .agent, _agent, _agents
+    // et une règle non always_on porte unverifiedVariantRule: 'non-always-on'
+    await writeFile(path.join(sansAgents, '.agent', 'rules', 'r-un.md'), '---\ntrigger: always_on\ndescription: R1\n---\n# R1');
+    await writeFile(
+      path.join(sansAgents, '_agent', 'rules', 'r-cond.md'),
+      '---\ntrigger: model_decision\ndescription: Conditionnelle dans variante\n---\n# Cond'
+    );
+    const troisVariantes260 = await LocalScanner.scan(workspaceFor(sansAgents, null), ANTIGRAVITY_PROFILES['2.6.0']);
+    assert.deepStrictEqual(
+      troisVariantes260.items.filter((i) => i.type === 'rule').map((i) => i.id),
+      ['.agent/r-un', '_agent/r-cond', '_agent/r-deux', '_agents/r-trois'],
+      'Ordre observé en phase 2c : .agent, _agent, _agents'
+    );
+    assert.strictEqual(
+      troisVariantes260.items.find((i) => i.id === '_agent/r-cond')?.metadata?.unverifiedVariantRule,
+      'non-always-on'
+    );
+    assert.strictEqual(
+      troisVariantes260.items.find((i) => i.id === '.agent/r-un')?.metadata?.unverifiedVariantRule,
+      undefined
+    );
+
+    // 2. Avec .agents/ ET les variantes : cumul par prudence et marque unverifiedVariantRule en 2.6.0 ;
+    // une règle sans frontmatter dans _agents/rules/ garde unverifiedVariantRule à undefined (ignoredByAgent vrai) ; D-9 pour .agent/skills/
+    const avecAgents = path.join(tempBaseDir, 'variantes-avec-agents');
+    await writeFile(path.join(avecAgents, '.agents', 'rules', 'r-zero.md'), '---\ntrigger: always_on\ndescription: R0\n---\n# R0');
+    await writeFile(path.join(avecAgents, '.agent', 'rules', 'r-un.md'), '---\ntrigger: always_on\ndescription: R1\n---\n# R1');
+    await writeFile(
+      path.join(avecAgents, '_agent', 'rules', 'r-cond.md'),
+      '---\ntrigger: model_decision\ndescription: Cond\n---\n# Cond'
+    );
+    await writeFile(path.join(avecAgents, '_agents', 'rules', 'r-trois.md'), '---\ntrigger: always_on\ndescription: R3\n---\n# R3');
+    await writeFile(path.join(avecAgents, '_agents', 'rules', 'r-sans-fm.md'), '# Sans frontmatter dans une variante');
+    await writeFile(path.join(avecAgents, '.agent', 'skills', 's-legacy', 'SKILL.md'), skillContent('s-legacy'));
+    await writeFile(path.join(avecAgents, '_agent', 'skills', 's-ignore-1', 'SKILL.md'), skillContent('s-ignore-1'));
+    await writeFile(path.join(avecAgents, '_agents', 'skills', 's-ignore-2', 'SKILL.md'), skillContent('s-ignore-2'));
+    await writeFile(path.join(avecAgents, 'src', 'mod', '_agents', 'rules', 'imbriquee.md'), '---\ntrigger: always_on\n---\n# Sous');
+
+    const avec255 = await LocalScanner.scan(workspaceFor(avecAgents, '.agents'), ANTIGRAVITY_PROFILES['2.5.5']);
+    assert.deepStrictEqual(
+      avec255.items.filter((i) => i.type === 'rule').map((i) => i.id),
+      ['r-zero', '.agent/r-un'],
+      'Profil 2.5.5 : ni _agent/ ni _agents/ ni sous-dossier _agents/ ne sont lus (D-8)'
+    );
+    assert.ok(avec255.items.every((i) => i.metadata?.unverifiedVariantRule === undefined), 'Aucune marque unverifiedVariantRule en 2.5.5');
+    const skills255 = avec255.items.filter((i) => i.type === 'skill');
+    assert.deepStrictEqual(skills255.map((i) => i.id), ['.agent/s-legacy'], 'D-9 en 2.5.5 : seul .agent/skills/ est lu');
+    assert.strictEqual(skills255[0].metadata?.legacyLocation, true);
+
+    const avec260 = await LocalScanner.scan(workspaceFor(avecAgents, '.agents'), ANTIGRAVITY_PROFILES['2.6.0']);
+    const reglesRacine260 = avec260.items.filter((i) => i.type === 'rule' && !i.metadata?.directoryScope);
+    assert.deepStrictEqual(
+      reglesRacine260.map((i) => i.id),
+      ['r-zero', '.agent/r-un', '_agent/r-cond', '_agents/r-sans-fm', '_agents/r-trois'],
+      'Profil 2.6.0 : .agents puis .agent, _agent, _agents dans cet ordre'
+    );
+    assert.strictEqual(reglesRacine260.find((i) => i.id === 'r-zero')?.metadata?.unverifiedVariantRule, undefined);
+    assert.strictEqual(reglesRacine260.find((i) => i.id === '.agent/r-un')?.metadata?.unverifiedVariantRule, 'cohabitation');
+    assert.strictEqual(reglesRacine260.find((i) => i.id === '_agent/r-cond')?.metadata?.unverifiedVariantRule, 'both');
+    assert.strictEqual(reglesRacine260.find((i) => i.id === '_agents/r-trois')?.metadata?.unverifiedVariantRule, 'cohabitation');
+    const sansFmVariante = reglesRacine260.find((i) => i.id === '_agents/r-sans-fm')!;
+    assert.strictEqual(sansFmVariante.metadata?.ignoredByAgent, true, 'Une règle sans frontmatter dans _agents/rules/ est ignorée');
+    assert.strictEqual(sansFmVariante.metadata?.unverifiedVariantRule, undefined, 'Une règle ignorée ne reçoit pas unverifiedVariantRule');
+    assert.strictEqual(avec260.rulesStat.permanentCount, 3);
+    assert.strictEqual(avec260.rulesStat.conditionalCount, 1);
+
+    const imbriquee260 = avec260.items.find((i) => i.id === 'src/mod/_agents/rules/imbriquee')!;
+    assert.ok(imbriquee260, 'findNestedRuleSources reçoit la liste du profil 2.6.0');
+    assert.strictEqual(imbriquee260.metadata?.antigravityStatus, 'never-loaded');
+
+    const skills260 = avec260.items.filter((i) => i.type === 'skill');
+    assert.deepStrictEqual(skills260.map((i) => i.id), ['.agent/s-legacy'], 'D-9 en 2.6.0 : seul .agent/skills/ reste lu');
+    assert.strictEqual(skills260[0].metadata?.legacyLocation, true);
+
+    // 3. D-20 : dans un projet n'ayant que _agents/ et _agent/, l'import local cible toujours .agents/
+    const sourceRule = path.join(tempBaseDir, 'import-d20-source', 'r-import.md');
+    await writeFile(sourceRule, '---\ntrigger: always_on\ndescription: Import D-20\n---\n# Import');
+    const importRes = await ImportService.importResource(
+      {
+        id: 'r-import',
+        name: 'r-import',
+        description: 'Import D-20',
+        type: 'rule',
+        scope: 'nas',
+        enabled: true,
+        path: sourceRule,
+        targetTool: 'antigravity',
+        isFolder: false,
+      },
+      'local',
+      workspaceFor(sansAgents, null)
+    );
+    assert.strictEqual(importRes.success, true, importRes.error);
+    assert.strictEqual(importRes.targetPath, path.join(sansAgents, '.agents', 'rules', 'r-import.md'));
+  });
+
+  test('15. Lot L8 : la sauvegarde du banc d\'essai (.banc-essai-sauvegarde/racine/_agents/) n\'est jamais lue, dans aucun profil', async () => {
+    const dir = path.join(tempBaseDir, 'sauvegarde-banc-agents');
+    await writeFile(
+      path.join(dir, '.banc-essai-sauvegarde', 'racine', '_agents', 'rules', '02-rule.md.sauvegarde'),
+      '---\ntrigger: always_on\ndescription: Sauvegarde\n---\n# Règle sauvegardée'
+    );
+    await writeFile(
+      path.join(dir, '.banc-essai-sauvegarde', 'racine', '_agents', 'rules', 'fuite.md'),
+      '---\ntrigger: always_on\ndescription: Même sans suffixe .sauvegarde\n---\n# Fuite'
+    );
+
+    for (const profil of [ANTIGRAVITY_PROFILES['2.5.5'], ANTIGRAVITY_PROFILES['2.6.0']]) {
+      const scan = await LocalScanner.scan(workspaceFor(dir, null), profil);
+      assert.deepStrictEqual(scan.items, [], `Aucune ressource ne doit être lue depuis .banc-essai-sauvegarde/ (profil ${profil.id})`);
+      assert.strictEqual(scan.rulesStat.totalCount, 0);
+      assert.strictEqual(scan.rulesStat.tokenCount, 0);
+    }
+  });
 });

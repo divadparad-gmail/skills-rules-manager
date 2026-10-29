@@ -98,7 +98,11 @@ export function nomReel(fichier: string): string {
 }
 
 // --------------------------------------------------------------------------
-// Noms dans la sauvegarde : « .agents » devient « _agents », « .claude » devient « _claude »
+// Noms dans la sauvegarde : « .agents » devient « _agents », « .claude » devient « _claude ».
+// En Antigravity IDE 2.6.0, un dossier « _agents/rules/ » à la racine de l'espace de travail est
+// chargé par l'agent (🧪 observé, phase 2c). La sauvegarde reste hors de portée car elle est placée
+// sous le sous-dossier caché « .banc-essai-sauvegarde/racine/ » (jamais lu par l'agent, R1, et
+// ignoré par findNestedRuleSources) et chaque fichier sauvegardé reçoit le suffixe « .sauvegarde ».
 // --------------------------------------------------------------------------
 
 const DOSSIERS_MASQUES: Record<string, string> = { '.agents': '_agents', '.claude': '_claude' };

@@ -13,7 +13,6 @@ import { appliesInAntigravity, buildAntigravityRuleItem, countsAtBoot, hasResour
 import { buildAntigravitySkillItem, listSkillFolders, pluginSectionHeadersTokens } from './antigravitySkillItem';
 import { antigravityRulesBootStat, truncationSummary } from './antigravityBootCost';
 import {
-  ANTIGRAVITY_AGENT_DIRS,
   collectRulesJsonFiles,
   findNestedRuleSources,
   listFlatRuleFiles,
@@ -29,8 +28,8 @@ import {
 
 export class LocalScanner {
   /**
-   * Scanne les compétences et règles définies dans le projet actif local avec comptage réel des caractères.
-   * Le profil de comportement d'Antigravity est reçu, mais pas encore lu (chantier 2.6.0, lots L6 et suivants).
+   * Scanne les compétences et règles définies dans le projet actif local avec comptage réel des caractères,
+   * selon le profil de comportement d'Antigravity (skills de plugin, troncature, règles glob, variantes).
    */
   public static async scan(
     workspace: WorkspaceContext,
@@ -84,13 +83,15 @@ export class LocalScanner {
       }
     };
 
-    // 1. Scan Antigravity (.agents ou .agent) uniquement si targetTool === 'antigravity'
+    // 1. Scan Antigravity (.agents, et variantes selon le profil) uniquement si targetTool === 'antigravity'
     if (targetTool === 'antigravity') {
       const agentsDirName = workspace.agentsDir || '.agents';
       const agentsDir = path.isAbsolute(agentsDirName) ? agentsDirName : path.join(rootPath, agentsDirName);
+      const agentsDirExists = fs.existsSync(agentsDir);
+      const hasPrimaryAgentsDir = fs.existsSync(path.join(rootPath, '.agents'));
 
-      if (fs.existsSync(agentsDir)) {
-        // Skills locaux, et l'ancien emplacement .agent/skills (documenté, chargement non vérifié)
+      if (agentsDirExists) {
+        // Skills locaux, et l'ancien emplacement .agent/skills (D-9 : documenté, chargement non vérifié)
         const skillsDir = path.join(agentsDir, 'skills');
         skillsDirFound = skillsDir;
         const legacySkillsDir = path.join(rootPath, LEGACY_WORKSPACE_SKILLS_DIR);
@@ -108,43 +109,54 @@ export class LocalScanner {
             items.push(skillItem);
           }
         }
+      }
 
-        // Rules locales : .agents/rules/*.md, l'ancien .agent/rules/*.md (tous deux chargés
-        // par Antigravity) et les règles déclarées par .agents/rules.json
-        const rulesDir = path.join(agentsDir, 'rules');
+      // Rules locales : .agents/rules/*.md, les variantes du profil (.agent en 2.5.5 ; .agent, _agent
+      // et _agents en 2.6.0, lues et cumulées dans cet ordre même sans .agents/, 🧪 phase 2c) et les
+      // règles déclarées par .agents/rules.json
+      const rulesDir = path.join(agentsDir, 'rules');
+      if (agentsDirExists) {
         rulesDirFound = rulesDir;
-        const ruleDirs = [rulesDir];
-        for (const dirName of ANTIGRAVITY_AGENT_DIRS) {
+      }
+      const ruleDirs: string[] = [];
+      if (agentsDirExists || profile.id === '2.6.0') {
+        ruleDirs.push(rulesDir);
+        for (const dirName of profile.workspaceAgentRuleDirs) {
           const candidate = path.join(rootPath, dirName, 'rules');
           if (!ruleDirs.some((dir) => path.resolve(dir) === path.resolve(candidate))) {
             ruleDirs.push(candidate);
           }
         }
+      }
 
-        // Clé = chemin sans « .disabled » : un .md et son .md.disabled désignent la même règle,
-        // le fichier actif est prioritaire
-        const rulesMap = new Map<string, ResourceItem>();
-        const addRule = (item: ResourceItem) => {
-          const key = path.resolve(item.path).replace(/\.disabled$/, '');
-          const existing = rulesMap.get(key);
-          if (!existing || (!existing.enabled && item.enabled)) {
-            rulesMap.set(key, item);
-          }
-        };
-
-        for (const dir of ruleDirs) {
-          const isPrimary = dir === rulesDir;
-          for (const filePath of await listFlatRuleFiles(dir)) {
-            const cleanId = path.basename(filePath).replace(/\.disabled$/, '').replace(/\.md$/, '');
-            addRule(await buildAntigravityRuleItem(filePath, {
-              id: isPrimary ? cleanId : `${path.basename(path.dirname(dir))}/${cleanId}`,
-              scope: 'local',
-              fallbackDescription: 'Règle locale du projet',
-              profile,
-            }));
-          }
+      // Clé = chemin sans « .disabled » : un .md et son .md.disabled désignent la même règle,
+      // le fichier actif est prioritaire
+      const rulesMap = new Map<string, ResourceItem>();
+      const addRule = (item: ResourceItem) => {
+        const key = path.resolve(item.path).replace(/\.disabled$/, '');
+        const existing = rulesMap.get(key);
+        if (!existing || (!existing.enabled && item.enabled)) {
+          rulesMap.set(key, item);
         }
+      };
 
+      for (const dir of ruleDirs) {
+        const isPrimary = dir === rulesDir;
+        const dirName = path.basename(path.dirname(dir));
+        const isVariant = dirName === '.agent' || dirName === '_agent' || dirName === '_agents';
+        for (const filePath of await listFlatRuleFiles(dir)) {
+          const cleanId = path.basename(filePath).replace(/\.disabled$/, '').replace(/\.md$/, '');
+          addRule(await buildAntigravityRuleItem(filePath, {
+            id: isPrimary ? cleanId : `${dirName}/${cleanId}`,
+            scope: 'local',
+            fallbackDescription: 'Règle locale du projet',
+            ...(isVariant ? { variantRule: { hasPrimaryAgentsDir } } : {}),
+            profile,
+          }));
+        }
+      }
+
+      if (agentsDirExists) {
         const rulesJsonPath = path.join(agentsDir, 'rules.json');
         if (fs.existsSync(rulesJsonPath)) {
           for (const entry of await collectRulesJsonFiles(rulesJsonPath)) {
@@ -158,12 +170,14 @@ export class LocalScanner {
             }));
           }
         }
+      }
 
-        for (const ruleItem of rulesMap.values()) {
-          accountRule(ruleItem);
-          items.push(ruleItem);
-        }
+      for (const ruleItem of rulesMap.values()) {
+        accountRule(ruleItem);
+        items.push(ruleItem);
+      }
 
+      if (agentsDirExists) {
         // Plugins locaux Antigravity (.agents/plugins)
         const pluginsDir = path.join(agentsDir, 'plugins');
         if (fs.existsSync(pluginsDir)) {
@@ -213,7 +227,7 @@ export class LocalScanner {
 
       // Règles des sous-dossiers : affichées, mais jamais chargées par Antigravity (R1)
       const nestedRules = new Map<string, ResourceItem>();
-      for (const source of await findNestedRuleSources(rootPath)) {
+      for (const source of await findNestedRuleSources(rootPath, profile.workspaceAgentRuleDirs)) {
         const relativeFile = path.relative(path.join(rootPath, source.directoryScope), source.path).split(path.sep).join('/');
         const nestedItem = await buildAntigravityRuleItem(source.path, {
           id: `${source.directoryScope}/${relativeFile.replace(/\.disabled$/, '').replace(/\.md$/, '')}`,

@@ -23,6 +23,14 @@ export interface AntigravityRuleItemOptions {
   pluginName?: string;
   /** Règle d'un plugin : comptée par prudence, chargement non vérifié dans aucune version (D-19). */
   unverifiedPluginRule?: boolean;
+  /**
+   * Règle issue d'une variante (`.agent`, `_agent`, `_agents`) : en profil 2.6.0, pose
+   * `unverifiedVariantRule` si `.agents/` existe aussi (`cohabitation`) et/ou si le trigger reconnu
+   * n'est pas `always_on` (`non-always-on`). Sans `.agents/`, une règle `always_on` est observée (phase 2c).
+   */
+  variantRule?: { hasPrimaryAgentsDir: boolean };
+  /** Valeur explicite de `unverifiedVariantRule` (tests unitaires). */
+  unverifiedVariantRule?: 'cohabitation' | 'non-always-on' | 'both';
   directoryScope?: string;
   /** Dossier parent d'où la règle est héritée (R2) : la carte est verrouillée. */
   inheritedFrom?: string;
@@ -73,6 +81,18 @@ export async function buildAntigravityRuleItem(filePath: string, options: Antigr
   const frontmatterDescription = typeof frontmatter.description === 'string' ? frontmatter.description.trim() : '';
   const title = parsed.title || options.id;
   const sizeAdvice = ruleSizeAdvice(rawContent, inspection, isAppliedStatus(status), options.standalone === true);
+  // Lot L8 : en profil 2.6.0, une règle issue d'une variante (.agent, _agent, _agents) est marquée
+  // « ❔ Non vérifié » quand .agents/ existe aussi (cohabitation) et/ou quand son trigger reconnu
+  // n'est pas always_on. Sans .agents/, une règle always_on de variante est observée (phase 2c).
+  const unverifiedVariantRule = options.unverifiedVariantRule ?? (() => {
+    if (!options.variantRule || profile.id !== '2.6.0' || inspection.ignored) return undefined;
+    const cohabitation = options.variantRule.hasPrimaryAgentsDir;
+    const nonAlwaysOn = inspection.trigger !== 'always_on';
+    if (cohabitation && nonAlwaysOn) return 'both';
+    if (cohabitation) return 'cohabitation';
+    if (nonAlwaysOn) return 'non-always-on';
+    return undefined;
+  })();
 
   return {
     id: options.id,
@@ -93,6 +113,7 @@ export async function buildAntigravityRuleItem(filePath: string, options: Antigr
       ...(options.spreadFrontmatter ? frontmatter : {}),
       ...(options.pluginName ? { pluginName: options.pluginName } : {}),
       ...(options.unverifiedPluginRule ? { unverifiedPluginRule: true } : {}),
+      ...(unverifiedVariantRule ? { unverifiedVariantRule } : {}),
       ...(options.directoryScope !== undefined ? { directoryScope: options.directoryScope } : {}),
       ...(options.inheritedFrom !== undefined ? { inheritedFrom: options.inheritedFrom, locked: true } : {}),
       ...(options.fromRulesJson ? { fromRulesJson: true } : {}),

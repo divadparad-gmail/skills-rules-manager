@@ -1969,6 +1969,18 @@
         'Règle de plugin (.agents/plugins/<plugin>/rules/ ou ~/.gemini/config/plugins/<plugin>/rules/) : emplacement documenté, mais dont le chargement n\'a été vérifié par les tests dans aucune version d\'Antigravity IDE (2.5.5 ni 2.6.0). La règle est comptée par prudence.');
     }
 
+    // Lot L8 : règle d'une variante (.agent, _agent, _agents) en 2.6.0 dans un cas non vérifié
+    if (item.metadata && item.metadata.unverifiedVariantRule) {
+      const reason = item.metadata.unverifiedVariantRule;
+      const detail = reason === 'both'
+        ? 'la cohabitation de .agents/ avec une variante et un trigger autre que always_on dans une variante n\'ont pas été vérifiés'
+        : reason === 'cohabitation'
+          ? 'la cohabitation de .agents/ avec une variante n\'a pas été vérifiée'
+          : 'seul le trigger always_on a été testé dans une variante ; ce trigger n\'a pas été vérifié';
+      addBadge('pill-warn-amber', '❔ Non vérifié',
+        `Règle lue dans un dossier de variante (.agent/rules/, _agent/rules/ ou _agents/rules/) : sans .agents/, le chargement et le cumul des règles always_on de ces trois variantes ont été observés dans Antigravity IDE 2.6.0 (🧪 phase 2c, testé le ${behavior.testedOn}). En revanche, ${detail} par les tests (❔ non vérifié). La règle est comptée par prudence.`);
+    }
+
     // Ancien emplacement que la version du profil ne lit pas (~/.gemini/antigravity/skills/ en 2.6.0)
     if (agStatus === 'not-read') {
       const version = item.metadata.notReadBy || '';

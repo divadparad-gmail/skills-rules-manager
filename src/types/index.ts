@@ -93,6 +93,12 @@ export interface ResourceItem {
     unverifiedIn?: string;
     /** Règle d'un plugin (global ou du projet) : comptée par prudence, chargement non vérifié dans aucune version (D-19). */
     unverifiedPluginRule?: boolean;
+    /**
+     * Règle d'une variante (`.agent`, `_agent`, `_agents`) en profil 2.6.0 dont le cas n'a pas été
+     * vérifié par la sonde (phase 2c) : `cohabitation` quand `.agents/` existe aussi, `non-always-on`
+     * quand son trigger n'est pas `always_on`, ou `both` quand les deux s'appliquent. Comptée par prudence.
+     */
+    unverifiedVariantRule?: 'cohabitation' | 'non-always-on' | 'both';
     /** Skill de plugin listé une seule fois, sans section de plugin (profil 2.6.0). Absent en 2.5.5 (deux fois). */
     pluginListedOnce?: boolean;
     /** Nom brut d'un skill (sans préfixe de plugin), utilisé pour détecter les doublons. */

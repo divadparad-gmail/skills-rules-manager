@@ -144,7 +144,10 @@ export interface NestedRuleSource {
  * ses règles sont lues par le scan principal). Le parcours ignore les dossiers cachés,
  * les dépendances et les sorties de compilation, et reste borné en profondeur et en nombre.
  */
-export async function findNestedRuleSources(rootPath: string): Promise<NestedRuleSource[]> {
+export async function findNestedRuleSources(
+  rootPath: string,
+  agentDirs: readonly string[] = ANTIGRAVITY_AGENT_DIRS
+): Promise<NestedRuleSource[]> {
   const sources: NestedRuleSource[] = [];
   const queue: Array<{ dir: string; depth: number }> = [{ dir: rootPath, depth: 0 }];
   let visited = 0;
@@ -167,7 +170,7 @@ export async function findNestedRuleSources(rootPath: string): Promise<NestedRul
       for (const file of ANTIGRAVITY_STANDALONE_FILES) {
         if (names.has(file)) sources.push({ path: path.join(dir, file), directoryScope, kind: 'standalone' });
       }
-      for (const agentsDir of ANTIGRAVITY_AGENT_DIRS) {
+      for (const agentsDir of agentDirs) {
         if (!names.has(agentsDir)) continue;
         const agentsPath = path.join(dir, agentsDir);
         for (const file of ANTIGRAVITY_STANDALONE_FILES) {

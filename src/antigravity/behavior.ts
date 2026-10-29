@@ -87,6 +87,15 @@ export interface AntigravityBehaviorProfile {
    * trois sessions, `globs:` comme `glob:`). L'import des `paths:` de Claude Code suit (D-6).
    */
   globInjected: boolean;
+  /**
+   * Dossiers d'agent lus à la racine de l'espace de travail pour les règles (`<dossier>/rules/*.md`),
+   * dans l'ordre observé. En 2.5.5, seuls `.agents` et `.agent` sont lus (D-8 : `_agent` et `_agents`
+   * n'y ont jamais été testés). En 2.6.0, sans `.agents/`, les règles `always_on` de `.agent/rules/`,
+   * `_agent/rules/` et `_agents/rules/` sont toutes chargées et cumulées, dans cet ordre (🧪 phase 2c).
+   * ❔ Non vérifié en 2.6.0 : la cohabitation de `.agents/` avec une variante, et les règles non
+   * `always_on` d'une variante (comptées par prudence avec un badge « ❔ Non vérifié »).
+   */
+  workspaceAgentRuleDirs: readonly string[];
 }
 
 export const ANTIGRAVITY_PROFILES: Readonly<Record<AntigravityProfileId, AntigravityBehaviorProfile>> = Object.freeze({
@@ -102,6 +111,7 @@ export const ANTIGRAVITY_PROFILES: Readonly<Record<AntigravityProfileId, Antigra
     pluginSectionHeader: true,
     truncation: 'byte',
     globInjected: true,
+    workspaceAgentRuleDirs: Object.freeze(['.agents', '.agent'] as const),
   }),
   '2.6.0': Object.freeze({
     id: '2.6.0',
@@ -115,6 +125,7 @@ export const ANTIGRAVITY_PROFILES: Readonly<Record<AntigravityProfileId, Antigra
     pluginSectionHeader: false,
     truncation: 'line-end',
     globInjected: false,
+    workspaceAgentRuleDirs: Object.freeze(['.agents', '.agent', '_agent', '_agents'] as const),
   }),
 });
 

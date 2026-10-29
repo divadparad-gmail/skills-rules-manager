@@ -8,6 +8,8 @@
  */
 
 import * as assert from 'node:assert';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import { test, describe } from 'node:test';
 import {
@@ -19,6 +21,7 @@ import {
 } from '../src/environment/HostEnvironmentDetector';
 import { AgentRuntimeDetector } from '../src/environment/AgentRuntimeDetector';
 import { SkillProtocolAdapter } from '../src/environment/SkillProtocolAdapter';
+import { detectAgentsDirName } from '../src/deploy/deployReview';
 
 /** Entrées de sonde neutres : aucun signal Anti-Gravity n'est présent. */
 function neutralInputs(overrides: Record<string, unknown> = {}) {
@@ -377,5 +380,29 @@ describe("Suite de Tests : Détection d'environnement et adaptation de protocole
       !paths.directory.includes('..'),
       "Aucun segment de remontée ne doit subsister dans le chemin résolu."
     );
+  });
+
+  test('22. Lot L8 (D-20) : le déploiement cible toujours .agents/ quand seul _agents/ ou _agent/ existe', async () => {
+    const tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'agy-d20-'));
+    try {
+      const onlyUnderscore = path.join(tempDir, 'only-underscore');
+      await fs.promises.mkdir(path.join(onlyUnderscore, '_agents', 'rules'), { recursive: true });
+      await fs.promises.mkdir(path.join(onlyUnderscore, '_agent', 'rules'), { recursive: true });
+
+      const chosen = detectAgentsDirName(onlyUnderscore);
+      assert.strictEqual(chosen, '.agents', 'D-20 : seul _agents/ ou _agent/ ne détourne pas la cible hors de .agents/');
+
+      const resolved = SkillProtocolAdapter.resolveDeploymentPaths({
+        runtime: 'antigravity',
+        target: 'local',
+        type: 'rules',
+        resourceId: 'nouvelle-regle.md',
+        workspaceRoot: onlyUnderscore,
+        agentsDirName: chosen,
+      });
+      assert.strictEqual(resolved.file, path.join(onlyUnderscore, '.agents', 'rules', 'nouvelle-regle.md'));
+    } finally {
+      await fs.promises.rm(tempDir, { recursive: true, force: true });
+    }
   });
 });
