@@ -4,6 +4,8 @@ import { McpServerStat, TokenCategoryStat, WorkspaceContext } from '../types';
 import { getEffectiveGlobalAntigravityPath, getUserHome } from '../utils/paths';
 import { countTokens, countTokensForFile } from '../utils/tokenizer';
 import {
+  ANTIGRAVITY_PROFILES,
+  AntigravityBehaviorProfile,
   formatMcpServer,
   isUnsupportedRemoteMcpServer,
   MCP_DISABLED_SERVERS_COUNTED,
@@ -22,10 +24,12 @@ export class McpScanner {
    * Scanne les serveurs MCP globaux selon l'outil actif.
    * - Antigravity : ~/.gemini/config/mcp_config.json
    * - Claude Code : ~/.claude.json (clé mcpServers)
+   * Le profil de comportement d'Antigravity est reçu, mais pas encore lu (chantier 2.6.0, lot L4).
    */
   public static async scanGlobal(
     customGlobalPath?: string,
-    targetTool: 'antigravity' | 'claude-code' = 'antigravity'
+    targetTool: 'antigravity' | 'claude-code' = 'antigravity',
+    profile: AntigravityBehaviorProfile = ANTIGRAVITY_PROFILES['2.5.5']
   ): Promise<TokenCategoryStat> {
     if (targetTool === 'claude-code') {
       const userHome = getUserHome();
@@ -48,8 +52,12 @@ export class McpScanner {
    * Scanne les serveurs MCP locaux selon l'outil actif.
    * - Antigravity : <workspace>/.agents/mcp_config.json
    * - Claude Code : <workspace>/.mcp.json ou ~/.claude.json (projects[path].mcpServers)
+   * Le profil de comportement d'Antigravity est reçu, mais pas encore lu (chantier 2.6.0, lot L4).
    */
-  public static async scanLocal(workspace: WorkspaceContext): Promise<TokenCategoryStat> {
+  public static async scanLocal(
+    workspace: WorkspaceContext,
+    profile: AntigravityBehaviorProfile = ANTIGRAVITY_PROFILES['2.5.5']
+  ): Promise<TokenCategoryStat> {
     if (!workspace.hasWorkspace || !workspace.workspacePath) {
       return this.emptyStat('local', '');
     }

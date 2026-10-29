@@ -185,6 +185,22 @@
           "default": "",
           "description": "Chemin global de configuration Antigravity (laisser vide pour détection automatique : ~/.gemini/config)"
         },
+        "skillsManager.antigravityProfile": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "2.5.5",
+            "2.6.0"
+          ],
+          "enumDescriptions": [
+            "Déduit de la structure des données de ~/.gemini. Elle indique une génération d'Antigravity, et non sa version exacte ; si rien n'est reconnu, le profil 2.6.0 s'applique.",
+            "Comportement mesuré dans Antigravity IDE 2.5.5 (tests du 2026-10-21).",
+            "Comportement mesuré dans Antigravity IDE 2.6.0 (tests du 2026-10-28)."
+          ],
+          "default": "2.5.5",
+          "scope": "machine",
+          "description": "Profil de comportement d'Antigravity utilisé pour compter ce que l'agent charge réellement (chemins, règles et coûts au démarrage)."
+        },
         "skillsManager.claudeGlobalPath": {
           "type": "string",
           "default": "",

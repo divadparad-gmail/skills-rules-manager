@@ -16,7 +16,7 @@ import { appliesInAntigravity, buildAntigravityRuleItem, countsAtBoot, hasResour
 import { listFlatRuleFiles } from './antigravityRuleSources';
 import { buildAntigravitySkillItem, listSkillFolders, pluginSectionHeadersTokens } from './antigravitySkillItem';
 import { antigravityRulesBootStat, truncationSummary } from './antigravityBootCost';
-import { BUILTIN_SKILLS_DIR, LEGACY_GLOBAL_SKILLS_DIR } from '../antigravity/behavior';
+import { ANTIGRAVITY_PROFILES, AntigravityBehaviorProfile, BUILTIN_SKILLS_DIR, LEGACY_GLOBAL_SKILLS_DIR } from '../antigravity/behavior';
 
 let vscodeModule: any = null;
 try {
@@ -47,11 +47,13 @@ export class GlobalScanner {
   }
 
   /**
-   * Scanne le dossier global selon l'outil actif (Antigravity ou Claude Code).
+   * Scanne le dossier global selon l'outil actif (Antigravity ou Claude Code). Le profil de
+   * comportement d'Antigravity est reçu, mais pas encore lu (chantier 2.6.0, lots L4 et suivants).
    */
   public static async scan(
     customGlobalPath?: string,
-    targetTool: TargetTool = 'antigravity'
+    targetTool: TargetTool = 'antigravity',
+    profile: AntigravityBehaviorProfile = ANTIGRAVITY_PROFILES['2.5.5']
   ): Promise<{
     items: ResourceItem[];
     soulStat: TokenCategoryStat;

@@ -19,10 +19,11 @@ import { computeAntigravityDynamicCosts } from './antigravityDynamicCosts';
 import { readAntigravityHooks } from './antigravityHooks';
 import { DashboardPanel } from '../providers/DashboardPanel';
 import { CheatSheetPanel } from '../providers/CheatSheetPanel';
-import { getUserHome } from '../utils/paths';
+import { getEffectiveGlobalAntigravityPath, getUserHome } from '../utils/paths';
 import { resetTokenizerMetrics, getTokenizerMetrics } from '../utils/tokenizer';
 import { debounce } from '../utils/debounce';
 import { ANTIGRAVITY_TESTED_ON, ANTIGRAVITY_TESTED_VERSION } from '../antigravity/behavior';
+import { ResolvedAntigravityProfile, resolveConfiguredAntigravityProfile } from '../antigravity/behaviorProfile';
 
 export class StateManager {
   private static cachedState: ManagerFullState | null = null;
@@ -92,9 +93,17 @@ export class StateManager {
   public static lastTimingLog: string | null = null;
   private static timingHistory: string[] = [];
   private static _debugTimingOverride: boolean | null = null;
+  private static _antigravityProfileOverride: ResolvedAntigravityProfile | null = null;
+  /** Profil de comportement d'Antigravity transmis aux scanners lors du dernier scan. */
+  public static lastAntigravityProfile: ResolvedAntigravityProfile | null = null;
 
   public static setDebugTimingForTesting(enabled: boolean | null): void {
     this._debugTimingOverride = enabled;
+  }
+
+  /** Impose un profil aux scans suivants, sans lire le réglage ni le disque ; null rétablit la résolution normale. */
+  public static setAntigravityProfileForTesting(resolved: ResolvedAntigravityProfile | null): void {
+    this._antigravityProfileOverride = resolved;
   }
 
   public static isDebugTimingActive(): boolean {
@@ -186,12 +195,19 @@ export class StateManager {
 
     const workspace = WorkspaceDetector.detectWorkspace();
 
+    // Profil de comportement d'Antigravity : le réglage, puis la structure des données en « auto ».
+    // Les scanners le reçoivent ; les lots suivants du chantier 2.6.0 en lisent les champs.
+    const resolvedProfile = this._antigravityProfileOverride
+      ?? resolveConfiguredAntigravityProfile(getEffectiveGlobalAntigravityPath());
+    this.lastAntigravityProfile = resolvedProfile;
+    const antigravityProfile = resolvedProfile.profile;
+
     const [nasResult, globalResult, localResult, mcpGlobalStat, mcpLocalStat] = await Promise.all([
       NasScanner.scan(undefined, workspace.tool),
-      GlobalScanner.scan(undefined, workspace.tool),
-      LocalScanner.scan(workspace),
-      McpScanner.scanGlobal(undefined, workspace.tool),
-      McpScanner.scanLocal(workspace),
+      GlobalScanner.scan(undefined, workspace.tool, antigravityProfile),
+      LocalScanner.scan(workspace, antigravityProfile),
+      McpScanner.scanGlobal(undefined, workspace.tool, antigravityProfile),
+      McpScanner.scanLocal(workspace, antigravityProfile),
     ]);
 
     // Fixtures du banc d'essai dans le profil global (règle doublon), reconnues à leur contenu

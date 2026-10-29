@@ -6,6 +6,7 @@ import { StateManager } from './services/StateManager';
 import { WorkspaceDetector } from './services/WorkspaceDetector';
 import { NasScanner } from './services/NasScanner';
 import { warmupTokenizer } from './utils/tokenizer';
+import { ANTIGRAVITY_PROFILE_SETTING } from './antigravity/behaviorProfile';
 import { createDiscoveryContainer } from './common/container';
 import { extensionEventBus } from './common/ExtensionEventBus';
 import { DiscoveryViewProvider } from './ui/DiscoveryViewProvider';
@@ -143,6 +144,10 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.workspace.onDidChangeConfiguration((event) => {
       if (event.affectsConfiguration(DISCOVERY_ENABLED_SETTING)) {
         environmentStatusBar.setVisible(isDiscoveryEnabled());
+      }
+      // Le profil de comportement d'Antigravity et le dossier global changent ce que compte le scan
+      if (event.affectsConfiguration(ANTIGRAVITY_PROFILE_SETTING) || event.affectsConfiguration('skillsManager.globalPath')) {
+        StateManager.requestDebouncedReload(350);
       }
     })
   );

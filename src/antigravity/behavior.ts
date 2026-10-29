@@ -12,8 +12,28 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-export const ANTIGRAVITY_TESTED_VERSION = 'Antigravity IDE 2.5.5';
-export const ANTIGRAVITY_TESTED_ON = '2026-10-21';
+/**
+ * Profil de comportement : les faits mesurés pour une version d'Antigravity IDE. Un fait qui diffère
+ * d'une version à l'autre devient un champ du profil ; les autres restent des constantes de ce module.
+ * Le choix du profil (réglage, puis détection) : src/antigravity/behaviorProfile.ts.
+ */
+export type AntigravityProfileId = '2.5.5' | '2.6.0';
+
+export interface AntigravityBehaviorProfile {
+  id: AntigravityProfileId;
+  /** Version testée, citée dans les infobulles. */
+  testedVersion: string;
+  /** Date de la baseline de la suite de régression pour cette version. */
+  testedOn: string;
+}
+
+export const ANTIGRAVITY_PROFILES: Readonly<Record<AntigravityProfileId, AntigravityBehaviorProfile>> = Object.freeze({
+  '2.5.5': Object.freeze({ id: '2.5.5', testedVersion: 'Antigravity IDE 2.5.5', testedOn: '2026-10-21' }),
+  '2.6.0': Object.freeze({ id: '2.6.0', testedVersion: 'Antigravity IDE 2.6.0', testedOn: '2026-10-28' }),
+});
+
+export const ANTIGRAVITY_TESTED_VERSION = ANTIGRAVITY_PROFILES['2.5.5'].testedVersion;
+export const ANTIGRAVITY_TESTED_ON = ANTIGRAVITY_PROFILES['2.5.5'].testedOn;
 
 /**
  * R6 (SC07) : dans `rules/`, un fichier sans frontmatter, ou dont le `trigger` n'est pas
