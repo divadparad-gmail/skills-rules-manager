@@ -38,7 +38,8 @@ if (!require.cache['vscode']) {
 }
 
 import { LocalScanner } from '../src/services/LocalScanner';
-import { isBulkToggleable, NEVER_LOADED_REFUSAL, ToggleManager } from '../src/services/ToggleManager';
+import { GlobalScanner } from '../src/services/GlobalScanner';
+import { isBulkToggleable, NEVER_LOADED_REFUSAL, notReadSkillRefusal, ToggleManager } from '../src/services/ToggleManager';
 import { DeleteService } from '../src/services/DeleteService';
 import { ResourceItem, WorkspaceContext } from '../src/types';
 import { ANTIGRAVITY_PROFILES } from '../src/antigravity/behavior';
@@ -208,6 +209,70 @@ describe('Suite de Tests : règles de sous-dossier jamais chargées (bascules et
       assert.ok(!all.some((el) => el.className === 'soul-locked-badge'), 'Aucun verrou « 🚫 Sans effet »');
     } finally {
       await fs.promises.rm(globDir, { recursive: true, force: true });
+    }
+  });
+
+  // Chantier 2.6.0, lot LR (Garde 2 et D-19) : un skill not-read ne peut être ni basculé ni supprimé ;
+  // une règle de plugin affiche le badge « ❔ Non vérifié ».
+  test('8. Profil 2.6.0 : un skill « not-read » est refusé par toggleItem et deleteResource, fichier intact ; badge « ❔ Non vérifié » des règles de plugin', async () => {
+    const tmp = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'agy-lr-not-read-'));
+    try {
+      const geminiRoot = path.join(tmp, '.gemini');
+      const globalDir = path.join(geminiRoot, 'config');
+      const legacySkillMd = path.join(geminiRoot, 'antigravity', 'skills', 'skill-oublie', 'SKILL.md');
+      const skillContent = '---\nname: skill-oublie\ndescription: Skill oublié dans l\'ancien emplacement.\n---\n# Corps intact\n';
+      await fs.promises.mkdir(path.dirname(legacySkillMd), { recursive: true });
+      await fs.promises.writeFile(legacySkillMd, skillContent, 'utf8');
+
+      const pluginRulePath = path.join(globalDir, 'plugins', 'greffon', 'rules', 'r-plugin.md');
+      await fs.promises.mkdir(path.dirname(pluginRulePath), { recursive: true });
+      await fs.promises.writeFile(pluginRulePath, permanentRule, 'utf8');
+
+      const scan = await GlobalScanner.scan(globalDir, 'antigravity', ANTIGRAVITY_PROFILES['2.6.0']);
+      const notReadSkill = scan.items.find((i) => i.metadata?.rawId === 'skill-oublie')!;
+      assert.strictEqual(notReadSkill.metadata?.antigravityStatus, 'not-read');
+      assert.strictEqual(notReadSkill.metadata?.notReadBy, '2.6.0');
+      assert.strictEqual(isBulkToggleable(notReadSkill), false);
+      assert.strictEqual(
+        isBulkToggleable({ ...notReadSkill, metadata: { antigravityStatus: 'not-read' } }),
+        false,
+        'Un skill not-read reste exclu des bascules en masse même sans locked'
+      );
+
+      assert.match(notReadSkillRefusal(), /non lu par Antigravity IDE :/, 'Repli sans numéro de version');
+      assert.strictEqual(notReadSkillRefusal(''), notReadSkillRefusal());
+
+      const toggleRes = await ToggleManager.toggleItem(notReadSkill, false);
+      assert.strictEqual(toggleRes.success, false);
+      assert.strictEqual(toggleRes.error, notReadSkillRefusal('2.6.0'));
+      assert.match(toggleRes.error!, /Antigravity IDE 2\.6\.0/);
+      const toggleFallback = await ToggleManager.toggleItem(
+        { ...notReadSkill, metadata: { antigravityStatus: 'not-read' } },
+        false
+      );
+      assert.strictEqual(toggleFallback.success, false);
+      assert.strictEqual(toggleFallback.error, notReadSkillRefusal());
+      assert.strictEqual(await fs.promises.readFile(legacySkillMd, 'utf8'), skillContent, 'Contenu intact après toggleItem');
+      assert.ok(!fs.existsSync(`${legacySkillMd}.disabled`), 'Aucun renommage en .disabled');
+
+      const deleteCandidate: ResourceItem = {
+        ...notReadSkill,
+        syncStatus: 'synced',
+        metadata: { ...notReadSkill.metadata, isScenarioFixture: true },
+      };
+      const deleteRes = await DeleteService.deleteResource(deleteCandidate);
+      assert.strictEqual(deleteRes.success, false);
+      assert.strictEqual(deleteRes.error, notReadSkillRefusal('2.6.0'));
+      assert.strictEqual(await fs.promises.readFile(legacySkillMd, 'utf8'), skillContent, 'Contenu intact après deleteResource');
+
+      const pluginRule = scan.items.find((i) => i.id === 'greffon:r-plugin')!;
+      const card = main.createItemCard(pluginRule, true, { createElement });
+      const badges = descendants(card).filter((el) => el.className.includes('item-badge-pill'));
+      const unverifiedBadge = badges.find((el) => el.textContent === '❔ Non vérifié');
+      assert.ok(unverifiedBadge, 'La carte d\'une règle de plugin porte le badge « ❔ Non vérifié »');
+      assert.match(unverifiedBadge.title, /2\.5\.5 ni 2\.6\.0/);
+    } finally {
+      await fs.promises.rm(tmp, { recursive: true, force: true });
     }
   });
 });

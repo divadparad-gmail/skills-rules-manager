@@ -1963,6 +1963,12 @@
         `Fichier global documenté comme toujours actif. Son chargement a été observé dans Antigravity IDE 2.6.0, mais pas dans Antigravity IDE ${version}, où seul ~/.gemini/GEMINI.md a été vérifié. Il est compté par prudence, dans l'enveloppe <RULE[user_global]>.`);
     }
 
+    // D-19 : règle d'un plugin (global ou du projet), comptée par prudence, chargement non vérifié
+    if (item.metadata && item.metadata.unverifiedPluginRule) {
+      addBadge('pill-warn-amber', '❔ Non vérifié',
+        'Règle de plugin (.agents/plugins/<plugin>/rules/ ou ~/.gemini/config/plugins/<plugin>/rules/) : emplacement documenté, mais dont le chargement n\'a été vérifié par les tests dans aucune version d\'Antigravity IDE (2.5.5 ni 2.6.0). La règle est comptée par prudence.');
+    }
+
     // Ancien emplacement que la version du profil ne lit pas (~/.gemini/antigravity/skills/ en 2.6.0)
     if (agStatus === 'not-read') {
       const version = item.metadata.notReadBy || '';

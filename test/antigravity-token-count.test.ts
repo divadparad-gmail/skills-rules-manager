@@ -55,7 +55,7 @@ import {
 import { inspectAntigravityRule } from '../src/utils/antigravityRules';
 import { countTokens, countTokensForFile, clearTokenCache } from '../src/utils/tokenizer';
 import { LocalScanner } from '../src/services/LocalScanner';
-import { GlobalScanner } from '../src/services/GlobalScanner';
+import { defaultAntigravityGlobalSoulPath, GlobalScanner, globalSoulCandidates } from '../src/services/GlobalScanner';
 import { McpScanner } from '../src/services/McpScanner';
 import { DuplicateService } from '../src/services/DuplicateService';
 import { applyAntigravityIndexHeaders } from '../src/services/antigravityBootCost';
@@ -585,5 +585,129 @@ describe('Suite de Tests : comptage des tokens au démarrage d\'Antigravity (lot
     const v255 = await LocalScanner.scan(workspaceFor(projet), ANTIGRAVITY_PROFILES['2.5.5']);
     const item255 = v255.items.find((i) => i.id === 'une-ligne')!;
     assert.deepStrictEqual([item255.metadata?.truncatedBytes, item255.metadata?.truncationRule], [6001, undefined]);
+  });
+
+  // Chantier 2.6.0, lot LR (Garde 1) : sans dossier personnel connu, aucun chemin relatif au dossier
+  // courant ('.') n'est proposé ni consulté sur le disque pour les âmes globales.
+  test('19. Âmes globales sans dossier personnel : aucun chemin relatif consulté sur le disque, coût 0', async () => {
+    for (const profile of [ANTIGRAVITY_PROFILES['2.5.5'], ANTIGRAVITY_PROFILES['2.6.0']]) {
+      for (const invalide of ['', '   ', 'relatif/config', '.gemini/config']) {
+        assert.deepStrictEqual(globalSoulCandidates(invalide, profile), [], `${profile.id} : globalSoulCandidates(${JSON.stringify(invalide)})`);
+        assert.strictEqual(defaultAntigravityGlobalSoulPath(invalide), '', `${profile.id} : defaultAntigravityGlobalSoulPath(${JSON.stringify(invalide)})`);
+      }
+
+      for (const videOuBlanc of ['', '   ']) {
+        const cheminsConsultes: string[] = [];
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const rawFs = require('fs') as Record<string, any>;
+        const rawFsPromises = rawFs.promises as Record<string, any>;
+        const origExistsSync = rawFs.existsSync;
+        const origStatSync = rawFs.statSync;
+        const origReadFileSync = rawFs.readFileSync;
+        const origReaddirSync = rawFs.readdirSync;
+        const origPromisesStat = rawFsPromises.stat;
+        const origPromisesReadFile = rawFsPromises.readFile;
+        const origPromisesReaddir = rawFsPromises.readdir;
+
+        try {
+          rawFs.existsSync = (p: fs.PathLike) => {
+            cheminsConsultes.push(String(p));
+            return origExistsSync(p);
+          };
+          rawFs.statSync = (p: fs.PathLike, ...args: any[]) => {
+            cheminsConsultes.push(String(p));
+            return origStatSync(p, ...args);
+          };
+          rawFs.readFileSync = (p: fs.PathOrFileDescriptor, ...args: any[]) => {
+            cheminsConsultes.push(String(p));
+            return origReadFileSync(p, ...args);
+          };
+          rawFs.readdirSync = (p: fs.PathLike, ...args: any[]) => {
+            cheminsConsultes.push(String(p));
+            return origReaddirSync(p, ...args);
+          };
+          rawFsPromises.stat = async (p: fs.PathLike, ...args: any[]) => {
+            cheminsConsultes.push(String(p));
+            return origPromisesStat(p, ...args);
+          };
+          rawFsPromises.readFile = async (p: any, ...args: any[]) => {
+            cheminsConsultes.push(String(p));
+            return origPromisesReadFile(p, ...args);
+          };
+          rawFsPromises.readdir = async (p: fs.PathLike, ...args: any[]) => {
+            cheminsConsultes.push(String(p));
+            return origPromisesReaddir(p, ...args);
+          };
+
+          const scan = await GlobalScanner.scan(videOuBlanc, 'antigravity', profile);
+          const relatifs = cheminsConsultes.filter((c) => !path.isAbsolute(c));
+          assert.deepStrictEqual(relatifs, [], `${profile.id} (${JSON.stringify(videOuBlanc)}) : aucun chemin relatif consulté sur le disque`);
+          assert.strictEqual(scan.items.filter((i) => i.type === 'soul').length, 0, `${profile.id} : aucune âme lue`);
+          assert.strictEqual(scan.soulStat.tokenCount, 0, `${profile.id} : coût 0`);
+          assert.strictEqual(scan.soulStat.directoryPath, '', `${profile.id} : aucun chemin par défaut relatif`);
+        } finally {
+          rawFs.existsSync = origExistsSync;
+          rawFs.statSync = origStatSync;
+          rawFs.readFileSync = origReadFileSync;
+          rawFs.readdirSync = origReaddirSync;
+          rawFsPromises.stat = origPromisesStat;
+          rawFsPromises.readFile = origPromisesReadFile;
+          rawFsPromises.readdir = origPromisesReaddir;
+        }
+      }
+    }
+  });
+
+  // Chantier 2.6.0, lot LR (D-19) : les règles d'un plugin (global ou du projet) restent comptées
+  // dans les deux profils et portent la marque unverifiedPluginRule, sans incrémenter warningCount.
+  test('20. D-19 : règles de plugin comptées dans les deux profils et marquées non vérifiées', async () => {
+    const corpsPlugin = '---\ntrigger: always_on\ndescription: Règle fournie par le plugin.\n---\n# Règle plugin\nContenu P.';
+    const corpsHorsPlugin = '---\ntrigger: always_on\ndescription: Règle normale hors plugin.\n---\n# Règle normale\nContenu N.';
+
+    const projet = path.join(tempBaseDir, 'd19-plugins', 'projet');
+    const reglePluginLocale = path.join(projet, '.agents', 'plugins', 'greffon', 'rules', 'r-plugin.md');
+    const regleLocale = path.join(projet, '.agents', 'rules', 'r-normale.md');
+    await writeFile(reglePluginLocale, corpsPlugin);
+    await writeFile(regleLocale, corpsHorsPlugin);
+
+    const globalDir = path.join(tempBaseDir, 'd19-plugins', '.gemini', 'config');
+    const reglePluginGlobale = path.join(globalDir, 'plugins', 'greffon', 'rules', 'r-plugin.md');
+    const regleGlobale = path.join(globalDir, 'rules', 'r-normale.md');
+    await writeFile(reglePluginGlobale, corpsPlugin);
+    await writeFile(regleGlobale, corpsHorsPlugin);
+
+    const cas = [
+      {
+        portee: 'local',
+        cheminPlugin: reglePluginLocale,
+        cheminNormal: regleLocale,
+        scan: (p: AntigravityBehaviorProfile) => LocalScanner.scan(workspaceFor(projet), p),
+      },
+      {
+        portee: 'global',
+        cheminPlugin: reglePluginGlobale,
+        cheminNormal: regleGlobale,
+        scan: (p: AntigravityBehaviorProfile) => GlobalScanner.scan(globalDir, 'antigravity', p),
+      },
+    ];
+
+    for (const { portee, cheminPlugin, cheminNormal, scan } of cas) {
+      const attenduPlugin = countTokens(formatPermanentRule(cheminPlugin, '\n# Règle plugin\nContenu P.').text);
+      const attenduNormal = countTokens(formatPermanentRule(cheminNormal, '\n# Règle normale\nContenu N.').text);
+
+      for (const profile of [ANTIGRAVITY_PROFILES['2.5.5'], ANTIGRAVITY_PROFILES['2.6.0']]) {
+        const res = await scan(profile);
+        const rPlugin = res.items.find((i) => i.id === 'greffon:r-plugin')!;
+        const rNormale = res.items.find((i) => i.id === 'r-normale')!;
+
+        assert.ok(rPlugin, `${portee} ${profile.id} : règle de plugin présente`);
+        assert.strictEqual(rPlugin.metadata?.unverifiedPluginRule, true, `${portee} ${profile.id} : marque posée`);
+        assert.strictEqual(rPlugin.tokenCount, attenduPlugin, `${portee} ${profile.id} : règle de plugin comptée`);
+        assert.strictEqual(rNormale.metadata?.unverifiedPluginRule, undefined, `${portee} ${profile.id} : hors plugin sans marque`);
+        assert.strictEqual(res.rulesStat.activeCount, 2, `${portee} ${profile.id} : deux règles actives`);
+        assert.strictEqual(res.rulesStat.tokenCount, attenduPlugin + attenduNormal, `${portee} ${profile.id} : cumul dans la jauge`);
+        assert.strictEqual(res.rulesStat.warningCount, 0, `${portee} ${profile.id} : unverifiedPluginRule n'est pas un warning`);
+      }
+    }
   });
 });

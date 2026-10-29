@@ -21,6 +21,8 @@ export interface AntigravityRuleItemOptions {
   /** Suffixe ajouté au titre (ex: « [Plugin: x] »). */
   nameSuffix?: string;
   pluginName?: string;
+  /** Règle d'un plugin : comptée par prudence, chargement non vérifié dans aucune version (D-19). */
+  unverifiedPluginRule?: boolean;
   directoryScope?: string;
   /** Dossier parent d'où la règle est héritée (R2) : la carte est verrouillée. */
   inheritedFrom?: string;
@@ -90,6 +92,7 @@ export async function buildAntigravityRuleItem(filePath: string, options: Antigr
     metadata: {
       ...(options.spreadFrontmatter ? frontmatter : {}),
       ...(options.pluginName ? { pluginName: options.pluginName } : {}),
+      ...(options.unverifiedPluginRule ? { unverifiedPluginRule: true } : {}),
       ...(options.directoryScope !== undefined ? { directoryScope: options.directoryScope } : {}),
       ...(options.inheritedFrom !== undefined ? { inheritedFrom: options.inheritedFrom, locked: true } : {}),
       ...(options.fromRulesJson ? { fromRulesJson: true } : {}),

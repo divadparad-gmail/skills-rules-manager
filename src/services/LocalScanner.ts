@@ -186,7 +186,7 @@ export class LocalScanner {
                 items.push(skillItem);
               }
 
-              // 2. Rules du plugin
+              // 2. Rules du plugin (D-19 : comptées par prudence, chargement non vérifié)
               const pRulesDir = path.join(pPath, 'rules');
               if (fs.existsSync(pRulesDir)) {
                 for (const rPath of await listFlatRuleFiles(pRulesDir)) {
@@ -197,6 +197,7 @@ export class LocalScanner {
                     fallbackDescription: `Règle du plugin ${pFolder.name}`,
                     nameSuffix: `[Plugin: ${pFolder.name}]`,
                     pluginName: pFolder.name,
+                    unverifiedPluginRule: true,
                     profile,
                   });
                   accountRule(ruleItem);

@@ -21,9 +21,53 @@ import {
   AntigravityBehaviorProfile,
   GLOBAL_SOUL_FILES,
   GLOBAL_SOUL_RULE_LABEL,
+  GlobalSoulId,
   LEGACY_GLOBAL_SKILLS_DIR,
 } from '../antigravity/behavior';
 import { geminiRootFromGlobalPath } from '../antigravity/behaviorProfile';
+
+export interface GlobalSoulCandidate {
+  id: GlobalSoulId;
+  path: string;
+  verified: boolean;
+}
+
+/**
+ * Âmes globales candidates d'Antigravity pour un dossier `<gemini>/config` donné.
+ * Sans dossier global connu (chaîne vide, blanche ou chemin relatif), renvoie une liste vide pour
+ * ne jamais résoudre `AGENTS.md` ou `GEMINI.md` dans le dossier courant de l'hôte.
+ */
+export function globalSoulCandidates(
+  globalPath: string,
+  profile: AntigravityBehaviorProfile = ANTIGRAVITY_PROFILES['2.5.5']
+): GlobalSoulCandidate[] {
+  const trimmed = globalPath.trim();
+  if (!trimmed || !path.isAbsolute(trimmed)) {
+    return [];
+  }
+  const geminiRoot = geminiRootFromGlobalPath(trimmed);
+  if (!geminiRoot || !path.isAbsolute(geminiRoot)) {
+    return [];
+  }
+  return GLOBAL_SOUL_FILES.map((soul) => ({
+    id: soul.id,
+    path: path.join(soul.dir === 'gemini' ? geminiRoot : trimmed, path.basename(soul.id)),
+    verified: profile.verifiedGlobalSouls.includes(soul.id),
+  }));
+}
+
+/**
+ * Chemin affiché par défaut pour l'âme globale d'Antigravity (`<gemini>/GEMINI.md`), ou chaîne
+ * vide si le dossier global est inconnu ou relatif.
+ */
+export function defaultAntigravityGlobalSoulPath(globalPath: string): string {
+  const trimmed = globalPath.trim();
+  if (!trimmed || !path.isAbsolute(trimmed)) {
+    return '';
+  }
+  const geminiRoot = geminiRootFromGlobalPath(trimmed);
+  return geminiRoot && path.isAbsolute(geminiRoot) ? path.join(geminiRoot, 'GEMINI.md') : '';
+}
 
 let vscodeModule: any = null;
 try {
@@ -37,6 +81,9 @@ export class GlobalScanner {
    * Lit la liste des exclusions déclarées dans skills.json
    */
   public static async getExcludedSkillIds(configDir: string): Promise<string[]> {
+    if (!configDir.trim()) {
+      return [];
+    }
     const skillsJsonPath = path.join(configDir, 'skills.json');
     if (!fs.existsSync(skillsJsonPath)) {
       return [];
@@ -69,7 +116,10 @@ export class GlobalScanner {
     skillsStat: TokenCategoryStat;
     excludedIds: string[];
   }> {
-    const globalPath = getEffectiveGlobalAntigravityPath(customGlobalPath);
+    const globalPath =
+      customGlobalPath !== undefined && customGlobalPath.trim().length === 0
+        ? ''
+        : getEffectiveGlobalAntigravityPath(customGlobalPath);
 
     const items: ResourceItem[] = [];
     const excludedIds = await this.getExcludedSkillIds(globalPath);
@@ -99,7 +149,7 @@ export class GlobalScanner {
       }
     };
 
-    const skillsDir = path.join(globalPath, 'skills');
+    const skillsDir = globalPath ? path.join(globalPath, 'skills') : '';
     const claudeGlobalPath = getEffectiveGlobalClaudePath();
 
     // 1.A. Si Antigravity : skills globaux (~/.gemini/config/skills), skills intégrés (F7, un seul
@@ -112,7 +162,7 @@ export class GlobalScanner {
         ? { idPrefix: 'antigravity/', legacyLocation: true, notReadBy: profile.id }
         : { idPrefix: 'antigravity/', legacyLocation: true };
       const skillSources = [
-        { dir: skillsDir, options: {} },
+        ...(skillsDir ? [{ dir: skillsDir, options: {} }] : []),
         ...(geminiRoot
           ? [
             { dir: path.join(geminiRoot, profile.builtinSkillsDir), options: { builtin: true } },
@@ -220,13 +270,9 @@ export class GlobalScanner {
     if (targetTool === 'antigravity') {
       // Âmes globales Antigravity : fichiers autonomes toujours actifs, tous chargés et cumulés, dans
       // l'ordre observé, chacun dans l'enveloppe <RULE[user_global]>. Une âme non vérifiée pour la
-      // version du profil reste comptée, par prudence, avec un badge « ❔ ».
-      const geminiRoot = path.dirname(globalPath);
-      const soulCandidates = GLOBAL_SOUL_FILES.map((soul) => ({
-        id: soul.id,
-        path: path.join(soul.dir === 'gemini' ? geminiRoot : globalPath, path.basename(soul.id)),
-        verified: profile.verifiedGlobalSouls.includes(soul.id),
-      }));
+      // version du profil reste comptée, par prudence, avec un badge « ❔ ». Sans dossier ~/.gemini
+      // connu, aucune âme globale n'est lue.
+      const soulCandidates = globalSoulCandidates(globalPath, profile);
 
       for (const candidate of soulCandidates) {
         if (fs.existsSync(candidate.path) && fs.statSync(candidate.path).isFile()) {
@@ -329,7 +375,7 @@ export class GlobalScanner {
       // Règles globales modulaires : ~/.gemini/config/rules/*.md uniquement (seul emplacement documenté)
       const rulesMap = new Map<string, ResourceItem>();
 
-      for (const filePath of await listFlatRuleFiles(path.join(globalPath, 'rules'))) {
+      for (const filePath of globalPath ? await listFlatRuleFiles(path.join(globalPath, 'rules')) : []) {
         const cleanId = path.basename(filePath).replace(/\.disabled$/, '').replace(/\.md$/, '');
         const newItem = await buildAntigravityRuleItem(filePath, {
           id: cleanId,
@@ -353,8 +399,8 @@ export class GlobalScanner {
       }
 
       // Scan des plugins globaux sous ~/.gemini/config/plugins/
-      const pluginsDir = path.join(globalPath, 'plugins');
-      if (fs.existsSync(pluginsDir)) {
+      const pluginsDir = globalPath ? path.join(globalPath, 'plugins') : '';
+      if (pluginsDir && fs.existsSync(pluginsDir)) {
         try {
           const pluginFolders = await fs.promises.readdir(pluginsDir, { withFileTypes: true });
           for (const pFolder of pluginFolders) {
@@ -375,7 +421,7 @@ export class GlobalScanner {
               items.push(skillItem);
             }
 
-            // Rules internes du plugin global
+            // Rules internes du plugin global (D-19 : comptées par prudence, chargement non vérifié)
             const pRulesDir = path.join(pluginRoot, 'rules');
             if (fs.existsSync(pRulesDir)) {
               for (const rPath of await listFlatRuleFiles(pRulesDir)) {
@@ -386,6 +432,7 @@ export class GlobalScanner {
                   fallbackDescription: `Règle du plugin global ${pFolder.name}`,
                   nameSuffix: `[Plugin: ${pFolder.name}]`,
                   pluginName: pFolder.name,
+                  unverifiedPluginRule: true,
                   profile,
                 });
                 accountRule(ruleItem);
@@ -545,7 +592,7 @@ export class GlobalScanner {
     const soulTokenTotal = activeSoulList.reduce((sum, i) => sum + (i.tokenCount || 0), 0);
 
     const defaultSkillsDir = targetTool === 'claude-code' ? path.join(claudeGlobalPath, 'skills') : skillsDir;
-    const defaultRulesDir = targetTool === 'claude-code' ? path.join(claudeGlobalPath, 'rules') : path.join(globalPath, 'rules');
+    const defaultRulesDir = targetTool === 'claude-code' ? path.join(claudeGlobalPath, 'rules') : (globalPath ? path.join(globalPath, 'rules') : '');
 
     // Antigravity : en-têtes des sections de plugin (F6), qui n'appartiennent à aucune carte ; aucune section en 2.6.0
     const skillsOverhead = isAntigravity && profile.pluginSectionHeader ? pluginSectionHeadersTokens(allSkillsList, pluginRoots) : 0;
@@ -583,7 +630,7 @@ export class GlobalScanner {
     const defaultSoulPath =
       targetTool === 'claude-code'
         ? path.join(claudeGlobalPath, 'CLAUDE.md')
-        : path.join(path.dirname(globalPath), 'GEMINI.md');
+        : defaultAntigravityGlobalSoulPath(globalPath);
 
     const soulStat: TokenCategoryStat = {
       type: 'soul',

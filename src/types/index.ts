@@ -91,6 +91,8 @@ export interface ResourceItem {
     notReadBy?: string;
     /** Profil d'Antigravity IDE (ex. « 2.5.5 ») qui n'a pas vérifié le chargement de cette âme globale, comptée par prudence. */
     unverifiedIn?: string;
+    /** Règle d'un plugin (global ou du projet) : comptée par prudence, chargement non vérifié dans aucune version (D-19). */
+    unverifiedPluginRule?: boolean;
     /** Skill de plugin listé une seule fois, sans section de plugin (profil 2.6.0). Absent en 2.5.5 (deux fois). */
     pluginListedOnce?: boolean;
     /** Nom brut d'un skill (sans préfixe de plugin), utilisé pour détecter les doublons. */

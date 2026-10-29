@@ -14,30 +14,53 @@ try {
 export const NEVER_LOADED_REFUSAL =
   'Règle de sous-dossier jamais chargée par Antigravity : elle est sans effet, activée ou non, et ne peut être ni basculée ni supprimée depuis le tableau de bord.';
 
+/** Message renvoyé quand un skill d'un emplacement non lu par la version du profil (`not-read`) est visé par une bascule ou une suppression. */
+export function notReadSkillRefusal(version?: string): string {
+  const versionLabel = version ? `Antigravity IDE ${version}` : 'Antigravity IDE';
+  return `Skill de l'ancien emplacement ~/.gemini/antigravity/skills/ non lu par ${versionLabel} : il est sans effet, activé ou non, et ne peut être ni basculé ni supprimé depuis le tableau de bord.`;
+}
+
 /** Antigravity (R1) : une règle de sous-dossier n'a aucun effet, activée ou non. */
 export function isNeverLoaded(item: ResourceItem): boolean {
   return item.metadata?.antigravityStatus === 'never-loaded';
 }
 
+/** Antigravity (profil 2.6.0) : un skill de l'ancien emplacement global n'est pas lu par l'IDE. */
+export function isNotRead(item: ResourceItem): boolean {
+  return item.metadata?.antigravityStatus === 'not-read';
+}
+
+/** Motif de refus si la ressource est jamais chargée (R1) ou non lue par le profil (`not-read`), sinon null. */
+export function getUnloadedResourceRefusal(item: ResourceItem): string | null {
+  if (isNeverLoaded(item)) {
+    return NEVER_LOADED_REFUSAL;
+  }
+  if (isNotRead(item)) {
+    return notReadSkillRefusal(item.metadata?.notReadBy);
+  }
+  return null;
+}
+
 /**
  * Vrai si la ressource peut basculer en masse et compter dans les compteurs ON/OFF : ni verrouillée
- * (héritée d'un dossier parent, intégrée), ni jamais chargée (R1).
+ * (héritée d'un dossier parent, intégrée, non lue), ni jamais chargée (R1).
  */
 export function isBulkToggleable(item: ResourceItem): boolean {
-  return !item.metadata?.locked && !isNeverLoaded(item);
+  return !item.metadata?.locked && !isNeverLoaded(item) && !isNotRead(item);
 }
 
 export class ToggleManager {
   /**
-   * Bascule une ressource connue de l'état chargé. Refuse une règle jamais chargée (R1), même si
-   * la demande arrive : la renommer en `.md.disabled` n'aurait aucun effet sur l'agent.
+   * Bascule une ressource connue de l'état chargé. Refuse une règle jamais chargée (R1) ou un skill
+   * d'un emplacement non lu par la version du profil (`not-read`), même si la demande arrive.
    */
   public static async toggleItem(
     item: ResourceItem,
     targetState: boolean
   ): Promise<{ success: boolean; newState: boolean; error?: string }> {
-    if (isNeverLoaded(item)) {
-      return { success: false, newState: item.enabled, error: NEVER_LOADED_REFUSAL };
+    const refusal = getUnloadedResourceRefusal(item);
+    if (refusal) {
+      return { success: false, newState: item.enabled, error: refusal };
     }
     return await this.toggle(item.path, targetState, item.type, item.scope, item.id);
   }

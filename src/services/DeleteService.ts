@@ -5,7 +5,7 @@ import { ResourceItem } from '../types';
 import { StateManager } from './StateManager';
 import { WorkspaceDetector } from './WorkspaceDetector';
 import { ScenarioManager } from './ScenarioManager';
-import { isNeverLoaded, NEVER_LOADED_REFUSAL } from './ToggleManager';
+import { getUnloadedResourceRefusal } from './ToggleManager';
 
 export class DeleteService {
   /**
@@ -15,10 +15,11 @@ export class DeleteService {
     item: ResourceItem
   ): Promise<{ success: boolean; error?: string }> {
     try {
-      // Antigravity (R1) : une règle de sous-dossier est sans effet, sa suppression n'apporte rien
-      if (isNeverLoaded(item)) {
-        vscode.window.showErrorMessage(`Suppression impossible : ${NEVER_LOADED_REFUSAL}`);
-        return { success: false, error: NEVER_LOADED_REFUSAL };
+      // Antigravity : une règle de sous-dossier (R1) ou un skill d'un emplacement non lu par le profil est sans effet
+      const unloadedRefusal = getUnloadedResourceRefusal(item);
+      if (unloadedRefusal) {
+        vscode.window.showErrorMessage(`Suppression impossible : ${unloadedRefusal}`);
+        return { success: false, error: unloadedRefusal };
       }
 
       const rootPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
