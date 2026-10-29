@@ -6,6 +6,7 @@ import {
   countBodyLines,
   countLines,
   isAppliedStatus,
+  RuleTruncation,
   SizeAdvice,
   SizeAdviceKind,
   sizeAdviceFor,
@@ -27,6 +28,8 @@ export interface AntigravityRuleItemOptions {
   spreadFrontmatter?: boolean;
   /** AGENTS.md / GEMINI.md : pas de frontmatter, toujours actif dans sa portée. */
   standalone?: boolean;
+  /** Coupe d'un corps trop long, selon le profil (`byte` par défaut). */
+  truncation?: RuleTruncation;
 }
 
 /**
@@ -47,7 +50,7 @@ export async function buildAntigravityRuleItem(filePath: string, options: Antigr
   const parsed = extractMarkdownTitleAndSummary(rawContent);
   const inspection: AntigravityRuleInspection = options.standalone
     ? {
-        ...(await measureAntigravitySoul(rawContent, filePath, fileStat)),
+        ...(await measureAntigravitySoul(rawContent, filePath, fileStat, { truncation: options.truncation })),
         trigger: 'always_on',
         ignored: false,
         isConditional: false,
@@ -57,7 +60,7 @@ export async function buildAntigravityRuleItem(filePath: string, options: Antigr
         issues: [],
         warningNoDescription: false,
       }
-    : await inspectAntigravityRule(rawContent, filePath, fileStat);
+    : await inspectAntigravityRule(rawContent, filePath, fileStat, { truncation: options.truncation });
   // R1 : une règle de sous-dossier n'est jamais chargée, quel que soit son frontmatter
   const status = options.directoryScope !== undefined && !SUBFOLDER_RULES_LOADED ? 'never-loaded' : inspection.status;
   const frontmatterDescription = typeof frontmatter.description === 'string' ? frontmatter.description.trim() : '';
@@ -97,6 +100,7 @@ export async function buildAntigravityRuleItem(filePath: string, options: Antigr
       bootTokenCount: inspection.bootTokenCount,
       bootCharCount: inspection.bootCharCount,
       ...(inspection.truncatedBytes > 0 ? { truncatedBytes: inspection.truncatedBytes, lostTokens: inspection.lostTokens } : {}),
+      ...(inspection.truncatedBytes > 0 && inspection.truncationRule ? { truncationRule: inspection.truncationRule } : {}),
       warningSizeExceeded: inspection.warningSizeExceeded,
       ...(sizeAdvice ? { sizeAdvice, warningLinesExceeded: true } : {}),
       warningNoDescription: inspection.warningNoDescription,

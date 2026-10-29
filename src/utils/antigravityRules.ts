@@ -20,6 +20,7 @@ import {
   formatConditionalIndexEntry,
   formatPermanentRule,
   RULE_BODY_MAX_BYTES,
+  RuleTruncation,
   splitRuleBody,
   validateGlobs,
 } from '../antigravity/behavior';
@@ -113,6 +114,14 @@ export interface AntigravityBootCost {
   truncatedBytes: number;
   /** Tokens de la partie coupée, jamais lue par l'agent. */
   lostTokens: number;
+  /** Coupe `line-end` appliquée à un corps coupé (voir TruncatedBody.rule) ; absent en coupe à l'octet. */
+  truncationRule?: 'line-end' | 'byte-fallback';
+}
+
+/** Options de mesure : étiquette des balises F1 (le chemin par défaut) et coupe du profil (`byte` par défaut). */
+export interface AntigravityMeasureOptions {
+  ruleLabel?: string;
+  truncation?: RuleTruncation;
 }
 
 export interface AntigravityRuleInspection extends AntigravityBootCost {
@@ -136,13 +145,18 @@ type FileStamp = { size: number; mtimeMs: number } | null | undefined;
 /**
  * Coût d'un corps injecté au démarrage dans l'enveloppe F1 (règle permanente, âme, règle
  * héritée), tronqué à 24 000 octets. `injected` à faux : seul le poids du corps est mesuré.
- * `ruleLabel` : étiquette des balises, le chemin du fichier par défaut.
  */
-async function measureBody(body: string, filePath: string, stamp: FileStamp, injected: boolean, ruleLabel = filePath): Promise<AntigravityBootCost> {
+async function measureBody(
+  body: string,
+  filePath: string,
+  stamp: FileStamp,
+  injected: boolean,
+  options: AntigravityMeasureOptions = {}
+): Promise<AntigravityBootCost> {
   const expanded = await expandRuleIncludes(body, filePath);
   const count = (text: string, variant: string) => countTokensForFile(filePath, stamp?.size, stamp?.mtimeMs, text, variant);
   const bodyTokenCount = count(expanded.content, 'body');
-  const permanent = formatPermanentRule(ruleLabel, expanded.content);
+  const permanent = formatPermanentRule(options.ruleLabel ?? filePath, expanded.content, options.truncation);
   const truncatedBytes = Math.max(0, expanded.byteSize - Buffer.byteLength(permanent.truncation.kept, 'utf8'));
   return {
     byteSize: expanded.byteSize,
@@ -152,6 +166,7 @@ async function measureBody(body: string, filePath: string, stamp: FileStamp, inj
     bodyTokenCount,
     truncatedBytes,
     lostTokens: permanent.truncation.lost ? count(permanent.truncation.lost, 'lost') : 0,
+    ...(permanent.truncation.rule ? { truncationRule: permanent.truncation.rule } : {}),
   };
 }
 
@@ -159,7 +174,12 @@ async function measureBody(body: string, filePath: string, stamp: FileStamp, inj
  * Inspecte un fichier `rules/*.md` d'Antigravity : validité du frontmatter, mode d'activation,
  * taille du corps après inclusions et coût au démarrage selon le trigger.
  */
-export async function inspectAntigravityRule(rawContent: string, filePath: string, stamp?: FileStamp): Promise<AntigravityRuleInspection> {
+export async function inspectAntigravityRule(
+  rawContent: string,
+  filePath: string,
+  stamp?: FileStamp,
+  options: Pick<AntigravityMeasureOptions, 'truncation'> = {}
+): Promise<AntigravityRuleInspection> {
   const check = checkAntigravityRuleFrontmatter(rawContent);
   const { metadata } = extractFrontmatter(rawContent);
   const verdict = check.trigger === 'glob' && !check.issues.includes('missing-globs')
@@ -172,7 +192,7 @@ export async function inspectAntigravityRule(rawContent: string, filePath: strin
     : 'active';
 
   // F1 : règle permanente, corps sans frontmatter ; F3 : entrée d'index ; F4 : glob et manual, rien
-  const cost = await measureBody(splitRuleBody(rawContent).body, filePath, stamp, check.trigger === 'always_on' && !check.ignored);
+  const cost = await measureBody(splitRuleBody(rawContent).body, filePath, stamp, check.trigger === 'always_on' && !check.ignored, options);
   if (check.trigger === 'model_decision' && !check.ignored) {
     const description = typeof metadata.description === 'string' ? metadata.description : '';
     const entry = formatConditionalIndexEntry(filePath, description);
@@ -321,6 +341,11 @@ export function ensureAntigravityTrigger(content: string): AntigravityRuleConver
  * le fichier entier est le corps, injecté dans l'enveloppe F1 et tronqué à 24 000 octets. Une âme
  * globale passe `ruleLabel` = GLOBAL_SOUL_RULE_LABEL ; une âme du projet ou d'un parent garde son chemin.
  */
-export async function measureAntigravitySoul(rawContent: string, filePath: string, stamp?: FileStamp, ruleLabel?: string): Promise<AntigravityBootCost> {
-  return measureBody(rawContent, filePath, stamp, true, ruleLabel);
+export async function measureAntigravitySoul(
+  rawContent: string,
+  filePath: string,
+  stamp?: FileStamp,
+  options: AntigravityMeasureOptions = {}
+): Promise<AntigravityBootCost> {
+  return measureBody(rawContent, filePath, stamp, true, options);
 }

@@ -237,7 +237,10 @@ export class GlobalScanner {
             const lineCount = rawContent.split(/\r\n|\r|\n/).length;
             const parsed = extractMarkdownTitleAndSummary(rawContent);
             // Enveloppe F1 à l'étiquette user_global, corps tronqué à 24 000 octets après inclusions
-            const measured = await measureAntigravitySoul(rawContent, candidate.path, stat, GLOBAL_SOUL_RULE_LABEL);
+            const measured = await measureAntigravitySoul(rawContent, candidate.path, stat, {
+              ruleLabel: GLOBAL_SOUL_RULE_LABEL,
+              truncation: profile.truncation,
+            });
             const ruleTokenCount = measured.bootTokenCount;
             const sizeAdvice = soulSizeAdvice(rawContent, measured.truncatedBytes);
 
@@ -265,6 +268,7 @@ export class GlobalScanner {
                 bootTokenCount: measured.bootTokenCount,
                 bootCharCount: measured.bootCharCount,
                 ...(measured.truncatedBytes > 0 ? { truncatedBytes: measured.truncatedBytes, lostTokens: measured.lostTokens } : {}),
+                ...(measured.truncationRule ? { truncationRule: measured.truncationRule } : {}),
                 warningSizeExceeded: measured.warningSizeExceeded,
                 ...(sizeAdvice ? { sizeAdvice, warningLinesExceeded: true } : {}),
               },
@@ -332,6 +336,7 @@ export class GlobalScanner {
           scope: 'global',
           fallbackDescription: 'Règle globale Antigravity',
           spreadFrontmatter: true,
+          truncation: profile.truncation,
         });
 
         // Un .md et son .md.disabled désignent la même règle : le fichier actif est prioritaire
@@ -358,12 +363,13 @@ export class GlobalScanner {
             const pluginRoot = path.join(pluginsDir, pFolder.name);
             pluginRoots.set(pFolder.name, pluginRoot);
 
-            // Skills internes du plugin global (F5 + F6 : listés deux fois)
+            // Skills internes du plugin global (F5 + F6 : listés deux fois en 2.5.5, une fois en 2.6.0)
             for (const itemFolder of await listSkillFolders(path.join(pluginRoot, 'skills'))) {
               const skillItem = await buildAntigravitySkillItem(itemFolder, {
                 scope: 'global',
                 fallbackDescription: () => `Skill du plugin global ${pFolder.name}`,
                 pluginName: pFolder.name,
+                pluginSkillIndexCopies: profile.pluginSkillIndexCopies,
               });
               if (skillItem.enabled) skillsCharTotal += skillItem.charCount || 0;
               items.push(skillItem);
@@ -380,6 +386,7 @@ export class GlobalScanner {
                   fallbackDescription: `Règle du plugin global ${pFolder.name}`,
                   nameSuffix: `[Plugin: ${pFolder.name}]`,
                   pluginName: pFolder.name,
+                  truncation: profile.truncation,
                 });
                 accountRule(ruleItem);
                 items.push(ruleItem);
@@ -540,8 +547,8 @@ export class GlobalScanner {
     const defaultSkillsDir = targetTool === 'claude-code' ? path.join(claudeGlobalPath, 'skills') : skillsDir;
     const defaultRulesDir = targetTool === 'claude-code' ? path.join(claudeGlobalPath, 'rules') : path.join(globalPath, 'rules');
 
-    // Antigravity : en-têtes des sections de plugin (F6), qui n'appartiennent à aucune carte
-    const skillsOverhead = isAntigravity ? pluginSectionHeadersTokens(allSkillsList, pluginRoots) : 0;
+    // Antigravity : en-têtes des sections de plugin (F6), qui n'appartiennent à aucune carte ; aucune section en 2.6.0
+    const skillsOverhead = isAntigravity && profile.pluginSectionHeader ? pluginSectionHeadersTokens(allSkillsList, pluginRoots) : 0;
     const skillsTokenWithOverhead = skillsTokenTotal + skillsOverhead;
 
     const skillsStat: TokenCategoryStat = {

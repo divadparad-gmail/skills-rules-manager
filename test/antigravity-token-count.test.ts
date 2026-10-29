@@ -484,4 +484,106 @@ describe('Suite de Tests : comptage des tokens au démarrage d\'Antigravity (lot
     const projet = local.items.find((i) => i.type === 'soul')!;
     assert.strictEqual(projet.metadata?.bootTokenCount, countTokens(`<RULE[${ameProjet}]>\n# Âme du projet\nConsigne P.\n</RULE[${ameProjet}]>\n`));
   });
+
+  // Chantier 2.6.0, lot L6 : en 2.6.0, un skill de plugin figure une seule fois dans <skills>, sans
+  // section <plugins> (phase 2c pour un plugin global, S3 = false pour un plugin du projet).
+  test('16. F5 et F6 par profil : un plugin à un skill, deux copies et un en-tête en 2.5.5, une copie sans en-tête en 2.6.0', async () => {
+    const skill = '---\nname: skill-de-plugin\ndescription: Skill fourni par le plugin.\n---\n# Corps';
+    const projet = path.join(tempBaseDir, 'plugin-profils', 'projet');
+    const pluginLocal = path.join(projet, '.agents', 'plugins', 'plugin-fictif');
+    await writeFile(path.join(pluginLocal, 'plugin.json'), '{ "description": "Jamais injectée en 2.6.0." }');
+    await writeFile(path.join(pluginLocal, 'skills', 'skill-de-plugin', 'SKILL.md'), skill);
+    const globalDir = path.join(tempBaseDir, 'plugin-profils', '.gemini', 'config');
+    const pluginGlobal = path.join(globalDir, 'plugins', 'plugin-fictif');
+    await writeFile(path.join(pluginGlobal, 'plugin.json'), '{}');
+    await writeFile(path.join(pluginGlobal, 'skills', 'skill-de-plugin', 'SKILL.md'), skill);
+
+    const cas = [
+      { portee: 'local', racine: pluginLocal, scan: (p: AntigravityBehaviorProfile) => LocalScanner.scan(workspaceFor(projet), p) },
+      { portee: 'global', racine: pluginGlobal, scan: (p: AntigravityBehaviorProfile) => GlobalScanner.scan(globalDir, 'antigravity', p) },
+    ];
+    for (const { portee, racine, scan } of cas) {
+      const ligne = countTokens(formatSkillIndexLine('skill-de-plugin', path.join(racine, 'skills', 'skill-de-plugin', 'SKILL.md'), 'Skill fourni par le plugin.'));
+      const entete = countTokens(formatPluginSectionHeader('plugin-fictif', racine));
+
+      const v255 = await scan(ANTIGRAVITY_PROFILES['2.5.5']);
+      const s255 = v255.items.find((i) => i.id === 'plugin-fictif:skill-de-plugin')!;
+      assert.strictEqual(s255.tokenCount, 2 * ligne, `${portee} 2.5.5 : deux copies`);
+      assert.strictEqual(s255.metadata?.pluginListedOnce, undefined, `${portee} 2.5.5 : aucune marque`);
+      assert.strictEqual(v255.skillsStat.overheadTokens, entete, `${portee} 2.5.5 : un en-tête de section`);
+      assert.strictEqual(v255.skillsStat.tokenCount, 2 * ligne + entete);
+
+      const v260 = await scan(ANTIGRAVITY_PROFILES['2.6.0']);
+      const s260 = v260.items.find((i) => i.id === 'plugin-fictif:skill-de-plugin')!;
+      assert.strictEqual(s260.tokenCount, ligne, `${portee} 2.6.0 : une copie`);
+      assert.strictEqual(s260.metadata?.pluginListedOnce, true);
+      assert.strictEqual(v260.skillsStat.overheadTokens, 0, `${portee} 2.6.0 : aucune section de plugin`);
+      assert.strictEqual(v260.skillsStat.tokenCount, ligne);
+    }
+  });
+
+  // D-18 : la coupe à la dernière fin de ligne reproduit les 5 960 octets de la 2.6.0 ; c'est une
+  // seule mesure. La 2.5.5 garde la coupe à l'octet (5 957).
+  test('17. Troncature par profil : r-tronque.md coupé de 5 957 octets en 2.5.5, de 5 960 en 2.6.0', async () => {
+    const source = path.join(ROOT, 'test', 'scenarios', 'antigravity-injection-contexte', '.agents', 'rules', 'r-tronque.md');
+    const projet = path.join(tempBaseDir, 'troncature-profils');
+    const regle = path.join(projet, '.agents', 'rules', 'r-tronque.md');
+    await writeFile(regle, await fs.promises.readFile(source, 'utf8'));
+    const corps = splitRuleBody(await fs.promises.readFile(regle, 'utf8')).body;
+
+    const attendu = [
+      { profile: ANTIGRAVITY_PROFILES['2.5.5'], coupe: 5957, regleCoupe: undefined },
+      { profile: ANTIGRAVITY_PROFILES['2.6.0'], coupe: 5960, regleCoupe: 'line-end' },
+    ];
+    for (const { profile, coupe, regleCoupe } of attendu) {
+      const scan = await LocalScanner.scan(workspaceFor(projet), profile);
+      const item = scan.items.find((i) => i.id === 'r-tronque')!;
+      assert.strictEqual(item.metadata?.truncatedBytes, coupe, profile.id);
+      assert.strictEqual(item.metadata?.truncationRule, regleCoupe, profile.id);
+      const { kept } = truncateRuleBody(corps, profile.truncation);
+      const texte = `<RULE[${regle}]>\n${kept.replace(/^(?:\r?\n)+/, '')}<truncated ${coupe} bytes>\n</RULE[${regle}]>\n`;
+      assert.strictEqual(item.metadata?.bootTokenCount, countTokens(texte), `${profile.id} : seule la partie gardée est comptée`);
+    }
+    const ligne = truncateRuleBody(corps, 'line-end');
+    assert.ok(ligne.lost.startsWith('\n'), 'La coupe tombe juste avant une fin de ligne');
+    assert.strictEqual(ligne.kept + ligne.lost, corps);
+    assert.ok(!('rule' in truncateRuleBody(corps)), 'La coupe à l\'octet ne change pas de forme');
+  });
+
+  // ❔ Non vérifié : sans fin de ligne avant la limite, la coupe 2.6.0 se replie sur une coupe à l'octet.
+  test('18. Troncature line-end : repli à l\'octet sans fin de ligne avant la limite (non vérifié)', async () => {
+    // Corps d'une règle à frontmatter : la fin de ligne du `---` fermant ne compte ni dans la limite ni comme coupe
+    const sansFinDeLigne = '\n' + 'a'.repeat(30000);
+    const repli = truncateRuleBody(sansFinDeLigne, 'line-end');
+    assert.strictEqual(repli.rule, 'byte-fallback');
+    assert.strictEqual(Buffer.byteLength(repli.kept, 'utf8'), 24001, 'Fin de ligne de tête + 24 000 octets');
+    assert.strictEqual(repli.truncatedBytes, 6000);
+    assert.strictEqual(truncateRuleBody(sansFinDeLigne, 'byte').truncatedBytes, 6001, 'Coupe 2.5.5 inchangée');
+
+    // Une fin de ligne au-delà de la limite ne sert pas ; le recul UTF-8 reste appliqué
+    const apresLimite = truncateRuleBody('é'.repeat(13000) + '\nfin', 'line-end');
+    assert.strictEqual(apresLimite.rule, 'byte-fallback');
+    assert.strictEqual(Buffer.byteLength(apresLimite.kept, 'utf8'), 24000);
+    assert.strictEqual(apresLimite.kept + apresLimite.lost, 'é'.repeat(13000) + '\nfin');
+
+    // Fichier sans frontmatter (âme) : aucune fin de ligne de tête
+    assert.strictEqual(truncateRuleBody('b'.repeat(30000), 'line-end').truncatedBytes, 6000);
+
+    // Une seule fin de ligne avant la limite suffit ; le \r d'un CRLF reste gardé (non vérifié)
+    const crlf = truncateRuleBody('x'.repeat(100) + '\r\n' + 'y'.repeat(30000), 'line-end');
+    assert.strictEqual(crlf.rule, 'line-end');
+    assert.strictEqual(crlf.kept, 'x'.repeat(100) + '\r');
+    // Sous la limite, rien n'est coupé
+    assert.deepStrictEqual(truncateRuleBody('\n' + 'c'.repeat(24000), 'line-end'), { kept: '\n' + 'c'.repeat(24000), lost: '', truncatedBytes: 0 });
+
+    // Par le scanner : la carte porte le repli, que l'infobulle signale comme non vérifié
+    const projet = path.join(tempBaseDir, 'troncature-repli');
+    await writeFile(path.join(projet, '.agents', 'rules', 'une-ligne.md'), `---\ntrigger: always_on\n---\n${'z'.repeat(30000)}`);
+    const v260 = await LocalScanner.scan(workspaceFor(projet), ANTIGRAVITY_PROFILES['2.6.0']);
+    const item = v260.items.find((i) => i.id === 'une-ligne')!;
+    assert.deepStrictEqual([item.metadata?.truncatedBytes, item.metadata?.truncationRule], [6000, 'byte-fallback']);
+    const v255 = await LocalScanner.scan(workspaceFor(projet), ANTIGRAVITY_PROFILES['2.5.5']);
+    const item255 = v255.items.find((i) => i.id === 'une-ligne')!;
+    assert.deepStrictEqual([item255.metadata?.truncatedBytes, item255.metadata?.truncationRule], [6001, undefined]);
+  });
 });

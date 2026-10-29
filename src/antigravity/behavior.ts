@@ -39,6 +39,12 @@ export type GlobalSoulId = (typeof GLOBAL_SOUL_FILES)[number]['id'];
  */
 export const GLOBAL_SOUL_RULE_LABEL = 'user_global';
 
+/**
+ * Coupe d'un corps au-delà de RULE_BODY_MAX_BYTES : à l'octet (`byte`), ou à la dernière fin de
+ * ligne avant la limite (`line-end`). Voir truncateRuleBody.
+ */
+export type RuleTruncation = 'byte' | 'line-end';
+
 export interface AntigravityBehaviorProfile {
   id: AntigravityProfileId;
   /** Version testée, citée dans les infobulles. */
@@ -62,6 +68,19 @@ export interface AntigravityBehaviorProfile {
    * actives, mais non vérifiées pour cette version : comptées par prudence, avec un badge « ❔ ».
    */
   verifiedGlobalSouls: readonly GlobalSoulId[];
+  /**
+   * F5 et F6 : nombre de lignes d'index d'un skill de plugin. En 2.5.5, la ligne figure dans
+   * l'index des skills et dans la section du plugin (2) ; en 2.6.0, une seule fois dans `<skills>`,
+   * sans section `<plugins>` (phase 2c pour un plugin global, S3 pour un plugin du projet).
+   */
+  pluginSkillIndexCopies: 1 | 2;
+  /** F6 : en-tête de section injecté pour chaque plugin qui a un skill actif (absent en 2.6.0). */
+  pluginSectionHeader: boolean;
+  /**
+   * Coupe d'un corps trop long : à l'octet en 2.5.5 (5 957 octets coupés sur `r-tronque.md`) ;
+   * à la dernière fin de ligne en 2.6.0, déduit d'une seule mesure (5 960 octets sur le même fichier).
+   */
+  truncation: RuleTruncation;
 }
 
 export const ANTIGRAVITY_PROFILES: Readonly<Record<AntigravityProfileId, AntigravityBehaviorProfile>> = Object.freeze({
@@ -73,6 +92,9 @@ export const ANTIGRAVITY_PROFILES: Readonly<Record<AntigravityProfileId, Antigra
     mcpToolCacheDir: path.join('antigravity-ide', 'mcp'),
     legacyGlobalSkills: 'unverified',
     verifiedGlobalSouls: Object.freeze(['GEMINI.md'] as const),
+    pluginSkillIndexCopies: 2,
+    pluginSectionHeader: true,
+    truncation: 'byte',
   }),
   '2.6.0': Object.freeze({
     id: '2.6.0',
@@ -82,6 +104,9 @@ export const ANTIGRAVITY_PROFILES: Readonly<Record<AntigravityProfileId, Antigra
     mcpToolCacheDir: path.join('antigravity', 'mcp'),
     legacyGlobalSkills: 'not-read',
     verifiedGlobalSouls: Object.freeze(GLOBAL_SOUL_FILES.map((soul) => soul.id)),
+    pluginSkillIndexCopies: 1,
+    pluginSectionHeader: false,
+    truncation: 'line-end',
   }),
 });
 
@@ -283,7 +308,7 @@ export function convertClaudePaths(paths: string[]): PathsConversion {
  * Plafond d'une règle permanente ou d'une âme, en octets UTF-8 du corps sans frontmatter,
  * inclusions développées. Le corps commence juste après le `---` fermant : sa fin de ligne en fait
  * partie. Mesuré par la suite de régression : 5 957 octets coupés sur `r-tronque.md`, soit exactement
- * le corps moins 24 000 octets. Observé en phase 1 : 14 978 octets coupés sur
+ * le corps moins 24 000 octets (2.5.5 ; 5 960 en 2.6.0, voir truncateRuleBody). Observé en phase 1 : 14 978 octets coupés sur
  * `06-rule-warn-size-exceeded-24kb.md`, alors une copie de 39 106 octets en CRLF (3 CR dans le
  * corps) ; la fixture actuelle, en LF, ne reproduit pas cet état.
  * Antigravity compte les CR comme des octets du corps (déduit de l'enquête L1b, non testé directement).
@@ -305,19 +330,44 @@ export interface TruncatedBody {
   lost: string;
   /** Octets coupés, tels qu'annoncés par le marqueur `<truncated N bytes>`. */
   truncatedBytes: number;
+  /**
+   * Coupe `line-end` appliquée, seulement quand le corps est coupé : `line-end` (déduit d'une seule
+   * mesure), ou `byte-fallback` quand aucune fin de ligne ne précède la limite (❔ non vérifié).
+   */
+  rule?: 'line-end' | 'byte-fallback';
+}
+
+/** Recule au début du caractère UTF-8 qui contient l'octet `end`. */
+function utf8Boundary(bytes: Buffer, end: number): number {
+  while (end > 0 && (bytes[end] & 0xc0) === 0x80) end--;
+  return end;
 }
 
 /**
- * Coupe un corps à RULE_BODY_MAX_BYTES octets sans couper un caractère UTF-8. Ce que fait
- * Antigravity au milieu d'un caractère n'a pas été observé : on recule au caractère précédent.
+ * Coupe un corps trop long, selon la règle du profil.
+ * - `byte` (2.5.5) : à RULE_BODY_MAX_BYTES octets, sans couper un caractère UTF-8. Ce que fait
+ *   Antigravity au milieu d'un caractère n'a pas été observé : on recule au caractère précédent.
+ * - `line-end` (2.6.0, déduit d'une seule mesure) : juste avant la dernière fin de ligne (`\n`) des
+ *   24 000 premiers octets. Antigravity compte ces octets sans la fin de ligne du `---` fermant
+ *   (« original 29956 bytes » pour `r-tronque.md`, dont le corps fait ici 29 957 octets) : la limite
+ *   et la fenêtre sont décalées d'autant. Le `\r` d'un CRLF reste dans la partie gardée (❔ non vérifié).
+ *   ❔ Non vérifié : sans aucune fin de ligne avant la limite, on se replie sur une coupe à l'octet
+ *   (`byte-fallback`), avec le même décalage et le même recul UTF-8.
  */
-export function truncateRuleBody(body: string): TruncatedBody {
+export function truncateRuleBody(body: string, mode: RuleTruncation = 'byte'): TruncatedBody {
   const bytes = Buffer.from(body, 'utf8');
-  if (bytes.length <= RULE_BODY_MAX_BYTES) return { kept: body, lost: '', truncatedBytes: 0 };
-  let end = RULE_BODY_MAX_BYTES;
-  while (end > 0 && (bytes[end] & 0xc0) === 0x80) end--;
+  const lead = mode === 'line-end' ? (/^\r?\n/.exec(body)?.[0].length ?? 0) : 0;
+  const limit = RULE_BODY_MAX_BYTES + lead;
+  if (bytes.length <= limit) return { kept: body, lost: '', truncatedBytes: 0 };
+  let end = utf8Boundary(bytes, limit);
+  let rule: TruncatedBody['rule'];
+  if (mode === 'line-end') {
+    const lineEnd = bytes.lastIndexOf(0x0a, limit - 1);
+    rule = lineEnd >= lead ? 'line-end' : 'byte-fallback';
+    if (rule === 'line-end') end = lineEnd;
+  }
   const kept = bytes.subarray(0, end).toString('utf8');
-  return { kept, lost: body.slice(kept.length), truncatedBytes: bytes.length - end };
+  return { kept, lost: body.slice(kept.length), truncatedBytes: bytes.length - end, ...(rule ? { rule } : {}) };
 }
 
 /**
@@ -336,11 +386,15 @@ export function toAntigravityUri(filePath: string): string {
  * F1 (phase 1) : règle permanente, âme ou règle héritée, injectée entre deux balises qui portent
  * le chemin absolu (Windows, avec `\`) : le chemin apparaît deux fois. Une âme globale porte
  * l'étiquette GLOBAL_SOUL_RULE_LABEL à la place du chemin. Le corps est injecté sans frontmatter
- * et, au-delà du plafond, se termine par `<truncated N bytes>`. Les sauts de ligne exacts autour
- * du corps n'ont pas été observés.
+ * et, au-delà du plafond, se termine par `<truncated N bytes>` (coupe selon `truncation` du profil).
+ * Les sauts de ligne exacts autour du corps n'ont pas été observés.
  */
-export function formatPermanentRule(ruleLabel: string, body: string): { text: string; truncation: TruncatedBody } {
-  const truncation = truncateRuleBody(body);
+export function formatPermanentRule(
+  ruleLabel: string,
+  body: string,
+  truncationMode: RuleTruncation = 'byte'
+): { text: string; truncation: TruncatedBody } {
+  const truncation = truncateRuleBody(body, truncationMode);
   const marker = truncation.truncatedBytes > 0 ? `<truncated ${truncation.truncatedBytes} bytes>` : '';
   const shown = truncation.kept.replace(/^(?:\r?\n)+/, '');
   return { text: `<RULE[${ruleLabel}]>\n${shown}${marker}\n</RULE[${ruleLabel}]>\n`, truncation };
@@ -372,13 +426,14 @@ export function formatSkillIndexLine(name: string, skillMdPath: string, descript
 }
 
 /**
- * F6 (phase 2) : en-tête de la section d'un plugin. Ses skills y sont relistés au format F5, en
- * plus de l'index des skills : chaque skill de plugin est donc injecté deux fois.
+ * F6 (phase 2, 2.5.5) : en-tête de la section d'un plugin. Ses skills y sont relistés au format F5,
+ * en plus de l'index des skills : chaque skill de plugin est donc injecté deux fois. En 2.6.0, ni
+ * section ni seconde copie (`pluginSectionHeader`, `pluginSkillIndexCopies`). Valeur du profil 2.5.5.
  */
 export function formatPluginSectionHeader(pluginName: string, pluginRoot: string): string {
   return `# ${pluginName} (${toAntigravityUri(pluginRoot)})\nSkills:\n`;
 }
-export const PLUGIN_SKILL_INDEX_COPIES = 2;
+export const PLUGIN_SKILL_INDEX_COPIES = ANTIGRAVITY_PROFILES['2.5.5'].pluginSkillIndexCopies;
 
 /**
  * F7 (phase 1) : skills intégrés, listés dans l'index F5 et impossibles à retirer. Chemin relatif

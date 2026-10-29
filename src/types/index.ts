@@ -78,6 +78,11 @@ export interface ResourceItem {
     truncatedBytes?: number;
     /** Tokens de la partie coupée, jamais lue par l'agent. */
     lostTokens?: number;
+    /**
+     * Coupe à la fin de ligne (profil 2.6.0) appliquée à un corps coupé : `line-end`, déduit d'une
+     * seule mesure, ou `byte-fallback` sans fin de ligne avant la limite (non vérifié). Absent en coupe à l'octet.
+     */
+    truncationRule?: 'line-end' | 'byte-fallback';
     /** Skill intégré d'Antigravity (F7), toujours présent et impossible à retirer. */
     builtin?: boolean;
     /** Skill d'un ancien emplacement, documenté mais dont le chargement n'a pas été vérifié. */
@@ -86,6 +91,8 @@ export interface ResourceItem {
     notReadBy?: string;
     /** Profil d'Antigravity IDE (ex. « 2.5.5 ») qui n'a pas vérifié le chargement de cette âme globale, comptée par prudence. */
     unverifiedIn?: string;
+    /** Skill de plugin listé une seule fois, sans section de plugin (profil 2.6.0). Absent en 2.5.5 (deux fois). */
+    pluginListedOnce?: boolean;
     /** Nom brut d'un skill (sans préfixe de plugin), utilisé pour détecter les doublons. */
     rawId?: string;
     /** Sous-dossier (relatif au projet) d'une règle imbriquée, jamais chargée par Antigravity (R1). */

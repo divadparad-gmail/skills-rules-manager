@@ -72,6 +72,8 @@ export interface AntigravitySkillItemOptions {
   /** Préfixe de l'identifiant (ex. « .agent/ » pour un ancien emplacement). */
   idPrefix?: string;
   pluginName?: string;
+  /** Copies de la ligne d'un skill de plugin dans le prompt, selon le profil (2 par défaut, comme en 2.5.5). */
+  pluginSkillIndexCopies?: 1 | 2;
   /** Exclu par skills.json : la carte reste affichée, désactivée. */
   excluded?: boolean;
   /** Skill intégré d'Antigravity (F7) : verrouillé, toujours actif. */
@@ -100,7 +102,8 @@ export async function listSkillFolders(skillsDir: string): Promise<string[]> {
 
 /**
  * Construit la carte d'un skill Antigravity. Son coût au démarrage est sa ligne dans l'index des
- * skills (F5) ; un skill de plugin y figure aussi dans la section du plugin (F6), donc deux fois.
+ * skills (F5) ; en 2.5.5, un skill de plugin y figure aussi dans la section du plugin (F6), donc
+ * deux fois, et une seule fois en 2.6.0.
  */
 export async function buildAntigravitySkillItem(itemFolder: string, options: AntigravitySkillItemOptions): Promise<ResourceItem> {
   const entryName = path.basename(itemFolder);
@@ -130,13 +133,14 @@ export async function buildAntigravitySkillItem(itemFolder: string, options: Ant
 
   // F5 : la ligne porte le chemin de SKILL.md, même quand la carte est désactivée
   const indexLine = formatSkillIndexLine(name, skillMd, description);
-  const copies = options.pluginName ? PLUGIN_SKILL_INDEX_COPIES : 1;
+  const copies = options.pluginName ? options.pluginSkillIndexCopies ?? PLUGIN_SKILL_INDEX_COPIES : 1;
   const lineTokens = countTokensForFile(activeFile, fileStat?.size, fileStat?.mtimeMs, indexLine, 'f5');
 
   const metadata: NonNullable<ResourceItem['metadata']> = {
     tags,
     hasDisabledSuffix: !hasEnabledFile,
     ...(options.pluginName ? { pluginName: options.pluginName } : {}),
+    ...(options.pluginName && copies === 1 ? { pluginListedOnce: true } : {}),
     ...(options.pluginName || options.idPrefix ? { rawId: entryName } : {}),
     ...(options.excluded !== undefined ? { excludedInJson: options.excluded } : {}),
     ...(options.builtin ? { builtin: true, locked: true } : {}),
@@ -173,7 +177,8 @@ export async function buildAntigravitySkillItem(itemFolder: string, options: Ant
 
 /**
  * Tokens des en-têtes de section F6 des plugins qui ont au moins un skill actif. Les lignes de
- * leurs skills sont déjà comptées (deux fois) sur les cartes.
+ * leurs skills sont déjà comptées (deux fois) sur les cartes. Profil 2.5.5 seulement
+ * (`pluginSectionHeader`) : les scanners n'appellent pas cette fonction en 2.6.0.
  */
 export function pluginSectionHeadersTokens(items: ResourceItem[], pluginRoots: Map<string, string>): number {
   const plugins = new Set(

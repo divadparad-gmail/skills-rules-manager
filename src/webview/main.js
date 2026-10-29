@@ -813,6 +813,9 @@
     const boot = (meta.bootTokenCount || 0).toLocaleString('fr-FR');
     const tok = (item.tokenCount || 0).toLocaleString('fr-FR');
     if (item.type === 'skill' || item.type === 'workflow') {
+      if (meta.pluginName && meta.pluginListedOnce) {
+        return `Coût au démarrage : ${tok} tokens (sa ligne dans l'index des skills, une seule fois : Antigravity IDE 2.6.0 n'injecte plus de section de plugin)`;
+      }
       return meta.pluginName
         ? `Coût au démarrage : ${tok} tokens, car sa ligne est listée deux fois (index des skills et section du plugin)`
         : `Coût au démarrage : ${tok} tokens (sa ligne dans l'index des skills : nom, chemin de SKILL.md et description)`;
@@ -1970,8 +1973,18 @@
     const truncatedBytes = (isReadByAgent && item.metadata && item.metadata.truncatedBytes) || 0;
     if (truncatedBytes > 0) {
       const lost = (item.metadata.lostTokens || 0).toLocaleString('fr-FR');
+      // Profil 2.6.0 : coupe à la dernière fin de ligne (déduite) ou repli à l'octet (non vérifié)
+      const cutRules = {
+        'line-end': `Antigravity coupe le corps de ce fichier à la dernière fin de ligne avant 24 000 octets (frontmatter non compté, inclusions @[label](path) comprises)`,
+        'byte-fallback': `Antigravity coupe le corps de ce fichier à 24 000 octets (frontmatter non compté, inclusions @[label](path) comprises)`,
+      };
+      const cutNotes = {
+        'line-end': `\n🧮 Règle de coupe déduite d'une seule mesure (Antigravity IDE 2.6.0, r-tronque.md : 5 960 octets coupés).`,
+        'byte-fallback': `\n❔ Non vérifié : aucune fin de ligne ne précède la limite. L'extension suppose une coupe à l'octet ; le comportement d'Antigravity IDE 2.6.0 dans ce cas n'a pas été observé.`,
+      };
+      const cutRule = item.metadata.truncationRule;
       addBadge('pill-warn', '✂️ Tronquée',
-        `Antigravity coupe le corps de ce fichier à 24 000 octets (frontmatter non compté, inclusions @[label](path) comprises) : ${truncatedBytes.toLocaleString('fr-FR')} octets coupés, soit ≈ ${lost} tokens jamais lus par l'agent.\nLe coût affiché ne compte que la partie gardée.`);
+        `${cutRules[cutRule] || 'Antigravity coupe le corps de ce fichier à 24 000 octets (frontmatter non compté, inclusions @[label](path) comprises)'} : ${truncatedBytes.toLocaleString('fr-FR')} octets coupés, soit ≈ ${lost} tokens jamais lus par l'agent.\nLe coût affiché ne compte que la partie gardée.${cutNotes[cutRule] || ''}`);
     } else if (item.metadata && item.metadata.warningSizeExceeded) {
       const warnBadge = targetDoc.createElement('span');
       warnBadge.className = 'item-badge-pill pill-warn';

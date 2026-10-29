@@ -140,6 +140,7 @@ export class LocalScanner {
               id: isPrimary ? cleanId : `${path.basename(path.dirname(dir))}/${cleanId}`,
               scope: 'local',
               fallbackDescription: 'Règle locale du projet',
+              truncation: profile.truncation,
             }));
           }
         }
@@ -153,6 +154,7 @@ export class LocalScanner {
               scope: 'local',
               fallbackDescription: 'Règle déclarée par .agents/rules.json',
               fromRulesJson: true,
+              truncation: profile.truncation,
             }));
           }
         }
@@ -172,12 +174,13 @@ export class LocalScanner {
               const pPath = path.join(pluginsDir, pFolder.name);
               pluginRoots.set(pFolder.name, pPath);
 
-              // 1. Skills du plugin (F5 + F6 : listés deux fois)
+              // 1. Skills du plugin (F5 + F6 : listés deux fois en 2.5.5, une fois en 2.6.0)
               for (const sFolder of await listSkillFolders(path.join(pPath, 'skills'))) {
                 const skillItem = await buildAntigravitySkillItem(sFolder, {
                   scope: 'local',
                   fallbackDescription: () => `Compétence du plugin ${pFolder.name}`,
                   pluginName: pFolder.name,
+                  pluginSkillIndexCopies: profile.pluginSkillIndexCopies,
                 });
                 if (skillItem.enabled) skillsCharTotal += skillItem.charCount || 0;
                 items.push(skillItem);
@@ -194,6 +197,7 @@ export class LocalScanner {
                     fallbackDescription: `Règle du plugin ${pFolder.name}`,
                     nameSuffix: `[Plugin: ${pFolder.name}]`,
                     pluginName: pFolder.name,
+                    truncation: profile.truncation,
                   });
                   accountRule(ruleItem);
                   items.push(ruleItem);
@@ -217,6 +221,7 @@ export class LocalScanner {
           nameSuffix: `[${source.directoryScope}/]`,
           directoryScope: source.directoryScope,
           standalone: source.kind === 'standalone',
+          truncation: profile.truncation,
         });
         // Un .md et son .md.disabled désignent la même règle : le fichier actif est prioritaire
         const existing = nestedRules.get(nestedItem.id);
@@ -244,6 +249,7 @@ export class LocalScanner {
             fallbackDescription: `Règle héritée du dossier parent ${inheritedFrom}`,
             nameSuffix: `[${inheritedFrom}/]`,
             inheritedFrom,
+            truncation: profile.truncation,
           });
           // Un .md et son .md.disabled désignent la même règle : le fichier actif est prioritaire
           const existing = parentRules.get(parentItem.id);
@@ -459,7 +465,7 @@ export class LocalScanner {
           const isAntigravity = candidate.tool === 'antigravity';
           // Antigravity : enveloppe F1, corps tronqué à 24 000 octets après inclusions ; au-delà de
           // 200 lignes, avertissement de taille, sauf pour une âme déjà tronquée (lot A3)
-          const measured = isAntigravity ? await measureAntigravitySoul(rawContent, candidatePath, stat) : null;
+          const measured = isAntigravity ? await measureAntigravitySoul(rawContent, candidatePath, stat, { truncation: profile.truncation }) : null;
           const tokenCount = measured
             ? measured.bootTokenCount
             : countTokensForFile(candidatePath, stat.size, stat.mtimeMs, rawContent);
@@ -492,6 +498,7 @@ export class LocalScanner {
               ...(candidate.inheritedFrom !== undefined ? { inheritedFrom: candidate.inheritedFrom } : {}),
               ...(measured ? { byteSize: measured.byteSize, bootTokenCount: measured.bootTokenCount, bootCharCount: measured.bootCharCount } : {}),
               ...(measured && measured.truncatedBytes > 0 ? { truncatedBytes: measured.truncatedBytes, lostTokens: measured.lostTokens } : {}),
+              ...(measured?.truncationRule ? { truncationRule: measured.truncationRule } : {}),
               ...(sizeAdvice ? { sizeAdvice } : {}),
               warningLinesExceeded: isWarningLines,
               warningSizeExceeded: isWarningSize,
@@ -555,8 +562,8 @@ export class LocalScanner {
     // Somme directe des tokens BPE de l'Âme active
     const soulTokenTotal = activeSoulList.reduce((sum, i) => sum + (i.tokenCount || 0), 0);
 
-    // Antigravity : en-têtes des sections de plugin (F6), qui n'appartiennent à aucune carte
-    const skillsOverhead = isAntigravity ? pluginSectionHeadersTokens(allSkillsList, pluginRoots) : 0;
+    // Antigravity : en-têtes des sections de plugin (F6), qui n'appartiennent à aucune carte ; aucune section en 2.6.0
+    const skillsOverhead = isAntigravity && profile.pluginSectionHeader ? pluginSectionHeadersTokens(allSkillsList, pluginRoots) : 0;
     const skillsTokenWithOverhead = skillsTokenTotal + skillsOverhead;
 
     const skillsStat: TokenCategoryStat = {
