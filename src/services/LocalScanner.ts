@@ -140,7 +140,7 @@ export class LocalScanner {
               id: isPrimary ? cleanId : `${path.basename(path.dirname(dir))}/${cleanId}`,
               scope: 'local',
               fallbackDescription: 'Règle locale du projet',
-              truncation: profile.truncation,
+              profile,
             }));
           }
         }
@@ -154,7 +154,7 @@ export class LocalScanner {
               scope: 'local',
               fallbackDescription: 'Règle déclarée par .agents/rules.json',
               fromRulesJson: true,
-              truncation: profile.truncation,
+              profile,
             }));
           }
         }
@@ -197,7 +197,7 @@ export class LocalScanner {
                     fallbackDescription: `Règle du plugin ${pFolder.name}`,
                     nameSuffix: `[Plugin: ${pFolder.name}]`,
                     pluginName: pFolder.name,
-                    truncation: profile.truncation,
+                    profile,
                   });
                   accountRule(ruleItem);
                   items.push(ruleItem);
@@ -221,7 +221,7 @@ export class LocalScanner {
           nameSuffix: `[${source.directoryScope}/]`,
           directoryScope: source.directoryScope,
           standalone: source.kind === 'standalone',
-          truncation: profile.truncation,
+          profile,
         });
         // Un .md et son .md.disabled désignent la même règle : le fichier actif est prioritaire
         const existing = nestedRules.get(nestedItem.id);
@@ -249,7 +249,7 @@ export class LocalScanner {
             fallbackDescription: `Règle héritée du dossier parent ${inheritedFrom}`,
             nameSuffix: `[${inheritedFrom}/]`,
             inheritedFrom,
-            truncation: profile.truncation,
+            profile,
           });
           // Un .md et son .md.disabled désignent la même règle : le fichier actif est prioritaire
           const existing = parentRules.get(parentItem.id);

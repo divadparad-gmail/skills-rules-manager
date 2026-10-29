@@ -38,6 +38,7 @@ if (!require.cache['vscode']) {
 }
 
 import {
+  ANTIGRAVITY_PROFILES,
   countBodyLines,
   countLines,
   GLOB_REINJECTION_HEADER,
@@ -486,5 +487,64 @@ describe('Suite de Tests : alertes et coûts dynamiques d\'Antigravity (lot A3a)
     assert.strictEqual(nodes.dynamicCostsSummary.textContent, '⏱️ Coûts dynamiques : 3 motifs glob');
     const text = allText(nodes.dynamicCostsBody);
     assert.ok(text.includes('*.ts\n · \n*.tsx\n : 1 règle, 132 tok injectés à chaque fichier .ts ou .tsx lu ou modifié'));
+  });
+
+  // Chantier 2.6.0, lot L7, D-5 : une règle glob est chargée mais jamais injectée (phase 2b)
+  test('16. Règle glob par profil : active et empilée en 2.5.5 ; « ⛔ Sans effet dans l\'IDE 2.6.0 », hors coûts dynamiques en 2.6.0', async () => {
+    const files = {
+      '.agents/rules/pluriel.md': '---\ntrigger: glob\nglobs: "*.ts"\ndescription: P.\n---\n# Pluriel\nCorps glob.\n',
+      '.agents/rules/singulier.md': '---\ntrigger: glob\nglob: "*.ts"\ndescription: S.\n---\n# Singulier\nCorps glob.\n',
+      '.agents/rules/morte.md': '---\ntrigger: glob\nglobs: "src/*.ts"\ndescription: M.\n---\n# Morte\n',
+      '.agents/rules/liste.md': '---\ntrigger: glob\nglobs:\n  - "*.ts"\ndescription: L.\n---\n# Liste\n',
+      '.agents/rules/perm.md': '---\ntrigger: always_on\ndescription: A.\n---\n# Permanente\n',
+    };
+    const dir = path.join(tempBaseDir, 'glob-profils');
+    for (const [relative, content] of Object.entries(files)) await writeFile(path.join(dir, relative), content);
+    const statut = (items: ResourceItem[], id: string) => items.find((i) => i.id === id)!.metadata?.antigravityStatus;
+
+    const v255 = await LocalScanner.scan(workspaceFor(dir), ANTIGRAVITY_PROFILES['2.5.5']);
+    assert.deepStrictEqual(await LocalScanner.scan(workspaceFor(dir)), v255, 'Le profil par défaut est 2.5.5');
+    assert.deepStrictEqual(
+      ['pluriel', 'singulier', 'morte', 'liste'].map((id) => statut(v255.items, id)),
+      ['active', 'active', 'never-triggers', 'ignored-yaml-list']
+    );
+    assert.strictEqual(computeGlobStacks(v255.items).length, 1, 'Les deux règles *.ts forment une pile');
+    assert.strictEqual(v255.items.find((i) => i.id === 'pluriel')!.metadata?.noEffectIn, undefined);
+
+    const v260 = await LocalScanner.scan(workspaceFor(dir), ANTIGRAVITY_PROFILES['2.6.0']);
+    assert.deepStrictEqual(
+      ['pluriel', 'singulier', 'morte', 'liste'].map((id) => statut(v260.items, id)),
+      ['glob-no-effect', 'glob-no-effect', 'glob-no-effect', 'ignored-yaml-list'],
+      'globs: et glob: sans effet ; la liste YAML échoue toujours au parsing'
+    );
+    const pluriel = v260.items.find((i) => i.id === 'pluriel')!;
+    assert.strictEqual(pluriel.metadata?.noEffectIn, '2.6.0');
+    assert.strictEqual(pluriel.metadata?.bootTokenCount, 0, 'Aucun coût au démarrage');
+    assert.strictEqual(pluriel.enabled, true, 'Le fichier n\'est pas désactivé');
+    assert.ok(hasResourceWarning(pluriel), 'Signalée dans les compteurs d\'avertissements');
+    assert.deepStrictEqual(computeGlobStacks(v260.items), [], 'Aucune pile de coûts dynamiques');
+    assert.deepStrictEqual(computeAntigravityDynamicCosts(v260.items).globStacks, []);
+    assert.strictEqual(v260.rulesStat.tokenCount, v255.rulesStat.tokenCount, 'Coût au démarrage inchangé : une règle glob coûtait déjà 0');
+    assert.strictEqual(statut(v260.items, 'perm'), 'active');
+
+    // La carte : badge daté et sourcé, métrique à 0, interrupteur conservé
+    const card = main.createItemCard(pluriel, true, mockDoc());
+    const text = allText(card);
+    assert.ok(text.includes('⛔ Sans effet dans l\'IDE 2.6.0'));
+    const titles = (el: MockEl): string[] => [el.title, ...el.children.flatMap(titles)];
+    const tooltip = titles(card).find((t) => t.includes('ne l\'injecte jamais'))!;
+    assert.match(tooltip, /mesuré, phase 2b/);
+    assert.match(tooltip, /model_decision/);
+    assert.match(tooltip, /always_on/);
+    assert.match(tooltip, /ne modifie pas la règle d'elle-même/);
+    assert.ok(text.includes('0 tok au boot'));
+    assert.ok(!text.includes('par fichier correspondant'), 'Plus de coût par opération');
+  });
+
+  test('17. Doublons en 2.6.0 : une copie glob sans effet n\'apporte aucun coût dynamique', () => {
+    const local = permanentItem('glob', 999, { scope: 'local', path: '/local/glob.md', metadata: { trigger: 'glob', bootTokenCount: 0, antigravityStatus: 'glob-no-effect' } as any });
+    const global = permanentItem('glob', 999, { scope: 'global', path: '/global/glob.md', metadata: { trigger: 'glob', bootTokenCount: 0, antigravityStatus: 'glob-no-effect' } as any });
+    const { enrichedLocal } = DuplicateService.detectDuplicates([global], [local]);
+    assert.strictEqual(enrichedLocal[0].metadata!.duplicateInfo!.dynamicCost, undefined);
   });
 });

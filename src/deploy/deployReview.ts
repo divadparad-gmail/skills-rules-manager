@@ -15,6 +15,7 @@ import { ConflictPolicy, DeploymentResult } from '../common/discoveryTypes';
 import { DeployTarget, DiscoveryResourceType } from '../common/eventTypes';
 import { antigravityHookRefusal, DeployContext, MultiTargetDeployService } from './MultiTargetDeployService';
 import { ensureAntigravityTrigger } from '../utils/antigravityRules';
+import { resolveActiveAntigravityProfile } from '../antigravity/behaviorProfile';
 
 /** Ressource proposée à l'installation, avec son registre d'origine. */
 export interface ReviewableResource {
@@ -72,12 +73,12 @@ export async function reviewAndDeploy(
   }
 
   // Une règle destinée à Antigravity reçoit un trigger valide et des motifs qui se déclenchent
-  // vraiment, avant l'aperçu : l'utilisateur relit exactement ce qui sera écrit.
+  // vraiment, selon le profil actif (D-6), avant l'aperçu : l'utilisateur relit exactement ce qui sera écrit.
   let resource = original;
   let ruleNotes: string[] = [];
   if (options.context.runtime === 'antigravity' && original.type === 'rules') {
     try {
-      const prepared = ensureAntigravityTrigger(original.manifest);
+      const prepared = ensureAntigravityTrigger(original.manifest, resolveActiveAntigravityProfile().profile);
       resource = { ...original, manifest: prepared.content };
       ruleNotes = [
         ...(prepared.addedTrigger

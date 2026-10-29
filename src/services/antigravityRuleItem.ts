@@ -5,8 +5,9 @@ import { AntigravityRuleInspection, inspectAntigravityRule, measureAntigravitySo
 import {
   countBodyLines,
   countLines,
+  ANTIGRAVITY_PROFILES,
+  AntigravityBehaviorProfile,
   isAppliedStatus,
-  RuleTruncation,
   SizeAdvice,
   SizeAdviceKind,
   sizeAdviceFor,
@@ -28,14 +29,15 @@ export interface AntigravityRuleItemOptions {
   spreadFrontmatter?: boolean;
   /** AGENTS.md / GEMINI.md : pas de frontmatter, toujours actif dans sa portée. */
   standalone?: boolean;
-  /** Coupe d'un corps trop long, selon le profil (`byte` par défaut). */
-  truncation?: RuleTruncation;
+  /** Profil de comportement : coupe d'un corps trop long, injection des règles glob (2.5.5 par défaut). */
+  profile?: AntigravityBehaviorProfile;
 }
 
 /**
  * Construit la carte d'un fichier `rules/*.md` (ou `.md.disabled`) d'Antigravity.
  */
 export async function buildAntigravityRuleItem(filePath: string, options: AntigravityRuleItemOptions): Promise<ResourceItem> {
+  const profile = options.profile ?? ANTIGRAVITY_PROFILES['2.5.5'];
   const isDisabled = filePath.endsWith('.md.disabled');
   let rawContent = '';
   let fileStat: fs.Stats | null = null;
@@ -50,7 +52,7 @@ export async function buildAntigravityRuleItem(filePath: string, options: Antigr
   const parsed = extractMarkdownTitleAndSummary(rawContent);
   const inspection: AntigravityRuleInspection = options.standalone
     ? {
-        ...(await measureAntigravitySoul(rawContent, filePath, fileStat, { truncation: options.truncation })),
+        ...(await measureAntigravitySoul(rawContent, filePath, fileStat, { truncation: profile.truncation })),
         trigger: 'always_on',
         ignored: false,
         isConditional: false,
@@ -60,7 +62,10 @@ export async function buildAntigravityRuleItem(filePath: string, options: Antigr
         issues: [],
         warningNoDescription: false,
       }
-    : await inspectAntigravityRule(rawContent, filePath, fileStat, { truncation: options.truncation });
+    : await inspectAntigravityRule(rawContent, filePath, fileStat, {
+        truncation: profile.truncation,
+        globInjected: profile.globInjected,
+      });
   // R1 : une règle de sous-dossier n'est jamais chargée, quel que soit son frontmatter
   const status = options.directoryScope !== undefined && !SUBFOLDER_RULES_LOADED ? 'never-loaded' : inspection.status;
   const frontmatterDescription = typeof frontmatter.description === 'string' ? frontmatter.description.trim() : '';
@@ -92,6 +97,7 @@ export async function buildAntigravityRuleItem(filePath: string, options: Antigr
       isConditional: inspection.isConditional,
       ignoredByAgent: inspection.ignored,
       antigravityStatus: status,
+      ...(status === 'glob-no-effect' ? { noEffectIn: profile.id } : {}),
       ...(inspection.deadGlobs.length > 0 ? { deadGlobs: inspection.deadGlobs } : {}),
       ...(inspection.globPatterns.length > 0 ? { globPatterns: inspection.globPatterns } : {}),
       ruleIssues: inspection.issues,

@@ -1900,6 +1900,17 @@
       addBadge('pill-warn', '⛔ Ne se déclenchera jamais',
         `Antigravity compare le motif au nom de fichier seul. Utilisez *.ts au lieu de src/**/*.ts.\nMotifs concernés : ${deadGlobs.join(', ')}`);
     }
+    // D-5 : règle glob chargée, mais jamais injectée par la version du profil (2.6.0)
+    if (agStatus === 'glob-no-effect') {
+      const version = item.metadata.noEffectIn || '';
+      addBadge('pill-warn', `⛔ Sans effet dans l'IDE ${version}`,
+        `Antigravity IDE ${version} charge cette règle glob sans erreur et la liste dans le panneau Settings, mais ne l'injecte jamais dans le contexte : ni à la lecture, à la modification, à la création ou au listing d'un fichier, ni par l'onglet actif, ni par une mention @, avec globs: comme avec glob: (🧪 mesuré, phase 2b, testé le ${behavior.testedOn}).\n` +
+        'Elle ne coûte rien, ni au démarrage ni en cours de session.\n' +
+        'Pour qu\'elle s\'applique, changez son trigger :\n' +
+        '• model_decision, avec une description qui nomme les fichiers visés : l\'agent voit son chemin et sa description au démarrage (🧪 mesuré, phase 2c), et lit le corps quand la description correspond (📄 documenté, non testé) ;\n' +
+        '• always_on : toujours chargée, elle coûte son corps au démarrage.\n' +
+        'L\'extension ne modifie pas la règle d\'elle-même.');
+    }
     if (agStatus === 'partial') {
       addBadge('pill-warn-amber', '⚠️ Partiellement active',
         `Ces motifs ne se déclencheront jamais : ${deadGlobs.join(', ')}\nAntigravity compare le motif au nom de fichier seul.`);
@@ -2072,7 +2083,9 @@
           ? 'Règle qui ne se déclenchera jamais'
           : agStatus === 'not-read'
             ? `Skill d'un emplacement qu'Antigravity IDE ${item.metadata.notReadBy || ''} ne lit pas`
-            : 'Règle ignorée par Antigravity';
+            : agStatus === 'glob-no-effect'
+              ? `Règle glob qu'Antigravity IDE ${item.metadata.noEffectIn || ''} n'injecte jamais`
+              : 'Règle ignorée par Antigravity';
       metricsEl.innerHTML = `<span>${charStr} car.</span> <span class="tok-highlight">0 tok au boot (${tokStr} plein)</span>`;
       metricsEl.title = `${why} : aucun coût.\n• Poids si corrigée : ${charStr} car. (${tokStr} tokens)`;
     } else if (isAntigravityItem && item.enabled && item.metadata && item.metadata.trigger === 'glob') {

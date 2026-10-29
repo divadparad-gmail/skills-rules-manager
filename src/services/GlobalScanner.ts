@@ -336,7 +336,7 @@ export class GlobalScanner {
           scope: 'global',
           fallbackDescription: 'Règle globale Antigravity',
           spreadFrontmatter: true,
-          truncation: profile.truncation,
+          profile,
         });
 
         // Un .md et son .md.disabled désignent la même règle : le fichier actif est prioritaire
@@ -386,7 +386,7 @@ export class GlobalScanner {
                   fallbackDescription: `Règle du plugin global ${pFolder.name}`,
                   nameSuffix: `[Plugin: ${pFolder.name}]`,
                   pluginName: pFolder.name,
-                  truncation: profile.truncation,
+                  profile,
                 });
                 accountRule(ruleItem);
                 items.push(ruleItem);

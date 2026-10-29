@@ -43,6 +43,7 @@ import { LocalScanner } from '../src/services/LocalScanner';
 import { GlobalScanner } from '../src/services/GlobalScanner';
 import { ImportService } from '../src/services/ImportService';
 import { ResourceItem, WorkspaceContext } from '../src/types';
+import { ANTIGRAVITY_PROFILES } from '../src/antigravity/behavior';
 
 // Règles vérifiées selon https://antigravity.google/docs/rules/
 describe('Suite de Tests : Règles Antigravity conformes à la documentation officielle', () => {
@@ -292,5 +293,57 @@ describe('Suite de Tests : Règles Antigravity conformes à la documentation off
     assert.ok(result.notice && result.notice.includes('trigger: glob'));
     const written = await fs.promises.readFile(result.targetPath!, 'utf8');
     assert.strictEqual(checkAntigravityRuleFrontmatter(written).trigger, 'glob');
+  });
+
+  // Chantier 2.6.0, lot L7, D-6 : Antigravity IDE 2.6.0 n'injecte jamais une règle glob (phase 2b)
+  test('13. Import par profil : paths: en glob en 2.5.5, en model_decision avec les fichiers visés en 2.6.0', () => {
+    const corps = '\n# Conventions TypeScript\n\n- Typage strict, aucun any.\n';
+    const claude = `---\npaths:\n  - "src/**/*.ts"\n  - "test/**/*.ts"\n---\n${corps}`;
+
+    const v255 = ensureAntigravityTrigger(claude, ANTIGRAVITY_PROFILES['2.5.5']);
+    assert.deepStrictEqual(v255, ensureAntigravityTrigger(claude), 'Le profil par défaut est 2.5.5');
+    assert.strictEqual(
+      v255.content,
+      `---\ntrigger: glob\nglobs: "*.ts"\ndescription: "Conventions TypeScript"\npaths:\n  - "src/**/*.ts"\n  - "test/**/*.ts"\n---\n${corps}`
+    );
+    assert.strictEqual(v255.addedTrigger, 'glob');
+
+    const v260 = ensureAntigravityTrigger(claude, ANTIGRAVITY_PROFILES['2.6.0']);
+    const description = 'Conventions TypeScript. À appliquer quand on lit ou modifie des fichiers *.ts dans src/ ou test/ (motifs d\'origine : src/**/*.ts, test/**/*.ts).';
+    assert.strictEqual(v260.content, `---\ntrigger: model_decision\ndescription: ${JSON.stringify(description)}\n---\n${corps}`);
+    assert.strictEqual(v260.addedTrigger, 'model_decision');
+    const fm = extractFrontmatter(v260.content).metadata;
+    assert.deepStrictEqual([fm.trigger, fm.description, fm.globs, fm.paths], ['model_decision', description, undefined, undefined]);
+    assert.strictEqual(checkAntigravityRuleFrontmatter(v260.content).ignored, false);
+    assert.match(v260.warnings.join('\n'), /n'injecte jamais une règle « trigger: glob »/);
+    assert.match(v260.warnings.join('\n'), /index d'une règle model_decision .* est mesuré .* n'est que documenté : il n'a pas été testé/);
+
+    // L'exemple de la décision D-6, sans titre ni description d'origine
+    const seul = ensureAntigravityTrigger('---\npaths: "src/**/*.ts"\n---\nCorps.', ANTIGRAVITY_PROFILES['2.6.0']);
+    assert.strictEqual(
+      extractFrontmatter(seul.content).metadata.description,
+      'À appliquer quand on lit ou modifie des fichiers *.ts dans src/ (motifs d\'origine : src/**/*.ts).'
+    );
+    // Une description d'origine est gardée en tête ; un dossier entier et un fichier nommé
+    const dossier = ensureAntigravityTrigger(
+      '---\ndescription: Règles de la doc.\npaths:\n  - "docs/**"\n  - "package.json"\n---\nCorps.',
+      ANTIGRAVITY_PROFILES['2.6.0']
+    );
+    assert.strictEqual(
+      extractFrontmatter(dossier.content).metadata.description,
+      'Règles de la doc. À appliquer quand on lit ou modifie des fichiers dans docs/ ou des fichiers package.json (motifs d\'origine : docs/**, package.json).'
+    );
+    assert.strictEqual((dossier.content.match(/^description:/gm) || []).length, 1, 'Une seule description');
+
+    // Sans paths:, rien ne change ; une règle déjà en glob est copiée telle quelle, avec un avertissement
+    assert.deepStrictEqual(
+      ensureAntigravityTrigger('# Sans frontmatter\nCorps.', ANTIGRAVITY_PROFILES['2.6.0']),
+      ensureAntigravityTrigger('# Sans frontmatter\nCorps.', ANTIGRAVITY_PROFILES['2.5.5'])
+    );
+    const dejaGlob = '---\ntrigger: glob\nglobs: "*.ts"\ndescription: D.\n---\nCorps.';
+    const copie = ensureAntigravityTrigger(dejaGlob, ANTIGRAVITY_PROFILES['2.6.0']);
+    assert.strictEqual(copie.content, dejaGlob, 'Rien n\'est converti automatiquement');
+    assert.match(copie.warnings.join(' '), /ne l'injecte jamais/);
+    assert.deepStrictEqual(ensureAntigravityTrigger(dejaGlob, ANTIGRAVITY_PROFILES['2.5.5']).warnings, []);
   });
 });

@@ -100,9 +100,11 @@ export interface ResourceItem {
     /**
      * Statut d'une ressource Antigravity vis-à-vis de l'agent (voir src/antigravity/behavior.ts).
      * `not-read` : skill d'un emplacement que la version du profil ne lit pas (ancien emplacement
-     * global en 2.6.0).
+     * global en 2.6.0). `glob-no-effect` : règle glob que la version du profil n'injecte jamais (2.6.0).
      */
-    antigravityStatus?: 'active' | 'partial' | 'never-loaded' | 'never-triggers' | 'ignored-yaml-list' | 'ignored' | 'not-read';
+    antigravityStatus?: 'active' | 'partial' | 'never-loaded' | 'never-triggers' | 'ignored-yaml-list' | 'ignored' | 'not-read' | 'glob-no-effect';
+    /** Profil d'Antigravity IDE (ex. « 2.6.0 ») qui n'injecte jamais cette règle glob (statut `glob-no-effect`). */
+    noEffectIn?: string;
     /** Motifs `globs` qui contiennent un dossier et ne se déclencheront jamais (R3). */
     deadGlobs?: string[];
     /** Motifs `globs` qui se déclenchent (R3), tels qu'écrits dans le frontmatter. */

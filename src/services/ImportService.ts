@@ -4,6 +4,7 @@ import * as path from 'path';
 import { ResourceItem, WorkspaceContext } from '../types';
 import { getEffectiveGlobalAntigravityPath, getEffectiveGlobalClaudePath } from '../utils/paths';
 import { ensureAntigravityTrigger } from '../utils/antigravityRules';
+import { resolveActiveAntigravityProfile } from '../antigravity/behaviorProfile';
 
 export class ImportService {
   /**
@@ -229,11 +230,12 @@ export class ImportService {
   /**
    * Copie une règle vers un dossier rules/ d'Antigravity en garantissant un trigger valide
    * (sans trigger, Antigravity ignorerait la règle). Retourne un message si le frontmatter a été
-   * complété ou si les motifs `globs` posent problème (portée élargie, motifs morts, liste YAML).
+   * complété ou si les motifs `globs` posent problème (portée élargie, motifs morts, liste YAML,
+   * règle glob sans effet). La conversion des `paths:` suit le profil actif (D-6).
    */
   private static async copyRuleForAntigravity(sourcePath: string, targetFile: string): Promise<string | undefined> {
     const content = await fs.promises.readFile(sourcePath, 'utf8');
-    const prepared = ensureAntigravityTrigger(content);
+    const prepared = ensureAntigravityTrigger(content, resolveActiveAntigravityProfile().profile);
     await fs.promises.writeFile(targetFile, prepared.content, 'utf8');
     const notices = [
       ...(prepared.addedTrigger

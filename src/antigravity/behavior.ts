@@ -81,6 +81,12 @@ export interface AntigravityBehaviorProfile {
    * à la dernière fin de ligne en 2.6.0, déduit d'une seule mesure (5 960 octets sur le même fichier).
    */
   truncation: RuleTruncation;
+  /**
+   * R3 et SC02 : une règle `glob` est injectée dans le résultat d'un outil en 2.5.5. En 2.6.0, elle
+   * est chargée sans erreur mais n'entre jamais dans le contexte (🧪 phase 2b : dix points d'entrée,
+   * trois sessions, `globs:` comme `glob:`). L'import des `paths:` de Claude Code suit (D-6).
+   */
+  globInjected: boolean;
 }
 
 export const ANTIGRAVITY_PROFILES: Readonly<Record<AntigravityProfileId, AntigravityBehaviorProfile>> = Object.freeze({
@@ -95,6 +101,7 @@ export const ANTIGRAVITY_PROFILES: Readonly<Record<AntigravityProfileId, Antigra
     pluginSkillIndexCopies: 2,
     pluginSectionHeader: true,
     truncation: 'byte',
+    globInjected: true,
   }),
   '2.6.0': Object.freeze({
     id: '2.6.0',
@@ -107,6 +114,7 @@ export const ANTIGRAVITY_PROFILES: Readonly<Record<AntigravityProfileId, Antigra
     pluginSkillIndexCopies: 1,
     pluginSectionHeader: false,
     truncation: 'line-end',
+    globInjected: false,
   }),
 });
 
@@ -128,7 +136,9 @@ export type AntigravityRuleTrigger = (typeof ANTIGRAVITY_RULE_TRIGGERS)[number];
  * - ignored-yaml-list : `globs` écrit en liste YAML (R4) ;
  * - ignored : frontmatter absent ou `trigger` invalide (R6) ;
  * - not-read : skill d'un emplacement que la version du profil ne lit pas (ancien emplacement
- *   global `~/.gemini/antigravity/skills/` en 2.6.0).
+ *   global `~/.gemini/antigravity/skills/` en 2.6.0) ;
+ * - glob-no-effect : règle `glob` chargée, mais jamais injectée par la version du profil
+ *   (`globInjected` faux, 2.6.0). Elle reste basculable : ce n'est pas une règle jamais chargée.
  */
 export type AntigravityRuleStatus =
   | 'active'
@@ -137,7 +147,8 @@ export type AntigravityRuleStatus =
   | 'never-triggers'
   | 'ignored-yaml-list'
   | 'ignored'
-  | 'not-read';
+  | 'not-read'
+  | 'glob-no-effect';
 
 /** Vrai si une règle de ce statut est réellement lue par l'agent. */
 export function isAppliedStatus(status: AntigravityRuleStatus | undefined): boolean {
@@ -296,6 +307,32 @@ export function convertClaudePaths(paths: string[]): PathsConversion {
       ? [`Portée élargie : Antigravity ne peut pas cibler un dossier ; la règle s'appliquera à tous les fichiers ${listed} du projet.`]
       : [],
   };
+}
+
+/**
+ * D-6 (profil où une règle `glob` n'est jamais injectée, `globInjected` faux) : phrase qui nomme
+ * les fichiers visés par les `paths:` d'une règle Claude Code, pour la description d'une règle
+ * `model_decision`, suivie des motifs d'origine. Exemple : `src/**\/*.ts` donne « À appliquer quand
+ * on lit ou modifie des fichiers *.ts dans src/ (motifs d'origine : src/**\/*.ts). »
+ */
+export function describeClaudePaths(paths: string[]): string {
+  const patterns = paths.map((p) => p.trim()).filter(Boolean);
+  const foldersByFiles = new Map<string, string[]>();
+  for (const pattern of patterns.flatMap(expandBraces)) {
+    const segments = pattern.replace(/^\.[\\/]/, '').split(/[\\/]/).filter(Boolean);
+    if (/[\\/]$/.test(pattern)) segments.push('**');
+    const last = segments.pop() ?? '**';
+    const files = last === '*' || last === '**' ? 'des fichiers' : `des fichiers ${last}`;
+    const firstGlob = segments.findIndex((segment) => /[*?]/.test(segment));
+    const folder = segments.slice(0, firstGlob === -1 ? segments.length : firstGlob).join('/');
+    const folders = foldersByFiles.get(files) ?? [];
+    if (!folders.includes(folder)) folders.push(folder);
+    foldersByFiles.set(files, folders);
+  }
+  const parts = [...foldersByFiles].map(([files, folders]) =>
+    folders.includes('') ? files : `${files} dans ${folders.map((folder) => `${folder}/`).join(' ou ')}`
+  );
+  return `À appliquer quand on lit ou modifie ${parts.join(' ou ')} (motifs d'origine : ${patterns.join(', ')}).`;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -568,6 +605,7 @@ export function hasTableOfContents(content: string): boolean {
  * 🧪 (phase 3b) : une règle `glob` est ajoutée à la fin du résultat de l'outil qui lit, modifie ou
  * crée un fichier dont le nom correspond, sous cet en-tête, avec toutes les règles qui correspondent
  * au même fichier. L'enveloppe de chaque règle n'a pas été observée : seul son corps est compté.
+ * Antigravity IDE 2.5.5 seulement : en 2.6.0, aucune règle `glob` n'est injectée (`globInjected`).
  */
 export const GLOB_REINJECTION_HEADER =
   'The following text is not part of the file, it is a list of user-defined rules that you MUST follow:\n';

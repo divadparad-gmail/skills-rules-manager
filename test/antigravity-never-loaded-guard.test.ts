@@ -41,6 +41,7 @@ import { LocalScanner } from '../src/services/LocalScanner';
 import { isBulkToggleable, NEVER_LOADED_REFUSAL, ToggleManager } from '../src/services/ToggleManager';
 import { DeleteService } from '../src/services/DeleteService';
 import { ResourceItem, WorkspaceContext } from '../src/types';
+import { ANTIGRAVITY_PROFILES } from '../src/antigravity/behavior';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const main = require(path.resolve(__dirname, '../../src/webview/main.js'));
@@ -174,5 +175,39 @@ describe('Suite de Tests : règles de sous-dossier jamais chargées (bascules et
 
     const rootCard = main.createItemCard(items.find((i) => i.id.includes('racine'))!, true, { createElement });
     assert.ok(descendants(rootCard).some((el) => el.tagName === 'INPUT'), 'La règle de la racine garde son interrupteur');
+  });
+
+  // Chantier 2.6.0, lot L7 : une règle glob sans effet n'est pas une règle jamais chargée
+  test('7. Profil 2.6.0 : une règle glob sans effet reste basculable ; une règle glob de sous-dossier reste « never-loaded »', async () => {
+    const globDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'agy-r1-glob-'));
+    try {
+      const glob = '---\ntrigger: glob\nglobs: "*.ts"\ndescription: G.\n---\nCorps glob\n';
+      for (const relative of ['.agents/rules/motif.md', 'sous/.agents/rules/motif-imbrique.md']) {
+        const file = path.join(globDir, relative);
+        await fs.promises.mkdir(path.dirname(file), { recursive: true });
+        await fs.promises.writeFile(file, glob, 'utf8');
+      }
+      const scan = await LocalScanner.scan({ ...workspace(), workspacePath: globDir }, ANTIGRAVITY_PROFILES['2.6.0']);
+      const motif = scan.items.find((i) => i.id === 'motif')!;
+      const imbrique = scan.items.find((i) => i.metadata?.antigravityStatus === 'never-loaded')!;
+      assert.strictEqual(motif.metadata?.antigravityStatus, 'glob-no-effect');
+      assert.ok(imbrique, 'La règle de sous-dossier garde le statut never-loaded, prioritaire');
+      assert.strictEqual(imbrique.metadata?.noEffectIn, undefined);
+
+      assert.ok(isBulkToggleable(motif), 'Bascule en masse permise');
+      const off = await ToggleManager.toggleItem(motif, false);
+      assert.strictEqual(off.success, true, off.error);
+      assert.ok(fs.existsSync(`${motif.path}.disabled`), 'Désactivée : renommée en .md.disabled');
+      const on = await ToggleManager.toggleItem({ ...motif, path: `${motif.path}.disabled`, enabled: false }, true);
+      assert.strictEqual(on.success, true, on.error);
+      assert.ok(fs.existsSync(motif.path), 'Réactivée');
+
+      const card = main.createItemCard(motif, true, { createElement });
+      const all = descendants(card);
+      assert.ok(all.some((el) => el.tagName === 'INPUT'), 'Interrupteur conservé');
+      assert.ok(!all.some((el) => el.className === 'soul-locked-badge'), 'Aucun verrou « 🚫 Sans effet »');
+    } finally {
+      await fs.promises.rm(globDir, { recursive: true, force: true });
+    }
   });
 });

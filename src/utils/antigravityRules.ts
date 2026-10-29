@@ -15,8 +15,11 @@ import {
 import { getUserHome } from './paths';
 import { countTokensForFile } from './tokenizer';
 import {
+  ANTIGRAVITY_PROFILES,
+  AntigravityBehaviorProfile,
   AntigravityRuleStatus,
   convertClaudePaths,
+  describeClaudePaths,
   formatConditionalIndexEntry,
   formatPermanentRule,
   RULE_BODY_MAX_BYTES,
@@ -178,15 +181,18 @@ export async function inspectAntigravityRule(
   rawContent: string,
   filePath: string,
   stamp?: FileStamp,
-  options: Pick<AntigravityMeasureOptions, 'truncation'> = {}
+  options: Pick<AntigravityMeasureOptions, 'truncation'> & { globInjected?: boolean } = {}
 ): Promise<AntigravityRuleInspection> {
   const check = checkAntigravityRuleFrontmatter(rawContent);
   const { metadata } = extractFrontmatter(rawContent);
   const verdict = check.trigger === 'glob' && !check.issues.includes('missing-globs')
     ? validateGlobs(globsOf(metadata))
     : null;
+  // Une liste YAML échoue au parsing dans toutes les versions (R4) ; sinon, une règle glob que la
+  // version ne réinjecte jamais est sans effet, quels que soient ses motifs
   const status: AntigravityRuleStatus = check.ignored ? 'ignored'
     : verdict?.status === 'yaml-list' ? 'ignored-yaml-list'
+    : check.trigger === 'glob' && options.globInjected === false ? 'glob-no-effect'
     : verdict?.status === 'never-triggers' ? 'never-triggers'
     : verdict?.status === 'partial' ? 'partial'
     : 'active';
@@ -260,7 +266,9 @@ function removeFrontmatterKey(content: string, key: string): string {
     skipping = false;
     kept.push(line);
   }
-  return `${opening}${kept.join(newline)}${closing}${content.slice(whole.length)}`;
+  // Frontmatter vidé : aucune ligne blanche entre les deux `---`
+  const rest = kept.length > 0 ? `${kept.join(newline)}${closing}` : closing.replace(/^\r?\n/, '');
+  return `${opening}${rest}${content.slice(whole.length)}`;
 }
 
 function quotedList(items: string[]): string {
@@ -283,10 +291,19 @@ export interface AntigravityRuleConversion {
  * ni trigger devient `trigger: always_on`. Un trigger présent mais non reconnu n'est pas
  * deviné : l'import est refusé. Une règle déjà valide est copiée telle quelle, avec ses
  * éventuels avertissements.
+ * Profil où une règle `glob` n'est jamais injectée (2.6.0, D-6) : les `paths:` deviennent
+ * `trigger: model_decision`, avec une description qui nomme les fichiers visés et les motifs
+ * d'origine ; la clé `paths:` est retirée du frontmatter, et aucune clé `globs` n'est écrite.
  */
-export function ensureAntigravityTrigger(content: string): AntigravityRuleConversion {
+export function ensureAntigravityTrigger(
+  content: string,
+  profile: AntigravityBehaviorProfile = ANTIGRAVITY_PROFILES['2.5.5']
+): AntigravityRuleConversion {
   const check = checkAntigravityRuleFrontmatter(content);
-  if (!check.ignored) return { content, addedTrigger: null, warnings: describeGlobsProblems(content) };
+  if (!check.ignored) {
+    const globNotice = check.trigger === 'glob' && !profile.globInjected ? [globNoEffectWarning(profile)] : [];
+    return { content, addedTrigger: null, warnings: [...globNotice, ...describeGlobsProblems(content)] };
+  }
 
   if (check.issues.includes('invalid-trigger')) {
     throw new Error(
@@ -298,9 +315,13 @@ export function ensureAntigravityTrigger(content: string): AntigravityRuleConver
   const rawPaths = metadata.paths;
   const paths = (Array.isArray(rawPaths) ? rawPaths : typeof rawPaths === 'string' ? rawPaths.split(',') : [])
     .map((pattern) => String(pattern));
-  const conversion = convertClaudePaths(paths);
-
   const existingDescription = typeof metadata.description === 'string' ? metadata.description.trim() : '';
+
+  if (!profile.globInjected && paths.some((pattern) => pattern.trim() !== '')) {
+    return convertPathsToModelDecision(content, paths, existingDescription, profile);
+  }
+
+  const conversion = convertClaudePaths(paths);
   let description = existingDescription;
   if (conversion.trigger === 'model_decision') {
     const files = conversion.fileNames.length > 0 ? `, et aux fichiers ${quotedList(conversion.fileNames)}` : '';
@@ -333,6 +354,40 @@ export function ensureAntigravityTrigger(content: string): AntigravityRuleConver
     content: source.slice(0, insertAt) + frontmatterLines.join(eol) + eol + source.slice(insertAt),
     addedTrigger: conversion.trigger,
     warnings: conversion.warnings,
+  };
+}
+
+/** Avertissement d'une règle `glob` copiée vers une version qui ne l'injecte jamais (2.6.0). */
+function globNoEffectWarning(profile: AntigravityBehaviorProfile): string {
+  return `Cette règle est en « trigger: glob » : ${profile.testedVersion} la charge, mais ne l'injecte jamais dans le contexte (mesuré, phase 2b). Passez-la en model_decision ou en always_on pour qu'elle s'applique.`;
+}
+
+/**
+ * D-6 : `paths:` de Claude Code vers `trigger: model_decision`, pour une version qui n'injecte
+ * jamais une règle `glob`. La description garde la description ou le titre d'origine, puis nomme
+ * les fichiers visés et les motifs d'origine ; les clés `paths` et `description` d'origine sont retirées.
+ */
+function convertPathsToModelDecision(
+  content: string,
+  paths: string[],
+  existingDescription: string,
+  profile: AntigravityBehaviorProfile
+): AntigravityRuleConversion {
+  const appliesWhen = describeClaudePaths(paths);
+  const base = existingDescription || extractMarkdownTitleAndSummary(content).title || '';
+  const description = base ? `${base.replace(/\.$/, '')}. ${appliesWhen}` : appliesWhen;
+  const source = removeFrontmatterKey(removeFrontmatterKey(content, 'paths'), 'description');
+  const eol = content.includes('\r\n') ? '\r\n' : '\n';
+  const opening = source.match(/^\s*---[ \t]*\r?\n/);
+  const insertAt = opening ? opening[0].length : 0;
+  const frontmatterLines = ['trigger: model_decision', `description: ${JSON.stringify(description)}`];
+  return {
+    content: source.slice(0, insertAt) + frontmatterLines.join(eol) + eol + source.slice(insertAt),
+    addedTrigger: 'model_decision',
+    warnings: [
+      `${profile.testedVersion} n'injecte jamais une règle « trigger: glob » (mesuré, phase 2b) : les paths: deviennent « trigger: model_decision », et la description nomme les fichiers visés. La clé paths: est retirée.`,
+      `L'index d'une règle model_decision (chemin et description) est mesuré dans ${profile.testedVersion} (phase 2c). Le chargement de son corps, quand l'agent juge la description pertinente, n'est que documenté : il n'a pas été testé.`,
+    ],
   };
 }
 

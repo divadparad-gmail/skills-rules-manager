@@ -171,7 +171,10 @@ export class DuplicateService {
 
   /** Règle `glob` ou `manual` : injectée en cours de session, quand elle s'applique. */
   private static hasDynamicTrigger(item: ResourceItem): boolean {
-    return item.type === 'rule' && (item.metadata?.trigger === 'glob' || item.metadata?.trigger === 'manual');
+    // Une règle glob sans effet (2.6.0) n'est jamais injectée : elle ne coûte rien en cours de session
+    return item.type === 'rule'
+      && (item.metadata?.trigger === 'glob' || item.metadata?.trigger === 'manual')
+      && item.metadata?.antigravityStatus !== 'glob-no-effect';
   }
 
   /**

@@ -13,6 +13,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { ANTIGRAVITY_PROFILES, AntigravityBehaviorProfile, AntigravityProfileId } from './behavior';
+import { getEffectiveGlobalAntigravityPath } from '../utils/paths';
 
 let vscodeModule: any = null;
 try {
@@ -162,4 +163,12 @@ export function resolveConfiguredAntigravityProfile(
     ? collectProfileSignals(geminiRootFromGlobalPath(globalPath), stat)
     : NO_PROFILE_SIGNALS;
   return resolveAntigravityProfile(setting, signals);
+}
+
+/**
+ * Profil actif pour les opérations qui ne passent pas par le scan (import, déploiement) : même
+ * résolution que StateManager.loadFullState, avec le dossier global effectif.
+ */
+export function resolveActiveAntigravityProfile(): ResolvedAntigravityProfile {
+  return resolveConfiguredAntigravityProfile(getEffectiveGlobalAntigravityPath());
 }
