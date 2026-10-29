@@ -78,6 +78,11 @@ export interface AntigravitySkillItemOptions {
   builtin?: boolean;
   /** Ancien emplacement : compté, chargement non vérifié. */
   legacyLocation?: boolean;
+  /**
+   * Profil d'Antigravity IDE (ex. « 2.6.0 ») qui ne lit pas cet emplacement : statut `not-read`, carte verrouillée,
+   * ni comptée ni active (ancien emplacement global en 2.6.0).
+   */
+  notReadBy?: string;
 }
 
 /** Dossiers de skills (contenant SKILL.md ou SKILL.md.disabled) directement sous `skillsDir`. */
@@ -136,6 +141,7 @@ export async function buildAntigravitySkillItem(itemFolder: string, options: Ant
     ...(options.excluded !== undefined ? { excludedInJson: options.excluded } : {}),
     ...(options.builtin ? { builtin: true, locked: true } : {}),
     ...(options.legacyLocation ? { legacyLocation: true } : {}),
+    ...(options.notReadBy ? { antigravityStatus: 'not-read' as const, notReadBy: options.notReadBy, locked: true } : {}),
   };
   if (!options.builtin) {
     // Corps de SKILL.md, frontmatter exclu ; aucun plafond de taille n'est documenté pour un

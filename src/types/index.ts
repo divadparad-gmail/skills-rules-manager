@@ -82,12 +82,18 @@ export interface ResourceItem {
     builtin?: boolean;
     /** Skill d'un ancien emplacement, documenté mais dont le chargement n'a pas été vérifié. */
     legacyLocation?: boolean;
+    /** Profil d'Antigravity IDE (ex. « 2.6.0 ») qui ne lit pas l'emplacement de ce skill (statut `not-read`). */
+    notReadBy?: string;
     /** Nom brut d'un skill (sans préfixe de plugin), utilisé pour détecter les doublons. */
     rawId?: string;
     /** Sous-dossier (relatif au projet) d'une règle imbriquée, jamais chargée par Antigravity (R1). */
     directoryScope?: string;
-    /** Statut d'une règle Antigravity vis-à-vis de l'agent (voir src/antigravity/behavior.ts). */
-    antigravityStatus?: 'active' | 'partial' | 'never-loaded' | 'never-triggers' | 'ignored-yaml-list' | 'ignored';
+    /**
+     * Statut d'une ressource Antigravity vis-à-vis de l'agent (voir src/antigravity/behavior.ts).
+     * `not-read` : skill d'un emplacement que la version du profil ne lit pas (ancien emplacement
+     * global en 2.6.0).
+     */
+    antigravityStatus?: 'active' | 'partial' | 'never-loaded' | 'never-triggers' | 'ignored-yaml-list' | 'ignored' | 'not-read';
     /** Motifs `globs` qui contiennent un dossier et ne se déclencheront jamais (R3). */
     deadGlobs?: string[];
     /** Motifs `globs` qui se déclenchent (R3), tels qu'écrits dans le frontmatter. */

@@ -30,7 +30,7 @@ import {
 export class LocalScanner {
   /**
    * Scanne les compétences et règles définies dans le projet actif local avec comptage réel des caractères.
-   * Le profil de comportement d'Antigravity est reçu, mais pas encore lu (chantier 2.6.0, lots L4 et suivants).
+   * Le profil de comportement d'Antigravity est reçu, mais pas encore lu (chantier 2.6.0, lots L6 et suivants).
    */
   public static async scan(
     workspace: WorkspaceContext,

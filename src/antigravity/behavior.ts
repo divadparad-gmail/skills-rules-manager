@@ -25,11 +25,37 @@ export interface AntigravityBehaviorProfile {
   testedVersion: string;
   /** Date de la baseline de la suite de régression pour cette version. */
   testedOn: string;
+  /**
+   * F7 : skills intégrés, relatifs au dossier `~/.gemini`. Un seul dossier est lu : après la
+   * migration vers la 2.6.0, l'ancien garde ses skills, et les lire tous deux compterait double.
+   */
+  builtinSkillsDir: string;
+  /** F8 : cache des schémas d'outils MCP, relatif au dossier `~/.gemini`. */
+  mcpToolCacheDir: string;
+  /**
+   * Ancien emplacement global `~/.gemini/antigravity/skills/` : documenté mais non vérifié en
+   * 2.5.5 (compté par prudence) ; absent du prompt et de l'état interne en 2.6.0 (phase 2c).
+   */
+  legacyGlobalSkills: 'unverified' | 'not-read';
 }
 
 export const ANTIGRAVITY_PROFILES: Readonly<Record<AntigravityProfileId, AntigravityBehaviorProfile>> = Object.freeze({
-  '2.5.5': Object.freeze({ id: '2.5.5', testedVersion: 'Antigravity IDE 2.5.5', testedOn: '2026-10-21' }),
-  '2.6.0': Object.freeze({ id: '2.6.0', testedVersion: 'Antigravity IDE 2.6.0', testedOn: '2026-10-28' }),
+  '2.5.5': Object.freeze({
+    id: '2.5.5',
+    testedVersion: 'Antigravity IDE 2.5.5',
+    testedOn: '2026-10-21',
+    builtinSkillsDir: path.join('antigravity-ide', 'builtin', 'skills'),
+    mcpToolCacheDir: path.join('antigravity-ide', 'mcp'),
+    legacyGlobalSkills: 'unverified',
+  }),
+  '2.6.0': Object.freeze({
+    id: '2.6.0',
+    testedVersion: 'Antigravity IDE 2.6.0',
+    testedOn: '2026-10-28',
+    builtinSkillsDir: path.join('antigravity', 'builtin', 'skills'),
+    mcpToolCacheDir: path.join('antigravity', 'mcp'),
+    legacyGlobalSkills: 'not-read',
+  }),
 });
 
 export const ANTIGRAVITY_TESTED_VERSION = ANTIGRAVITY_PROFILES['2.5.5'].testedVersion;
@@ -48,7 +74,9 @@ export type AntigravityRuleTrigger = (typeof ANTIGRAVITY_RULE_TRIGGERS)[number];
  * - never-loaded : règle d'un sous-dossier du dossier ouvert, jamais chargée (R1) ;
  * - never-triggers : tous les motifs `globs` contiennent un dossier (R3) ;
  * - ignored-yaml-list : `globs` écrit en liste YAML (R4) ;
- * - ignored : frontmatter absent ou `trigger` invalide (R6).
+ * - ignored : frontmatter absent ou `trigger` invalide (R6) ;
+ * - not-read : skill d'un emplacement que la version du profil ne lit pas (ancien emplacement
+ *   global `~/.gemini/antigravity/skills/` en 2.6.0).
  */
 export type AntigravityRuleStatus =
   | 'active'
@@ -56,7 +84,8 @@ export type AntigravityRuleStatus =
   | 'never-loaded'
   | 'never-triggers'
   | 'ignored-yaml-list'
-  | 'ignored';
+  | 'ignored'
+  | 'not-read';
 
 /** Vrai si une règle de ce statut est réellement lue par l'agent. */
 export function isAppliedStatus(status: AntigravityRuleStatus | undefined): boolean {
@@ -325,14 +354,15 @@ export const PLUGIN_SKILL_INDEX_COPIES = 2;
 
 /**
  * F7 (phase 1) : skills intégrés, listés dans l'index F5 et impossibles à retirer. Chemin relatif
- * au dossier `~/.gemini`. Il y en avait 3 sur le poste de test en 2.5.5.
+ * au dossier `~/.gemini`, propre à chaque profil (`builtinSkillsDir`) : il y en avait 3 sur le
+ * poste de test en 2.5.5, et 9 sous `antigravity/builtin/skills` en 2.6.0. Valeur du profil 2.5.5.
  */
-export const BUILTIN_SKILLS_DIR = path.join('antigravity-ide', 'builtin', 'skills');
+export const BUILTIN_SKILLS_DIR = ANTIGRAVITY_PROFILES['2.5.5'].builtinSkillsDir;
 
 /**
- * 📄 Anciens emplacements de skills, documentés comme supportés mais non testés : `.agent/skills/`
- * dans le projet, `~/.gemini/antigravity/skills/` (relatif au dossier `~/.gemini`). Ils sont
- * comptés, avec un badge « chargement non vérifié ».
+ * 📄 Anciens emplacements de skills, documentés comme supportés : `.agent/skills/` dans le projet,
+ * non testé, compté avec un badge « chargement non vérifié » ; `~/.gemini/antigravity/skills/`
+ * (relatif au dossier `~/.gemini`), traité selon `legacyGlobalSkills` du profil.
  */
 export const LEGACY_WORKSPACE_SKILLS_DIR = path.join('.agent', 'skills');
 export const LEGACY_GLOBAL_SKILLS_DIR = path.join('antigravity', 'skills');
@@ -349,11 +379,13 @@ export function formatMcpServer(serverName: string, toolNames: string[] | null):
 
 /**
  * 🧪 Observé, non documenté (phase 1) : Antigravity garde un fichier de schéma par outil dans
- * `~/.gemini/antigravity-ide/mcp/<serveur>/<outil>.json` (chemin relatif au dossier `~/.gemini`).
- * Ce cache, moins `disabledTools`, redonnait exactement les outils listés au démarrage. Un
- * serveur qui ne se connecte pas n'affiche pas ses outils : le cache peut alors surestimer.
+ * `~/.gemini/antigravity-ide/mcp/<serveur>/<outil>.json` en 2.5.5, et sous `antigravity/mcp/` en
+ * 2.6.0 (chemin relatif au dossier `~/.gemini`, propre à chaque profil : `mcpToolCacheDir`). En
+ * 2.5.5, ce cache, moins `disabledTools`, redonnait exactement les outils listés au démarrage ; ce
+ * recoupement n'a pas été refait en 2.6.0. Un serveur qui ne se connecte pas n'affiche pas ses
+ * outils : le cache peut alors surestimer. Valeur du profil 2.5.5.
  */
-export const MCP_TOOL_CACHE_DIR = path.join('antigravity-ide', 'mcp');
+export const MCP_TOOL_CACHE_DIR = ANTIGRAVITY_PROFILES['2.5.5'].mcpToolCacheDir;
 
 /** Fourchette affichée par outil quand la liste des outils d'un serveur est inconnue. */
 export const MCP_TOKENS_PER_TOOL_RANGE = [3, 8] as const;

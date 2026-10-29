@@ -37,7 +37,13 @@ if (!require.cache['vscode']) {
   } as any;
 }
 
-import { ANTIGRAVITY_PROFILES, ANTIGRAVITY_TESTED_ON, ANTIGRAVITY_TESTED_VERSION } from '../src/antigravity/behavior';
+import {
+  ANTIGRAVITY_PROFILES,
+  ANTIGRAVITY_TESTED_ON,
+  ANTIGRAVITY_TESTED_VERSION,
+  BUILTIN_SKILLS_DIR,
+  MCP_TOOL_CACHE_DIR,
+} from '../src/antigravity/behavior';
 import {
   ANTIGRAVITY_PROFILE_SETTING,
   ANTIGRAVITY_PROFILE_SETTING_DEFAULT,
@@ -134,12 +140,28 @@ describe('Suite de Tests : profil de comportement d\'Antigravity (chantier 2.6.0
     for (const fichier of fichiers) await writeFile(path.join(gemini, fichier), '');
   };
 
-  test('1. Profils : version et date de chaque baseline ; les constantes historiques gardent leurs valeurs', () => {
+  test('1. Profils : version, date et chemins de chaque version ; les constantes historiques gardent leurs valeurs', () => {
     assert.deepStrictEqual(Object.keys(ANTIGRAVITY_PROFILES).sort(), ['2.5.5', '2.6.0']);
-    assert.deepStrictEqual(PROFIL_255, { id: '2.5.5', testedVersion: 'Antigravity IDE 2.5.5', testedOn: '2026-10-21' });
-    assert.deepStrictEqual(PROFIL_260, { id: '2.6.0', testedVersion: 'Antigravity IDE 2.6.0', testedOn: '2026-10-28' });
+    assert.deepStrictEqual(PROFIL_255, {
+      id: '2.5.5',
+      testedVersion: 'Antigravity IDE 2.5.5',
+      testedOn: '2026-10-21',
+      builtinSkillsDir: path.join('antigravity-ide', 'builtin', 'skills'),
+      mcpToolCacheDir: path.join('antigravity-ide', 'mcp'),
+      legacyGlobalSkills: 'unverified',
+    });
+    assert.deepStrictEqual(PROFIL_260, {
+      id: '2.6.0',
+      testedVersion: 'Antigravity IDE 2.6.0',
+      testedOn: '2026-10-28',
+      builtinSkillsDir: path.join('antigravity', 'builtin', 'skills'),
+      mcpToolCacheDir: path.join('antigravity', 'mcp'),
+      legacyGlobalSkills: 'not-read',
+    });
     assert.strictEqual(ANTIGRAVITY_TESTED_VERSION, 'Antigravity IDE 2.5.5');
     assert.strictEqual(ANTIGRAVITY_TESTED_ON, '2026-10-21');
+    assert.strictEqual(BUILTIN_SKILLS_DIR, PROFIL_255.builtinSkillsDir);
+    assert.strictEqual(MCP_TOOL_CACHE_DIR, PROFIL_255.mcpToolCacheDir);
     assert.ok(Object.isFrozen(ANTIGRAVITY_PROFILES) && Object.isFrozen(PROFIL_255), 'Un profil ne se modifie pas à l\'exécution');
   });
 
@@ -239,7 +261,7 @@ describe('Suite de Tests : profil de comportement d\'Antigravity (chantier 2.6.0
     assert.strictEqual(reglage.scope, 'machine', 'Portée machine : un dépôt ne peut pas fixer le profil');
   });
 
-  test('8. Neutralité : un scan sans profil, avec le profil 2.5.5 ou avec le profil 2.6.0 donne le même résultat', async () => {
+  test('8. Neutralité du défaut : sans profil = profil 2.5.5 ; le profil 2.6.0 ne change que les points du lot L4', async () => {
     const gemini = path.join(tempBaseDir, 'neutralite', '.gemini');
     const globalDir = path.join(gemini, 'config');
     const skill = (nom: string) => `---\nname: ${nom}\ndescription: Skill ${nom}.\n---\n# ${nom}\n`;
@@ -255,6 +277,7 @@ describe('Suite de Tests : profil de comportement d\'Antigravity (chantier 2.6.0
     await writeFile(path.join(gemini, 'antigravity', 'skills', 'ancien-global', 'SKILL.md'), skill('ancien-global'));
     await writeFile(path.join(gemini, 'antigravity-ide', 'mcp', 'serveur', 'ancien-outil.json'), '{}');
     await writeFile(path.join(gemini, 'antigravity', 'mcp', 'serveur', 'nouvel-outil.json'), '{}');
+    await writeFile(path.join(gemini, 'antigravity', 'mcp', 'serveur', 'second-outil.json'), '{}');
     await writeFile(path.join(gemini, 'antigravity-ide', '.ide_migration'), '');
 
     const projet = path.join(tempBaseDir, 'neutralite', 'projet');
@@ -273,13 +296,25 @@ describe('Suite de Tests : profil de comportement d\'Antigravity (chantier 2.6.0
       mcpLocal: await McpScanner.scanLocal(workspace),
     };
     assert.ok(reference.global.items.some((i) => i.metadata?.builtin), 'L\'arborescence doit couvrir les skills intégrés');
-    // En L3, aucun scanner ne lit le profil : le profil 2.6.0 ne change encore rien (le lot L4 inversera ce constat)
-    for (const profil of [PROFIL_255, PROFIL_260]) {
-      assert.deepStrictEqual(await GlobalScanner.scan(globalDir, 'antigravity', profil), reference.global, `GlobalScanner, profil ${profil.id}`);
-      assert.deepStrictEqual(await LocalScanner.scan(workspace, profil), reference.local, `LocalScanner, profil ${profil.id}`);
-      assert.deepStrictEqual(await McpScanner.scanGlobal(globalDir, 'antigravity', profil), reference.mcpGlobal, `McpScanner global, profil ${profil.id}`);
-      assert.deepStrictEqual(await McpScanner.scanLocal(workspace, profil), reference.mcpLocal, `McpScanner local, profil ${profil.id}`);
-    }
+    // Sans profil, les scanners appliquent le profil 2.5.5 : résultats strictement égaux
+    assert.deepStrictEqual(await GlobalScanner.scan(globalDir, 'antigravity', PROFIL_255), reference.global, 'GlobalScanner, profil 2.5.5');
+    assert.deepStrictEqual(await LocalScanner.scan(workspace, PROFIL_255), reference.local, 'LocalScanner, profil 2.5.5');
+    assert.deepStrictEqual(await McpScanner.scanGlobal(globalDir, 'antigravity', PROFIL_255), reference.mcpGlobal, 'McpScanner global, profil 2.5.5');
+    assert.deepStrictEqual(await McpScanner.scanLocal(workspace, PROFIL_255), reference.mcpLocal, 'McpScanner local, profil 2.5.5');
+
+    // Profil 2.6.0 (lot L4) : seuls les skills intégrés, l'ancien emplacement global et le cache MCP changent
+    const global260 = await GlobalScanner.scan(globalDir, 'antigravity', PROFIL_260);
+    const sansL4 = (items: typeof global260.items) => items.filter((i) => !i.metadata?.builtin && i.metadata?.rawId !== 'ancien-global');
+    assert.deepStrictEqual(sansL4(global260.items), sansL4(reference.global.items), 'Les autres éléments globaux ne changent pas');
+    assert.deepStrictEqual(global260.items.filter((i) => i.metadata?.builtin).map((i) => i.id), ['integre-nouveau']);
+    assert.deepStrictEqual(reference.global.items.filter((i) => i.metadata?.builtin).map((i) => i.id), ['integre-ancien']);
+    assert.strictEqual(global260.items.find((i) => i.metadata?.rawId === 'ancien-global')?.metadata?.antigravityStatus, 'not-read');
+    assert.deepStrictEqual(global260.rulesStat, reference.global.rulesStat, 'Les règles ne changent pas');
+    assert.deepStrictEqual(global260.soulStat, reference.global.soulStat, 'Les âmes ne changent pas');
+    assert.deepStrictEqual(await LocalScanner.scan(workspace, PROFIL_260), reference.local, 'LocalScanner ne lit pas encore le profil');
+    const mcp260 = await McpScanner.scanGlobal(globalDir, 'antigravity', PROFIL_260);
+    assert.deepStrictEqual(mcp260.mcpServers!.map((s) => s.toolCount), [2], 'Cache antigravity/mcp');
+    assert.deepStrictEqual(reference.mcpGlobal.mcpServers!.map((s) => s.toolCount), [1], 'Cache antigravity-ide/mcp');
   });
 
   test('9. État envoyé au webview : le réglage par défaut transmet le profil 2.5.5 et ne change ni antigravityBehavior ni les clés', async () => {

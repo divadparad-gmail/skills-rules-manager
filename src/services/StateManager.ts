@@ -22,7 +22,6 @@ import { CheatSheetPanel } from '../providers/CheatSheetPanel';
 import { getEffectiveGlobalAntigravityPath, getUserHome } from '../utils/paths';
 import { resetTokenizerMetrics, getTokenizerMetrics } from '../utils/tokenizer';
 import { debounce } from '../utils/debounce';
-import { ANTIGRAVITY_TESTED_ON, ANTIGRAVITY_TESTED_VERSION } from '../antigravity/behavior';
 import { ResolvedAntigravityProfile, resolveConfiguredAntigravityProfile } from '../antigravity/behaviorProfile';
 
 export class StateManager {
@@ -196,7 +195,8 @@ export class StateManager {
     const workspace = WorkspaceDetector.detectWorkspace();
 
     // Profil de comportement d'Antigravity : le réglage, puis la structure des données en « auto ».
-    // Les scanners le reçoivent ; les lots suivants du chantier 2.6.0 en lisent les champs.
+    // Les scanners le reçoivent (skills intégrés, ancien emplacement global, cache MCP), et
+    // l'état envoyé au webview en cite la version et la date de test.
     const resolvedProfile = this._antigravityProfileOverride
       ?? resolveConfiguredAntigravityProfile(getEffectiveGlobalAntigravityPath());
     this.lastAntigravityProfile = resolvedProfile;
@@ -302,7 +302,7 @@ export class StateManager {
       isDashboardOpen: this._isDashboardOpen,
       isCheatSheetOpen: this._isCheatSheetOpen,
       ...(localResult.antigravityParents ? { antigravityParents: localResult.antigravityParents } : {}),
-      antigravityBehavior: { version: ANTIGRAVITY_TESTED_VERSION, testedOn: ANTIGRAVITY_TESTED_ON },
+      antigravityBehavior: { version: antigravityProfile.testedVersion, testedOn: antigravityProfile.testedOn },
       userHome: getUserHome(),
       ...(workspace.workspacePath ? { bancEssai: presenterBanc(ScenarioManager.lireEtat(workspace.workspacePath)) } : {}),
     };

@@ -16,7 +16,8 @@ import { appliesInAntigravity, buildAntigravityRuleItem, countsAtBoot, hasResour
 import { listFlatRuleFiles } from './antigravityRuleSources';
 import { buildAntigravitySkillItem, listSkillFolders, pluginSectionHeadersTokens } from './antigravitySkillItem';
 import { antigravityRulesBootStat, truncationSummary } from './antigravityBootCost';
-import { ANTIGRAVITY_PROFILES, AntigravityBehaviorProfile, BUILTIN_SKILLS_DIR, LEGACY_GLOBAL_SKILLS_DIR } from '../antigravity/behavior';
+import { ANTIGRAVITY_PROFILES, AntigravityBehaviorProfile, LEGACY_GLOBAL_SKILLS_DIR } from '../antigravity/behavior';
+import { geminiRootFromGlobalPath } from '../antigravity/behaviorProfile';
 
 let vscodeModule: any = null;
 try {
@@ -48,7 +49,7 @@ export class GlobalScanner {
 
   /**
    * Scanne le dossier global selon l'outil actif (Antigravity ou Claude Code). Le profil de
-   * comportement d'Antigravity est reçu, mais pas encore lu (chantier 2.6.0, lots L4 et suivants).
+   * comportement d'Antigravity désigne les skills intégrés et le sort de l'ancien emplacement global.
    */
   public static async scan(
     customGlobalPath?: string,
@@ -94,14 +95,23 @@ export class GlobalScanner {
     const skillsDir = path.join(globalPath, 'skills');
     const claudeGlobalPath = getEffectiveGlobalClaudePath();
 
-    // 1.A. Si Antigravity : skills globaux (~/.gemini/config/skills), skills intégrés (F7,
-    // verrouillés) et ancien emplacement ~/.gemini/antigravity/skills (chargement non vérifié)
+    // 1.A. Si Antigravity : skills globaux (~/.gemini/config/skills), skills intégrés (F7, un seul
+    // dossier, celui du profil, verrouillés) et ancien emplacement ~/.gemini/antigravity/skills
+    // (non vérifié en 2.5.5, non lu en 2.6.0). Sans dossier ~/.gemini connu, aucun chemin relatif
+    // au dossier courant n'est lu.
     if (targetTool === 'antigravity') {
-      const geminiRoot = path.dirname(globalPath);
+      const geminiRoot = geminiRootFromGlobalPath(globalPath);
+      const legacyOptions = profile.legacyGlobalSkills === 'not-read'
+        ? { idPrefix: 'antigravity/', legacyLocation: true, notReadBy: profile.id }
+        : { idPrefix: 'antigravity/', legacyLocation: true };
       const skillSources = [
         { dir: skillsDir, options: {} },
-        { dir: path.join(geminiRoot, BUILTIN_SKILLS_DIR), options: { builtin: true } },
-        { dir: path.join(geminiRoot, LEGACY_GLOBAL_SKILLS_DIR), options: { idPrefix: 'antigravity/', legacyLocation: true } },
+        ...(geminiRoot
+          ? [
+            { dir: path.join(geminiRoot, profile.builtinSkillsDir), options: { builtin: true } },
+            { dir: path.join(geminiRoot, LEGACY_GLOBAL_SKILLS_DIR), options: legacyOptions },
+          ]
+          : []),
       ];
       for (const source of skillSources) {
         for (const folder of await listSkillFolders(source.dir)) {
@@ -112,7 +122,7 @@ export class GlobalScanner {
             ...(source.dir === skillsDir ? { excluded: excludedSet.has(path.basename(folder)) } : {}),
             ...source.options,
           });
-          if (skillItem.enabled) skillsCharTotal += skillItem.charCount || 0;
+          if (skillItem.enabled && appliesInAntigravity(skillItem)) skillsCharTotal += skillItem.charCount || 0;
           items.push(skillItem);
         }
       }
@@ -473,7 +483,8 @@ export class GlobalScanner {
     const allRulesList = items.filter((i) => i.type === 'rule');
     const allSoulList = items.filter((i) => i.type === 'soul');
 
-    const activeSkillsList = allSkillsList.filter((i) => i.enabled);
+    // Un skill d'un emplacement non lu (statut not-read) reste affiché, mais n'est ni actif ni compté
+    const activeSkillsList = allSkillsList.filter((i) => i.enabled && appliesInAntigravity(i));
     const activeSkillsCount = activeSkillsList.length;
     const skillsWarningCount = activeSkillsList.filter((i) => (
       i.metadata?.warningSizeExceeded ||

@@ -9,8 +9,8 @@ import {
   formatMcpServer,
   isUnsupportedRemoteMcpServer,
   MCP_DISABLED_SERVERS_COUNTED,
-  MCP_TOOL_CACHE_DIR,
 } from '../antigravity/behavior';
+import { geminiRootFromGlobalPath } from '../antigravity/behaviorProfile';
 
 let vscodeModule: any = null;
 try {
@@ -24,7 +24,7 @@ export class McpScanner {
    * Scanne les serveurs MCP globaux selon l'outil actif.
    * - Antigravity : ~/.gemini/config/mcp_config.json
    * - Claude Code : ~/.claude.json (clé mcpServers)
-   * Le profil de comportement d'Antigravity est reçu, mais pas encore lu (chantier 2.6.0, lot L4).
+   * Le profil de comportement d'Antigravity désigne le cache des outils MCP.
    */
   public static async scanGlobal(
     customGlobalPath?: string,
@@ -40,19 +40,23 @@ export class McpScanner {
     const globalPath = getEffectiveGlobalAntigravityPath(customGlobalPath);
     const mcpConfigPath = path.join(globalPath, 'mcp_config.json');
 
-    return this.parseAntigravityMcpConfig(mcpConfigPath, 'global', globalPath, this.toolCacheDir(globalPath));
+    return this.parseAntigravityMcpConfig(mcpConfigPath, 'global', globalPath, this.toolCacheDir(globalPath, profile));
   }
 
-  /** Cache des schémas d'outils d'Antigravity (🧪 observé, non documenté), sous `~/.gemini`. */
-  private static toolCacheDir(globalPath: string): string {
-    return path.join(path.dirname(globalPath), MCP_TOOL_CACHE_DIR);
+  /**
+   * Cache des schémas d'outils d'Antigravity (🧪 observé, non documenté), sous `~/.gemini`, dans le
+   * dossier du profil. Chaîne vide si le dossier `~/.gemini` est inconnu : aucun cache n'est lu.
+   */
+  private static toolCacheDir(globalPath: string, profile: AntigravityBehaviorProfile): string {
+    const geminiRoot = geminiRootFromGlobalPath(globalPath);
+    return geminiRoot ? path.join(geminiRoot, profile.mcpToolCacheDir) : '';
   }
 
   /**
    * Scanne les serveurs MCP locaux selon l'outil actif.
    * - Antigravity : <workspace>/.agents/mcp_config.json
    * - Claude Code : <workspace>/.mcp.json ou ~/.claude.json (projects[path].mcpServers)
-   * Le profil de comportement d'Antigravity est reçu, mais pas encore lu (chantier 2.6.0, lot L4).
+   * Le profil de comportement d'Antigravity désigne le cache des outils MCP.
    */
   public static async scanLocal(
     workspace: WorkspaceContext,
@@ -70,7 +74,7 @@ export class McpScanner {
     const localDir = path.join(workspace.workspacePath, agentsDir);
     const mcpConfigPath = path.join(localDir, 'mcp_config.json');
 
-    return this.parseAntigravityMcpConfig(mcpConfigPath, 'local', localDir, this.toolCacheDir(getEffectiveGlobalAntigravityPath()));
+    return this.parseAntigravityMcpConfig(mcpConfigPath, 'local', localDir, this.toolCacheDir(getEffectiveGlobalAntigravityPath(), profile));
   }
 
   /**
@@ -138,6 +142,7 @@ export class McpScanner {
    * celui du dépôt ouvert : un nom qui sortirait du dossier du cache est refusé.
    */
   private static async readCachedToolNames(toolCacheDir: string, serverName: string): Promise<string[] | null> {
+    if (!toolCacheDir) return null;
     if (!serverName || serverName === '.' || serverName === '..' || /[\\/]/.test(serverName)) return null;
     try {
       const entries = await fs.promises.readdir(path.join(toolCacheDir, serverName), { withFileTypes: true });

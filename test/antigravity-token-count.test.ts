@@ -38,6 +38,7 @@ if (!require.cache['vscode']) {
 }
 
 import {
+  ANTIGRAVITY_PROFILES,
   CONDITIONAL_RULES_HEADER,
   formatConditionalIndexEntry,
   formatMcpServer,
@@ -352,5 +353,73 @@ describe('Suite de Tests : comptage des tokens au démarrage d\'Antigravity (lot
     assert.strictEqual(countTokensForFile(file, stat.size, stat.mtimeMs, 'court', 'f3'), short);
     const changed = countTokensForFile(file, stat.size, stat.mtimeMs, 'court mais modifié par une inclusion', 'f3');
     assert.notStrictEqual(changed, short, 'Le texte compté fait partie de la clé');
+  });
+
+  // Chantier 2.6.0, lot L4 : les deux racines coexistent après la migration (antigravity-ide/ et
+  // antigravity/), comme sur le poste de test ; seul le dossier du profil doit être lu.
+  const deuxRacines = async (nom: string) => {
+    const geminiRoot = path.join(tempBaseDir, nom, '.gemini');
+    const skill = (n: string) => `---\nname: ${n}\ndescription: Skill ${n}.\n---\n# ${n}\n`;
+    for (const n of ['ancien-un', 'ancien-deux', 'ancien-trois']) {
+      await writeFile(path.join(geminiRoot, 'antigravity-ide', 'builtin', 'skills', n, 'SKILL.md'), skill(n));
+    }
+    for (const n of ['nouveau-un', 'nouveau-deux']) {
+      await writeFile(path.join(geminiRoot, 'antigravity', 'builtin', 'skills', n, 'SKILL.md'), skill(n));
+    }
+    await writeFile(path.join(geminiRoot, 'antigravity', 'skills', 'ancien-global', 'SKILL.md'), skill('ancien-global'));
+    await writeFile(path.join(geminiRoot, 'config', 'skills', 'courant', 'SKILL.md'), skill('courant'));
+    return { geminiRoot, globalDir: path.join(geminiRoot, 'config') };
+  };
+
+  test('13. F7 par profil : un seul dossier de skills intégrés ; ancien emplacement global compté en 2.5.5, ⛔ non lu en 2.6.0', async () => {
+    const { geminiRoot, globalDir } = await deuxRacines('f7-profils');
+    const integres = (items: { metadata?: { builtin?: boolean }; id: string }[]) => items.filter((i) => i.metadata?.builtin).map((i) => i.id).sort();
+
+    // Profil 2.5.5 (défaut) : antigravity-ide/builtin/skills, ancien emplacement compté avec « ❔ »
+    const v255 = await GlobalScanner.scan(globalDir, 'antigravity');
+    assert.deepStrictEqual(await GlobalScanner.scan(globalDir, 'antigravity', ANTIGRAVITY_PROFILES['2.5.5']), v255, 'Le profil par défaut est 2.5.5');
+    assert.deepStrictEqual(integres(v255.items), ['ancien-deux', 'ancien-trois', 'ancien-un']);
+    const ancien255 = v255.items.find((i) => i.metadata?.rawId === 'ancien-global')!;
+    assert.strictEqual(ancien255.metadata?.legacyLocation, true);
+    assert.strictEqual(ancien255.metadata?.antigravityStatus, undefined, 'En 2.5.5, son traitement ne change pas');
+    assert.strictEqual(v255.skillsStat.activeCount, 5, 'courant + 3 intégrés + ancien emplacement');
+
+    // Profil 2.6.0 : antigravity/builtin/skills, ancien emplacement affiché, ni actif ni compté
+    const v260 = await GlobalScanner.scan(globalDir, 'antigravity', ANTIGRAVITY_PROFILES['2.6.0']);
+    assert.deepStrictEqual(integres(v260.items), ['nouveau-deux', 'nouveau-un']);
+    const ancien260 = v260.items.find((i) => i.metadata?.rawId === 'ancien-global')!;
+    assert.ok(ancien260, 'Le skill de l\'ancien emplacement reste affiché');
+    assert.strictEqual(ancien260.metadata?.antigravityStatus, 'not-read');
+    assert.strictEqual(ancien260.metadata?.notReadBy, '2.6.0');
+    assert.strictEqual(ancien260.metadata?.locked, true, 'Ni bascule ni bascule en masse');
+    assert.strictEqual(v260.skillsStat.activeCount, 3, 'courant + 2 intégrés ; l\'ancien emplacement ne compte pas');
+    assert.strictEqual(v260.skillsStat.totalCount, 4);
+    const ligne = (n: string, dossier: string) => countTokens(formatSkillIndexLine(n, path.join(geminiRoot, dossier, n, 'SKILL.md'), `Skill ${n}.`));
+    assert.strictEqual(
+      v260.skillsStat.tokenCount,
+      ligne('courant', path.join('config', 'skills')) + ligne('nouveau-un', path.join('antigravity', 'builtin', 'skills')) + ligne('nouveau-deux', path.join('antigravity', 'builtin', 'skills')),
+      'Seules les lignes des skills lus sont comptées'
+    );
+  });
+
+  test('14. F8 par profil : le cache MCP de la racine du profil, jamais l\'autre', async () => {
+    const { geminiRoot, globalDir } = await deuxRacines('f8-profils');
+    for (const tool of ['perime-un', 'perime-deux']) await writeFile(path.join(geminiRoot, 'antigravity-ide', 'mcp', 'serveur', `${tool}.json`), '{}');
+    await writeFile(path.join(geminiRoot, 'antigravity-ide', 'mcp', 'serveur-disparu', 'outil.json'), '{}');
+    await writeFile(path.join(geminiRoot, 'antigravity', 'mcp', 'serveur', 'actuel.json'), '{}');
+    await writeFile(path.join(globalDir, 'mcp_config.json'), JSON.stringify({
+      mcpServers: { serveur: { command: 'x' }, 'serveur-disparu': { command: 'x' } },
+    }));
+
+    const outils = (stat: Awaited<ReturnType<typeof McpScanner.scanGlobal>>) =>
+      new Map(stat.mcpServers!.map((s) => [s.name, s.toolCount]));
+    const v255 = await McpScanner.scanGlobal(globalDir, 'antigravity');
+    assert.deepStrictEqual(await McpScanner.scanGlobal(globalDir, 'antigravity', ANTIGRAVITY_PROFILES['2.5.5']), v255);
+    assert.deepStrictEqual([...outils(v255)], [['serveur', 2], ['serveur-disparu', 1]]);
+    assert.strictEqual(v255.tokenCount, countTokens(formatMcpServer('serveur', ['perime-deux', 'perime-un'])) + countTokens(formatMcpServer('serveur-disparu', ['outil'])));
+
+    const v260 = await McpScanner.scanGlobal(globalDir, 'antigravity', ANTIGRAVITY_PROFILES['2.6.0']);
+    assert.deepStrictEqual([...outils(v260)], [['serveur', 1], ['serveur-disparu', null]], 'Le serveur absent du nouveau cache a une liste inconnue');
+    assert.strictEqual(v260.tokenCount, countTokens(formatMcpServer('serveur', ['actuel'])) + countTokens(formatMcpServer('serveur-disparu', null)));
   });
 });

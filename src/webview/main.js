@@ -1934,9 +1934,16 @@
     }
 
     // Ancien emplacement de skill, chargement non vérifié (un skill intégré porte un verrou à droite)
-    if (item.metadata && item.metadata.legacyLocation) {
+    if (item.metadata && item.metadata.legacyLocation && agStatus !== 'not-read') {
       addBadge('pill-warn-amber', '❔ Ancien emplacement',
         'Emplacement documenté comme supporté (.agent/skills/ ou ~/.gemini/antigravity/skills/), mais dont le chargement n\'a pas été vérifié par les tests. Le skill est compté par prudence.');
+    }
+
+    // Ancien emplacement que la version du profil ne lit pas (~/.gemini/antigravity/skills/ en 2.6.0)
+    if (agStatus === 'not-read') {
+      const version = item.metadata.notReadBy || '';
+      addBadge('pill-warn', `⛔ Non lu par l'IDE ${version}`,
+        `Antigravity IDE ${version} ne lit pas l'ancien emplacement ~/.gemini/antigravity/skills/ (testé le ${behavior.testedOn}). Ce skill n'est pas compté. Déplacez-le dans ~/.gemini/config/skills/ pour qu'il soit chargé.`);
     }
 
     if (item.metadata && item.metadata.fromRulesJson) {
@@ -2040,7 +2047,9 @@
         ? 'Règle de sous-dossier, jamais chargée par Antigravity'
         : agStatus === 'never-triggers'
           ? 'Règle qui ne se déclenchera jamais'
-          : 'Règle ignorée par Antigravity';
+          : agStatus === 'not-read'
+            ? `Skill d'un emplacement qu'Antigravity IDE ${item.metadata.notReadBy || ''} ne lit pas`
+            : 'Règle ignorée par Antigravity';
       metricsEl.innerHTML = `<span>${charStr} car.</span> <span class="tok-highlight">0 tok au boot (${tokStr} plein)</span>`;
       metricsEl.title = `${why} : aucun coût.\n• Poids si corrigée : ${charStr} car. (${tokStr} tokens)`;
     } else if (isAntigravityItem && item.enabled && item.metadata && item.metadata.trigger === 'glob') {
@@ -2079,14 +2088,17 @@
     const isInherited = !!(item.metadata && item.metadata.inheritedFrom !== undefined);
     // Skill intégré d'Antigravity (F7) : ni désactivable, ni supprimable
     const isBuiltin = !!(item.metadata && item.metadata.builtin);
-    // Règle de sous-dossier (R1) : sans effet, activée ou non ; ni interrupteur ni corbeille
-    const isWithoutEffect = agStatus === 'never-loaded';
+    // Règle de sous-dossier (R1), ou skill d'un emplacement non lu : sans effet, activé ou non ;
+    // ni interrupteur ni corbeille
+    const isWithoutEffect = agStatus === 'never-loaded' || agStatus === 'not-read';
     if (item.scope !== 'nas' && (isInherited || isBuiltin || isWithoutEffect)) {
       const rightControls = targetDoc.createElement('div');
       rightControls.className = 'item-right-controls';
       const lockedBadge = targetDoc.createElement('div');
       lockedBadge.className = 'soul-locked-badge';
-      lockedBadge.title = isWithoutEffect
+      lockedBadge.title = agStatus === 'not-read'
+        ? `Ancien emplacement : Antigravity IDE ${item.metadata.notReadBy || ''} ne lit pas ce skill, activé ou non. Déplacez-le dans ~/.gemini/config/skills/ pour l'appliquer.`
+        : isWithoutEffect
         ? 'Règle de sous-dossier : Antigravity ne la charge jamais, activée ou non. Déplacez-la dans .agents/rules/ du dossier ouvert pour l\'appliquer.'
         : isBuiltin
           ? 'Skill intégré d\'Antigravity : il est toujours listé au démarrage et ne peut pas être retiré.'
