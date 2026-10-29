@@ -16,7 +16,13 @@ import { appliesInAntigravity, buildAntigravityRuleItem, countsAtBoot, hasResour
 import { listFlatRuleFiles } from './antigravityRuleSources';
 import { buildAntigravitySkillItem, listSkillFolders, pluginSectionHeadersTokens } from './antigravitySkillItem';
 import { antigravityRulesBootStat, truncationSummary } from './antigravityBootCost';
-import { ANTIGRAVITY_PROFILES, AntigravityBehaviorProfile, LEGACY_GLOBAL_SKILLS_DIR } from '../antigravity/behavior';
+import {
+  ANTIGRAVITY_PROFILES,
+  AntigravityBehaviorProfile,
+  GLOBAL_SOUL_FILES,
+  GLOBAL_SOUL_RULE_LABEL,
+  LEGACY_GLOBAL_SKILLS_DIR,
+} from '../antigravity/behavior';
 import { geminiRootFromGlobalPath } from '../antigravity/behaviorProfile';
 
 let vscodeModule: any = null;
@@ -49,7 +55,8 @@ export class GlobalScanner {
 
   /**
    * Scanne le dossier global selon l'outil actif (Antigravity ou Claude Code). Le profil de
-   * comportement d'Antigravity désigne les skills intégrés et le sort de l'ancien emplacement global.
+   * comportement d'Antigravity désigne les skills intégrés, le sort de l'ancien emplacement global
+   * et les âmes globales vérifiées.
    */
   public static async scan(
     customGlobalPath?: string,
@@ -211,15 +218,15 @@ export class GlobalScanner {
 
     // 2. Scan du fichier maître d'Âme selon l'outil actif
     if (targetTool === 'antigravity') {
-      // Âmes globales Antigravity : fichiers autonomes toujours actifs, tous chargés et cumulés
-      // (~/.gemini/AGENTS.md, ~/.gemini/GEMINI.md, ~/.gemini/config/AGENTS.md, ~/.gemini/config/GEMINI.md)
+      // Âmes globales Antigravity : fichiers autonomes toujours actifs, tous chargés et cumulés, dans
+      // l'ordre observé, chacun dans l'enveloppe <RULE[user_global]>. Une âme non vérifiée pour la
+      // version du profil reste comptée, par prudence, avec un badge « ❔ ».
       const geminiRoot = path.dirname(globalPath);
-      const soulCandidates = [
-        { id: 'AGENTS.md', path: path.join(geminiRoot, 'AGENTS.md') },
-        { id: 'GEMINI.md', path: path.join(geminiRoot, 'GEMINI.md') },
-        { id: 'config/AGENTS.md', path: path.join(globalPath, 'AGENTS.md') },
-        { id: 'config/GEMINI.md', path: path.join(globalPath, 'GEMINI.md') },
-      ];
+      const soulCandidates = GLOBAL_SOUL_FILES.map((soul) => ({
+        id: soul.id,
+        path: path.join(soul.dir === 'gemini' ? geminiRoot : globalPath, path.basename(soul.id)),
+        verified: profile.verifiedGlobalSouls.includes(soul.id),
+      }));
 
       for (const candidate of soulCandidates) {
         if (fs.existsSync(candidate.path) && fs.statSync(candidate.path).isFile()) {
@@ -229,8 +236,8 @@ export class GlobalScanner {
             const fileCharCount = rawContent.length;
             const lineCount = rawContent.split(/\r\n|\r|\n/).length;
             const parsed = extractMarkdownTitleAndSummary(rawContent);
-            // Enveloppe F1, corps tronqué à 24 000 octets après inclusions
-            const measured = await measureAntigravitySoul(rawContent, candidate.path, stat);
+            // Enveloppe F1 à l'étiquette user_global, corps tronqué à 24 000 octets après inclusions
+            const measured = await measureAntigravitySoul(rawContent, candidate.path, stat, GLOBAL_SOUL_RULE_LABEL);
             const ruleTokenCount = measured.bootTokenCount;
             const sizeAdvice = soulSizeAdvice(rawContent, measured.truncatedBytes);
 
@@ -253,6 +260,7 @@ export class GlobalScanner {
               metadata: {
                 isSoul: true,
                 locked: true,
+                ...(candidate.verified ? {} : { unverifiedIn: profile.id }),
                 byteSize: measured.byteSize,
                 bootTokenCount: measured.bootTokenCount,
                 bootCharCount: measured.bootCharCount,

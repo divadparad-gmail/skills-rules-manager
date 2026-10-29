@@ -19,6 +19,26 @@ import * as path from 'path';
  */
 export type AntigravityProfileId = '2.5.5' | '2.6.0';
 
+/**
+ * Âmes globales : fichiers autonomes sans frontmatter, toujours actifs, tous chargés en entier et
+ * cumulés, dans cet ordre (🧪 phase 2c, Antigravity IDE 2.6.0). `dir` : `gemini` pour le dossier
+ * `~/.gemini`, `config` pour le dossier global `~/.gemini/config`.
+ */
+export const GLOBAL_SOUL_FILES = [
+  { id: 'AGENTS.md', dir: 'gemini' },
+  { id: 'GEMINI.md', dir: 'gemini' },
+  { id: 'config/AGENTS.md', dir: 'config' },
+  { id: 'config/GEMINI.md', dir: 'config' },
+] as const;
+export type GlobalSoulId = (typeof GLOBAL_SOUL_FILES)[number]['id'];
+
+/**
+ * Étiquette des balises d'une âme globale, à la place du chemin : `<RULE[user_global]>`. 🧪 Observée
+ * pour les quatre âmes globales en 2.6.0 (phase 2c), et pour `~/.gemini/GEMINI.md` dans la base de
+ * l'étalonnage 2.5.5 du 2026-10-21. Pour les trois autres âmes en 2.5.5, c'est une déduction.
+ */
+export const GLOBAL_SOUL_RULE_LABEL = 'user_global';
+
 export interface AntigravityBehaviorProfile {
   id: AntigravityProfileId;
   /** Version testée, citée dans les infobulles. */
@@ -37,6 +57,11 @@ export interface AntigravityBehaviorProfile {
    * 2.5.5 (compté par prudence) ; absent du prompt et de l'état interne en 2.6.0 (phase 2c).
    */
   legacyGlobalSkills: 'unverified' | 'not-read';
+  /**
+   * Âmes globales dont le chargement a été observé. Les autres sont documentées comme toujours
+   * actives, mais non vérifiées pour cette version : comptées par prudence, avec un badge « ❔ ».
+   */
+  verifiedGlobalSouls: readonly GlobalSoulId[];
 }
 
 export const ANTIGRAVITY_PROFILES: Readonly<Record<AntigravityProfileId, AntigravityBehaviorProfile>> = Object.freeze({
@@ -47,6 +72,7 @@ export const ANTIGRAVITY_PROFILES: Readonly<Record<AntigravityProfileId, Antigra
     builtinSkillsDir: path.join('antigravity-ide', 'builtin', 'skills'),
     mcpToolCacheDir: path.join('antigravity-ide', 'mcp'),
     legacyGlobalSkills: 'unverified',
+    verifiedGlobalSouls: Object.freeze(['GEMINI.md'] as const),
   }),
   '2.6.0': Object.freeze({
     id: '2.6.0',
@@ -55,6 +81,7 @@ export const ANTIGRAVITY_PROFILES: Readonly<Record<AntigravityProfileId, Antigra
     builtinSkillsDir: path.join('antigravity', 'builtin', 'skills'),
     mcpToolCacheDir: path.join('antigravity', 'mcp'),
     legacyGlobalSkills: 'not-read',
+    verifiedGlobalSouls: Object.freeze(GLOBAL_SOUL_FILES.map((soul) => soul.id)),
   }),
 });
 
@@ -307,15 +334,16 @@ export function toAntigravityUri(filePath: string): string {
 
 /**
  * F1 (phase 1) : règle permanente, âme ou règle héritée, injectée entre deux balises qui portent
- * le chemin absolu (Windows, avec `\`) : le chemin apparaît deux fois. Le corps est injecté sans
- * frontmatter et, au-delà du plafond, se termine par `<truncated N bytes>`. Les sauts de ligne
- * exacts autour du corps n'ont pas été observés.
+ * le chemin absolu (Windows, avec `\`) : le chemin apparaît deux fois. Une âme globale porte
+ * l'étiquette GLOBAL_SOUL_RULE_LABEL à la place du chemin. Le corps est injecté sans frontmatter
+ * et, au-delà du plafond, se termine par `<truncated N bytes>`. Les sauts de ligne exacts autour
+ * du corps n'ont pas été observés.
  */
-export function formatPermanentRule(filePath: string, body: string): { text: string; truncation: TruncatedBody } {
+export function formatPermanentRule(ruleLabel: string, body: string): { text: string; truncation: TruncatedBody } {
   const truncation = truncateRuleBody(body);
   const marker = truncation.truncatedBytes > 0 ? `<truncated ${truncation.truncatedBytes} bytes>` : '';
   const shown = truncation.kept.replace(/^(?:\r?\n)+/, '');
-  return { text: `<RULE[${filePath}]>\n${shown}${marker}\n</RULE[${filePath}]>\n`, truncation };
+  return { text: `<RULE[${ruleLabel}]>\n${shown}${marker}\n</RULE[${ruleLabel}]>\n`, truncation };
 }
 
 /**

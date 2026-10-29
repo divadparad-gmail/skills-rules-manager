@@ -826,6 +826,9 @@
     if (meta.trigger === 'manual') {
       return 'Coût au démarrage : 0 token (absente du contexte initial)';
     }
+    if (item.type === 'soul' && item.scope === 'global') {
+      return `Coût au démarrage : ${boot} tokens (fichier entier, entre deux balises <RULE[user_global]>, sans chemin)`;
+    }
     return `Coût au démarrage : ${boot} tokens (corps sans frontmatter, entre deux balises <RULE[chemin]> qui portent chacune le chemin complet)`;
   }
 
@@ -1937,6 +1940,13 @@
     if (item.metadata && item.metadata.legacyLocation && agStatus !== 'not-read') {
       addBadge('pill-warn-amber', '❔ Ancien emplacement',
         'Emplacement documenté comme supporté (.agent/skills/ ou ~/.gemini/antigravity/skills/), mais dont le chargement n\'a pas été vérifié par les tests. Le skill est compté par prudence.');
+    }
+
+    // Âme globale dont le chargement n'a pas été vérifié pour la version du profil (2.5.5)
+    if (item.metadata && item.metadata.unverifiedIn) {
+      const version = item.metadata.unverifiedIn;
+      addBadge('pill-warn-amber', `❔ Non vérifié en ${version}`,
+        `Fichier global documenté comme toujours actif. Son chargement a été observé dans Antigravity IDE 2.6.0, mais pas dans Antigravity IDE ${version}, où seul ~/.gemini/GEMINI.md a été vérifié. Il est compté par prudence, dans l'enveloppe <RULE[user_global]>.`);
     }
 
     // Ancien emplacement que la version du profil ne lit pas (~/.gemini/antigravity/skills/ en 2.6.0)

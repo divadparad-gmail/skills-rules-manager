@@ -149,6 +149,7 @@ describe('Suite de Tests : profil de comportement d\'Antigravity (chantier 2.6.0
       builtinSkillsDir: path.join('antigravity-ide', 'builtin', 'skills'),
       mcpToolCacheDir: path.join('antigravity-ide', 'mcp'),
       legacyGlobalSkills: 'unverified',
+      verifiedGlobalSouls: ['GEMINI.md'],
     });
     assert.deepStrictEqual(PROFIL_260, {
       id: '2.6.0',
@@ -157,6 +158,7 @@ describe('Suite de Tests : profil de comportement d\'Antigravity (chantier 2.6.0
       builtinSkillsDir: path.join('antigravity', 'builtin', 'skills'),
       mcpToolCacheDir: path.join('antigravity', 'mcp'),
       legacyGlobalSkills: 'not-read',
+      verifiedGlobalSouls: ['AGENTS.md', 'GEMINI.md', 'config/AGENTS.md', 'config/GEMINI.md'],
     });
     assert.strictEqual(ANTIGRAVITY_TESTED_VERSION, 'Antigravity IDE 2.5.5');
     assert.strictEqual(ANTIGRAVITY_TESTED_ON, '2026-10-21');

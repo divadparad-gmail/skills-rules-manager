@@ -136,12 +136,13 @@ type FileStamp = { size: number; mtimeMs: number } | null | undefined;
 /**
  * Coût d'un corps injecté au démarrage dans l'enveloppe F1 (règle permanente, âme, règle
  * héritée), tronqué à 24 000 octets. `injected` à faux : seul le poids du corps est mesuré.
+ * `ruleLabel` : étiquette des balises, le chemin du fichier par défaut.
  */
-async function measureBody(body: string, filePath: string, stamp: FileStamp, injected: boolean): Promise<AntigravityBootCost> {
+async function measureBody(body: string, filePath: string, stamp: FileStamp, injected: boolean, ruleLabel = filePath): Promise<AntigravityBootCost> {
   const expanded = await expandRuleIncludes(body, filePath);
   const count = (text: string, variant: string) => countTokensForFile(filePath, stamp?.size, stamp?.mtimeMs, text, variant);
   const bodyTokenCount = count(expanded.content, 'body');
-  const permanent = formatPermanentRule(filePath, expanded.content);
+  const permanent = formatPermanentRule(ruleLabel, expanded.content);
   const truncatedBytes = Math.max(0, expanded.byteSize - Buffer.byteLength(permanent.truncation.kept, 'utf8'));
   return {
     byteSize: expanded.byteSize,
@@ -317,8 +318,9 @@ export function ensureAntigravityTrigger(content: string): AntigravityRuleConver
 
 /**
  * Coût au démarrage d'un fichier AGENTS.md ou GEMINI.md : sans frontmatter (non supporté),
- * le fichier entier est le corps, injecté dans l'enveloppe F1 et tronqué à 24 000 octets.
+ * le fichier entier est le corps, injecté dans l'enveloppe F1 et tronqué à 24 000 octets. Une âme
+ * globale passe `ruleLabel` = GLOBAL_SOUL_RULE_LABEL ; une âme du projet ou d'un parent garde son chemin.
  */
-export async function measureAntigravitySoul(rawContent: string, filePath: string, stamp?: FileStamp): Promise<AntigravityBootCost> {
-  return measureBody(rawContent, filePath, stamp, true);
+export async function measureAntigravitySoul(rawContent: string, filePath: string, stamp?: FileStamp, ruleLabel?: string): Promise<AntigravityBootCost> {
+  return measureBody(rawContent, filePath, stamp, true, ruleLabel);
 }

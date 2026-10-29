@@ -84,6 +84,8 @@ export interface ResourceItem {
     legacyLocation?: boolean;
     /** Profil d'Antigravity IDE (ex. « 2.6.0 ») qui ne lit pas l'emplacement de ce skill (statut `not-read`). */
     notReadBy?: string;
+    /** Profil d'Antigravity IDE (ex. « 2.5.5 ») qui n'a pas vérifié le chargement de cette âme globale, comptée par prudence. */
+    unverifiedIn?: string;
     /** Nom brut d'un skill (sans préfixe de plugin), utilisé pour détecter les doublons. */
     rawId?: string;
     /** Sous-dossier (relatif au projet) d'une règle imbriquée, jamais chargée par Antigravity (R1). */

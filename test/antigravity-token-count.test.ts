@@ -39,6 +39,7 @@ if (!require.cache['vscode']) {
 
 import {
   ANTIGRAVITY_PROFILES,
+  AntigravityBehaviorProfile,
   CONDITIONAL_RULES_HEADER,
   formatConditionalIndexEntry,
   formatMcpServer,
@@ -421,5 +422,66 @@ describe('Suite de Tests : comptage des tokens au démarrage d\'Antigravity (lot
     const v260 = await McpScanner.scanGlobal(globalDir, 'antigravity', ANTIGRAVITY_PROFILES['2.6.0']);
     assert.deepStrictEqual([...outils(v260)], [['serveur', 1], ['serveur-disparu', null]], 'Le serveur absent du nouveau cache a une liste inconnue');
     assert.strictEqual(v260.tokenCount, countTokens(formatMcpServer('serveur', ['actuel'])) + countTokens(formatMcpServer('serveur-disparu', null)));
+  });
+
+  // Chantier 2.6.0, lot L5 : <RULE[user_global]> observé pour les quatre âmes globales en 2.6.0
+  // (phase 2c), et pour ~/.gemini/GEMINI.md dans la base de l'étalonnage 2.5.5 du 2026-10-21.
+  test('15. Âmes globales par profil : <RULE[user_global]> sans chemin, ordre observé, « ❔ » pour les trois âmes non vérifiées en 2.5.5', async () => {
+    const userGlobal = (corps: string) => `<RULE[user_global]>\n${corps}\n</RULE[user_global]>\n`;
+    const ames = [
+      { id: 'AGENTS.md', relatif: 'AGENTS.md', corps: '# Âme AGENTS racine\nConsigne A.' },
+      { id: 'GEMINI.md', relatif: 'GEMINI.md', corps: '# Âme GEMINI racine\nConsigne B.' },
+      { id: 'config/AGENTS.md', relatif: path.join('config', 'AGENTS.md'), corps: '# Âme AGENTS config\nConsigne C.' },
+      { id: 'config/GEMINI.md', relatif: path.join('config', 'GEMINI.md'), corps: '# Âme GEMINI config\nConsigne D.' },
+    ];
+    const scanner = async (nom: string, presentes: string[], profile: AntigravityBehaviorProfile) => {
+      const geminiRoot = path.join(tempBaseDir, 'ames-globales', nom, '.gemini');
+      await fs.promises.mkdir(path.join(geminiRoot, 'config'), { recursive: true });
+      for (const ame of ames.filter((a) => presentes.includes(a.id))) await writeFile(path.join(geminiRoot, ame.relatif), ame.corps);
+      return GlobalScanner.scan(path.join(geminiRoot, 'config'), 'antigravity', profile);
+    };
+
+    for (const profile of [ANTIGRAVITY_PROFILES['2.5.5'], ANTIGRAVITY_PROFILES['2.6.0']]) {
+      // Aucune âme globale
+      const aucune = await scanner(`zero-${profile.id}`, [], profile);
+      assert.strictEqual(aucune.items.filter((i) => i.type === 'soul').length, 0, profile.id);
+      assert.deepStrictEqual([aucune.soulStat.activeCount, aucune.soulStat.totalCount, aucune.soulStat.tokenCount], [0, 0, 0], profile.id);
+
+      // Une seule âme, ~/.gemini/GEMINI.md, vérifiée dans les deux versions
+      const une = await scanner(`une-${profile.id}`, ['GEMINI.md'], profile);
+      const gemini = une.items.find((i) => i.type === 'soul')!;
+      assert.strictEqual(gemini.id, 'GEMINI.md');
+      assert.strictEqual(gemini.metadata?.bootTokenCount, countTokens(userGlobal(ames[1].corps)), `${profile.id} : enveloppe user_global`);
+      assert.notStrictEqual(gemini.metadata?.bootTokenCount, countTokens(formatPermanentRule(gemini.path, ames[1].corps).text), `${profile.id} : le chemin n'est plus compté`);
+      assert.strictEqual(gemini.metadata?.unverifiedIn, undefined, `${profile.id} : GEMINI.md est vérifié`);
+      assert.strictEqual(une.soulStat.tokenCount, gemini.tokenCount);
+
+      // Les quatre âmes, cumulées dans l'ordre observé
+      const quatre = await scanner(`quatre-${profile.id}`, ames.map((a) => a.id), profile);
+      const soulItems = quatre.items.filter((i) => i.type === 'soul');
+      assert.deepStrictEqual(soulItems.map((i) => i.id), ames.map((a) => a.id), `${profile.id} : ordre observé`);
+      for (const [n, item] of soulItems.entries()) {
+        assert.strictEqual(item.enabled, true, `${profile.id} : ${item.id} actif`);
+        assert.strictEqual(item.tokenCount, countTokens(userGlobal(ames[n].corps)), `${profile.id} : ${item.id}`);
+      }
+      const nonVerifiees = soulItems.filter((i) => i.metadata?.unverifiedIn).map((i) => i.id);
+      assert.deepStrictEqual(
+        nonVerifiees,
+        profile.id === '2.5.5' ? ['AGENTS.md', 'config/AGENTS.md', 'config/GEMINI.md'] : [],
+        `${profile.id} : âmes non vérifiées`
+      );
+      assert.ok(soulItems.every((i) => !i.metadata?.unverifiedIn || i.metadata.unverifiedIn === profile.id));
+      // Comptage prudent : une âme non vérifiée compte comme une âme vérifiée
+      assert.strictEqual(quatre.soulStat.activeCount, 4, profile.id);
+      assert.strictEqual(quatre.soulStat.tokenCount, ames.reduce((somme, a) => somme + countTokens(userGlobal(a.corps)), 0), profile.id);
+    }
+
+    // Une âme du projet garde son chemin dans les balises
+    const dir = path.join(tempBaseDir, 'ame-projet');
+    const ameProjet = path.join(dir, 'GEMINI.md');
+    await writeFile(ameProjet, '# Âme du projet\nConsigne P.');
+    const local = await LocalScanner.scan(workspaceFor(dir));
+    const projet = local.items.find((i) => i.type === 'soul')!;
+    assert.strictEqual(projet.metadata?.bootTokenCount, countTokens(`<RULE[${ameProjet}]>\n# Âme du projet\nConsigne P.\n</RULE[${ameProjet}]>\n`));
   });
 });
