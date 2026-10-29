@@ -1,0 +1,93 @@
+{
+  "version_sonde": "1",
+  "meta": {
+    "date": "2026-10-28T13:41",
+    "modele": "Gemini 3.8 Flash (High)",
+    "version_antigravity": "2.6.0",
+    "infractions": []
+  },
+  "etapes": {
+    "E0": {
+      "canaris": [
+        "CANARI-RACINE",
+        "CANARI-ALWAYS",
+        "CANARI-TRONQUE-DEBUT"
+      ],
+      "autres_regles": [
+        "~/.gemini/GEMINI.md",
+        "<PROJET>/.agents/rules/09-rule-securite-code.md",
+        "<PROJET>/.agents/rules/projet-consignes.md"
+      ],
+      "notes": "Injecté dans le prompt système initial (<user_rules>)"
+    },
+    "E1": {
+      "canaris": [],
+      "autres_regles": [],
+      "notes": "Lecture de sandbox-enquete/app.ts"
+    },
+    "E2": {
+      "canaris": [],
+      "autres_regles": [],
+      "notes": "Lecture de sandbox-enquete/notes.md"
+    },
+    "E3": {
+      "canaris": [],
+      "autres_regles": [],
+      "notes": "Lecture de src/zz-test.ts"
+    },
+    "E4": {
+      "canaris": [],
+      "autres_regles": [],
+      "notes": "Lecture de sandbox-enquete/sous/profond/x.ts"
+    },
+    "E5": {
+      "canaris": [],
+      "autres_regles": [],
+      "notes": "Listing de sandbox-enquete/sous/"
+    },
+    "E6": {
+      "canaris": [],
+      "autres_regles": [],
+      "notes": "Lecture de sandbox-enquete/sous/module.ts"
+    },
+    "E7": {
+      "canaris": [],
+      "autres_regles": [],
+      "notes": "Modification de sandbox-enquete/sous/module.ts"
+    },
+    "E8": {
+      "canaris": [],
+      "autres_regles": [],
+      "notes": "Création de sandbox-enquete/nouveau.ts"
+    },
+    "E9": {
+      "canaris": [
+        "CANARI-SKILL-CORPS"
+      ],
+      "autres_regles": [],
+      "notes": "Mot de passe d'enquête : orange"
+    }
+  },
+  "structure": {
+    "S1": true,
+    "S2": false,
+    "S3": false,
+    "S4": true,
+    "S5": {
+      "present": true,
+      "octets_tronques": 5960
+    },
+    "S6": true,
+    "S7": false,
+    "S8": false,
+    "S9": false,
+    "S10": {
+      "descriptions_visibles": 0,
+      "categories": [
+        "Lazy"
+      ]
+    },
+    "S11": null,
+    "S12": "~/.gemini/antigravity/builtin/skills"
+  }
+}

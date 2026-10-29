@@ -4,12 +4,13 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { test, describe } from 'node:test';
 
-// Suite de régression « injection-contexte » : fige le comportement observé d'Antigravity IDE le 2026-10-21.
-// Le test statique protège les fixtures. La comparaison au dernier rapport de sonde ne s'exécute
-// qu'avec INJECTION_COMPARE=1 (npm run test:injection).
+// Suite de régression « injection-contexte » : fige le comportement observé d'Antigravity IDE, avec une
+// baseline par version (2.5.5 le 2026-10-21, 2.6.0 le 2026-10-28). Le test statique protège les fixtures.
+// La comparaison au dernier rapport de sonde ne s'exécute qu'avec INJECTION_COMPARE=1 (npm run test:injection) :
+// elle choisit la baseline selon meta.version_antigravity du rapport, ou selon SONDE_BASELINE.
 const ROOT = path.resolve(__dirname, '..', '..');
 const SUITE = path.join(ROOT, 'test', 'scenarios', 'antigravity-injection-contexte');
-const BASELINE_PATH = path.join(SUITE, 'attendu', 'baseline-2026-10-21.json');
+const ATTENDU = path.join(SUITE, 'attendu');
 const RESULTATS = path.join(SUITE, 'resultats');
 const SCENARIOS_MD = path.join(SUITE, 'SCENARIOS.md');
 const GENERATOR = path.join(ROOT, 'test', 'scenarios', 'scripts', 'generate-injection-contexte-r-tronque.js');
@@ -89,13 +90,29 @@ const ETAPES = ['E0', 'E1', 'E2', 'E3', 'E4', 'E5', 'E6', 'E7', 'E8', 'E9'];
 const RESET_HINT = 'lance le script de réinitialisation : npm run test:injection-reset';
 const README_HINT = 'voir test/scenarios/antigravity-injection-contexte/README.md';
 
+/** Une baseline par version d'Antigravity, jamais modifiée après coup : une nouvelle version reçoit une nouvelle baseline datée. */
+interface BaselineConnue {
+  fichier: string;
+  date: string;
+  version: string;
+  entrees: number;
+  observees: number;
+  transposees: number;
+}
+const BASELINES: BaselineConnue[] = [
+  { fichier: 'baseline-2026-10-21.json', date: '2026-10-21', version: '2.5.5', entrees: 156, observees: 105, transposees: 51 },
+  { fichier: 'baseline-2026-10-28.json', date: '2026-10-28', version: '2.6.0', entrees: 156, observees: 156, transposees: 0 },
+];
+const BASELINES_CONNUES = BASELINES.map((b) => `${b.version} → attendu/${b.fichier}`).join(', ');
+
 interface EntreeBaseline {
   id: string;
   type: 'canari' | 'structure';
   etape?: string;
   canari?: string;
   cle?: string;
-  attendu: boolean | string;
+  /** null : la valeur attendue est un null explicite dans le rapport (S11 en 2.6.0 : aucun préambule). */
+  attendu: boolean | string | null;
   confiance: 'observe' | 'transpose';
   scenario: string;
 }
@@ -103,8 +120,12 @@ interface EntreeBaseline {
 interface Baseline {
   baseline: string;
   environnement: Record<string, string>;
+  remarques?: string[];
   entrees: EntreeBaseline[];
 }
+
+/** Valeur observée : `null` si le rapport écrit null de façon explicite, `undefined` s'il ne fournit pas la valeur. */
+type Observation = boolean | string | null | undefined;
 
 interface EtapeRapport {
   canaris?: unknown[];
@@ -122,8 +143,8 @@ interface Rapport {
 interface LigneComparaison {
   id: string;
   scenario: string;
-  attendu: boolean | string;
-  observe: boolean | string | null;
+  attendu: boolean | string | null;
+  observe: Observation;
   confiance: string;
   ecart: boolean;
 }
@@ -143,7 +164,8 @@ const listFiles = (dir: string, base = ''): string[] => {
   return out;
 };
 
-const loadBaseline = (): Baseline => JSON.parse(fs.readFileSync(BASELINE_PATH, 'utf8'));
+const loadBaseline = (connue: BaselineConnue = BASELINES[0]): Baseline =>
+  JSON.parse(fs.readFileSync(path.join(ATTENDU, connue.fichier), 'utf8'));
 
 /** Canaris d'une étape, extraits de chaque élément et normalisés en majuscules, ou null si le tableau manque. */
 const extraireCanaris = (rapport: Rapport, etape: string): string[] | null => {
@@ -159,21 +181,29 @@ const extraireCanaris = (rapport: Rapport, etape: string): string[] | null => {
 
 const normaliserTexte = (valeur: string) => valeur.replace(QUOTES_PATTERN, '').trim();
 
-/** Valeur observée pour une entrée de la baseline, ou null si le rapport ne la fournit pas. */
-const observer = (entree: EntreeBaseline, rapport: Rapport): boolean | string | null => {
+/**
+ * Valeur observée pour une entrée de la baseline : `null` si le rapport écrit null de façon explicite,
+ * `undefined` si le rapport ne fournit pas la valeur (étape, clé absente ou de type inattendu).
+ */
+const observer = (entree: EntreeBaseline, rapport: Rapport): Observation => {
   if (entree.type === 'canari') {
     const canaris = extraireCanaris(rapport, entree.etape!);
-    return canaris ? canaris.includes(entree.canari!) : null;
+    return canaris ? canaris.includes(entree.canari!) : undefined;
   }
   const [cle, champ] = entree.cle!.split('.');
-  const brut = champ ? rapport.structure?.[cle]?.[champ] : rapport.structure?.[cle];
+  const conteneur = champ ? rapport.structure?.[cle] : rapport.structure;
+  const brut = conteneur !== null && typeof conteneur === 'object' ? conteneur[champ ?? cle] : undefined;
+  if (brut === null) return null;
   if (typeof brut === 'boolean') return brut;
   if (typeof brut === 'string') return normaliserTexte(brut);
-  return null;
+  return undefined;
 };
 
-/** Une attente textuelle (S11) est satisfaite si la valeur observée la contient. */
-const conforme = (attendu: boolean | string, observe: boolean | string | null) =>
+/**
+ * Une attente textuelle (S11 en 2.5.5) est satisfaite si la valeur observée la contient. Une attente
+ * null exige un null explicite : une valeur absente du rapport reste un écart.
+ */
+const conforme = (attendu: boolean | string | null, observe: Observation) =>
   typeof attendu === 'string' ? typeof observe === 'string' && observe.includes(attendu) : observe === attendu;
 
 const comparer = (baseline: Baseline, rapport: Rapport): LigneComparaison[] =>
@@ -223,6 +253,34 @@ const avertissementsRapport = (rapport: Rapport): string[] => {
 };
 
 /**
+ * Baseline à comparer au rapport : celle désignée par SONDE_BASELINE (version, date ou nom de fichier),
+ * sinon celle de meta.version_antigravity. Une version non renseignée ou inconnue n'est jamais devinée.
+ */
+const choisirBaseline = (rapport: Rapport, forcee?: string): { baseline: BaselineConnue } | { erreur: string } => {
+  const voulue = forcee?.trim();
+  if (voulue) {
+    const baseline = BASELINES.find((b) => [b.version, b.date, b.fichier].includes(voulue));
+    return baseline
+      ? { baseline }
+      : { erreur: `SONDE_BASELINE=${voulue} ne désigne aucune baseline connue (${BASELINES_CONNUES}).` };
+  }
+  const version = rapport.meta?.version_antigravity;
+  if (typeof version !== 'string' || VERSIONS_NON_RENSEIGNEES.has(version.trim().toUpperCase())) {
+    return {
+      erreur: "Version d'Antigravity non renseignée dans le rapport : note-la d'abord dans meta.version_antigravity "
+        + `(Help > About), puis relance la comparaison (${README_HINT}). Pour forcer une baseline, utilise SONDE_BASELINE.`,
+    };
+  }
+  const baseline = BASELINES.find((b) => b.version === version.trim());
+  return baseline
+    ? { baseline }
+    : {
+      erreur: `Aucune baseline pour Antigravity ${version.trim()} (connues : ${BASELINES_CONNUES}). Pour comparer `
+        + `quand même, désigne-en une avec SONDE_BASELINE ; pour figer cette version, crée une nouvelle baseline datée (${README_HINT}).`,
+    };
+};
+
+/**
  * Rapport le plus récent d'un dossier, parmi les fichiers nommés AAAA-MM-JJ-HHMM.json
  * (l'ordre alphabétique est alors l'ordre chronologique). Les autres .json sont ignorés et signalés.
  */
@@ -252,8 +310,9 @@ const lireSiCaChange = (): Record<string, string> => {
   return out;
 };
 
-const formater = (valeur: boolean | string | null, type: 'canari' | 'structure') => {
-  if (valeur === null) return '(absent du rapport)';
+const formater = (valeur: Observation, type: 'canari' | 'structure') => {
+  if (valeur === undefined) return '(absent du rapport)';
+  if (valeur === null) return 'null';
   if (typeof valeur === 'string') return JSON.stringify(valeur);
   if (type === 'canari') return valeur ? 'présent' : 'absent';
   return String(valeur);
@@ -316,33 +375,54 @@ describe('Suite de Tests : Injection de contexte Antigravity (intégrité des fi
     assert.deepStrictEqual(fuites, []);
   });
 
-  test('6. Baseline : JSON valide, sans doublon, 156 entrées (105 observées, 51 transposées)', () => {
-    const baseline = loadBaseline();
-    const ids = baseline.entrees.map((e) => e.id);
-    assert.strictEqual(new Set(ids).size, ids.length, 'Doublon d\'id dans la baseline');
-    assert.strictEqual(baseline.baseline, '2026-10-21');
-    assert.strictEqual(baseline.entrees.length, 156);
-    assert.strictEqual(baseline.entrees.filter((e) => e.confiance === 'observe').length, 105);
-    assert.strictEqual(baseline.entrees.filter((e) => e.confiance === 'transpose').length, 51);
-    for (const e of baseline.entrees) {
-      assert.match(e.scenario, /^SC(0[1-9]|1[0-2])$/, `Scénario invalide : ${e.id}`);
-      if (e.type === 'canari') {
-        assert.ok(ETAPES.includes(e.etape!), `Étape invalide : ${e.id}`);
-        assert.strictEqual(e.id, `${e.etape}:${e.canari}`);
-        assert.strictEqual(typeof e.attendu, 'boolean');
-      } else {
-        assert.strictEqual(e.id, e.cle);
+  test('6. Baselines : JSON valide, sans doublon, une par version, avec ses comptes (2.5.5 : 156 dont 105 observées ; 2.6.0 : 156 observées)', () => {
+    assert.deepStrictEqual(
+      fs.readdirSync(ATTENDU).filter((f) => f.endsWith('.json')).sort(),
+      BASELINES.map((b) => b.fichier).sort(),
+      'Chaque fichier de attendu/ doit figurer dans la table BASELINES du test'
+    );
+    assert.strictEqual(new Set(BASELINES.map((b) => b.version)).size, BASELINES.length, 'Une seule baseline par version');
+
+    for (const connue of BASELINES) {
+      const baseline = loadBaseline(connue);
+      const ids = baseline.entrees.map((e) => e.id);
+      assert.strictEqual(new Set(ids).size, ids.length, `Doublon d'id dans ${connue.fichier}`);
+      assert.strictEqual(baseline.baseline, connue.date, connue.fichier);
+      assert.strictEqual(baseline.environnement.version, connue.version, connue.fichier);
+      assert.strictEqual(baseline.entrees.length, connue.entrees, connue.fichier);
+      assert.strictEqual(baseline.entrees.filter((e) => e.confiance === 'observe').length, connue.observees, connue.fichier);
+      assert.strictEqual(baseline.entrees.filter((e) => e.confiance === 'transpose').length, connue.transposees, connue.fichier);
+      for (const e of baseline.entrees) {
+        assert.match(e.scenario, /^SC(0[1-9]|1[0-2])$/, `Scénario invalide : ${e.id}`);
+        if (e.type === 'canari') {
+          assert.ok(ETAPES.includes(e.etape!), `Étape invalide : ${e.id}`);
+          assert.strictEqual(e.id, `${e.etape}:${e.canari}`);
+          assert.strictEqual(typeof e.attendu, 'boolean');
+        } else {
+          assert.strictEqual(e.id, e.cle);
+          assert.ok(e.attendu === null || ['boolean', 'string'].includes(typeof e.attendu), `Attente invalide : ${e.id}`);
+        }
       }
     }
+
+    // Les baselines portent les mêmes entrées, dans le même ordre : seules les valeurs attendues changent
+    const signature = (connue: BaselineConnue) => loadBaseline(connue).entrees.map((e) => `${e.id}|${e.type}|${e.scenario}`);
+    for (const connue of BASELINES.slice(1)) {
+      assert.deepStrictEqual(signature(connue), signature(BASELINES[0]), `${connue.fichier} doit reprendre les entrées de ${BASELINES[0].fichier}`);
+    }
+    // S11 : le préambule en 2.5.5, un null explicite en 2.6.0 (aucun préambule)
+    const s11 = (version: string) => loadBaseline(BASELINES.find((b) => b.version === version)!).entrees.find((e) => e.id === 'S11')!.attendu;
+    assert.strictEqual(typeof s11('2.5.5'), 'string');
+    assert.strictEqual(s11('2.6.0'), null);
   });
 
   test('7. Comparateur : écarts, rédaction libre du rapport, choix du rapport et avertissements', async () => {
     // Rapports fabriqués en mémoire pour vérifier l'outillage : ce ne sont pas des résultats de sonde.
     const baseline = loadBaseline();
-    const conformeALaBaseline = (): Rapport => {
+    const conformeA = (reference: Baseline): Rapport => {
       const rapport: Rapport = { meta: { version_antigravity: '1.2.3', infractions: [] }, etapes: {}, structure: { S5: {} } };
       for (const etape of ETAPES) rapport.etapes![etape] = { canaris: [] };
-      for (const e of baseline.entrees) {
+      for (const e of reference.entrees) {
         if (e.type === 'canari') {
           if (e.attendu) rapport.etapes![e.etape!].canaris!.push(e.canari!);
         } else if (e.cle === 'S5.present') {
@@ -353,6 +433,7 @@ describe('Suite de Tests : Injection de contexte Antigravity (intégrité des fi
       }
       return rapport;
     };
+    const conformeALaBaseline = () => conformeA(baseline);
     const ecartsDe = (rapport: Rapport) => comparer(baseline, rapport).filter((l) => l.ecart);
 
     // Rapport conforme, puis une cellule inversée et une étape absente
@@ -362,7 +443,7 @@ describe('Suite de Tests : Injection de contexte Antigravity (intégrité des fi
     delete rapport.etapes!.E9;
     const ecarts = ecartsDe(rapport);
     assert.ok(ecarts.some((l) => l.id === 'E1:CANARI-G6' && l.scenario === 'SC03' && l.observe === true));
-    assert.ok(ecarts.filter((l) => l.id.startsWith('E9:')).every((l) => l.observe === null), 'Une étape absente du rapport est un écart');
+    assert.ok(ecarts.filter((l) => l.id.startsWith('E9:')).every((l) => l.observe === undefined), 'Une étape absente du rapport est un écart');
     assert.strictEqual(ecarts.length, 1 + baseline.entrees.filter((e) => e.etape === 'E9').length);
 
     // Point 1 : canaris annotés, en minuscules ou noyés dans du texte ; éléments sans canari ignorés
@@ -465,6 +546,41 @@ describe('Suite de Tests : Injection de contexte Antigravity (intégrité des fi
       '≈ ~20 tokens au démarrage',
     ].join('\n');
     assert.deepStrictEqual(lignesAvecCheminUtilisateur(propre), []);
+
+    // Point 7 : baseline 2.6.0, où S11 attend un null explicite ; une clé absente ou un préambule restent des écarts
+    const baseline26 = loadBaseline(BASELINES.find((b) => b.version === '2.6.0')!);
+    const ecarts26 = (r: Rapport) => comparer(baseline26, r).filter((l) => l.ecart);
+    assert.deepStrictEqual(ecarts26(conformeA(baseline26)), []);
+    const sansS11 = conformeA(baseline26);
+    delete sansS11.structure!.S11;
+    assert.deepStrictEqual(ecarts26(sansS11).map((l) => [l.id, l.observe]), [['S11', undefined]], 'Une clé S11 absente n\'est pas un null explicite');
+    const avecPreambule = conformeA(baseline26);
+    avecPreambule.structure!.S11 = preambule;
+    assert.deepStrictEqual(ecarts26(avecPreambule).map((l) => l.id), ['S11'], 'Un préambule réapparu est un écart en 2.6.0');
+    assert.strictEqual(formater(null, 'structure'), 'null');
+    assert.strictEqual(formater(undefined, 'structure'), '(absent du rapport)');
+
+    // Point 8 : choix de la baseline selon la version du rapport, ou forcé par SONDE_BASELINE ; jamais deviné
+    const avecVersion = (version: string | undefined): Rapport => {
+      const r = conformeALaBaseline();
+      r.meta!.version_antigravity = version;
+      return r;
+    };
+    const choisie = (r: Rapport, forcee?: string) => {
+      const choix = choisirBaseline(r, forcee);
+      return 'baseline' in choix ? choix.baseline.fichier : choix.erreur;
+    };
+    assert.strictEqual(choisie(avecVersion('2.5.5')), 'baseline-2026-10-21.json');
+    assert.strictEqual(choisie(avecVersion(' 2.6.0 ')), 'baseline-2026-10-28.json');
+    for (const version of [undefined, '', VERSION_A_REMPLIR, 'INCONNU']) {
+      assert.match(choisie(avecVersion(version)), /note-la d'abord dans meta\.version_antigravity/, `version ${JSON.stringify(version)}`);
+    }
+    assert.match(choisie(avecVersion('2.7.0')), /Aucune baseline pour Antigravity 2\.7\.0/);
+    assert.strictEqual(choisie(avecVersion('2.6.0'), '2.5.5'), 'baseline-2026-10-21.json', 'SONDE_BASELINE prime sur la version du rapport');
+    assert.strictEqual(choisie(avecVersion(VERSION_A_REMPLIR), '2026-10-28'), 'baseline-2026-10-28.json');
+    assert.strictEqual(choisie(avecVersion('2.5.5'), 'baseline-2026-10-28.json'), 'baseline-2026-10-28.json');
+    assert.strictEqual(choisie(avecVersion('2.5.5'), '  '), 'baseline-2026-10-21.json', 'Une variable vide ne force rien');
+    assert.match(choisie(avecVersion('2.5.5'), 'zz'), /SONDE_BASELINE=zz ne désigne aucune baseline connue/);
   });
 
   test('8. Confidentialité : aucun chemin personnel, de lecteur ou réseau dans resultats/ ni historique/', () => {
@@ -487,7 +603,7 @@ describe('Suite de Tests : Injection de contexte Antigravity (intégrité des fi
 });
 
 describe('Suite de Tests : Injection de contexte Antigravity (comparaison au rapport de sonde)', () => {
-  test('9. Le dernier rapport de sonde est conforme à la baseline du 2026-10-21', (t) => {
+  test('9. Le dernier rapport de sonde est conforme à la baseline de sa version d\'Antigravity', (t) => {
     if (!COMPARE) {
       t.skip('Comparaison désactivée dans npm test : lance npm run test:injection.');
       return;
@@ -511,13 +627,22 @@ describe('Suite de Tests : Injection de contexte Antigravity (comparaison au rap
       rapportPath = choix.rapport;
     }
 
-    const baseline = loadBaseline();
     const rapport: Rapport = JSON.parse(fs.readFileSync(rapportPath, 'utf8'));
     log.push(`Rapport : ${path.relative(ROOT, rapportPath)}`);
     log.push(
       `Sonde v${rapport.version_sonde ?? '?'} | date ${rapport.meta?.date ?? '?'} | modèle ${rapport.meta?.modele ?? '?'}`
       + ` | Antigravity ${rapport.meta?.version_antigravity ?? '(version non notée)'}`
     );
+
+    const forcee = process.env.SONDE_BASELINE;
+    const choixBaseline = choisirBaseline(rapport, forcee);
+    if ('erreur' in choixBaseline) {
+      console.log(log.join('\n'));
+      assert.fail(choixBaseline.erreur);
+    }
+    const connue = choixBaseline.baseline;
+    const baseline = loadBaseline(connue);
+    log.push(`Baseline : attendu/${connue.fichier} (Antigravity ${connue.version}, ${forcee?.trim() ? 'forcée par SONDE_BASELINE' : 'choisie selon la version du rapport'})`);
 
     const infractions = rapport.meta?.infractions ?? [];
     log.push(...avertissementsRapport(rapport));
@@ -558,7 +683,7 @@ describe('Suite de Tests : Injection de contexte Antigravity (comparaison au rap
         return `- ${sc} (${n} écart(s)) : ${siCaChange[sc] ?? '(ligne « Si ça change » introuvable dans SCENARIOS.md)'}`;
       });
       const suspect = infractions.length > 0 ? ' Rapport SUSPECT : vérifie les infractions avant de conclure.' : '';
-      assert.fail(`${ecarts.length} écart(s) avec la baseline du 2026-10-21.${suspect}\n${details.join('\n')}`);
+      assert.fail(`${ecarts.length} écart(s) avec la baseline du ${connue.date} (Antigravity ${connue.version}).${suspect}\n${details.join('\n')}`);
     }
   });
 });
