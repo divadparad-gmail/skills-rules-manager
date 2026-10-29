@@ -255,28 +255,46 @@ export class StateManager {
     }
 
     // Antigravity : le budget de 20 000 tokens est réservé aux règles (âmes comprises) ; les skills
-    // et les MCP relèvent d'un budget de personnalisation distinct (https://antigravity.google/docs/rules/)
+    // et les MCP relèvent d'un budget de personnalisation distinct (https://antigravity.google/docs/rules/).
+    // En 2.6.0 (D-10), le panneau Settings de l'IDE affiche un second budget de 20 000 tokens pour
+    // « Other Customizations » (skills et MCP, skills intégrés et doublons compris).
     const budgetExcludesPersonalization = workspace.tool === 'antigravity';
     const rulesAndSoulTokens =
       soulGlobal.tokenCount +
       soulLocal.tokenCount +
       rulesGlobal.tokenCount +
       rulesLocal.tokenCount;
+    const personalizationTokens =
+      skillsGlobal.tokenCount +
+      skillsLocal.tokenCount +
+      mcpGlobal.tokenCount +
+      mcpLocal.tokenCount;
     const usedTokensTotal = budgetExcludesPersonalization
       ? rulesAndSoulTokens
-      : rulesAndSoulTokens +
-        skillsGlobal.tokenCount +
-        skillsLocal.tokenCount +
-        mcpGlobal.tokenCount +
-        mcpLocal.tokenCount;
+      : rulesAndSoulTokens + personalizationTokens;
 
     const availablePercentage = Number(Math.max(0, 100 - (usedTokensTotal / budgetTotal) * 100).toFixed(1));
+    const personalizationBudgetTotal =
+      workspace.tool === 'antigravity' && antigravityProfile.personalizationBudgetTokens !== null
+        ? antigravityProfile.personalizationBudgetTokens
+        : undefined;
+    const personalizationAvailablePercentage =
+      personalizationBudgetTotal !== undefined
+        ? Number(Math.max(0, 100 - (personalizationTokens / personalizationBudgetTotal) * 100).toFixed(1))
+        : undefined;
 
     const stats: ManagerStats = {
       budgetTotal,
       budgetExcludesPersonalization,
       usedTokensTotal,
       availablePercentage,
+      ...(personalizationBudgetTotal !== undefined
+        ? {
+            personalizationBudgetTotal,
+            personalizationUsedTokensTotal: personalizationTokens,
+            personalizationAvailablePercentage,
+          }
+        : {}),
       soulGlobal,
       soulLocal,
       rulesGlobal,

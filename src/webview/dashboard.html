@@ -73,6 +73,29 @@
       <div id="barMcpLocal" class="segment segment-mcp-local" style="width: 0%;" title="MCP (local)"></div>
     </div>
 
+    <!-- Seconde jauge Antigravity IDE 2.6.0 (D-10) : Budget « Other Customizations » (skills et MCP), masquée en 2.5.5 et en Claude Code -->
+    <div id="personalizationGaugeWrap" style="display: none; margin-top: 8px;">
+      <div class="token-gauge-header" style="margin-bottom: 4px;">
+        <div class="token-gauge-title-wrap">
+          <span class="token-gauge-title" style="font-size: 12px;">
+            <span>🧩 Budget « Other Customizations » (Skills &amp; MCP)</span>
+          </span>
+          <span class="token-budget-target">(&lt; 20 000 tokens · 🧪 IDE 2.6.0)</span>
+        </div>
+        <div class="token-gauge-value" style="font-size: 12px;">
+          <span class="gauge-used-label">utilisé <span id="personalizationUsedPercent" class="gauge-pct gauge-used-val">0%</span></span>
+          <span class="gauge-sep">|</span>
+          <span class="gauge-avail-label">disponible <span id="personalizationAvailablePercent" class="gauge-pct gauge-avail-val">100%</span></span>
+        </div>
+      </div>
+      <div id="personalizationProgressTrack" class="stacked-progress-track" style="height: 8px;">
+        <div id="barPersonalizationSkillGlobal" class="segment segment-skill-global" style="width: 0%;" title="Skills (global)"></div>
+        <div id="barPersonalizationSkillLocal" class="segment segment-skill-local" style="width: 0%;" title="Skills (local)"></div>
+        <div id="barPersonalizationMcpGlobal" class="segment segment-mcp-global" style="width: 0%;" title="MCP (global)"></div>
+        <div id="barPersonalizationMcpLocal" class="segment segment-mcp-local" style="width: 0%;" title="MCP (local)"></div>
+      </div>
+    </div>
+
     <!-- Grille 3 Colonnes : GLOBAL vs LOCAL vs TOTAL -->
     <div class="dashboard-budget-grid">
       <!-- COLONNE GAUCHE : GLOBAL -->

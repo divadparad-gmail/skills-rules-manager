@@ -43,6 +43,8 @@ import {
   ANTIGRAVITY_TESTED_VERSION,
   BUILTIN_SKILLS_DIR,
   MCP_TOOL_CACHE_DIR,
+  PERSONALIZATION_BUDGET_EXCLUSION_TESTED,
+  PERSONALIZATION_BUDGET_TOKENS,
 } from '../src/antigravity/behavior';
 import {
   ANTIGRAVITY_PROFILE_SETTING,
@@ -155,6 +157,7 @@ describe('Suite de Tests : profil de comportement d\'Antigravity (chantier 2.6.0
       truncation: 'byte',
       globInjected: true,
       workspaceAgentRuleDirs: ['.agents', '.agent'],
+      personalizationBudgetTokens: null,
     });
     assert.deepStrictEqual(PROFIL_260, {
       id: '2.6.0',
@@ -169,7 +172,10 @@ describe('Suite de Tests : profil de comportement d\'Antigravity (chantier 2.6.0
       truncation: 'line-end',
       globInjected: false,
       workspaceAgentRuleDirs: ['.agents', '.agent', '_agent', '_agents'],
+      personalizationBudgetTokens: 20000,
     });
+    assert.strictEqual(PERSONALIZATION_BUDGET_TOKENS, 20000);
+    assert.strictEqual(PERSONALIZATION_BUDGET_EXCLUSION_TESTED, false);
     assert.strictEqual(ANTIGRAVITY_TESTED_VERSION, 'Antigravity IDE 2.5.5');
     assert.strictEqual(ANTIGRAVITY_TESTED_ON, '2026-10-21');
     assert.strictEqual(BUILTIN_SKILLS_DIR, PROFIL_255.builtinSkillsDir);

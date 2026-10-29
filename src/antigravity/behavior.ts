@@ -96,6 +96,14 @@ export interface AntigravityBehaviorProfile {
    * `always_on` d'une variante (comptées par prudence avec un badge « ❔ Non vérifié »).
    */
   workspaceAgentRuleDirs: readonly string[];
+  /**
+   * D-10 : budget du reste (« Other Customizations » : skills et MCP), distinct du budget de 20 000
+   * tokens des règles. En 2.5.5, ce budget est mentionné par la documentation sans être chiffré (`null`).
+   * En 2.6.0, le panneau Settings de l'IDE affiche un plafond de 20 000 tokens (🧪 observé le
+   * 2026-10-28) ; l'exclusion des grosses personnalisations au-delà du budget est annoncée par l'IDE,
+   * non testée (❔).
+   */
+  personalizationBudgetTokens: number | null;
 }
 
 export const ANTIGRAVITY_PROFILES: Readonly<Record<AntigravityProfileId, AntigravityBehaviorProfile>> = Object.freeze({
@@ -112,6 +120,7 @@ export const ANTIGRAVITY_PROFILES: Readonly<Record<AntigravityProfileId, Antigra
     truncation: 'byte',
     globInjected: true,
     workspaceAgentRuleDirs: Object.freeze(['.agents', '.agent'] as const),
+    personalizationBudgetTokens: null,
   }),
   '2.6.0': Object.freeze({
     id: '2.6.0',
@@ -126,6 +135,7 @@ export const ANTIGRAVITY_PROFILES: Readonly<Record<AntigravityProfileId, Antigra
     truncation: 'line-end',
     globInjected: false,
     workspaceAgentRuleDirs: Object.freeze(['.agents', '.agent', '_agent', '_agents'] as const),
+    personalizationBudgetTokens: 20000,
   }),
 });
 
@@ -634,6 +644,14 @@ export const ORDINARY_SESSION = { reads: 15, writes: 5 } as const;
  */
 export const RULES_BUDGET_TOKENS = 20000;
 export const RULES_BUDGET_POINTERS_TESTED = false;
+
+/**
+ * 🧪 Budget « Other Customizations » (skills et MCP) observé dans le panneau Settings d'Antigravity
+ * IDE 2.6.0 le 2026-10-28 (20 000 tokens), distinct du budget des règles. Au-delà, l'IDE annonce
+ * que les grosses personnalisations sont exclues : annoncé par l'IDE, non testé.
+ */
+export const PERSONALIZATION_BUDGET_TOKENS = 20000;
+export const PERSONALIZATION_BUDGET_EXCLUSION_TESTED = false;
 
 // ---------------------------------------------------------------------------------------------
 // Hooks et workflows (lot A3). Format des hooks : skill intégré `agy-customizations`

@@ -663,6 +663,7 @@
 
       // Mise à jour de la lueur / bordure d'alerte de la jauge (Stacked Bar)
       document.querySelectorAll('.stacked-progress-track').forEach((track) => {
+        if (track.id === 'personalizationProgressTrack' || track.id === 'personalizationProgressTrackSide') return;
         track.classList.remove('gauge-warning', 'gauge-critical');
         const pct = stats.availablePercentage;
         if (pct < 10) {
@@ -683,6 +684,9 @@
       setSegmentWidth('barSkillLocal', !excludesPersonalization && stats.skillsLocal ? stats.skillsLocal.percentage : 0);
       setSegmentWidth('barMcpGlobal', !excludesPersonalization && stats.mcpGlobal ? stats.mcpGlobal.percentage : 0);
       setSegmentWidth('barMcpLocal', !excludesPersonalization && stats.mcpLocal ? stats.mcpLocal.percentage : 0);
+
+      // Seconde jauge Antigravity IDE 2.6.0 (D-10) : Budget « Other Customizations » (skills et MCP)
+      renderPersonalizationGauge(state);
 
       // Mise à jour des lignes de détail de la légende (titre avec nombre actif entre parenthèses)
       updateBreakdownRow('SoulGlobal', stats.soulGlobal, 'Âme (global)');
@@ -789,8 +793,14 @@
         const dupNotice = (dupStats && dupStats.activeDuplicates > 0)
           ? ` • <span style="color: #fca5a5; font-weight: 700;">⚠️ ${dupStats.totalWastedTokens.toLocaleString('fr-FR')} tokens gaspillés en doublons</span>`
           : '';
+        const hasPersonalizationBudget = excludesPersonalization &&
+          typeof stats.personalizationBudgetTotal === 'number' &&
+          stats.personalizationBudgetTotal > 0;
+        const persUsed = stats.personalizationUsedTokensTotal ?? (skillTotalTokens + mcpTotalTokens);
         const personalizationNotice = excludesPersonalization
-          ? ` • Skills et MCP : ${(skillTotalTokens + mcpTotalTokens).toLocaleString()} tokens, hors budget des règles (budget de personnalisation distinct)`
+          ? (hasPersonalizationBudget
+              ? ` • Budget « Other Customizations » (skills et MCP) : ${persUsed.toLocaleString()} / ${stats.personalizationBudgetTotal.toLocaleString()} tokens (${((persUsed / stats.personalizationBudgetTotal) * 100).toFixed(1)}%)`
+              : ` • Skills et MCP : ${(skillTotalTokens + mcpTotalTokens).toLocaleString()} tokens, hors budget des règles (budget de personnalisation distinct)`)
           : '';
         const totalLabel = excludesPersonalization ? 'Budget des règles (âme comprise)' : 'Total utilisé';
         totalSummaryEl.innerHTML = `${totalLabel} : ${usedTokens.toLocaleString()} / ${budget.toLocaleString()} tokens (${usedPct}%)${personalizationNotice}${dupNotice}`;
@@ -798,6 +808,121 @@
 
       renderDynamicCosts(state);
     }
+  }
+
+  /**
+   * Infobulle de la seconde jauge « Other Customizations » (Antigravity IDE 2.6.0, lot L9, D-10).
+   * Insérée uniquement par `title` ou `textContent`.
+   */
+  function formatPersonalizationBudgetTooltip(usedTokens, budgetTokens = 20000) {
+    const used = (usedTokens || 0).toLocaleString('fr-FR');
+    const pct = Number((((usedTokens || 0) / (budgetTokens || 20000)) * 100).toFixed(1));
+    return (
+      `📊 Budget "Other Customizations" (skills et MCP) : ${used} / 20 000 tokens (${pct} %).\n` +
+      '🧪 Plafond de 20 000 tokens observé dans le panneau Settings d\'Antigravity IDE 2.6.0 (2026-10-28), distinct du budget de 20 000 tokens des règles.\n' +
+      '📏 Estimation de l\'extension (tokeniseur o200k_base) : le panneau de l\'IDE peut afficher un autre chiffre.\n' +
+      '🧩 Les skills intégrés et les skills présents à la fois en global et dans le projet sont comptés par prudence ; le panneau de l\'IDE semble les exclure (déduit, non vérifié).\n' +
+      '❔ Au-delà du budget, l\'IDE annonce que les grosses personnalisations sont exclues : annoncé par l\'IDE, non testé.'
+    );
+  }
+
+  /**
+   * Seconde jauge d'Antigravity IDE 2.6.0 (lot L9, D-10) : budget de 20 000 tokens pour
+   * « Other Customizations » (skills et MCP, skills intégrés et doublons compris). Masquée en
+   * profil 2.5.5 (`personalizationBudgetTotal` absent) et en mode Claude Code.
+   */
+  function renderPersonalizationGauge(state, doc) {
+    const targetDoc = doc || (typeof document !== 'undefined' ? document : null);
+    if (!targetDoc) return;
+    const stats = state && state.stats;
+    const isAntigravity = state && state.workspace && state.workspace.tool === 'antigravity';
+    const hasPersonalizationBudget = Boolean(
+      isAntigravity && stats && typeof stats.personalizationBudgetTotal === 'number' && stats.personalizationBudgetTotal > 0
+    );
+    const wraps = [
+      targetDoc.getElementById('personalizationGaugeWrap'),
+      targetDoc.getElementById('personalizationGaugeWrapSide'),
+    ];
+    if (!hasPersonalizationBudget) {
+      wraps.forEach((w) => {
+        if (w) {
+          w.style.display = 'none';
+          w.title = '';
+        }
+      });
+      ['barPersonalizationSkillGlobal', 'barPersonalizationSkillLocal', 'barPersonalizationMcpGlobal', 'barPersonalizationMcpLocal'].forEach((id) => {
+        const el = targetDoc.getElementById(id);
+        if (el) el.style.width = '0%';
+      });
+      return;
+    }
+
+    const persBudget = stats.personalizationBudgetTotal;
+    const persUsed = stats.personalizationUsedTokensTotal || 0;
+    const persUsedPct = Number(((persUsed / persBudget) * 100).toFixed(1));
+    const persAvailPct = stats.personalizationAvailablePercentage !== undefined
+      ? stats.personalizationAvailablePercentage
+      : Number(Math.max(0, 100 - persUsedPct).toFixed(1));
+    const tooltip = formatPersonalizationBudgetTooltip(persUsed, persBudget);
+
+    wraps.forEach((w) => {
+      if (w) {
+        w.style.display = '';
+        w.title = tooltip;
+      }
+    });
+
+    const applyThreshold = (el, avail) => {
+      if (!el) return;
+      el.classList.remove('pct-normal', 'pct-warning', 'pct-critical');
+      if (avail > 25) el.classList.add('pct-normal');
+      else if (avail >= 10) el.classList.add('pct-warning');
+      else el.classList.add('pct-critical');
+    };
+
+    const usedDash = targetDoc.getElementById('personalizationUsedPercent');
+    const availDash = targetDoc.getElementById('personalizationAvailablePercent');
+    if (usedDash) {
+      usedDash.textContent = `${persUsedPct}%`;
+      applyThreshold(usedDash, persAvailPct);
+    }
+    if (availDash) {
+      if (persAvailPct < 10) availDash.textContent = `🚨 ${persAvailPct}%`;
+      else if (persAvailPct <= 25) availDash.textContent = `⚠️ ${persAvailPct}%`;
+      else availDash.textContent = `${persAvailPct}%`;
+      applyThreshold(availDash, persAvailPct);
+    }
+
+    const usedSide = targetDoc.getElementById('personalizationUsedPercentSide');
+    const availSide = targetDoc.getElementById('personalizationAvailablePercentSide');
+    if (usedSide) {
+      usedSide.textContent = `${Math.round(persUsedPct)}%`;
+      applyThreshold(usedSide, persAvailPct);
+    }
+    if (availSide) {
+      availSide.textContent = `${Math.round(persAvailPct)}%`;
+      applyThreshold(availSide, persAvailPct);
+    }
+
+    [
+      targetDoc.getElementById('personalizationProgressTrack'),
+      targetDoc.getElementById('personalizationProgressTrackSide'),
+    ].forEach((track) => {
+      if (!track) return;
+      track.classList.remove('gauge-warning', 'gauge-critical');
+      if (persAvailPct < 10) track.classList.add('gauge-critical');
+      else if (persAvailPct <= 25) track.classList.add('gauge-warning');
+    });
+
+    const pctOf = (stat) => (stat ? Number(((stat.tokenCount / persBudget) * 100).toFixed(1)) : 0);
+    const setWidth = (id, pct) => {
+      const el = targetDoc.getElementById(id);
+      if (el) el.style.width = `${Math.max(0, pct)}%`;
+    };
+    setWidth('barPersonalizationSkillGlobal', pctOf(stats.skillsGlobal));
+    setWidth('barPersonalizationSkillLocal', pctOf(stats.skillsLocal));
+    setWidth('barPersonalizationMcpGlobal', pctOf(stats.mcpGlobal));
+    setWidth('barPersonalizationMcpLocal', pctOf(stats.mcpLocal));
   }
 
   function setSegmentWidth(elementId, percentage) {
@@ -1075,13 +1200,16 @@
     return lines.length > 0 ? `\n${lines.join('\n')}` : '';
   }
 
-  function updateBreakdownRow(prefix, stat, defaultTitle) {
+  function updateBreakdownRow(prefix, stat, defaultTitle, doc, stateOverride) {
     if (!stat) return;
+    const targetDoc = doc || (typeof document !== 'undefined' ? document : null);
+    if (!targetDoc) return;
+    const activeState = stateOverride || currentState;
 
-    const rowEl = document.getElementById(`row${prefix}`);
-    const titleEl = document.getElementById(`title${prefix}`);
-    const valEl = document.getElementById(`val${prefix}`);
-    const tooltipEl = document.getElementById(`tooltip${prefix}`);
+    const rowEl = targetDoc.getElementById(`row${prefix}`);
+    const titleEl = targetDoc.getElementById(`title${prefix}`);
+    const valEl = targetDoc.getElementById(`val${prefix}`);
+    const tooltipEl = targetDoc.getElementById(`tooltip${prefix}`);
 
     if (titleEl) {
       const warnSuffix = (stat.warningCount && stat.warningCount > 0) ? ' ⚠️' : '';
@@ -1097,16 +1225,26 @@
     }
 
     const outsideRulesBudget = (stat.type === 'skill' || stat.type === 'mcp') &&
-      currentState?.stats?.budgetExcludesPersonalization === true;
+      activeState?.stats?.budgetExcludesPersonalization === true;
+    const personalizationBudget = outsideRulesBudget &&
+      typeof activeState?.stats?.personalizationBudgetTotal === 'number' &&
+      activeState.stats.personalizationBudgetTotal > 0
+      ? activeState.stats.personalizationBudgetTotal
+      : null;
+    const personalizationPct = personalizationBudget !== null
+      ? Number(((stat.tokenCount / personalizationBudget) * 100).toFixed(1))
+      : null;
 
     if (valEl) {
       valEl.textContent = outsideRulesBudget
-        ? `${stat.tokenCount.toLocaleString()} tok (hors budget des règles)`
+        ? (personalizationBudget !== null
+            ? `${stat.tokenCount.toLocaleString()} tok (${personalizationPct}% / ${Math.round(personalizationBudget / 1000)}k)`
+            : `${stat.tokenCount.toLocaleString()} tok (hors budget des règles)`)
         : `${stat.tokenCount.toLocaleString()} tok (${stat.percentage}%)`;
     }
 
     if (tooltipEl) {
-      const isClaude = currentState?.workspace?.tool === 'claude-code';
+      const isClaude = activeState?.workspace?.tool === 'claude-code';
       const warningNote = ((stat.warningCount && stat.warningCount > 0)
         ? `\n\n⚠️ ${stat.warningCount} ressource(s) dépassent les recommandations techniques dans cette catégorie (voir badges sur les cartes).`
         : '') + (isClaude ? '' : antigravityStatNotes(stat));
@@ -1120,14 +1258,20 @@
         if (stat.type === 'rule' && stat.conditionalCount && stat.conditionalCount > 0) {
           extraInfo = `\n• Répartition : ${stat.permanentCount || 0} permanente(s) (${stat.tokenCount.toLocaleString()} tok au boot) + ${stat.conditionalCount} conditionnelle(s) (${conditionalBootNote}, +${stat.conditionalTokenCount?.toLocaleString()} tok si déclenchée(s))`;
         }
+        const personalizationTooltipNote = outsideRulesBudget && personalizationBudget !== null
+          ? `\n\n${formatPersonalizationBudgetTooltip(activeState?.stats?.personalizationUsedTokensTotal ?? stat.tokenCount, personalizationBudget)}`
+          : '';
         tooltipEl.textContent =
           `📊 ${defaultTitle} (Cumul Global + Local) :\n` +
           (outsideRulesBudget
-            ? `• Tokens : ${stat.tokenCount.toLocaleString()} tok, hors budget de 20 000 tokens des règles (budget de personnalisation distinct, non chiffré par la documentation d'Antigravity)\n`
+            ? (personalizationBudget !== null
+                ? `• Tokens : ${stat.tokenCount.toLocaleString()} tok (${personalizationPct}% du budget « Other Customizations » de ${personalizationBudget.toLocaleString('fr-FR').replace(/\s+/g, ' ')} tokens)\n`
+                : `• Tokens : ${stat.tokenCount.toLocaleString()} tok, hors budget de 20 000 tokens des règles (budget de personnalisation distinct, non chiffré par la documentation d'Antigravity)\n`)
             : `• Tokens au Boot : ${stat.tokenCount.toLocaleString()} tok (${stat.percentage}% du budget)\n`) +
           `• Caractères : ${stat.charCount.toLocaleString()} caractères` +
           extraInfo +
           `\nℹ️ Estimation des tokens (BPE o200k / repli 1 tok ≈ 4 car.)` +
+          personalizationTooltipNote +
           warningNote;
       } else if (prefix === 'SoulGlobal') {
         tooltipEl.textContent = (isClaude
@@ -2785,6 +2929,9 @@
       createItemCard,
       describeSizeAdvice,
       renderDynamicCosts,
+      renderPersonalizationGauge,
+      formatPersonalizationBudgetTooltip,
+      updateBreakdownRow,
       renderBancEssaiBanner,
       localRulesHeaderCount,
       updateBulkControl,

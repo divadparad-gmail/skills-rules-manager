@@ -46,12 +46,14 @@ import {
   formatPermanentRule,
   formatPluginSectionHeader,
   formatSkillIndexLine,
+  PERSONALIZATION_BUDGET_TOKENS,
   RULE_BODY_MAX_BYTES,
   SKILLS_INDEX_HEADER,
   splitRuleBody,
   toAntigravityUri,
   truncateRuleBody,
 } from '../src/antigravity/behavior';
+import { resolveAntigravityProfile } from '../src/antigravity/behaviorProfile';
 import { inspectAntigravityRule } from '../src/utils/antigravityRules';
 import { countTokens, countTokensForFile, clearTokenCache } from '../src/utils/tokenizer';
 import { LocalScanner } from '../src/services/LocalScanner';
@@ -59,6 +61,7 @@ import { defaultAntigravityGlobalSoulPath, GlobalScanner, globalSoulCandidates }
 import { McpScanner } from '../src/services/McpScanner';
 import { DuplicateService } from '../src/services/DuplicateService';
 import { applyAntigravityIndexHeaders } from '../src/services/antigravityBootCost';
+import { StateManager } from '../src/services/StateManager';
 import { TokenCategoryStat, WorkspaceContext } from '../src/types';
 
 const ROOT = path.resolve(__dirname, '..', '..');
@@ -708,6 +711,101 @@ describe('Suite de Tests : comptage des tokens au démarrage d\'Antigravity (lot
         assert.strictEqual(res.rulesStat.tokenCount, attenduPlugin + attenduNormal, `${portee} ${profile.id} : cumul dans la jauge`);
         assert.strictEqual(res.rulesStat.warningCount, 0, `${portee} ${profile.id} : unverifiedPluginRule n'est pas un warning`);
       }
+    }
+  });
+
+  // Chantier 2.6.0, lot L9 (D-10) : en 2.6.0, un second budget de 20 000 tokens « Other Customizations »
+  // (observé dans le panneau Settings le 2026-10-28) couvre skillsGlobal + skillsLocal + mcpGlobal + mcpLocal
+  // (skills intégrés et doublons compris). En 2.5.5 et en Claude Code, aucune clé n'est ajoutée à ManagerStats.
+  test('21. D-10 (lot L9) : second budget « Other Customizations » de 20 000 tokens en 2.6.0 ; absent de ManagerStats en 2.5.5 et en Claude Code', async () => {
+    const gemini = path.join(tempBaseDir, 'd10-budget', '.gemini');
+    const globalDir = path.join(gemini, 'config');
+    const claudeGlobalDir = path.join(tempBaseDir, 'd10-budget', '.claude');
+    const projet = path.join(tempBaseDir, 'd10-budget', 'projet');
+    const skillTexte = (nom: string, desc: string) => `---\nname: ${nom}\ndescription: ${desc}\n---\n# ${nom}\nCorps.\n`;
+
+    await writeFile(path.join(gemini, 'GEMINI.md'), '# Âme globale fictive\nConsigne G.\n');
+    await writeFile(path.join(globalDir, 'rules', 'r-globale.md'), '---\ntrigger: always_on\ndescription: Règle G.\n---\n# Règle globale\n');
+    await writeFile(path.join(globalDir, 'skills', 'skill-partage', 'SKILL.md'), skillTexte('skill-partage', 'Skill présent en global et en local.'));
+    await writeFile(path.join(gemini, 'antigravity', 'builtin', 'skills', 'skill-integre', 'SKILL.md'), skillTexte('skill-integre', 'Skill intégré fictif.'));
+    await writeFile(path.join(globalDir, 'mcp_config.json'), JSON.stringify({ mcpServers: { 'srv-global': { command: 'node' } } }));
+    await writeFile(path.join(gemini, 'antigravity', 'mcp', 'srv-global', 'outil-a.json'), '{}');
+
+    await writeFile(path.join(projet, '.agents', 'rules', 'r-locale.md'), '---\ntrigger: always_on\ndescription: Règle L.\n---\n# Règle locale\n');
+    await writeFile(path.join(projet, '.agents', 'skills', 'skill-partage', 'SKILL.md'), skillTexte('skill-partage', 'Copie locale du skill partagé.'));
+    await writeFile(path.join(projet, '.agents', 'skills', 'skill-local', 'SKILL.md'), skillTexte('skill-local', 'Skill uniquement local.'));
+    await writeFile(path.join(projet, '.agents', 'mcp_config.json'), JSON.stringify({ mcpServers: { 'srv-local': { command: 'node' } } }));
+    await fs.promises.mkdir(claudeGlobalDir, { recursive: true });
+
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const vscodeMock = require('vscode');
+    const origFolders = vscodeMock.workspace.workspaceFolders;
+    const origGetConfig = vscodeMock.workspace.getConfiguration;
+    const origAppName = vscodeMock.env.appName;
+    const indicesVides = { newStructure: false, migrationMarker: false, oldStructure: false };
+
+    try {
+      vscodeMock.workspace.workspaceFolders = [{ uri: { fsPath: projet } }];
+      vscodeMock.workspace.getConfiguration = () => ({
+        get: (key: string, def: any) => {
+          if (key === 'globalPath') return globalDir;
+          if (key === 'claudeGlobalPath') return claudeGlobalDir;
+          if (key === 'nasPath') return '';
+          return def;
+        },
+      });
+      vscodeMock.env.appName = 'Antigravity IDE';
+
+      // 1. Profil 2.5.5 : aucune des trois clés n'existe dans stats (neutralité stricte)
+      StateManager.setAntigravityProfileForTesting(resolveAntigravityProfile('2.5.5', indicesVides));
+      const state255 = await StateManager.loadFullState(true);
+      assert.strictEqual('personalizationBudgetTotal' in state255.stats, false, '2.5.5 : pas de personalizationBudgetTotal');
+      assert.strictEqual('personalizationUsedTokensTotal' in state255.stats, false, '2.5.5 : pas de personalizationUsedTokensTotal');
+      assert.strictEqual('personalizationAvailablePercentage' in state255.stats, false, '2.5.5 : pas de personalizationAvailablePercentage');
+      assert.strictEqual(
+        state255.stats.usedTokensTotal,
+        state255.stats.soulGlobal.tokenCount +
+          state255.stats.soulLocal.tokenCount +
+          state255.stats.rulesGlobal.tokenCount +
+          state255.stats.rulesLocal.tokenCount,
+        '2.5.5 : la jauge des règles ne compte que les âmes et les règles'
+      );
+
+      // 2. Profil 2.6.0 : second budget de 20 000 tokens = skillsGlobal + skillsLocal + mcpGlobal + mcpLocal
+      StateManager.setAntigravityProfileForTesting(resolveAntigravityProfile('2.6.0', indicesVides));
+      const state260 = await StateManager.loadFullState(true);
+      const tb = state260.stats;
+      const attenduUsed = tb.skillsGlobal.tokenCount + tb.skillsLocal.tokenCount + tb.mcpGlobal.tokenCount + tb.mcpLocal.tokenCount;
+      const attenduAvail = Number(Math.max(0, 100 - (attenduUsed / PERSONALIZATION_BUDGET_TOKENS) * 100).toFixed(1));
+
+      assert.ok(state260.globalResources.some((i) => i.metadata?.builtin), '2.6.0 : le skill intégré fait partie de skillsGlobal');
+      assert.strictEqual(tb.skillsGlobal.activeCount, 2, '2.6.0 : skill intégré + skill global partagé comptés');
+      assert.strictEqual(tb.skillsLocal.activeCount, 2, '2.6.0 : doublon local + skill local comptés');
+      assert.strictEqual(state260.stats.personalizationBudgetTotal, PERSONALIZATION_BUDGET_TOKENS);
+      assert.strictEqual(state260.stats.personalizationBudgetTotal, 20000);
+      assert.strictEqual(state260.stats.personalizationUsedTokensTotal, attenduUsed);
+      assert.strictEqual(state260.stats.personalizationAvailablePercentage, attenduAvail);
+      assert.strictEqual(
+        state260.stats.usedTokensTotal,
+        tb.soulGlobal.tokenCount + tb.soulLocal.tokenCount + tb.rulesGlobal.tokenCount + tb.rulesLocal.tokenCount,
+        '2.6.0 : la jauge des règles existante ne change pas de périmètre'
+      );
+
+      // 3. Claude Code : pas de budget Other Customizations même si l'override 2.6.0 est actif
+      const projetClaude = path.join(tempBaseDir, 'd10-budget', 'projet-claude');
+      await fs.promises.mkdir(path.join(projetClaude, '.claude', 'rules'), { recursive: true });
+      vscodeMock.workspace.workspaceFolders = [{ uri: { fsPath: projetClaude } }];
+      vscodeMock.env.appName = 'Visual Studio Code';
+      const stateClaude = await StateManager.loadFullState(true);
+      assert.strictEqual(stateClaude.workspace.tool, 'claude-code');
+      assert.strictEqual('personalizationBudgetTotal' in stateClaude.stats, false, 'Claude Code : pas de personalizationBudgetTotal');
+      assert.strictEqual('personalizationUsedTokensTotal' in stateClaude.stats, false, 'Claude Code : pas de personalizationUsedTokensTotal');
+      assert.strictEqual('personalizationAvailablePercentage' in stateClaude.stats, false, 'Claude Code : pas de personalizationAvailablePercentage');
+    } finally {
+      StateManager.setAntigravityProfileForTesting(null);
+      vscodeMock.workspace.workspaceFolders = origFolders;
+      vscodeMock.workspace.getConfiguration = origGetConfig;
+      vscodeMock.env.appName = origAppName;
     }
   });
 });

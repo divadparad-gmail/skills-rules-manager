@@ -547,4 +547,169 @@ describe('Suite de Tests : alertes et coûts dynamiques d\'Antigravity (lot A3a)
     const { enrichedLocal } = DuplicateService.detectDuplicates([global], [local]);
     assert.strictEqual(enrichedLocal[0].metadata!.duplicateInfo!.dynamicCost, undefined);
   });
+
+  // Chantier 2.6.0, lot L9, D-10 : seconde jauge « Other Customizations » (20 000 tokens)
+  test('18. Seconde jauge D-10 (lot L9) : masquée en 2.5.5 et en Claude Code ; affichée en 2.6.0 avec ses segments, ses seuils de couleur et son infobulle sourcée', () => {
+    const nodes: Record<string, MockEl> = {};
+    const doc = mockDoc(nodes);
+    const statSkillGlobal = {
+      type: 'skill', scope: 'global', activeCount: 29, totalCount: 29,
+      charCount: 10000, tokenCount: 2564, percentage: 12.8, directoryPath: '/virtuel/skills-global',
+    };
+    const statSkillLocal = {
+      type: 'skill', scope: 'local', activeCount: 1, totalCount: 1,
+      charCount: 400, tokenCount: 113, percentage: 0.6, directoryPath: '/virtuel/skills-local',
+    };
+    const statMcpGlobal = {
+      type: 'mcp', scope: 'global', activeCount: 2, totalCount: 4,
+      charCount: 160, tokenCount: 40, percentage: 0.2, directoryPath: '/virtuel/mcp-global',
+    };
+    const statMcpLocal = {
+      type: 'mcp', scope: 'local', activeCount: 0, totalCount: 0,
+      charCount: 0, tokenCount: 0, percentage: 0, directoryPath: '/virtuel/mcp-local',
+    };
+    const statSkillTotal = {
+      type: 'skill', scope: 'global', activeCount: 30, totalCount: 30,
+      charCount: 10400, tokenCount: 2677, percentage: 13.4, directoryPath: 'Cumul Global + Local',
+    };
+    const statMcpTotal = {
+      type: 'mcp', scope: 'global', activeCount: 2, totalCount: 2,
+      charCount: 160, tokenCount: 40, percentage: 0.2, directoryPath: 'Cumul Global + Local',
+    };
+
+    // 1. Claude Code et Antigravity 2.5.5 : seconde jauge masquée, libellé et infobulle 2.5.5 inchangés
+    main.renderPersonalizationGauge({ workspace: { tool: 'claude-code' }, stats: { personalizationBudgetTotal: 20000 } }, doc);
+    assert.strictEqual(nodes.personalizationGaugeWrap.style.display, 'none');
+    assert.strictEqual(nodes.personalizationGaugeWrapSide.style.display, 'none');
+    assert.strictEqual(nodes.personalizationGaugeWrap.title, '');
+
+    const state255 = {
+      workspace: { tool: 'antigravity' },
+      stats: {
+        budgetExcludesPersonalization: true,
+        skillsGlobal: statSkillGlobal,
+        skillsLocal: statSkillLocal,
+        mcpGlobal: statMcpGlobal,
+        mcpLocal: statMcpLocal,
+      },
+    };
+    main.renderPersonalizationGauge(state255, doc);
+    assert.strictEqual(nodes.personalizationGaugeWrap.style.display, 'none');
+    assert.strictEqual(nodes.personalizationGaugeWrapSide.style.display, 'none');
+    assert.strictEqual(nodes.barPersonalizationSkillGlobal.style.width, '0%');
+
+    main.updateBreakdownRow('SkillGlobal', statSkillGlobal, 'Skills (global)', doc, state255);
+    assert.strictEqual(nodes.valSkillGlobal.textContent, `${(2564).toLocaleString()} tok (hors budget des règles)`);
+    main.updateBreakdownRow('SkillTotal', statSkillTotal, 'Skills (total)', doc, state255);
+    assert.ok(
+      nodes.tooltipSkillTotal.textContent.includes(
+        'hors budget de 20 000 tokens des règles (budget de personnalisation distinct, non chiffré par la documentation d\'Antigravity)'
+      ),
+      'Profil 2.5.5 : infobulle SkillTotal inchangée'
+    );
+    main.updateBreakdownRow('McpGlobal', statMcpGlobal, 'MCP (global)', doc, state255);
+    assert.strictEqual(nodes.valMcpGlobal.textContent, `${(40).toLocaleString()} tok (hors budget des règles)`);
+    main.updateBreakdownRow('McpTotal', statMcpTotal, 'MCP (total)', doc, state255);
+    assert.ok(
+      nodes.tooltipMcpTotal.textContent.includes(
+        'hors budget de 20 000 tokens des règles (budget de personnalisation distinct, non chiffré par la documentation d\'Antigravity)'
+      ),
+      'Profil 2.5.5 : infobulle McpTotal inchangée'
+    );
+
+    // 2. Antigravity 2.6.0 : seconde jauge affichée, segments calculés sur 20 000, infobulle exacte
+    const state260 = {
+      workspace: { tool: 'antigravity' },
+      stats: {
+        budgetExcludesPersonalization: true,
+        personalizationBudgetTotal: 20000,
+        personalizationUsedTokensTotal: 2717,
+        personalizationAvailablePercentage: 86.4,
+        skillsGlobal: statSkillGlobal,
+        skillsLocal: statSkillLocal,
+        mcpGlobal: statMcpGlobal,
+        mcpLocal: statMcpLocal,
+      },
+    };
+    main.renderPersonalizationGauge(state260, doc);
+    assert.strictEqual(nodes.personalizationGaugeWrap.style.display, '');
+    assert.strictEqual(nodes.personalizationGaugeWrapSide.style.display, '');
+    assert.strictEqual(nodes.personalizationUsedPercent.textContent, '13.6%');
+    assert.strictEqual(nodes.personalizationAvailablePercent.textContent, '86.4%');
+    assert.strictEqual(nodes.personalizationUsedPercentSide.textContent, '14%');
+    assert.strictEqual(nodes.personalizationAvailablePercentSide.textContent, '86%');
+    assert.ok(nodes.personalizationUsedPercent.classList.contains('pct-normal'));
+    assert.ok(nodes.personalizationAvailablePercent.classList.contains('pct-normal'));
+    assert.ok(!nodes.personalizationProgressTrack.classList.contains('gauge-warning'));
+    assert.ok(!nodes.personalizationProgressTrack.classList.contains('gauge-critical'));
+    assert.strictEqual(nodes.barPersonalizationSkillGlobal.style.width, '12.8%');
+    assert.strictEqual(nodes.barPersonalizationSkillLocal.style.width, '0.6%');
+    assert.strictEqual(nodes.barPersonalizationMcpGlobal.style.width, '0.2%');
+    assert.strictEqual(nodes.barPersonalizationMcpLocal.style.width, '0%');
+
+    const expectedTooltip =
+      `📊 Budget "Other Customizations" (skills et MCP) : ${(2717).toLocaleString('fr-FR')} / 20 000 tokens (13.6 %).\n` +
+      '🧪 Plafond de 20 000 tokens observé dans le panneau Settings d\'Antigravity IDE 2.6.0 (2026-10-28), distinct du budget de 20 000 tokens des règles.\n' +
+      '📏 Estimation de l\'extension (tokeniseur o200k_base) : le panneau de l\'IDE peut afficher un autre chiffre.\n' +
+      '🧩 Les skills intégrés et les skills présents à la fois en global et dans le projet sont comptés par prudence ; le panneau de l\'IDE semble les exclure (déduit, non vérifié).\n' +
+      '❔ Au-delà du budget, l\'IDE annonce que les grosses personnalisations sont exclues : annoncé par l\'IDE, non testé.';
+    assert.strictEqual(main.formatPersonalizationBudgetTooltip(2717, 20000), expectedTooltip);
+    assert.strictEqual(nodes.personalizationGaugeWrap.title, expectedTooltip);
+    assert.strictEqual(nodes.personalizationGaugeWrapSide.title, expectedTooltip);
+
+    main.updateBreakdownRow('SkillGlobal', statSkillGlobal, 'Skills (global)', doc, state260);
+    assert.strictEqual(nodes.valSkillGlobal.textContent, `${(2564).toLocaleString()} tok (12.8% / 20k)`);
+    main.updateBreakdownRow('SkillTotal', statSkillTotal, 'Skills (total)', doc, state260);
+    assert.ok(nodes.tooltipSkillTotal.textContent.includes('13.4% du budget « Other Customizations » de 20 000 tokens'));
+    assert.ok(nodes.tooltipSkillTotal.textContent.includes(expectedTooltip));
+    main.updateBreakdownRow('McpGlobal', statMcpGlobal, 'MCP (global)', doc, state260);
+    assert.strictEqual(nodes.valMcpGlobal.textContent, `${(40).toLocaleString()} tok (0.2% / 20k)`);
+    main.updateBreakdownRow('McpTotal', statMcpTotal, 'MCP (total)', doc, state260);
+    assert.ok(nodes.tooltipMcpTotal.textContent.includes('0.2% du budget « Other Customizations » de 20 000 tokens'));
+    assert.ok(nodes.tooltipMcpTotal.textContent.includes(expectedTooltip));
+
+    // 2b. Budget fictif de 10 000 tokens : le pourcentage et le dénominateur suivent personalizationBudgetTotal
+    const state260Budget10k = {
+      workspace: { tool: 'antigravity' },
+      stats: {
+        ...state260.stats,
+        personalizationBudgetTotal: 10000,
+      },
+    };
+    main.updateBreakdownRow('SkillGlobal', statSkillGlobal, 'Skills (global)', doc, state260Budget10k);
+    assert.strictEqual(nodes.valSkillGlobal.textContent, `${(2564).toLocaleString()} tok (25.6% / 10k)`);
+    main.updateBreakdownRow('SkillTotal', statSkillTotal, 'Skills (total)', doc, state260Budget10k);
+    assert.ok(nodes.tooltipSkillTotal.textContent.includes('26.8% du budget « Other Customizations » de 10 000 tokens'));
+    main.updateBreakdownRow('McpGlobal', statMcpGlobal, 'MCP (global)', doc, state260Budget10k);
+    assert.strictEqual(nodes.valMcpGlobal.textContent, `${(40).toLocaleString()} tok (0.4% / 10k)`);
+    main.updateBreakdownRow('McpTotal', statMcpTotal, 'MCP (total)', doc, state260Budget10k);
+    assert.ok(nodes.tooltipMcpTotal.textContent.includes('0.4% du budget « Other Customizations » de 10 000 tokens'));
+
+    // 3. Seuils de couleur (warning <= 25%, critical < 10%) sans alerte dédiée
+    main.renderPersonalizationGauge({
+      workspace: { tool: 'antigravity' },
+      stats: {
+        ...state260.stats,
+        personalizationUsedTokensTotal: 16000,
+        personalizationAvailablePercentage: 20,
+      },
+    }, doc);
+    assert.strictEqual(nodes.personalizationAvailablePercent.textContent, '⚠️ 20%');
+    assert.ok(nodes.personalizationUsedPercent.classList.contains('pct-warning'));
+    assert.ok(nodes.personalizationProgressTrack.classList.contains('gauge-warning'));
+    assert.ok(!nodes.personalizationProgressTrack.classList.contains('gauge-critical'));
+
+    main.renderPersonalizationGauge({
+      workspace: { tool: 'antigravity' },
+      stats: {
+        ...state260.stats,
+        personalizationUsedTokensTotal: 19000,
+        personalizationAvailablePercentage: 5,
+      },
+    }, doc);
+    assert.strictEqual(nodes.personalizationAvailablePercent.textContent, '🚨 5%');
+    assert.ok(nodes.personalizationUsedPercent.classList.contains('pct-critical'));
+    assert.ok(nodes.personalizationProgressTrack.classList.contains('gauge-critical'));
+    assert.ok(!nodes.personalizationProgressTrack.classList.contains('gauge-warning'));
+  });
 });

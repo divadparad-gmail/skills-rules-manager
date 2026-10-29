@@ -285,6 +285,22 @@ export interface ManagerStats {
   budgetExcludesPersonalization?: boolean;
   usedTokensTotal: number;
   availablePercentage: number;
+  /**
+   * D-10 (Antigravity IDE 2.6.0) : plafond de 20 000 tokens du budget « Other Customizations »
+   * (skills et MCP), observé dans le panneau Settings d'Antigravity IDE 2.6.0 le 2026-10-28.
+   * Omis lorsque le profil ne chiffre pas ce budget (profil 2.5.5) ou en mode Claude Code.
+   */
+  personalizationBudgetTotal?: number;
+  /**
+   * D-10 (Antigravity IDE 2.6.0) : cumul `skillsGlobal + skillsLocal + mcpGlobal + mcpLocal`,
+   * skills intégrés et doublons compris. Omis en profil 2.5.5 et en mode Claude Code.
+   */
+  personalizationUsedTokensTotal?: number;
+  /**
+   * D-10 (Antigravity IDE 2.6.0) : pourcentage disponible sur `personalizationBudgetTotal`.
+   * Omis en profil 2.5.5 et en mode Claude Code.
+   */
+  personalizationAvailablePercentage?: number;
   soulGlobal: TokenCategoryStat;
   soulLocal: TokenCategoryStat;
   rulesGlobal: TokenCategoryStat;
