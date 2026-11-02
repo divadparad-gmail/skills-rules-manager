@@ -1,9 +1,11 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { ANTIGRAVITY_PROFILES, AntigravityBehaviorProfile, GLOBAL_SOUL_RULE_LABEL } from '../antigravity/behavior';
 import { NasStatus, ResourceItem, ResourceType } from '../types';
+import { measureAntigravitySoul } from '../utils/antigravityRules';
 import { extractFrontmatter, extractMarkdownTitleAndSummary } from '../utils/frontmatter';
 import { countTokens, countTokensForFile } from '../utils/tokenizer';
-import { buildAntigravityRuleItem } from './antigravityRuleItem';
+import { buildAntigravityRuleItem, soulSizeAdvice } from './antigravityRuleItem';
 
 let vscodeModule: any = null;
 try {
@@ -113,7 +115,8 @@ export class NasScanner {
    */
   public static async scan(
     customNasPath?: string,
-    targetTool: 'antigravity' | 'claude-code' = 'antigravity'
+    targetTool: 'antigravity' | 'claude-code' = 'antigravity',
+    profile: AntigravityBehaviorProfile = ANTIGRAVITY_PROFILES['2.5.5']
   ): Promise<{ status: NasStatus; items: ResourceItem[] }> {
     const config = vscodeModule && vscodeModule.workspace ? vscodeModule.workspace.getConfiguration('skillsManager') : null;
     const rawNasPath = customNasPath || (config ? config.get('nasPath', '') : '');
@@ -158,30 +161,66 @@ export class NasScanner {
             const fileCharCount = rawContent.length;
             const lineCount = rawContent.split(/\r\n|\r|\n/).length;
             const parsed = extractMarkdownTitleAndSummary(rawContent);
-            const isWarningLines = lineCount > 200;
-            const isWarningSize = fileCharCount > 24000;
-            const soulTokenCount = countTokensForFile(soulCandidate, stat.size, stat.mtimeMs, rawContent);
 
-            items.push({
-              id: targetSoulFile,
-              name: targetSoulFile,
-              description: parsed.summary || (targetTool === 'claude-code' ? 'Âme Maître Claude Code (Sauvegarde NAS)' : 'Âme Maître Antigravity (Sauvegarde NAS - Niveau 0)'),
-              type: 'soul',
-              scope: 'nas',
-              enabled: true,
-              path: soulCandidate,
-              targetTool,
-              isFolder: false,
-              charCount: fileCharCount,
-              tokenCount: soulTokenCount,
-              lineCount,
-              metadata: {
-                isSoul: true,
-                locked: true,
-                warningLinesExceeded: isWarningLines,
-                warningSizeExceeded: isWarningSize,
-              },
-            });
+            if (targetTool === 'antigravity' && profile.id === '2.6.0') {
+              // Profil Antigravity IDE 2.6.0 : même enveloppe <RULE[user_global]> et troncature que l'âme globale
+              const measured = await measureAntigravitySoul(rawContent, soulCandidate, stat, {
+                ruleLabel: GLOBAL_SOUL_RULE_LABEL,
+                truncation: profile.truncation,
+              });
+              const sizeAdvice = soulSizeAdvice(rawContent, measured.truncatedBytes);
+
+              items.push({
+                id: targetSoulFile,
+                name: targetSoulFile,
+                description: parsed.summary || 'Âme Maître Antigravity (Sauvegarde NAS - Niveau 0)',
+                type: 'soul',
+                scope: 'nas',
+                enabled: true,
+                path: soulCandidate,
+                targetTool,
+                isFolder: false,
+                charCount: fileCharCount,
+                tokenCount: measured.bootTokenCount,
+                lineCount,
+                metadata: {
+                  isSoul: true,
+                  locked: true,
+                  byteSize: measured.byteSize,
+                  bootTokenCount: measured.bootTokenCount,
+                  bootCharCount: measured.bootCharCount,
+                  ...(measured.truncatedBytes > 0 ? { truncatedBytes: measured.truncatedBytes, lostTokens: measured.lostTokens } : {}),
+                  ...(measured.truncationRule ? { truncationRule: measured.truncationRule } : {}),
+                  warningSizeExceeded: measured.warningSizeExceeded,
+                  ...(sizeAdvice ? { sizeAdvice, warningLinesExceeded: true } : {}),
+                },
+              });
+            } else {
+              const isWarningLines = lineCount > 200;
+              const isWarningSize = fileCharCount > 24000;
+              const soulTokenCount = countTokensForFile(soulCandidate, stat.size, stat.mtimeMs, rawContent);
+
+              items.push({
+                id: targetSoulFile,
+                name: targetSoulFile,
+                description: parsed.summary || (targetTool === 'claude-code' ? 'Âme Maître Claude Code (Sauvegarde NAS)' : 'Âme Maître Antigravity (Sauvegarde NAS - Niveau 0)'),
+                type: 'soul',
+                scope: 'nas',
+                enabled: true,
+                path: soulCandidate,
+                targetTool,
+                isFolder: false,
+                charCount: fileCharCount,
+                tokenCount: soulTokenCount,
+                lineCount,
+                metadata: {
+                  isSoul: true,
+                  locked: true,
+                  warningLinesExceeded: isWarningLines,
+                  warningSizeExceeded: isWarningSize,
+                },
+              });
+            }
           } catch {
             // Lecture fallback
           }
@@ -285,6 +324,7 @@ export class NasScanner {
             id: cleanId,
             scope: 'nas',
             fallbackDescription: 'Règle de gouvernance Antigravity',
+            profile,
           });
 
           if (rulesMap.has(cleanId)) {

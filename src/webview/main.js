@@ -954,6 +954,12 @@
     if (meta.trigger === 'manual') {
       return 'Coût au démarrage : 0 token (absente du contexte initial)';
     }
+    // Âme du catalogue : jamais chargée, son coût n'est qu'une estimation après déploiement (lot L10a)
+    if (item.type === 'soul' && item.scope === 'nas') {
+      return meta.bootTokenCount !== undefined
+        ? `Estimation une fois déployée en global : ${boot} tokens (entre deux balises <RULE[user_global]>, sans chemin). En local, les deux balises portent le chemin complet du GEMINI.md du projet.`
+        : `Catalogue : ${tok} tokens (texte brut, sans enveloppe ni coupe à 24 000 octets). Une fois déployée, l'extension la compte entre deux balises <RULE[user_global]> en global, ou entre deux balises qui portent le chemin complet du GEMINI.md du projet en local.`;
+    }
     if (item.type === 'soul' && item.scope === 'global') {
       return `Coût au démarrage : ${boot} tokens (fichier entier, entre deux balises <RULE[user_global]>, sans chemin)`;
     }
@@ -2927,6 +2933,7 @@
       computeDuplicateRecommendation,
       openCompareModal,
       createItemCard,
+      describeAntigravityBootCost,
       describeSizeAdvice,
       renderDynamicCosts,
       renderPersonalizationGauge,

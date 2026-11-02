@@ -203,7 +203,7 @@ export class StateManager {
     const antigravityProfile = resolvedProfile.profile;
 
     const [nasResult, globalResult, localResult, mcpGlobalStat, mcpLocalStat] = await Promise.all([
-      NasScanner.scan(undefined, workspace.tool),
+      NasScanner.scan(undefined, workspace.tool, antigravityProfile),
       GlobalScanner.scan(undefined, workspace.tool, antigravityProfile),
       LocalScanner.scan(workspace, antigravityProfile),
       McpScanner.scanGlobal(undefined, workspace.tool, antigravityProfile),

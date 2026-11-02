@@ -46,6 +46,7 @@ import {
   formatPermanentRule,
   formatPluginSectionHeader,
   formatSkillIndexLine,
+  GLOBAL_SOUL_RULE_LABEL,
   PERSONALIZATION_BUDGET_TOKENS,
   RULE_BODY_MAX_BYTES,
   SKILLS_INDEX_HEADER,
@@ -59,6 +60,7 @@ import { countTokens, countTokensForFile, clearTokenCache } from '../src/utils/t
 import { LocalScanner } from '../src/services/LocalScanner';
 import { defaultAntigravityGlobalSoulPath, GlobalScanner, globalSoulCandidates } from '../src/services/GlobalScanner';
 import { McpScanner } from '../src/services/McpScanner';
+import { NasScanner } from '../src/services/NasScanner';
 import { DuplicateService } from '../src/services/DuplicateService';
 import { applyAntigravityIndexHeaders } from '../src/services/antigravityBootCost';
 import { StateManager } from '../src/services/StateManager';
@@ -807,5 +809,242 @@ describe('Suite de Tests : comptage des tokens au démarrage d\'Antigravity (lot
       vscodeMock.workspace.getConfiguration = origGetConfig;
       vscodeMock.env.appName = origAppName;
     }
+  });
+
+  // Chantier 2.6.0, lot L10a : le profil de comportement actif est transmis à NasScanner.scan.
+  // En 2.5.5, l'état du catalogue est strictement identique au scan sans profil (âme en texte brut,
+  // coupe à l'octet, statuts glob inchangés). En 2.6.0, l'âme GEMINI.md du catalogue est mesurée dans
+  // l'enveloppe <RULE[user_global]> comme l'âme globale, les règles sont coupées sur fin de ligne
+  // (line-end) et les règles glob reçoivent glob-no-effect. En Claude Code, rien ne change.
+  // Dans les deux profils, l'infobulle de la carte d'âme du catalogue n'affiche plus « 0 tokens ».
+  test('22. Lot L10a : catalogue NAS par profil (2.5.5, 2.6.0 et Claude Code), StateManager.loadFullState et infobulle de l\'âme', async () => {
+    const base = path.join(tempBaseDir, 'l10a-nas');
+    const nasDir = path.join(base, 'catalogue');
+    const soulAntigravityFile = path.join(base, 'backup_cerveau_ia', '.gemini', 'GEMINI.md');
+    const soulClaudeFile = path.join(base, 'backup_cerveau_ia', '.claude', 'CLAUDE.md');
+    const soulContent = '# Âme Maître Fictive\nConsigne du catalogue pour les tests unitaires.\n';
+    const soulClaudeContent = '# Âme Claude Fictive\nConsigne Claude du catalogue.\n';
+
+    await writeFile(soulAntigravityFile, soulContent);
+    await writeFile(soulClaudeFile, soulClaudeContent);
+
+    // Skills et workflows du catalogue
+    await writeFile(
+      path.join(nasDir, 'skills', 'skill-alpha', 'SKILL.md'),
+      '---\nname: skill-alpha\ndescription: Compétence alpha du catalogue.\n---\n# Alpha\nCorps.\n'
+    );
+    await writeFile(
+      path.join(nasDir, 'skills', 'wf-beta', 'SKILL.md'),
+      '---\nname: wf-beta\ndescription: Workflow bêta du catalogue.\n---\n# Beta\nCorps.\n'
+    );
+
+    // Règles du catalogue : r-tronque.md (> 24 Ko), globs variés, model_decision, sans frontmatter
+    const sourceTronque = path.join(ROOT, 'test', 'scenarios', 'antigravity-injection-contexte', '.agents', 'rules', 'r-tronque.md');
+    await writeFile(path.join(nasDir, 'rules', 'r-tronque.md'), await fs.promises.readFile(sourceTronque, 'utf8'));
+    await writeFile(
+      path.join(nasDir, 'rules', 'r-glob-actif.md'),
+      '---\ntrigger: glob\nglobs: "**/*.ts"\ndescription: Glob simple.\n---\n# Glob actif\nCorps.\n'
+    );
+    await writeFile(
+      path.join(nasDir, 'rules', 'r-glob-partiel.md'),
+      '---\ntrigger: glob\nglobs: "*.ts, src/**/*.ts"\ndescription: Glob partiellement mort.\n---\n# Glob partiel\nCorps.\n'
+    );
+    await writeFile(
+      path.join(nasDir, 'rules', 'r-glob-mort.md'),
+      '---\ntrigger: glob\nglobs: "src/**/*.ts"\ndescription: Glob avec dossier.\n---\n# Glob mort\nCorps.\n'
+    );
+    await writeFile(
+      path.join(nasDir, 'rules', 'r-glob-liste-yaml.md'),
+      '---\ntrigger: glob\nglobs:\n  - "**/*.ts"\ndescription: Glob en liste YAML.\n---\n# Glob YAML\nCorps.\n'
+    );
+    await writeFile(
+      path.join(nasDir, 'rules', 'r-conditionnelle.md'),
+      '---\ntrigger: model_decision\ndescription: Règle conditionnelle du catalogue.\n---\n# Conditionnelle\nCorps.\n'
+    );
+    await writeFile(path.join(nasDir, 'rules', 'r-sans-fm.md'), '# Sans frontmatter\nToujours active.\n');
+
+    // 1. Profil 2.5.5 : scan sans profil deepStrictEqual au scan avec profil 2.5.5
+    const scanDefaut = await NasScanner.scan(nasDir, 'antigravity');
+    const scan255 = await NasScanner.scan(nasDir, 'antigravity', ANTIGRAVITY_PROFILES['2.5.5']);
+    assert.strictEqual(scanDefaut.status.online, true);
+    assert.deepStrictEqual(scan255.items, scanDefaut.items, '2.5.5 : scan explicite identique au scan par défaut');
+
+    const soul255 = scan255.items.find((i) => i.type === 'soul' && i.id === 'GEMINI.md')!;
+    assert.ok(soul255, '2.5.5 : carte GEMINI.md présente');
+    assert.strictEqual(soul255.tokenCount, countTokens(soulContent), '2.5.5 : âme comptée en texte brut');
+    assert.strictEqual(soul255.metadata?.bootTokenCount, undefined, '2.5.5 : pas de bootTokenCount sur l\'âme du catalogue');
+    assert.deepStrictEqual(soul255.metadata, {
+      isSoul: true,
+      locked: true,
+      warningLinesExceeded: false,
+      warningSizeExceeded: false,
+    });
+
+    const tronque255 = scan255.items.find((i) => i.id === 'r-tronque')!;
+    assert.strictEqual(tronque255.metadata?.truncatedBytes, 5957, '2.5.5 : r-tronque coupé à l\'octet (5 957)');
+    assert.strictEqual(tronque255.metadata?.truncationRule, undefined, '2.5.5 : truncationRule undefined');
+
+    assert.strictEqual(scan255.items.find((i) => i.id === 'r-glob-actif')?.metadata?.antigravityStatus, 'active');
+    assert.strictEqual(scan255.items.find((i) => i.id === 'r-glob-partiel')?.metadata?.antigravityStatus, 'partial');
+    assert.strictEqual(scan255.items.find((i) => i.id === 'r-glob-mort')?.metadata?.antigravityStatus, 'never-triggers');
+    assert.strictEqual(scan255.items.find((i) => i.id === 'r-glob-liste-yaml')?.metadata?.antigravityStatus, 'ignored-yaml-list');
+    assert.ok(
+      scan255.items.every((i) => i.metadata?.antigravityStatus !== 'glob-no-effect'),
+      '2.5.5 : aucune règle en glob-no-effect'
+    );
+
+    // 2. Profil 2.6.0 : coupe line-end, glob-no-effect, et âme mesurée avec <RULE[user_global]>
+    const scan260 = await NasScanner.scan(nasDir, 'antigravity', ANTIGRAVITY_PROFILES['2.6.0']);
+
+    const tronque260 = scan260.items.find((i) => i.id === 'r-tronque')!;
+    assert.strictEqual(tronque260.metadata?.truncatedBytes, 5960, '2.6.0 : r-tronque coupé sur fin de ligne (5 960)');
+    assert.strictEqual(tronque260.metadata?.truncationRule, 'line-end', '2.6.0 : truncationRule line-end');
+
+    for (const id of ['r-glob-actif', 'r-glob-partiel', 'r-glob-mort']) {
+      const rGlob = scan260.items.find((i) => i.id === id)!;
+      assert.strictEqual(rGlob.metadata?.antigravityStatus, 'glob-no-effect', `2.6.0 : ${id} en glob-no-effect`);
+      assert.strictEqual(rGlob.metadata?.noEffectIn, '2.6.0', `2.6.0 : ${id} porte noEffectIn 2.6.0`);
+      assert.strictEqual(rGlob.metadata?.bootTokenCount, 0);
+    }
+    assert.strictEqual(
+      scan260.items.find((i) => i.id === 'r-glob-liste-yaml')?.metadata?.antigravityStatus,
+      'ignored-yaml-list',
+      '2.6.0 : une liste YAML reste ignored-yaml-list'
+    );
+
+    // Âme du catalogue en 2.6.0 : bootTokenCount égal à celui de l'âme globale pour un contenu identique
+    const globalGeminiDir = path.join(base, 'global-home', '.gemini');
+    const globalConfigDir = path.join(globalGeminiDir, 'config');
+    await writeFile(path.join(globalGeminiDir, 'GEMINI.md'), soulContent);
+    const globalScan260 = await GlobalScanner.scan(globalConfigDir, 'antigravity', ANTIGRAVITY_PROFILES['2.6.0']);
+    const globalSoul260 = globalScan260.items.find((i) => i.type === 'soul' && i.id === 'GEMINI.md')!;
+    const soul260 = scan260.items.find((i) => i.type === 'soul' && i.id === 'GEMINI.md')!;
+
+    const enveloppeAttendue = formatPermanentRule(GLOBAL_SOUL_RULE_LABEL, soulContent).text;
+    assert.strictEqual(soul260.metadata?.bootTokenCount, countTokens(enveloppeAttendue), '2.6.0 : âme dans <RULE[user_global]>');
+    assert.strictEqual(soul260.tokenCount, soul260.metadata?.bootTokenCount);
+    assert.strictEqual(soul260.metadata?.bootTokenCount, globalSoul260.metadata?.bootTokenCount, '2.6.0 : coût identique à l\'âme globale');
+    assert.strictEqual(soul260.tokenCount, globalSoul260.tokenCount);
+
+    // Skills, workflows, model_decision et sans frontmatter sous 24 Ko : identiques entre 2.5.5 et 2.6.0
+    for (const id of ['skill-alpha', 'wf-beta', 'r-conditionnelle', 'r-sans-fm']) {
+      assert.deepStrictEqual(
+        scan260.items.find((i) => i.id === id),
+        scan255.items.find((i) => i.id === id),
+        `Catalogue : ${id} inchangé entre 2.5.5 et 2.6.0`
+      );
+    }
+
+    // 3. Claude Code : carte CLAUDE.md identique sans profil, en 2.5.5 et en 2.6.0
+    const claudeDefaut = await NasScanner.scan(nasDir, 'claude-code');
+    const claude255 = await NasScanner.scan(nasDir, 'claude-code', ANTIGRAVITY_PROFILES['2.5.5']);
+    const claude260 = await NasScanner.scan(nasDir, 'claude-code', ANTIGRAVITY_PROFILES['2.6.0']);
+    const soulClaudeDefaut = claudeDefaut.items.find((i) => i.type === 'soul' && i.id === 'CLAUDE.md')!;
+    const soulClaude255 = claude255.items.find((i) => i.type === 'soul' && i.id === 'CLAUDE.md')!;
+    const soulClaude260 = claude260.items.find((i) => i.type === 'soul' && i.id === 'CLAUDE.md')!;
+    assert.ok(soulClaudeDefaut, 'Claude Code : carte CLAUDE.md présente');
+    assert.deepStrictEqual(soulClaude255, soulClaudeDefaut, 'Claude Code : CLAUDE.md identique en 2.5.5');
+    assert.deepStrictEqual(soulClaude260, soulClaudeDefaut, 'Claude Code : CLAUDE.md identique en 2.6.0');
+
+    // 4. StateManager.loadFullState avec nasPath configuré : nasResources égal au scan direct en profil par défaut (et en 2.6.0)
+    const projet = path.join(base, 'projet');
+    const claudeGlobalDir = path.join(base, 'claude-home');
+    await fs.promises.mkdir(path.join(projet, '.agents', 'rules'), { recursive: true });
+    await fs.promises.mkdir(claudeGlobalDir, { recursive: true });
+
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const vscodeMock = require('vscode');
+    const origFolders = vscodeMock.workspace.workspaceFolders;
+    const origGetConfig = vscodeMock.workspace.getConfiguration;
+    const origAppName = vscodeMock.env.appName;
+    const indicesVides = { newStructure: false, migrationMarker: false, oldStructure: false };
+
+    try {
+      vscodeMock.workspace.workspaceFolders = [{ uri: { fsPath: projet } }];
+      vscodeMock.workspace.getConfiguration = () => ({
+        get: (key: string, def: any) => {
+          if (key === 'globalPath') return globalConfigDir;
+          if (key === 'claudeGlobalPath') return claudeGlobalDir;
+          if (key === 'nasPath') return nasDir;
+          return def;
+        },
+      });
+      vscodeMock.env.appName = 'Antigravity IDE';
+
+      StateManager.setAntigravityProfileForTesting(null);
+      const stateDefaut = await StateManager.loadFullState(true);
+      assert.strictEqual(stateDefaut.antigravityBehavior?.version, 'Antigravity IDE 2.5.5');
+      assert.deepStrictEqual(stateDefaut.nasResources, scanDefaut.items, 'StateManager (défaut 2.5.5) : nasResources égal au scan direct');
+
+      StateManager.setAntigravityProfileForTesting(resolveAntigravityProfile('2.6.0', indicesVides));
+      const state260 = await StateManager.loadFullState(true);
+      assert.strictEqual(state260.antigravityBehavior?.version, 'Antigravity IDE 2.6.0');
+      assert.deepStrictEqual(state260.nasResources, scan260.items, 'StateManager (2.6.0) : nasResources égal au scan 2.6.0');
+    } finally {
+      StateManager.setAntigravityProfileForTesting(null);
+      vscodeMock.workspace.workspaceFolders = origFolders;
+      vscodeMock.workspace.getConfiguration = origGetConfig;
+      vscodeMock.env.appName = origAppName;
+    }
+
+    // 5. Infobulle de la carte d'âme du catalogue : une estimation, jamais un « Coût au démarrage »
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const main = require(path.resolve(__dirname, '../../src/webview/main.js'));
+    const fmt = (n?: number) => (n || 0).toLocaleString('fr-FR');
+    const info255: string = main.describeAntigravityBootCost(soul255);
+    const info260: string = main.describeAntigravityBootCost(soul260);
+
+    assert.strictEqual(
+      info255,
+      `Catalogue : ${fmt(soul255.tokenCount)} tokens (texte brut, sans enveloppe ni coupe à 24 000 octets). Une fois déployée, l'extension la compte entre deux balises <RULE[user_global]> en global, ou entre deux balises qui portent le chemin complet du GEMINI.md du projet en local.`
+    );
+    assert.strictEqual(
+      info260,
+      `Estimation une fois déployée en global : ${fmt(soul260.metadata?.bootTokenCount)} tokens (entre deux balises <RULE[user_global]>, sans chemin). En local, les deux balises portent le chemin complet du GEMINI.md du projet.`
+    );
+    for (const info of [info255, info260]) {
+      assert.ok(!info.startsWith('Coût au démarrage'), `Catalogue : jamais de « Coût au démarrage » (${info})`);
+    }
+    // L'infobulle de l'âme globale garde son texte d'origine
+    assert.strictEqual(
+      main.describeAntigravityBootCost(globalSoul260),
+      `Coût au démarrage : ${fmt(globalSoul260.metadata?.bootTokenCount)} tokens (fichier entier, entre deux balises <RULE[user_global]>, sans chemin)`
+    );
+  });
+
+  // Lot L10a : une âme du catalogue de plus de 24 Ko, en Antigravity IDE 2.6.0, est coupée sur fin de ligne
+  // comme l'âme globale de même contenu ; coupée, elle ne reçoit pas de conseil de taille (soulSizeAdvice).
+  test('23. Lot L10a : âme du catalogue de plus de 24 Ko en 2.6.0, coupée en line-end comme l\'âme globale', async () => {
+    const base = path.join(tempBaseDir, 'l10a-nas-longue');
+    const nasDir = path.join(base, 'catalogue');
+    await fs.promises.mkdir(nasDir, { recursive: true });
+    // 300 lignes de 99 octets : 29 700 octets, au-delà du plafond de 24 000 octets
+    const soulContent = Array.from({ length: 300 }, (_, i) => `Consigne ${String(i).padStart(3, '0')} `.padEnd(98, 'x')).join('\n') + '\n';
+    assert.ok(Buffer.byteLength(soulContent, 'utf8') > RULE_BODY_MAX_BYTES);
+    await writeFile(path.join(base, 'backup_cerveau_ia', '.gemini', 'GEMINI.md'), soulContent);
+
+    const globalGeminiDir = path.join(base, 'global-home', '.gemini');
+    const globalConfigDir = path.join(globalGeminiDir, 'config');
+    await writeFile(path.join(globalGeminiDir, 'GEMINI.md'), soulContent);
+
+    const scan260 = await NasScanner.scan(nasDir, 'antigravity', ANTIGRAVITY_PROFILES['2.6.0']);
+    const globalScan260 = await GlobalScanner.scan(globalConfigDir, 'antigravity', ANTIGRAVITY_PROFILES['2.6.0']);
+    const soul260 = scan260.items.find((i) => i.type === 'soul' && i.id === 'GEMINI.md')!;
+    const globalSoul260 = globalScan260.items.find((i) => i.type === 'soul' && i.id === 'GEMINI.md')!;
+    assert.ok(soul260, 'Catalogue : carte GEMINI.md présente');
+    assert.ok(globalSoul260, 'Global : carte GEMINI.md présente');
+
+    const attendu = formatPermanentRule(GLOBAL_SOUL_RULE_LABEL, soulContent, 'line-end');
+    assert.ok(attendu.truncation.truncatedBytes > 0);
+    assert.strictEqual(soul260.metadata?.truncationRule, 'line-end', '2.6.0 : coupe sur fin de ligne');
+    assert.strictEqual(soul260.metadata?.truncatedBytes, attendu.truncation.truncatedBytes, '2.6.0 : octets coupés');
+    assert.strictEqual(soul260.metadata?.bootTokenCount, countTokens(attendu.text), '2.6.0 : partie gardée dans <RULE[user_global]>');
+    assert.strictEqual(soul260.metadata?.warningSizeExceeded, true);
+    assert.strictEqual(soul260.metadata?.sizeAdvice, undefined, '2.6.0 : âme coupée, pas de conseil de taille');
+    assert.strictEqual(soul260.metadata?.warningLinesExceeded, undefined);
+
+    assert.strictEqual(soul260.metadata?.bootTokenCount, globalSoul260.metadata?.bootTokenCount, '2.6.0 : même coût que l\'âme globale');
+    assert.strictEqual(soul260.tokenCount, globalSoul260.tokenCount);
+    assert.deepStrictEqual(soul260.metadata, globalSoul260.metadata, '2.6.0 : mêmes métadonnées que l\'âme globale');
   });
 });
