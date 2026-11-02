@@ -40,6 +40,28 @@ Les scripts associés se trouvent dans `test/scenarios/scripts/` :
 - `reset-injection-contexte.js` est le script de réinitialisation.
 - `generate-injection-contexte-r-tronque.js` a généré la fixture `.agents/rules/r-tronque.md` (30 018 octets). Le test statique vérifie que le fichier commité est identique à sa sortie. Ne le relance que si tu modifies volontairement cette fixture : `node test/scenarios/scripts/generate-injection-contexte-r-tronque.js`.
 
+## Préconditions de la sonde
+
+**🛑 Arrête-toi avant de coller le moindre message de sonde**, et valide ces points un par un :
+
+1. Le modèle est **Gemini 3.8 Flash (High)**.
+2. Le Permission Preset est **Turbo**.
+3. La Plan Review Policy est **Always Ask**.
+4. La Browser Javascript Execution Policy est **Request Review**.
+5. **Une seule fenêtre** d'Antigravity est ouverte : toute autre fenêtre d'Antigravity est fermée.
+6. Le dossier ouvert est celui que la sonde indique (ce dossier, ou l'espace de la sonde), seul, et jamais la racine du dépôt.
+7. Aucun onglet d'éditeur n'est ouvert après `Developer: Reload Window`.
+
+Les réglages 2 à 4 sont ceux de toutes les sondes menées depuis le 2026-10-28.
+
+**Ouvre une conversation neuve avant tout message.** Au lancement, Antigravity rouvre la dernière conversation (observé le 2026-11-02) : un message envoyé dans celle-ci mêlerait deux contextes.
+
+**Après la sonde :**
+
+1. Quitte Antigravity (Fichier > Quitter) et note l'heure.
+2. Attends qu'aucun processus `agy` ni `Antigravity` ne figure dans le Gestionnaire des tâches, puis une minute de plus. Le moteur `agy` peut tourner jusqu'à 6 minutes après la fermeture de l'IDE (observé le 2026-10-28).
+3. À la prochaine ouverture, remets le Permission Preset sur **Request Review**. Le préréglage Turbo ne change pas seulement les permissions : il modifie aussi, dans `~/.gemini/config/config.json`, l'exécution automatique (`autoExecutionPolicy`) et l'accès aux fichiers hors de l'espace de travail (`nonWorkspaceFileAccessPolicy`). Le retour à Request Review rétablit ces deux réglages : après ce retour, le fichier était identique, octet pour octet, à sa copie d'avant la sonde (observé le 2026-11-02).
+
 ## Procédure d'exécution
 
 1. **Réinitialise les fixtures** depuis la racine du dépôt : `npm run test:injection-reset`.

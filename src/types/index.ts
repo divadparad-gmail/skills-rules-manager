@@ -79,8 +79,8 @@ export interface ResourceItem {
     /** Tokens de la partie coupée, jamais lue par l'agent. */
     lostTokens?: number;
     /**
-     * Coupe à la fin de ligne (profil 2.6.0) appliquée à un corps coupé : `line-end`, déduit d'une
-     * seule mesure, ou `byte-fallback` sans fin de ligne avant la limite (non vérifié). Absent en coupe à l'octet.
+     * Coupe à la fin de ligne (profil 2.6.0) appliquée à un corps coupé : `line-end`, observé sur deux
+     * fichiers, ou `byte-fallback` sans fin de ligne avant la limite (non vérifié). Absent en coupe à l'octet.
      */
     truncationRule?: 'line-end' | 'byte-fallback';
     /** Skill intégré d'Antigravity (F7), toujours présent et impossible à retirer. */

@@ -316,7 +316,8 @@ describe('Suite de Tests : Règles Antigravity conformes à la documentation off
     assert.deepStrictEqual([fm.trigger, fm.description, fm.globs, fm.paths], ['model_decision', description, undefined, undefined]);
     assert.strictEqual(checkAntigravityRuleFrontmatter(v260.content).ignored, false);
     assert.match(v260.warnings.join('\n'), /n'injecte jamais une règle « trigger: glob »/);
-    assert.match(v260.warnings.join('\n'), /index d'une règle model_decision .* est mesuré .* n'est que documenté : il n'a pas été testé/);
+    assert.match(v260.warnings.join('\n'), /index d'une règle model_decision .* est mesuré .* Son corps n'est pas injecté par le moteur : l'agent le lit \(read_file\) quand il juge que le sujet correspond .*\(observé dans Antigravity IDE 2\.6\.0, sonde du 2026-11-02/);
+    assert.doesNotMatch(v260.warnings.join('\n'), /n'est que documenté/);
 
     // L'exemple de la décision D-6, sans titre ni description d'origine
     const seul = ensureAntigravityTrigger('---\npaths: "src/**/*.ts"\n---\nCorps.', ANTIGRAVITY_PROFILES['2.6.0']);

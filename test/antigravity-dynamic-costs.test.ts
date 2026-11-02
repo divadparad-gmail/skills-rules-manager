@@ -220,6 +220,12 @@ describe('Suite de Tests : alertes et coûts dynamiques d\'Antigravity (lot A3a)
     const pills = pillsOf(main.createItemCard(item, true, mockDoc()));
     assert.ok(pills.some((p) => p.text === '✂️ Tronquée'));
     assert.ok(!pills.some((p) => /li\.|> 24 Ko/.test(p.text)), 'Aucun second avertissement de taille');
+
+    // Profil 2.6.0 : la coupe sur fin de ligne est observée sur deux fichiers (sonde du 2026-11-02)
+    const ligne = pillsOf(main.createItemCard({ ...item, metadata: { ...item.metadata, truncationRule: 'line-end' } }, true, mockDoc()))
+      .find((p) => p.text === '✂️ Tronquée')!;
+    assert.match(ligne.title, /🧪 Règle de coupe observée dans Antigravity IDE 2\.6\.0 sur deux fichiers : r-tronque\.md \(5 960 octets coupés\) et la règle 06 du banc d'essai \(15 090 octets coupés, sonde du 2026-11-02\)/);
+    assert.doesNotMatch(ligne.title, /déduite/);
   });
 
   test('6. Skill : 500 lignes de corps au plus, frontmatter exclu, et plus d\'alerte de 24 Ko', async () => {

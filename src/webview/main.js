@@ -436,7 +436,7 @@
         <li><span class="cs-icon">🎯</span><span><strong>Règles :</strong> <code>trigger</code> obligatoire • Budget de 20 000 tokens partagé avec l'Âme • <code>glob</code> : nom de fichier seul, réinjectée à chaque lecture ou modification</span></li>
         <li><span class="cs-icon">🧠</span><span><strong>Skills :</strong> Une ligne par skill au démarrage (nom, chemin, description) • Corps lu à la demande</span></li>
         <li><span class="cs-icon">🔌</span><span><strong>MCP &amp; Plugins :</strong> Noms des outils MCP seuls au démarrage • Skills de plugin listés deux fois, sans préfixe</span></li>
-        <li><span class="cs-icon">⏹️</span><span><strong>Workflows :</strong> Hors service depuis le 19 octobre 2026 • Migrer vers des skills • Les <code>wf-*</code> de l'extension sont déjà des skills</span></li>
+        ${antigravityWorkflowsCheatSheetItem(currentAntigravityVersion())}
         <li><span class="cs-icon">🏛️</span><span><strong>Hiérarchie :</strong> N0 (Global) → N1 (Projet) → N2 (PC) → N3 (NAS)</span></li>
       </ul>
     `;
@@ -966,8 +966,32 @@
     return `Coût au démarrage : ${boot} tokens (corps sans frontmatter, entre deux balises <RULE[chemin]> qui portent chacune le chemin complet)`;
   }
 
-  /** Antigravity : ce que la catégorie « Workflows » contient réellement (src/antigravity/behavior.ts). */
-  const WF_SKILL_NOTE = 'Skill dont le nom commence par wf- : Antigravity le liste comme un skill, et il reste compté. Ce n\'est pas un workflow, format retiré le 19 octobre 2026.';
+  /** Version du profil 2.6.0, telle que transmise dans `state.antigravityBehavior.version` (src/antigravity/behavior.ts). */
+  const ANTIGRAVITY_260_VERSION = 'Antigravity IDE 2.6.0';
+
+  /** Version du profil actif transmise par l'extension (vide avant le premier état). */
+  function currentAntigravityVersion() {
+    return (currentState && currentState.antigravityBehavior && currentState.antigravityBehavior.version) || '';
+  }
+
+  /**
+   * Antigravity : ce que la catégorie « Workflows » contient réellement (src/antigravity/behavior.ts).
+   * Profil 2.6.0 : les workflows Markdown ne sont pas retirés de l'IDE (sonde du 2026-11-02,
+   * Antigravity IDE 2.6.0) ; les autres profils gardent le texte de la documentation.
+   */
+  function wfSkillNote(version) {
+    const prefix = 'Skill dont le nom commence par wf- : Antigravity le liste comme un skill, et il reste compté.';
+    return version === ANTIGRAVITY_260_VERSION
+      ? `${prefix} Ce n'est pas un workflow Markdown (.agents/workflows/ ou ~/.gemini/config/global_workflows/), qu'Antigravity IDE 2.6.0 liste encore dans « / » (observé).`
+      : `${prefix} Ce n'est pas un workflow, format retiré le 19 octobre 2026.`;
+  }
+
+  /** Ligne « Workflows » de l'aide-mémoire Antigravity, selon la version du profil (texte statique). */
+  function antigravityWorkflowsCheatSheetItem(version) {
+    return version === ANTIGRAVITY_260_VERSION
+      ? '<li><span class="cs-icon">⏹️</span><span><strong>Workflows :</strong> Retirés selon la documentation, mais encore listés dans « / » par l\'IDE 2.6.0 (observé) • <code>.agents/workflows/</code> et <code>~/.gemini/config/global_workflows/</code> • Corps injecté à l\'invocation seulement (observé pour <code>.agents/workflows/</code>, déduit pour le global) • Les <code>wf-*</code> de l\'extension sont des skills</span></li>'
+      : '<li><span class="cs-icon">⏹️</span><span><strong>Workflows :</strong> Hors service depuis le 19 octobre 2026 • Migrer vers des skills • Les <code>wf-*</code> de l\'extension sont déjà des skills</span></li>';
+  }
 
   /** Badge et infobulle d'un dépassement de taille recommandée (Antigravity, lot A3). */
   function describeSizeAdvice(advice) {
@@ -1687,7 +1711,7 @@
       const isClaudeMode = !!(currentState && currentState.workspace && currentState.workspace.tool === 'claude-code');
       controlEl.title = isClaudeMode
         ? controlEl.dataset.defaultTitle
-        : `${WF_SKILL_NOTE}\nCliquez pour basculer ces skills ON/OFF.`;
+        : `${wfSkillNote(currentAntigravityVersion())}\nCliquez pour basculer ces skills ON/OFF.`;
     }
 
     if (countEl) {
@@ -1997,7 +2021,7 @@
     const badgeEl = targetDoc.createElement('span');
     badgeEl.className = `item-type-badge ${typeClass}`;
     badgeEl.textContent = typeLabel;
-    if (item.type === 'workflow' && item.targetTool === 'antigravity') badgeEl.title = WF_SKILL_NOTE;
+    if (item.type === 'workflow' && item.targetTool === 'antigravity') badgeEl.title = wfSkillNote(currentAntigravityVersion());
     badgesLine.appendChild(badgeEl);
 
     // Badges enrichis
@@ -2152,13 +2176,13 @@
     const truncatedBytes = (isReadByAgent && item.metadata && item.metadata.truncatedBytes) || 0;
     if (truncatedBytes > 0) {
       const lost = (item.metadata.lostTokens || 0).toLocaleString('fr-FR');
-      // Profil 2.6.0 : coupe à la dernière fin de ligne (déduite) ou repli à l'octet (non vérifié)
+      // Profil 2.6.0 : coupe à la dernière fin de ligne (observée) ou repli à l'octet (non vérifié)
       const cutRules = {
         'line-end': `Antigravity coupe le corps de ce fichier à la dernière fin de ligne avant 24 000 octets (frontmatter non compté, inclusions @[label](path) comprises)`,
         'byte-fallback': `Antigravity coupe le corps de ce fichier à 24 000 octets (frontmatter non compté, inclusions @[label](path) comprises)`,
       };
       const cutNotes = {
-        'line-end': `\n🧮 Règle de coupe déduite d'une seule mesure (Antigravity IDE 2.6.0, r-tronque.md : 5 960 octets coupés).`,
+        'line-end': `\n🧪 Règle de coupe observée dans Antigravity IDE 2.6.0 sur deux fichiers : r-tronque.md (5 960 octets coupés) et la règle 06 du banc d'essai (15 090 octets coupés, sonde du 2026-11-02).`,
         'byte-fallback': `\n❔ Non vérifié : aucune fin de ligne ne précède la limite. L'extension suppose une coupe à l'octet ; le comportement d'Antigravity IDE 2.6.0 dans ce cas n'a pas été observé.`,
       };
       const cutRule = item.metadata.truncationRule;
@@ -2938,6 +2962,8 @@
       renderDynamicCosts,
       renderPersonalizationGauge,
       formatPersonalizationBudgetTooltip,
+      wfSkillNote,
+      antigravityWorkflowsCheatSheetItem,
       updateBreakdownRow,
       renderBancEssaiBanner,
       localRulesHeaderCount,

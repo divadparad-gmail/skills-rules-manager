@@ -78,7 +78,8 @@ export interface AntigravityBehaviorProfile {
   pluginSectionHeader: boolean;
   /**
    * Coupe d'un corps trop long : à l'octet en 2.5.5 (5 957 octets coupés sur `r-tronque.md`) ;
-   * à la dernière fin de ligne en 2.6.0, déduit d'une seule mesure (5 960 octets sur le même fichier).
+   * à la dernière fin de ligne en 2.6.0 (🧪 5 960 octets sur le même fichier ; 15 090 octets sur
+   * `06-rule-warn-size-exceeded-24kb.md`, sonde du 2026-11-02, Antigravity IDE 2.6.0).
    */
   truncation: RuleTruncation;
   /**
@@ -389,8 +390,8 @@ export interface TruncatedBody {
   /** Octets coupés, tels qu'annoncés par le marqueur `<truncated N bytes>`. */
   truncatedBytes: number;
   /**
-   * Coupe `line-end` appliquée, seulement quand le corps est coupé : `line-end` (déduit d'une seule
-   * mesure), ou `byte-fallback` quand aucune fin de ligne ne précède la limite (❔ non vérifié).
+   * Coupe `line-end` appliquée, seulement quand le corps est coupé : `line-end` (🧪 observé sur deux
+   * fichiers), ou `byte-fallback` quand aucune fin de ligne ne précède la limite (❔ non vérifié).
    */
   rule?: 'line-end' | 'byte-fallback';
 }
@@ -405,10 +406,13 @@ function utf8Boundary(bytes: Buffer, end: number): number {
  * Coupe un corps trop long, selon la règle du profil.
  * - `byte` (2.5.5) : à RULE_BODY_MAX_BYTES octets, sans couper un caractère UTF-8. Ce que fait
  *   Antigravity au milieu d'un caractère n'a pas été observé : on recule au caractère précédent.
- * - `line-end` (2.6.0, déduit d'une seule mesure) : juste avant la dernière fin de ligne (`\n`) des
- *   24 000 premiers octets. Antigravity compte ces octets sans la fin de ligne du `---` fermant
- *   (« original 29956 bytes » pour `r-tronque.md`, dont le corps fait ici 29 957 octets) : la limite
- *   et la fenêtre sont décalées d'autant. Le `\r` d'un CRLF reste dans la partie gardée (❔ non vérifié).
+ * - `line-end` (2.6.0) : juste avant la dernière fin de ligne (`\n`) des 24 000 premiers octets,
+ *   fin de ligne exclue. 🧪 Observé sur deux fichiers en LF : `r-tronque.md` (5 960 octets coupés) et
+ *   `06-rule-warn-size-exceeded-24kb.md` (15 090 octets coupés, 23 884 gardés ; sonde du 2026-11-02,
+ *   Antigravity IDE 2.6.0). Antigravity compte ces octets sans la fin de ligne du `---` fermant
+ *   (« original 29956 bytes » pour `r-tronque.md`, dont le corps fait ici 29 957 octets ; « original
+ *   38974 bytes » pour la règle 06, corps de 38 975 octets) : la limite et la fenêtre sont décalées
+ *   d'autant. Le `\r` d'un CRLF reste dans la partie gardée (❔ non vérifié).
  *   ❔ Non vérifié : sans aucune fin de ligne avant la limite, on se replie sur une coupe à l'octet
  *   (`byte-fallback`), avec le même décalage et le même recul UTF-8.
  */
@@ -733,8 +737,13 @@ export function parseHooksConfig(config: unknown): HooksConfigParse {
 }
 
 /**
- * 📄 / 🧪 Workflows : hors service depuis le 19 octobre 2026, et `/migrate-workflows` est absent
- * de l'IDE 2.5.5. La catégorie « Workflows » de l'extension regroupe en réalité des skills dont le
- * nom commence par `wf-` : Antigravity les liste comme des skills, ils restent comptés.
+ * 📄 / 🧪 Workflows : hors service depuis le 19 octobre 2026 selon la documentation, et
+ * `/migrate-workflows` est absent de l'IDE 2.5.5. 🧪 Antigravity IDE 2.6.0 liste pourtant encore dans
+ * « / » les workflows de `.agents/workflows/` et de `~/.gemini/config/global_workflows/` (observé pour
+ * les deux). Il injecte le corps d'un workflow à son invocation : 🧪 observé pour `.agents/workflows/`,
+ * déduit du même mécanisme pour `~/.gemini/config/global_workflows/` (sonde du 2026-11-02,
+ * Antigravity IDE 2.6.0). La catégorie
+ * « Workflows » de l'extension regroupe en réalité des skills dont le nom commence par `wf-` :
+ * Antigravity les liste comme des skills, ils restent comptés.
  */
 export const WORKFLOWS_RETIRED_ON = '2026-10-19';

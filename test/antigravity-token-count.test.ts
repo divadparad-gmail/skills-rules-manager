@@ -527,9 +527,10 @@ describe('Suite de Tests : comptage des tokens au démarrage d\'Antigravity (lot
     }
   });
 
-  // D-18 : la coupe à la dernière fin de ligne reproduit les 5 960 octets de la 2.6.0 ; c'est une
-  // seule mesure. La 2.5.5 garde la coupe à l'octet (5 957).
-  test('17. Troncature par profil : r-tronque.md coupé de 5 957 octets en 2.5.5, de 5 960 en 2.6.0', async () => {
+  // D-18 : la coupe à la dernière fin de ligne reproduit les 5 960 octets de r-tronque.md et les
+  // 15 090 octets de la règle 06 (sonde du 2026-11-02, Antigravity IDE 2.6.0) : observée sur deux
+  // fichiers. La 2.5.5 garde la coupe à l'octet (5 957).
+  test('17. Troncature par profil : r-tronque.md coupé de 5 957 octets en 2.5.5, de 5 960 en 2.6.0 ; règle 06 coupée de 15 090 en 2.6.0', async () => {
     const source = path.join(ROOT, 'test', 'scenarios', 'antigravity-injection-contexte', '.agents', 'rules', 'r-tronque.md');
     const projet = path.join(tempBaseDir, 'troncature-profils');
     const regle = path.join(projet, '.agents', 'rules', 'r-tronque.md');
@@ -553,6 +554,16 @@ describe('Suite de Tests : comptage des tokens au démarrage d\'Antigravity (lot
     assert.ok(ligne.lost.startsWith('\n'), 'La coupe tombe juste avant une fin de ligne');
     assert.strictEqual(ligne.kept + ligne.lost, corps);
     assert.ok(!('rule' in truncateRuleBody(corps)), 'La coupe à l\'octet ne change pas de forme');
+
+    // Règle 06 du banc d'essai (39 100 octets, LF) : « truncated by 15090 bytes (original 38974 bytes) »,
+    // partie gardée terminée par « ### Directive Technique 35 » (sonde du 2026-11-02, Antigravity IDE 2.6.0)
+    const regle06 = path.join(ROOT, 'test', 'scenarios', 'antigravity', '.agents', 'rules', '06-rule-warn-size-exceeded-24kb.md');
+    const corps06 = splitRuleBody(await fs.promises.readFile(regle06, 'utf8')).body;
+    const coupe06 = truncateRuleBody(corps06, 'line-end');
+    assert.strictEqual(coupe06.truncatedBytes, 15090, 'Règle 06 : 15 090 octets coupés en 2.6.0');
+    assert.strictEqual(coupe06.rule, 'line-end');
+    assert.ok(coupe06.kept.endsWith('### Directive Technique 35'), 'Règle 06 : la partie gardée finit sur la dernière ligne entière');
+    assert.strictEqual(Buffer.byteLength(coupe06.kept.replace(/^\n/, ''), 'utf8'), 23884, 'Règle 06 : 23 884 octets gardés, sans la fin de ligne du --- fermant');
   });
 
   // ❔ Non vérifié : sans fin de ligne avant la limite, la coupe 2.6.0 se replie sur une coupe à l'octet.
