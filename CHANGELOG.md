@@ -5,6 +5,10 @@ Le format s'inspire de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) 
 
 ## [Non publié]
 
+### Ajouts
+
+- Avec le profil Antigravity IDE 2.6.0, les workflows Markdown de `.agents/workflows/` et de `~/.gemini/config/global_workflows/` sont affichés en lecture seule : aucun coût au démarrage, leur nom et leur description dans la seconde jauge « Other Customizations », leur corps à l'invocation (observé ; injection déduite pour le global). Ceux de `.agent/`, `_agent/` et `_agents/` portent « ❔ Non vérifié » ; ceux de `~/.gemini/config/workflows/` et des `global_workflows/` d'`antigravity-ide/` et d'`antigravity/` portent « ⛔ Sans effet dans l'IDE 2.6.0 », sans être comptés. Rien ne change avec le profil 2.5.5.
+
 ### Modifications
 
 - Avec le profil Antigravity IDE 2.6.0, l'aide-mémoire et l'infobulle des skills `wf-*` ne disent plus que les workflows sont retirés : l'IDE liste encore ceux de `.agents/workflows/` et de `~/.gemini/config/global_workflows/` (observé). La coupe sur fin de ligne est donnée comme observée, et l'import des `paths:` précise que l'agent lit le corps d'une règle `model_decision` quand le sujet correspond (observé). Rien ne change avec le profil 2.5.5.

@@ -15,6 +15,7 @@ import { measureAntigravitySoul } from '../utils/antigravityRules';
 import { appliesInAntigravity, buildAntigravityRuleItem, countsAtBoot, hasResourceWarning, soulSizeAdvice } from './antigravityRuleItem';
 import { listFlatRuleFiles } from './antigravityRuleSources';
 import { buildAntigravitySkillItem, listSkillFolders, pluginSectionHeadersTokens } from './antigravitySkillItem';
+import { buildAntigravityWorkflowItem, listWorkflowFiles } from './antigravityWorkflowItem';
 import { antigravityRulesBootStat, truncationSummary } from './antigravityBootCost';
 import {
   ANTIGRAVITY_PROFILES,
@@ -181,6 +182,29 @@ export class GlobalScanner {
           });
           if (skillItem.enabled && appliesInAntigravity(skillItem)) skillsCharTotal += skillItem.charCount || 0;
           items.push(skillItem);
+        }
+      }
+
+      // Workflows Markdown (profil 2.6.0) : ~/.gemini/config/global_workflows/, et les emplacements que
+      // l'IDE ignore, affichés « sans effet » (sonde du 2026-11-02, Antigravity IDE 2.6.0)
+      const workflows = profile.markdownWorkflows;
+      if (workflows && globalPath) {
+        const workflowSources = [
+          { dir: path.join(globalPath, workflows.globalDir), idPrefix: `${workflows.globalDir}/`, ignored: false },
+          ...workflows.ignoredConfigDirs.map((dir) => ({ dir: path.join(globalPath, dir), idPrefix: `config/${dir}/`, ignored: true })),
+          ...(geminiRoot
+            ? workflows.ignoredGeminiDirs.map((dir) => ({ dir: path.join(geminiRoot, dir), idPrefix: `${dir.split(path.sep).join('/')}/`, ignored: true }))
+            : []),
+        ];
+        for (const source of workflowSources) {
+          for (const file of await listWorkflowFiles(source.dir)) {
+            items.push(await buildAntigravityWorkflowItem(file, {
+              scope: 'global',
+              idPrefix: source.idPrefix,
+              source: source.ignored ? 'ignored' : 'global',
+              ...(source.ignored ? { notReadBy: profile.id } : {}),
+            }));
+          }
         }
       }
     }
@@ -541,7 +565,8 @@ export class GlobalScanner {
       }
     }
 
-    const allSkillsList = items.filter((i) => i.type === 'skill' || i.type === 'workflow');
+    // Les workflows Markdown ne sont pas des skills : ils comptent dans « Other Customizations » (StateManager)
+    const allSkillsList = items.filter((i) => (i.type === 'skill' || i.type === 'workflow') && !i.metadata?.markdownWorkflow);
     const allRulesList = items.filter((i) => i.type === 'rule');
     const allSoulList = items.filter((i) => i.type === 'soul');
 

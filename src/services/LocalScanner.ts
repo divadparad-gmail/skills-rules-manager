@@ -11,6 +11,7 @@ import { measureAntigravitySoul } from '../utils/antigravityRules';
 import { ScenarioManager } from './ScenarioManager';
 import { appliesInAntigravity, buildAntigravityRuleItem, countsAtBoot, hasResourceWarning, soulSizeAdvice } from './antigravityRuleItem';
 import { buildAntigravitySkillItem, listSkillFolders, pluginSectionHeadersTokens } from './antigravitySkillItem';
+import { buildAntigravityWorkflowItem, listWorkflowFiles } from './antigravityWorkflowItem';
 import { antigravityRulesBootStat, truncationSummary } from './antigravityBootCost';
 import {
   collectRulesJsonFiles,
@@ -107,6 +108,26 @@ export class LocalScanner {
             });
             if (skillItem.enabled) skillsCharTotal += skillItem.charCount || 0;
             items.push(skillItem);
+          }
+        }
+      }
+
+      // Workflows Markdown (profil 2.6.0) : .agents/workflows/ (sonde du 2026-11-02, Antigravity IDE
+      // 2.6.0), puis les variantes .agent, _agent et _agents, non vérifiées et comptées par prudence ;
+      // lus même sans .agents/, comme les règles des variantes
+      const workflows = profile.markdownWorkflows;
+      if (workflows) {
+        const workflowSources = [
+          { dir: workflows.workspaceDir, source: 'workspace' as const },
+          ...workflows.workspaceVariantDirs.map((dir) => ({ dir, source: 'workspace-variant' as const })),
+        ];
+        for (const { dir, source } of workflowSources) {
+          for (const file of await listWorkflowFiles(path.join(rootPath, dir))) {
+            items.push(await buildAntigravityWorkflowItem(file, {
+              scope: 'local',
+              idPrefix: `${dir.split(path.sep).join('/')}/`,
+              source,
+            }));
           }
         }
       }
@@ -525,7 +546,8 @@ export class LocalScanner {
       }
     }
 
-    const allSkillsList = items.filter((i) => i.type === 'skill' || i.type === 'workflow');
+    // Les workflows Markdown ne sont pas des skills : ils comptent dans « Other Customizations » (StateManager)
+    const allSkillsList = items.filter((i) => (i.type === 'skill' || i.type === 'workflow') && !i.metadata?.markdownWorkflow);
     const allRulesList = items.filter((i) => i.type === 'rule');
     const allSoulList = items.filter((i) => i.type === 'soul');
 

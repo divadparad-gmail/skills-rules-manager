@@ -218,8 +218,10 @@ export class DuplicateService {
    */
   private static getDuplicateKey(item: ResourceItem): string {
     const cleanId = (item.metadata?.rawId ?? item.id).replace(/\.disabled$/, '').replace(/\.md$/, '').toLowerCase();
-    // Normaliser types compatibles : skills et workflows partagent le même espace de noms
-    const typeGroup = item.type === 'workflow' ? 'skill' : item.type;
+    // Normaliser types compatibles : skills et workflows wf-* partagent le même espace de noms. Un
+    // workflow Markdown (profil 2.6.0) n'est jamais comparé à un skill ; son identifiant nomme son
+    // emplacement, et un même nom en global et dans le projet n'est pas traité en doublon (non vérifié)
+    const typeGroup = item.metadata?.markdownWorkflow ? 'markdown-workflow' : item.type === 'workflow' ? 'skill' : item.type;
     return `${typeGroup}:${cleanId}`;
   }
 

@@ -158,6 +158,7 @@ describe('Suite de Tests : profil de comportement d\'Antigravity (chantier 2.6.0
       globInjected: true,
       workspaceAgentRuleDirs: ['.agents', '.agent'],
       personalizationBudgetTokens: null,
+      markdownWorkflows: null,
     });
     assert.deepStrictEqual(PROFIL_260, {
       id: '2.6.0',
@@ -173,6 +174,13 @@ describe('Suite de Tests : profil de comportement d\'Antigravity (chantier 2.6.0
       globInjected: false,
       workspaceAgentRuleDirs: ['.agents', '.agent', '_agent', '_agents'],
       personalizationBudgetTokens: 20000,
+      markdownWorkflows: {
+        workspaceDir: path.join('.agents', 'workflows'),
+        workspaceVariantDirs: [path.join('.agent', 'workflows'), path.join('_agent', 'workflows'), path.join('_agents', 'workflows')],
+        globalDir: 'global_workflows',
+        ignoredConfigDirs: ['workflows'],
+        ignoredGeminiDirs: [path.join('antigravity-ide', 'global_workflows'), path.join('antigravity', 'global_workflows')],
+      },
     });
     assert.strictEqual(PERSONALIZATION_BUDGET_TOKENS, 20000);
     assert.strictEqual(PERSONALIZATION_BUDGET_EXCLUSION_TESTED, false);

@@ -5,7 +5,7 @@ import { ResourceItem } from '../types';
 import { StateManager } from './StateManager';
 import { WorkspaceDetector } from './WorkspaceDetector';
 import { ScenarioManager } from './ScenarioManager';
-import { getUnloadedResourceRefusal } from './ToggleManager';
+import { getProtectedResourceRefusal } from './ToggleManager';
 
 export class DeleteService {
   /**
@@ -15,8 +15,9 @@ export class DeleteService {
     item: ResourceItem
   ): Promise<{ success: boolean; error?: string }> {
     try {
-      // Antigravity : une règle de sous-dossier (R1) ou un skill d'un emplacement non lu par le profil est sans effet
-      const unloadedRefusal = getUnloadedResourceRefusal(item);
+      // Antigravity : une règle de sous-dossier (R1) ou un skill d'un emplacement non lu par le profil est
+      // sans effet ; un workflow Markdown est en lecture seule
+      const unloadedRefusal = getProtectedResourceRefusal(item);
       if (unloadedRefusal) {
         vscode.window.showErrorMessage(`Suppression impossible : ${unloadedRefusal}`);
         return { success: false, error: unloadedRefusal };

@@ -102,9 +102,42 @@ export interface AntigravityBehaviorProfile {
    * tokens des règles. En 2.5.5, ce budget est mentionné par la documentation sans être chiffré (`null`).
    * En 2.6.0, le panneau Settings de l'IDE affiche un plafond de 20 000 tokens (🧪 observé le
    * 2026-10-28) ; l'exclusion des grosses personnalisations au-delà du budget est annoncée par l'IDE,
-   * non testée (❔).
+   * non testée (❔). Il compte aussi le nom et la description des workflows Markdown (🧪 sonde du
+   * 2026-11-02, Antigravity IDE 2.6.0).
    */
   personalizationBudgetTokens: number | null;
+  /**
+   * Workflows Markdown (`<nom>.md`, voir MarkdownWorkflowDirs). `null` en 2.5.5 : aucun n'est lu, faute
+   * de mesure dans cette version. En 2.6.0 (sonde du 2026-11-02, Antigravity IDE 2.6.0), ils ne coûtent
+   * rien au démarrage, et leur nom et leur description comptent dans « Other Customizations ».
+   */
+  markdownWorkflows: MarkdownWorkflowDirs | null;
+}
+
+/**
+ * Emplacements des workflows Markdown d'un profil. Un workflow est un fichier `<nom>.md` placé
+ * directement dans le dossier ; il est invoqué par `/<nom>`.
+ */
+export interface MarkdownWorkflowDirs {
+  /**
+   * 🧪 Dossier de l'espace de travail, relatif à sa racine : listé dans « / », et injecté en entier
+   * (corps sans frontmatter) à l'invocation seulement.
+   */
+  workspaceDir: string;
+  /**
+   * ❔ Variantes de l'espace de travail, relatives à sa racine : non vérifiées (la sonde n'a posé qu'un
+   * workflow dans `.agents/workflows/`). Lues et comptées par prudence, comme les règles des variantes.
+   */
+  workspaceVariantDirs: readonly string[];
+  /**
+   * 🧪 Dossier global, relatif au dossier `~/.gemini/config` : listé dans « / » ; l'injection du corps
+   * à l'invocation est déduite du même mécanisme que l'espace de travail.
+   */
+  globalDir: string;
+  /** 🧪 Emplacements globaux ignorés par l'IDE, relatifs au dossier `~/.gemini/config` : jamais listés. */
+  ignoredConfigDirs: readonly string[];
+  /** 🧪 Emplacements globaux ignorés par l'IDE, relatifs au dossier `~/.gemini` : jamais listés. */
+  ignoredGeminiDirs: readonly string[];
 }
 
 export const ANTIGRAVITY_PROFILES: Readonly<Record<AntigravityProfileId, AntigravityBehaviorProfile>> = Object.freeze({
@@ -122,6 +155,7 @@ export const ANTIGRAVITY_PROFILES: Readonly<Record<AntigravityProfileId, Antigra
     globInjected: true,
     workspaceAgentRuleDirs: Object.freeze(['.agents', '.agent'] as const),
     personalizationBudgetTokens: null,
+    markdownWorkflows: null,
   }),
   '2.6.0': Object.freeze({
     id: '2.6.0',
@@ -137,6 +171,15 @@ export const ANTIGRAVITY_PROFILES: Readonly<Record<AntigravityProfileId, Antigra
     globInjected: false,
     workspaceAgentRuleDirs: Object.freeze(['.agents', '.agent', '_agent', '_agents'] as const),
     personalizationBudgetTokens: 20000,
+    // Sonde du 2026-11-02, Antigravity IDE 2.6.0 : seuls `.agents/workflows/` et
+    // `config/global_workflows/` sont listés dans « / », dans le panneau Settings et par l'agent
+    markdownWorkflows: Object.freeze({
+      workspaceDir: path.join('.agents', 'workflows'),
+      workspaceVariantDirs: Object.freeze(['.agent', '_agent', '_agents'].map((dir) => path.join(dir, 'workflows'))),
+      globalDir: 'global_workflows',
+      ignoredConfigDirs: Object.freeze(['workflows']),
+      ignoredGeminiDirs: Object.freeze([path.join('antigravity-ide', 'global_workflows'), path.join('antigravity', 'global_workflows')]),
+    }),
   }),
 });
 
@@ -651,8 +694,9 @@ export const RULES_BUDGET_POINTERS_TESTED = false;
 
 /**
  * 🧪 Budget « Other Customizations » (skills et MCP) observé dans le panneau Settings d'Antigravity
- * IDE 2.6.0 le 2026-10-28 (20 000 tokens), distinct du budget des règles. Au-delà, l'IDE annonce
- * que les grosses personnalisations sont exclues : annoncé par l'IDE, non testé.
+ * IDE 2.6.0 le 2026-10-28 (20 000 tokens), distinct du budget des règles ; le nom et la description
+ * des workflows Markdown y figurent aussi (🧪 sonde du 2026-11-02, Antigravity IDE 2.6.0). Au-delà,
+ * l'IDE annonce que les grosses personnalisations sont exclues : annoncé par l'IDE, non testé.
  */
 export const PERSONALIZATION_BUDGET_TOKENS = 20000;
 export const PERSONALIZATION_BUDGET_EXCLUSION_TESTED = false;

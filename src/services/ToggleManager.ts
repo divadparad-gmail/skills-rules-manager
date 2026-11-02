@@ -20,6 +20,16 @@ export function notReadSkillRefusal(version?: string): string {
   return `Skill de l'ancien emplacement ~/.gemini/antigravity/skills/ non lu par ${versionLabel} : il est sans effet, activé ou non, et ne peut être ni basculé ni supprimé depuis le tableau de bord.`;
 }
 
+/**
+ * Message renvoyé quand un workflow Markdown (profil 2.6.0) est visé par une bascule ou une suppression.
+ * Aucun état désactivé d'un workflow n'est connu : la carte est en lecture seule.
+ */
+export function markdownWorkflowRefusal(item: ResourceItem): string {
+  return isNotRead(item)
+    ? `Workflow Markdown d'un emplacement qu'Antigravity IDE ${item.metadata?.notReadBy ?? ''} ne lit pas : il est sans effet et ne peut être ni basculé ni supprimé depuis le tableau de bord.`
+    : 'Workflow Markdown en lecture seule : Antigravity ne lui connaît aucun état désactivé, et il ne peut être ni basculé ni supprimé depuis le tableau de bord. Modifiez ou supprimez le fichier lui-même.';
+}
+
 /** Antigravity (R1) : une règle de sous-dossier n'a aucun effet, activée ou non. */
 export function isNeverLoaded(item: ResourceItem): boolean {
   return item.metadata?.antigravityStatus === 'never-loaded';
@@ -42,6 +52,17 @@ export function getUnloadedResourceRefusal(item: ResourceItem): string | null {
 }
 
 /**
+ * Motif de refus d'une bascule ou d'une suppression : workflow Markdown (lecture seule), puis
+ * ressource jamais chargée ou non lue (getUnloadedResourceRefusal) ; sinon null.
+ */
+export function getProtectedResourceRefusal(item: ResourceItem): string | null {
+  if (item.metadata?.markdownWorkflow) {
+    return markdownWorkflowRefusal(item);
+  }
+  return getUnloadedResourceRefusal(item);
+}
+
+/**
  * Vrai si la ressource peut basculer en masse et compter dans les compteurs ON/OFF : ni verrouillée
  * (héritée d'un dossier parent, intégrée, non lue), ni jamais chargée (R1).
  */
@@ -51,14 +72,15 @@ export function isBulkToggleable(item: ResourceItem): boolean {
 
 export class ToggleManager {
   /**
-   * Bascule une ressource connue de l'état chargé. Refuse une règle jamais chargée (R1) ou un skill
-   * d'un emplacement non lu par la version du profil (`not-read`), même si la demande arrive.
+   * Bascule une ressource connue de l'état chargé. Refuse une règle jamais chargée (R1), un skill
+   * d'un emplacement non lu par la version du profil (`not-read`) ou un workflow Markdown (lecture
+   * seule), même si la demande arrive.
    */
   public static async toggleItem(
     item: ResourceItem,
     targetState: boolean
   ): Promise<{ success: boolean; newState: boolean; error?: string }> {
-    const refusal = getUnloadedResourceRefusal(item);
+    const refusal = getProtectedResourceRefusal(item);
     if (refusal) {
       return { success: false, newState: item.enabled, error: refusal };
     }

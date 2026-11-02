@@ -17,6 +17,7 @@ import { presenterBanc } from '../ui/bancEssaiPresentation';
 import { applyAntigravityIndexHeaders } from './antigravityBootCost';
 import { computeAntigravityDynamicCosts } from './antigravityDynamicCosts';
 import { readAntigravityHooks } from './antigravityHooks';
+import { markdownWorkflowPersonalizationTokens } from './antigravityWorkflowItem';
 import { DashboardPanel } from '../providers/DashboardPanel';
 import { CheatSheetPanel } from '../providers/CheatSheetPanel';
 import { getEffectiveGlobalAntigravityPath, getUserHome } from '../utils/paths';
@@ -257,18 +258,22 @@ export class StateManager {
     // Antigravity : le budget de 20 000 tokens est réservé aux règles (âmes comprises) ; les skills
     // et les MCP relèvent d'un budget de personnalisation distinct (https://antigravity.google/docs/rules/).
     // En 2.6.0 (D-10), le panneau Settings de l'IDE affiche un second budget de 20 000 tokens pour
-    // « Other Customizations » (skills et MCP, skills intégrés et doublons compris).
+    // « Other Customizations » (skills et MCP, skills intégrés et doublons compris). Les workflows
+    // Markdown y ajoutent leur nom et leur description (sonde du 2026-11-02, Antigravity IDE 2.6.0) ;
+    // le profil 2.5.5 n'en lit aucun.
     const budgetExcludesPersonalization = workspace.tool === 'antigravity';
     const rulesAndSoulTokens =
       soulGlobal.tokenCount +
       soulLocal.tokenCount +
       rulesGlobal.tokenCount +
       rulesLocal.tokenCount;
+    const personalizationWorkflowTokens = markdownWorkflowPersonalizationTokens([...finalGlobal, ...finalLocal]);
     const personalizationTokens =
       skillsGlobal.tokenCount +
       skillsLocal.tokenCount +
       mcpGlobal.tokenCount +
-      mcpLocal.tokenCount;
+      mcpLocal.tokenCount +
+      personalizationWorkflowTokens;
     const usedTokensTotal = budgetExcludesPersonalization
       ? rulesAndSoulTokens
       : rulesAndSoulTokens + personalizationTokens;
@@ -293,6 +298,7 @@ export class StateManager {
             personalizationBudgetTotal,
             personalizationUsedTokensTotal: personalizationTokens,
             personalizationAvailablePercentage,
+            personalizationWorkflowTokens,
           }
         : {}),
       soulGlobal,

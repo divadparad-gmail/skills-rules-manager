@@ -654,7 +654,8 @@ describe('Suite de Tests : alertes et coûts dynamiques d\'Antigravity (lot A3a)
     assert.strictEqual(nodes.barPersonalizationMcpLocal.style.width, '0%');
 
     const expectedTooltip =
-      `📊 Budget "Other Customizations" (skills et MCP) : ${(2717).toLocaleString('fr-FR')} / 20 000 tokens (13.6 %).\n` +
+      `📊 Budget "Other Customizations" (skills, workflows et MCP) : ${(2717).toLocaleString('fr-FR')} / 20 000 tokens (13.6 %).\n` +
+      '🗂️ Workflows Markdown : 0 tokens, pour leur nom et leur description (🧪 le panneau Settings les compte sans leur corps, sonde du 2026-11-02, Antigravity IDE 2.6.0). Ceux de .agent/, _agent/ et _agents/ sont comptés par prudence (❔ non vérifié).\n' +
       '🧪 Plafond de 20 000 tokens observé dans le panneau Settings d\'Antigravity IDE 2.6.0 (2026-10-28), distinct du budget de 20 000 tokens des règles.\n' +
       '📏 Estimation de l\'extension (tokeniseur o200k_base) : le panneau de l\'IDE peut afficher un autre chiffre.\n' +
       '🧩 Les skills intégrés et les skills présents à la fois en global et dans le projet sont comptés par prudence ; le panneau de l\'IDE semble les exclure (déduit, non vérifié).\n' +

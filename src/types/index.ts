@@ -101,6 +101,19 @@ export interface ResourceItem {
     unverifiedVariantRule?: 'cohabitation' | 'non-always-on' | 'both';
     /** Skill de plugin listé une seule fois, sans section de plugin (profil 2.6.0). Absent en 2.5.5 (deux fois). */
     pluginListedOnce?: boolean;
+    /**
+     * Workflow Markdown d'Antigravity (`<nom>.md`, profil 2.6.0), à distinguer des skills `wf-*` de type
+     * `workflow`. Lecture seule : ni bascule ni suppression depuis le tableau de bord.
+     */
+    markdownWorkflow?: boolean;
+    /**
+     * Emplacement d'un workflow Markdown : `workspace` (`.agents/workflows/`, injection à l'invocation
+     * observée), `global` (`~/.gemini/config/global_workflows/`, injection déduite), `workspace-variant`
+     * (`.agent`, `_agent` ou `_agents`, non vérifié) ou `ignored` (emplacement que l'IDE ne lit pas).
+     */
+    markdownWorkflowSource?: 'workspace' | 'global' | 'workspace-variant' | 'ignored';
+    /** Tokens comptés dans le budget « Other Customizations » (nom et description d'un workflow Markdown). */
+    personalizationTokenCount?: number;
     /** Nom brut d'un skill (sans préfixe de plugin), utilisé pour détecter les doublons. */
     rawId?: string;
     /** Sous-dossier (relatif au projet) d'une règle imbriquée, jamais chargée par Antigravity (R1). */
@@ -287,13 +300,15 @@ export interface ManagerStats {
   availablePercentage: number;
   /**
    * D-10 (Antigravity IDE 2.6.0) : plafond de 20 000 tokens du budget « Other Customizations »
-   * (skills et MCP), observé dans le panneau Settings d'Antigravity IDE 2.6.0 le 2026-10-28.
+   * (skills et MCP), observé dans le panneau Settings d'Antigravity IDE 2.6.0 le 2026-10-28 ; les workflows
+   * Markdown y figurent aussi (sonde du 2026-11-02, Antigravity IDE 2.6.0).
    * Omis lorsque le profil ne chiffre pas ce budget (profil 2.5.5) ou en mode Claude Code.
    */
   personalizationBudgetTotal?: number;
   /**
    * D-10 (Antigravity IDE 2.6.0) : cumul `skillsGlobal + skillsLocal + mcpGlobal + mcpLocal`,
-   * skills intégrés et doublons compris. Omis en profil 2.5.5 et en mode Claude Code.
+   * skills intégrés et doublons compris, plus `personalizationWorkflowTokens`. Omis en profil 2.5.5
+   * et en mode Claude Code.
    */
   personalizationUsedTokensTotal?: number;
   /**
@@ -301,6 +316,11 @@ export interface ManagerStats {
    * Omis en profil 2.5.5 et en mode Claude Code.
    */
   personalizationAvailablePercentage?: number;
+  /**
+   * Antigravity IDE 2.6.0 : part des workflows Markdown dans `personalizationUsedTokensTotal` (nom et
+   * description de chacun). Omis en profil 2.5.5 et en mode Claude Code.
+   */
+  personalizationWorkflowTokens?: number;
   soulGlobal: TokenCategoryStat;
   soulLocal: TokenCategoryStat;
   rulesGlobal: TokenCategoryStat;

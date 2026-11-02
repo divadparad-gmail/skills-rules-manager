@@ -685,7 +685,7 @@
       setSegmentWidth('barMcpGlobal', !excludesPersonalization && stats.mcpGlobal ? stats.mcpGlobal.percentage : 0);
       setSegmentWidth('barMcpLocal', !excludesPersonalization && stats.mcpLocal ? stats.mcpLocal.percentage : 0);
 
-      // Seconde jauge Antigravity IDE 2.6.0 (D-10) : Budget « Other Customizations » (skills et MCP)
+      // Seconde jauge Antigravity IDE 2.6.0 (D-10) : Budget « Other Customizations » (skills, workflows et MCP)
       renderPersonalizationGauge(state);
 
       // Mise à jour des lignes de détail de la légende (titre avec nombre actif entre parenthèses)
@@ -799,7 +799,7 @@
         const persUsed = stats.personalizationUsedTokensTotal ?? (skillTotalTokens + mcpTotalTokens);
         const personalizationNotice = excludesPersonalization
           ? (hasPersonalizationBudget
-              ? ` • Budget « Other Customizations » (skills et MCP) : ${persUsed.toLocaleString()} / ${stats.personalizationBudgetTotal.toLocaleString()} tokens (${((persUsed / stats.personalizationBudgetTotal) * 100).toFixed(1)}%)`
+              ? ` • Budget « Other Customizations » (skills, workflows et MCP) : ${persUsed.toLocaleString()} / ${stats.personalizationBudgetTotal.toLocaleString()} tokens (${((persUsed / stats.personalizationBudgetTotal) * 100).toFixed(1)}%)`
               : ` • Skills et MCP : ${(skillTotalTokens + mcpTotalTokens).toLocaleString()} tokens, hors budget des règles (budget de personnalisation distinct)`)
           : '';
         const totalLabel = excludesPersonalization ? 'Budget des règles (âme comprise)' : 'Total utilisé';
@@ -814,11 +814,12 @@
    * Infobulle de la seconde jauge « Other Customizations » (Antigravity IDE 2.6.0, lot L9, D-10).
    * Insérée uniquement par `title` ou `textContent`.
    */
-  function formatPersonalizationBudgetTooltip(usedTokens, budgetTokens = 20000) {
+  function formatPersonalizationBudgetTooltip(usedTokens, budgetTokens = 20000, workflowTokens = 0) {
     const used = (usedTokens || 0).toLocaleString('fr-FR');
     const pct = Number((((usedTokens || 0) / (budgetTokens || 20000)) * 100).toFixed(1));
     return (
-      `📊 Budget "Other Customizations" (skills et MCP) : ${used} / 20 000 tokens (${pct} %).\n` +
+      `📊 Budget "Other Customizations" (skills, workflows et MCP) : ${used} / 20 000 tokens (${pct} %).\n` +
+      `🗂️ Workflows Markdown : ${(workflowTokens || 0).toLocaleString('fr-FR')} tokens, pour leur nom et leur description (🧪 le panneau Settings les compte sans leur corps, sonde du 2026-11-02, Antigravity IDE 2.6.0). Ceux de .agent/, _agent/ et _agents/ sont comptés par prudence (❔ non vérifié).\n` +
       '🧪 Plafond de 20 000 tokens observé dans le panneau Settings d\'Antigravity IDE 2.6.0 (2026-10-28), distinct du budget de 20 000 tokens des règles.\n' +
       '📏 Estimation de l\'extension (tokeniseur o200k_base) : le panneau de l\'IDE peut afficher un autre chiffre.\n' +
       '🧩 Les skills intégrés et les skills présents à la fois en global et dans le projet sont comptés par prudence ; le panneau de l\'IDE semble les exclure (déduit, non vérifié).\n' +
@@ -828,8 +829,8 @@
 
   /**
    * Seconde jauge d'Antigravity IDE 2.6.0 (lot L9, D-10) : budget de 20 000 tokens pour
-   * « Other Customizations » (skills et MCP, skills intégrés et doublons compris). Masquée en
-   * profil 2.5.5 (`personalizationBudgetTotal` absent) et en mode Claude Code.
+   * « Other Customizations » (skills, workflows Markdown et MCP, skills intégrés et doublons compris).
+   * Masquée en profil 2.5.5 (`personalizationBudgetTotal` absent) et en mode Claude Code.
    */
   function renderPersonalizationGauge(state, doc) {
     const targetDoc = doc || (typeof document !== 'undefined' ? document : null);
@@ -863,7 +864,7 @@
     const persAvailPct = stats.personalizationAvailablePercentage !== undefined
       ? stats.personalizationAvailablePercentage
       : Number(Math.max(0, 100 - persUsedPct).toFixed(1));
-    const tooltip = formatPersonalizationBudgetTooltip(persUsed, persBudget);
+    const tooltip = formatPersonalizationBudgetTooltip(persUsed, persBudget, stats.personalizationWorkflowTokens);
 
     wraps.forEach((w) => {
       if (w) {
@@ -937,6 +938,9 @@
     const meta = item.metadata || {};
     const boot = (meta.bootTokenCount || 0).toLocaleString('fr-FR');
     const tok = (item.tokenCount || 0).toLocaleString('fr-FR');
+    if (isMarkdownWorkflow(item)) {
+      return 'Coût au démarrage : 0 token (un workflow Markdown est absent du prompt système)';
+    }
     if (item.type === 'skill' || item.type === 'workflow') {
       if (meta.pluginName && meta.pluginListedOnce) {
         return `Coût au démarrage : ${tok} tokens (sa ligne dans l'index des skills, une seule fois : Antigravity IDE 2.6.0 n'injecte plus de section de plugin)`;
@@ -991,6 +995,42 @@
     return version === ANTIGRAVITY_260_VERSION
       ? '<li><span class="cs-icon">⏹️</span><span><strong>Workflows :</strong> Retirés selon la documentation, mais encore listés dans « / » par l\'IDE 2.6.0 (observé) • <code>.agents/workflows/</code> et <code>~/.gemini/config/global_workflows/</code> • Corps injecté à l\'invocation seulement (observé pour <code>.agents/workflows/</code>, déduit pour le global) • Les <code>wf-*</code> de l\'extension sont des skills</span></li>'
       : '<li><span class="cs-icon">⏹️</span><span><strong>Workflows :</strong> Hors service depuis le 19 octobre 2026 • Migrer vers des skills • Les <code>wf-*</code> de l\'extension sont déjà des skills</span></li>';
+  }
+
+  /** Workflow Markdown d'Antigravity IDE 2.6.0 (src/services/antigravityWorkflowItem.ts), distinct des skills wf-*. */
+  function isMarkdownWorkflow(item) {
+    return !!(item && item.metadata && item.metadata.markdownWorkflow);
+  }
+
+  /** Entrée de chemin de colonne pour les workflows Markdown d'un emplacement, ou null s'il n'y en a aucun. */
+  function markdownWorkflowPathItem(items, source, label) {
+    const matching = (items || []).filter((i) => isMarkdownWorkflow(i) && i.metadata.markdownWorkflowSource === source);
+    if (matching.length === 0) return null;
+    const filePath = matching[0].path || '';
+    // Sans séparateur, le dossier parent est inconnu : chemin vide (et non le nom amputé d'un caractère)
+    const separator = Math.max(filePath.lastIndexOf('/'), filePath.lastIndexOf('\\'));
+    const fullPath = separator >= 0 ? filePath.slice(0, separator) : '';
+    return { label, fullPath, icon: '📁', count: matching.length };
+  }
+
+  /**
+   * Coût d'un workflow Markdown actif (sonde du 2026-11-02, Antigravity IDE 2.6.0) : 0 au démarrage, nom
+   * et description dans « Other Customizations », corps à l'invocation selon son emplacement.
+   */
+  function describeMarkdownWorkflowCost(item) {
+    const meta = item.metadata || {};
+    const fmt = (n) => (n || 0).toLocaleString('fr-FR');
+    const invocation = meta.markdownWorkflowSource === 'workspace'
+      ? `🧪 Son corps (${fmt(item.tokenCount)} tokens, sans frontmatter) est injecté en entier quand on l'invoque par /${item.name}, et seulement alors (observé, sonde du 2026-11-02, Antigravity IDE 2.6.0).`
+      : meta.markdownWorkflowSource === 'global'
+        ? `🧪 Il est listé dans « / » (observé). Son corps (${fmt(item.tokenCount)} tokens, sans frontmatter) serait injecté en entier quand on l'invoque par /${item.name} : déduit du mécanisme observé pour .agents/workflows/ (sonde du 2026-11-02, Antigravity IDE 2.6.0).`
+        : `❔ Non vérifié : seule la lecture de .agents/workflows/ a été observée (sonde du 2026-11-02, Antigravity IDE 2.6.0). S'il est lu, son corps (${fmt(item.tokenCount)} tokens, sans frontmatter) serait injecté à l'invocation /${item.name}.`;
+    return (
+      'Workflow Markdown :\n' +
+      '• Coût au démarrage : 0 token (🧪 absent du prompt système)\n' +
+      `• Budget « Other Customizations » : ${fmt(meta.personalizationTokenCount)} tokens pour son nom et sa description (🧪 le panneau Settings les compte, sans le corps)\n` +
+      `• ${invocation}`
+    );
   }
 
   /** Badge et infobulle d'un dépassement de taille recommandée (Antigravity, lot A3). */
@@ -1289,7 +1329,7 @@
           extraInfo = `\n• Répartition : ${stat.permanentCount || 0} permanente(s) (${stat.tokenCount.toLocaleString()} tok au boot) + ${stat.conditionalCount} conditionnelle(s) (${conditionalBootNote}, +${stat.conditionalTokenCount?.toLocaleString()} tok si déclenchée(s))`;
         }
         const personalizationTooltipNote = outsideRulesBudget && personalizationBudget !== null
-          ? `\n\n${formatPersonalizationBudgetTooltip(activeState?.stats?.personalizationUsedTokensTotal ?? stat.tokenCount, personalizationBudget)}`
+          ? `\n\n${formatPersonalizationBudgetTooltip(activeState?.stats?.personalizationUsedTokensTotal ?? stat.tokenCount, personalizationBudget, activeState?.stats?.personalizationWorkflowTokens)}`
           : '';
         tooltipEl.textContent =
           `📊 ${defaultTitle} (Cumul Global + Local) :\n` +
@@ -1525,7 +1565,9 @@
     const globalPathEl = document.getElementById('globalPathLabel');
 
     const globalRulesCount = (state.globalResources || []).filter((i) => i.type === 'rule').length;
-    const globalSkillsCount = (state.globalResources || []).filter((i) => i.type === 'skill' || i.type === 'workflow').length;
+    const globalSkillsCount = (state.globalResources || []).filter((i) => (i.type === 'skill' || i.type === 'workflow') && !isMarkdownWorkflow(i)).length;
+    // Antigravity IDE 2.6.0 : workflows Markdown de ~/.gemini/config/global_workflows/ (aucun en 2.5.5)
+    const globalWorkflowsPathItem = markdownWorkflowPathItem(state.globalResources, 'global', '~/.gemini/config/global_workflows/');
     const globalSoulCount = (state.globalResources || []).filter((i) => i.type === 'soul' || (i.metadata && i.metadata.isSoul)).length;
 
     const userHome = (state.userHome || '~').replace(/\\/g, '/');
@@ -1559,12 +1601,14 @@
         globalPathItems.push({ label: '~/.gemini/GEMINI.md', fullPath: globalSoulPath, icon: '🧬', count: globalSoulCount });
         globalPathItems.push({ label: '~/.gemini/config/rules/', fullPath: globalRulesPath, icon: '📁', count: globalRulesCount });
         globalPathItems.push({ label: '~/.gemini/config/skills/', fullPath: globalSkillsPath, icon: '📁', count: globalSkillsCount });
+        if (globalWorkflowsPathItem) globalPathItems.push(globalWorkflowsPathItem);
       } else if (currentFilter === 'soul') {
         globalPathItems.push({ label: '~/.gemini/GEMINI.md', fullPath: globalSoulPath, icon: '🧬', count: globalSoulCount });
       } else if (currentFilter === 'rule') {
         globalPathItems.push({ label: '~/.gemini/config/rules/', fullPath: globalRulesPath, icon: '📁', count: globalRulesCount });
       } else if (currentFilter === 'skill' || currentFilter === 'workflow') {
         globalPathItems.push({ label: '~/.gemini/config/skills/', fullPath: globalSkillsPath, icon: '📁', count: globalSkillsCount });
+        if (globalWorkflowsPathItem) globalPathItems.push(globalWorkflowsPathItem);
       }
     }
     renderColumnPath(globalPathEl, globalPathItems);
@@ -1601,7 +1645,9 @@
     const wsPath = state.workspace && state.workspace.workspacePath ? state.workspace.workspacePath : '';
 
     const localRulesCount = localRulesHeaderCount(state.localResources, isClaude);
-    const localSkillsCount = (state.localResources || []).filter((i) => i.type === 'skill' || i.type === 'workflow').length;
+    const localSkillsCount = (state.localResources || []).filter((i) => (i.type === 'skill' || i.type === 'workflow') && !isMarkdownWorkflow(i)).length;
+    // Antigravity IDE 2.6.0 : workflows Markdown de .agents/workflows/ (aucun en 2.5.5)
+    const localWorkflowsPathItem = markdownWorkflowPathItem(state.localResources, 'workspace', 'projet-local\\.agents\\workflows\\');
     const localSoulCount = (state.localResources || []).filter((i) => i.type === 'soul' || (i.metadata && i.metadata.isSoul)).length;
 
     const localSoulPath = (state.stats && state.stats.soulLocal && state.stats.soulLocal.directoryPath)
@@ -1636,12 +1682,14 @@
         localPathItems.push({ label: 'projet-local\\GEMINI.md', fullPath: localSoulPath, icon: '🧬', count: localSoulCount });
         localPathItems.push({ label: 'projet-local\\.agents\\rules\\', fullPath: localRulesPath, icon: '📁', count: localRulesCount });
         localPathItems.push({ label: 'projet-local\\.agents\\skills\\', fullPath: localSkillsPath, icon: '📁', count: localSkillsCount });
+        if (localWorkflowsPathItem) localPathItems.push(localWorkflowsPathItem);
       } else if (currentFilter === 'soul') {
         localPathItems.push({ label: 'projet-local\\GEMINI.md', fullPath: localSoulPath, icon: '🧬', count: localSoulCount });
       } else if (currentFilter === 'rule') {
         localPathItems.push({ label: 'projet-local\\.agents\\rules\\', fullPath: localRulesPath, icon: '📁', count: localRulesCount });
       } else if (currentFilter === 'skill' || currentFilter === 'workflow') {
         localPathItems.push({ label: 'projet-local\\.agents\\skills\\', fullPath: localSkillsPath, icon: '📁', count: localSkillsCount });
+        if (localWorkflowsPathItem) localPathItems.push(localWorkflowsPathItem);
       }
     }
     renderColumnPath(localPathEl, localPathItems);
@@ -2021,7 +2069,11 @@
     const badgeEl = targetDoc.createElement('span');
     badgeEl.className = `item-type-badge ${typeClass}`;
     badgeEl.textContent = typeLabel;
-    if (item.type === 'workflow' && item.targetTool === 'antigravity') badgeEl.title = wfSkillNote(currentAntigravityVersion());
+    if (isMarkdownWorkflow(item)) {
+      badgeEl.title = `Workflow Markdown (${item.name}.md), invoqué par /${item.name}. Ce n'est pas un skill : son nom et sa description ne figurent pas dans l'index des skills.`;
+    } else if (item.type === 'workflow' && item.targetTool === 'antigravity') {
+      badgeEl.title = wfSkillNote(currentAntigravityVersion());
+    }
     badgesLine.appendChild(badgeEl);
 
     // Badges enrichis
@@ -2081,7 +2133,7 @@
         `Antigravity IDE ${version} charge cette règle glob sans erreur et la liste dans le panneau Settings, mais ne l'injecte jamais dans le contexte : ni à la lecture, à la modification, à la création ou au listing d'un fichier, ni par l'onglet actif, ni par une mention @, avec globs: comme avec glob: (🧪 mesuré, phase 2b, testé le ${behavior.testedOn}).\n` +
         'Elle ne coûte rien, ni au démarrage ni en cours de session.\n' +
         'Pour qu\'elle s\'applique, changez son trigger :\n' +
-        '• model_decision, avec une description qui nomme les fichiers visés : l\'agent voit son chemin et sa description au démarrage (🧪 mesuré, phase 2c), et lit le corps quand la description correspond (📄 documenté, non testé) ;\n' +
+        '• model_decision, avec une description qui nomme les fichiers visés : l\'agent voit son chemin et sa description au démarrage (🧪 mesuré, phase 2c), et lit le corps (read_file) quand il juge que le sujet correspond (🧪 observé, sonde du 2026-11-02, Antigravity IDE 2.6.0) ;\n' +
         '• always_on : toujours chargée, elle coûte son corps au démarrage.\n' +
         'L\'extension ne modifie pas la règle d\'elle-même.');
     }
@@ -2155,8 +2207,25 @@
         `Règle lue dans un dossier de variante (.agent/rules/, _agent/rules/ ou _agents/rules/) : sans .agents/, le chargement et le cumul des règles always_on de ces trois variantes ont été observés dans Antigravity IDE 2.6.0 (🧪 phase 2c, testé le ${behavior.testedOn}). En revanche, ${detail} par les tests (❔ non vérifié). La règle est comptée par prudence.`);
     }
 
+    // Workflows Markdown (profil 2.6.0, sonde du 2026-11-02) : emplacement ignoré, variante non
+    // vérifiée, ou workflow actif, qui ne coûte qu'à l'invocation
+    if (isMarkdownWorkflow(item)) {
+      const source = item.metadata.markdownWorkflowSource;
+      if (agStatus === 'not-read') {
+        const version = item.metadata.notReadBy || '';
+        addBadge('pill-warn', `⛔ Sans effet dans l'IDE ${version}`,
+          `Antigravity IDE ${version} ne lit pas les workflows de cet emplacement : ils n'apparaissent ni dans « / », ni dans le panneau Settings (🧪 observé, sonde du 2026-11-02, Antigravity IDE 2.6.0). Ce workflow n'est pas compté. Déplacez-le dans ~/.gemini/config/global_workflows/ ou dans .agents/workflows/ du projet pour qu'il soit listé.`);
+      } else {
+        if (source === 'workspace-variant') {
+          addBadge('pill-warn-amber', '❔ Non vérifié',
+            'Workflow lu dans un dossier de variante (.agent/workflows/, _agent/workflows/ ou _agents/workflows/) : seule la lecture de .agents/workflows/ a été observée dans Antigravity IDE 2.6.0 (sonde du 2026-11-02). Il est compté par prudence dans le budget « Other Customizations ».');
+        }
+        addBadge('pill-cond', '⚡ Sur invocation', describeMarkdownWorkflowCost(item));
+      }
+    }
+
     // Ancien emplacement que la version du profil ne lit pas (~/.gemini/antigravity/skills/ en 2.6.0)
-    if (agStatus === 'not-read') {
+    if (agStatus === 'not-read' && !isMarkdownWorkflow(item)) {
       const version = item.metadata.notReadBy || '';
       addBadge('pill-warn', `⛔ Non lu par l'IDE ${version}`,
         `Antigravity IDE ${version} ne lit pas l'ancien emplacement ~/.gemini/antigravity/skills/ (testé le ${behavior.testedOn}). Ce skill n'est pas compté. Déplacez-le dans ~/.gemini/config/skills/ pour qu'il soit chargé.`);
@@ -2274,12 +2343,16 @@
         : agStatus === 'never-triggers'
           ? 'Règle qui ne se déclenchera jamais'
           : agStatus === 'not-read'
-            ? `Skill d'un emplacement qu'Antigravity IDE ${item.metadata.notReadBy || ''} ne lit pas`
+            ? `${isMarkdownWorkflow(item) ? 'Workflow' : 'Skill'} d'un emplacement qu'Antigravity IDE ${item.metadata.notReadBy || ''} ne lit pas`
             : agStatus === 'glob-no-effect'
               ? `Règle glob qu'Antigravity IDE ${item.metadata.noEffectIn || ''} n'injecte jamais`
               : 'Règle ignorée par Antigravity';
       metricsEl.innerHTML = `<span>${charStr} car.</span> <span class="tok-highlight">0 tok au boot (${tokStr} plein)</span>`;
       metricsEl.title = `${why} : aucun coût.\n• Poids si corrigée : ${charStr} car. (${tokStr} tokens)`;
+    } else if (isMarkdownWorkflow(item)) {
+      // Workflow Markdown (profil 2.6.0) : rien au démarrage, son corps à l'invocation seulement
+      metricsEl.innerHTML = `<span>${charStr} car.</span> <span class="tok-highlight">0 tok au boot · ${tokStr} tok à l'invocation</span>`;
+      metricsEl.title = `${describeMarkdownWorkflowCost(item)}\nEstimation : BPE o200k (repli 1 token ≈ 4 car.)`;
     } else if (isAntigravityItem && item.enabled && item.metadata && item.metadata.trigger === 'glob') {
       // Réinjectée à chaque fichier correspondant : le coût se paie par opération, pas au démarrage
       const session = ordinarySession();
@@ -2319,19 +2392,27 @@
     // Règle de sous-dossier (R1), ou skill d'un emplacement non lu : sans effet, activé ou non ;
     // ni interrupteur ni corbeille
     const isWithoutEffect = agStatus === 'never-loaded' || agStatus === 'not-read';
-    if (item.scope !== 'nas' && (isInherited || isBuiltin || isWithoutEffect)) {
+    // Workflow Markdown (profil 2.6.0) : lecture seule, aucun état désactivé connu
+    const isWorkflowFile = isMarkdownWorkflow(item);
+    if (item.scope !== 'nas' && (isInherited || isBuiltin || isWithoutEffect || isWorkflowFile)) {
       const rightControls = targetDoc.createElement('div');
       rightControls.className = 'item-right-controls';
       const lockedBadge = targetDoc.createElement('div');
       lockedBadge.className = 'soul-locked-badge';
-      lockedBadge.title = agStatus === 'not-read'
+      lockedBadge.title = isWorkflowFile
+        ? (isWithoutEffect
+          ? `Emplacement ignoré : Antigravity IDE ${item.metadata.notReadBy || ''} ne lit pas ce workflow. Il n'a ni interrupteur ni corbeille dans le tableau de bord.`
+          : 'Workflow Markdown en lecture seule : Antigravity ne lui connaît aucun état désactivé. Il n\'a ni interrupteur ni corbeille dans le tableau de bord ; modifiez ou supprimez le fichier lui-même.')
+        : agStatus === 'not-read'
         ? `Ancien emplacement : Antigravity IDE ${item.metadata.notReadBy || ''} ne lit pas ce skill, activé ou non. Déplacez-le dans ~/.gemini/config/skills/ pour l'appliquer.`
         : isWithoutEffect
         ? 'Règle de sous-dossier : Antigravity ne la charge jamais, activée ou non. Déplacez-la dans .agents/rules/ du dossier ouvert pour l\'appliquer.'
         : isBuiltin
           ? 'Skill intégré d\'Antigravity : il est toujours listé au démarrage et ne peut pas être retiré.'
           : `Fichier du dossier parent ${item.metadata.inheritedFrom}, hors du dossier ouvert : modifiez-le depuis son dossier.`;
-      const [lockIcon, lockLabel] = isWithoutEffect ? ['🚫', 'Sans effet'] : ['🔒', isBuiltin ? 'Intégré' : 'Héritée'];
+      const [lockIcon, lockLabel] = isWithoutEffect
+        ? ['🚫', 'Sans effet']
+        : ['🔒', isWorkflowFile ? 'Lecture seule' : isBuiltin ? 'Intégré' : 'Héritée'];
       lockedBadge.innerHTML = `<span class="soul-locked-icon">${lockIcon}</span><span>${lockLabel}</span>`;
       rightControls.appendChild(lockedBadge);
       topRow.appendChild(rightControls);
@@ -2964,6 +3045,8 @@
       formatPersonalizationBudgetTooltip,
       wfSkillNote,
       antigravityWorkflowsCheatSheetItem,
+      describeMarkdownWorkflowCost,
+      markdownWorkflowPathItem,
       updateBreakdownRow,
       renderBancEssaiBanner,
       localRulesHeaderCount,
