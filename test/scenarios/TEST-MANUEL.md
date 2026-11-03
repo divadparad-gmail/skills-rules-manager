@@ -1,6 +1,6 @@
 # Test manuel du banc d'essai
 
-Ce document décrit le test manuel du banc d'essai dans l'hôte de développement de VS Code : déploiement, sauvegarde des vrais fichiers, avertissements, fixture modifiée, restauration à l'identique, scripts npm et arguments invalides. Il a été établi le **2026-10-23**, lors du lot L2b. Le fonctionnement du banc d'essai est décrit dans le [README.md](README.md).
+Ce document décrit le test manuel du banc d'essai dans l'hôte de développement de VS Code : déploiement, sauvegarde des vrais fichiers, avertissements, fixture modifiée, restauration à l'identique, scripts npm et arguments invalides. Il a été établi le **2026-10-23**, lors du lot L2b. La partie 9, ajoutée le **2026-11-03** à la fin du chantier « Antigravity IDE 2.6.0 », vérifie le profil Antigravity (pastille, badge glob, seconde jauge) pendant que le banc est déployé. Le fonctionnement du banc d'essai est décrit dans le [README.md](README.md).
 
 Chaque partie donne les commandes exactes, une par bloc de code, et le résultat attendu de chacune. Les commandes se lancent dans **PowerShell 7**, depuis la racine du dépôt, et dans **le même terminal du début à la fin** : plusieurs variables (`$utf8`, `$avant`, `$datesAvant`, `$h02`, `$code`, `$profilHote`) servent d'une partie à l'autre.
 
@@ -17,6 +17,7 @@ Chaque partie donne les commandes exactes, une par bloc de code, et le résultat
 | 6 | Même cycle par les scripts npm | Terminal, puis hôte |
 | 7 | Arguments invalides | Terminal |
 | 8 | Nettoyage | Terminal, puis hôte |
+| 9 | Profil Antigravity : pastille, badge glob et seconde jauge selon le profil (à faire entre les parties 2 et 3) | Hôte |
 
 **Où lancer quoi.** Le « terminal » est celui de la fenêtre principale de VS Code, ouverte sur le dépôt. L'« hôte » est la fenêtre « [Extension Development Host] » ouverte à la partie 1. Ne cliquez jamais sur un bouton de l'extension dans la fenêtre principale (voir les « Pièges connus »).
 
@@ -132,6 +133,8 @@ Attendu :
 - Un bandeau « ⚠️ Banc d'essai actif » s'affiche en haut de la barre latérale, avec un bouton « Vider et restaurer ».
 - Le même bandeau s'affiche dans le Grand Dashboard.
 - Côté Claude Code, le `CLAUDE.md` local porte le badge « 🧪 Test Scénario », mais pas « Consignes du projet ».
+
+Faites maintenant la partie 9 (profil Antigravity), pendant que le banc est déployé, puis revenez à la partie 3.
 
 ## 3 — Sauvegarde, refus du script, avertissement au démarrage
 
@@ -320,6 +323,59 @@ Test-Path $profilHote
 
 Attendu : `False`.
 
+## 9 — Profil Antigravity
+
+**Quand.** Entre la partie 2 et la partie 3 : le banc Antigravity est déployé par « ⚡ Tous », et la règle `glob` `.agents/rules/03-rule-cond-trigger-glob.md` (motifs `"*.ts, *.tsx"`) est en place. Toute la partie se fait dans l'hôte.
+
+**Ce qu'on vérifie.** La pastille du profil indique le profil retenu et l'origine de ce choix. Un changement du réglage `skillsManager.antigravityProfile` relance le scan sans recharger la fenêtre. Le badge de la règle 03, le panneau « ⏱️ Coûts dynamiques » et la seconde jauge suivent le profil.
+
+**Le réglage.** `skillsManager.antigravityProfile` a une portée `machine` : il se change dans les **paramètres utilisateur** de l'hôte (« Preferences: Open User Settings »), et non dans ceux de l'espace de travail. Comme l'hôte a sa propre instance (`--user-data-dir`), ce changement ne touche pas la version installée. Il vaut `auto` au départ.
+
+**Le mode Antigravity.** Le dépôt contient `.claude/` : dans VS Code, l'extension s'ouvre donc en mode Claude Code, où la pastille et la seconde jauge sont masquées. Dans le Grand Dashboard, cliquez sur la pilule « ANTIGRAVITY » de l'en-tête avant la première étape.
+
+### 9.1 — Profil `auto`
+
+Ouvrez le Grand Dashboard, puis placez le pointeur sur la pastille « Profil : … », dans l'en-tête de la jauge « ⚡ Charge Fixe de Démarrage ».
+
+Attendu :
+
+- La pastille dépend du dossier `~/.gemini` du poste, que l'extension lit sans le modifier :
+  - « Profil : Antigravity IDE 2.6.0 (détecté) » si `~/.gemini/antigravity/builtin/` ou `~/.gemini/antigravity-ide/.ide_migration` existe, c'est-à-dire sur un poste où Antigravity IDE 2.6.0 a déjà été lancé ;
+  - « Profil : Antigravity IDE 2.5.5 (détecté) » si seul `~/.gemini/antigravity-ide/` existe ;
+  - « Profil : Antigravity IDE 2.6.0 (non détecté) » si aucun de ces dossiers n'existe.
+- L'infobulle donne la raison du choix (par exemple « Données de la génération 2.6.0 trouvées dans .gemini (…) »), la date des tests du profil (« testé le 2026-10-28 » pour 2.6.0, « testé le 2026-10-21 » pour 2.5.5) et la ligne « Réglage : skillsManager.antigravityProfile (auto, 2.5.5 ou 2.6.0). ».
+- La même pastille s'affiche dans la barre latérale.
+
+### 9.2 — Profil `2.5.5` forcé
+
+Dans les paramètres utilisateur de l'hôte, cherchez `skillsManager.antigravityProfile` et choisissez `2.5.5`. Revenez au Grand Dashboard sans recharger la fenêtre.
+
+Attendu :
+
+- La pastille affiche « Profil : Antigravity IDE 2.5.5 (forcé) », et son infobulle contient « Profil 2.5.5 imposé par le réglage skillsManager.antigravityProfile. » et « testé le 2026-10-21 ».
+- Dans la colonne Local, la carte de `03-rule-cond-trigger-glob` porte le badge « ⚡ Conditionnel » et la mesure « 0 tok au boot · N tok par fichier correspondant », sans badge « ⛔ Sans effet dans l'IDE 2.6.0 ».
+- Le panneau « ⏱️ Coûts dynamiques », sous la jauge, cite la règle 03 sous ses motifs `*.ts` et `*.tsx`. Ils partagent une seule ligne (`*.ts` · `*.tsx`) si aucune autre règle `glob` active, par exemple une vraie règle globale du poste, ne vise un seul des deux.
+- La carte de `04-rule-cond-trigger-globs-list` garde « ⛔ Ignorée : liste YAML ».
+- La seconde jauge « 🧩 Budget « Other Customizations » (Skills, Workflows & MCP) » n'apparaît pas dans le Grand Dashboard, ni « 🧩 Other Customizations » dans la barre latérale.
+
+### 9.3 — Profil `2.6.0` forcé
+
+Dans les paramètres utilisateur de l'hôte, choisissez `2.6.0`. Revenez au Grand Dashboard sans recharger la fenêtre.
+
+Attendu :
+
+- La pastille affiche « Profil : Antigravity IDE 2.6.0 (forcé) », et son infobulle contient « Profil 2.6.0 imposé par le réglage skillsManager.antigravityProfile. » et « testé le 2026-10-28 ».
+- La carte de `03-rule-cond-trigger-glob` porte le badge « ⛔ Sans effet dans l'IDE 2.6.0 », sans « ⚡ Conditionnel », et la mesure « 0 tok au boot (N plein) », sans « par fichier correspondant ». Son interrupteur reste affiché. L'infobulle du badge propose de passer en `model_decision` ou en `always_on`, et précise que l'extension ne modifie pas la règle d'elle-même.
+- Le panneau « ⏱️ Coûts dynamiques » ne contient plus aucune ligne de règle `glob`.
+- La carte de `04-rule-cond-trigger-globs-list` garde « ⛔ Ignorée : liste YAML ».
+- La seconde jauge « 🧩 Budget « Other Customizations » (Skills, Workflows & MCP) » s'affiche sous la jauge des règles, avec la mention « (< 20 000 tokens · 🧪 IDE 2.6.0) », et « 🧩 Other Customizations » s'affiche dans la barre latérale. L'infobulle de la seconde jauge commence par « 📊 Budget "Other Customizations" (skills, workflows et MCP) : … / 20 000 tokens ».
+
+### 9.4 — Retour à `auto`
+
+Dans les paramètres utilisateur de l'hôte, choisissez de nouveau `auto` (ou « Reset Setting »).
+
+Attendu : la pastille et son infobulle sont de nouveau celles de l'étape 9.1. Revenez ensuite à la partie 3.
+
 ---
 
 ## Pièges connus
@@ -336,6 +392,6 @@ Attendu : `False`.
 
 À remplir à chaque passage : ✅ conforme, ❌ écart (à décrire dans les remarques), – non exécuté.
 
-| Date | Commit ou version | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | Remarques |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| 2026-10-23 | `2dde2ba` | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | ❌ | ✅ | 5 : date de `.mcp.json` restaurée avec 1 ms d'avance (arrondi). 7 : commande collée deux fois, pile d'appels affichée ; `--force` non essayé. 8 : le dossier temporaire s'appelait alors `vscode-hote-l2b`. Les écarts des parties 5 et 7 sont corrigés par `1a9f18c` et couverts par des tests automatiques, mais pas encore revérifiés à la main : à contrôler au prochain passage. |
+| Date | Commit ou version | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | Remarques |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 2026-10-23 | `2dde2ba` | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | ❌ | ✅ | – | 9 : partie ajoutée le 2026-11-03. 5 : date de `.mcp.json` restaurée avec 1 ms d'avance (arrondi). 7 : commande collée deux fois, pile d'appels affichée ; `--force` non essayé. 8 : le dossier temporaire s'appelait alors `vscode-hote-l2b`. Les écarts des parties 5 et 7 sont corrigés par `1a9f18c` et couverts par des tests automatiques, mais pas encore revérifiés à la main : à contrôler au prochain passage. |

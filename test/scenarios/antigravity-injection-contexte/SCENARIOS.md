@@ -79,7 +79,7 @@ Ainsi, une règle glob qui ne se déclenche plus à la modification renvoie à S
 
 **Résultat figé en 2.5.5.** Le contenu complet est entouré de `<RULE[chemin]>…</RULE[chemin]>`. Au-delà de 24 Ko, le contenu est coupé avec un marqueur `<truncated N bytes>`. Pendant l'enquête, la règle 06 du banc d'essai affichait `<truncated 14978 bytes>`. La valeur de N mesurée par la sonde (`S5.octets_tronques`) est affichée sans être comparée : 5 957 à l'étalonnage.
 
-**En 2.6.0.** Identique. `S5.octets_tronques` vaut 5 960, et le journal d'`agy` confirme la limite (« limit 24000 bytes »). L'écart de 3 octets correspond à une coupe sur la dernière fin de ligne avant 24 000 octets, comme l'annonce la documentation intégrée de la 2.6.0 (déduit, non comparé).
+**En 2.6.0.** Identique. `S5.octets_tronques` vaut 5 960, et le journal d'`agy` confirme la limite (« limit 24000 bytes »). L'écart de 3 octets correspond à une coupe sur la dernière fin de ligne avant 24 000 octets, comme l'annonce la documentation intégrée de la 2.6.0 (déduit ici, non comparé par la suite). Cette règle de coupe a été observée le 2026-11-02, hors de cette suite, sur la règle 06 du banc d'essai : 15 090 octets coupés, conformes au calcul.
 
 **Si ça change.** Recalibrer la taille maximale dans le profil de comportement de la version concernée. Si `CANARI-TRONQUE-FIN` apparaît, la limite a augmenté ou disparu. Si `CANARI-TRONQUE-DEBUT` disparaît, la règle n'est peut-être plus chargée du tout.
 
@@ -288,7 +288,8 @@ Les points suivants ne sont pas mesurés par la sonde automatique. Les trois pre
 
 - L'activation d'une règle `manual` par une mention `@` (test manuel).
 - La commande `/zz-skill-test` dans l'IDE (test manuel).
-- L'activation effective d'une règle `model_decision`, c'est-à-dire le chargement de son corps quand la description correspond (test manuel).
+- L'activation effective d'une règle `model_decision`, c'est-à-dire le chargement de son corps quand la description correspond (test manuel). En 2.6.0, elle a été observée le 2026-11-02, hors de cette suite : l'agent lit le corps (`read_file`) quand le sujet correspond, et ne le lit pas sinon (un modèle, un essai). Aucun scénario ne la fige.
 - Le critère qui sépare les outils MCP `Eager` et `Lazy`.
 - Le comportement de l'App et du CLI Antigravity : les baselines ne couvrent que l'IDE. En 2.6.0, l'agent de l'IDE est le moteur `agy`, que le CLI utilise aussi, mais le CLI n'a pas été mesuré.
 - Les fichiers du profil global (`~/.gemini/AGENTS.md`, `~/.gemini/config/rules/`, `~/.gemini/config/skills/`, `~/.gemini/config/plugins/`) et les variantes `.agent/`, `_agents/` et `_agent/` de l'espace de travail : ils ont été mesurés en 2.6.0 par des canaris temporaires, hors de cette suite, et ne font pas partie des baselines.
+- Les workflows Markdown de l'IDE 2.6.0 (listés dans « / » et invoqués) : observés le 2026-11-02 hors de cette suite ; un scénario « workflows » demanderait une nouvelle baseline.
