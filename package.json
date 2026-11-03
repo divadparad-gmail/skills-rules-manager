@@ -440,7 +440,7 @@
   "devDependencies": {
     "@types/node": "^20.11.0",
     "@types/vscode": "^1.85.0",
-    "@vscode/vsce": "^2.24.0",
+    "@vscode/vsce": "^4.1.0",
     "esbuild": "^0.28.2",
     "puppeteer-core": "^25.14.0",
     "typescript": "^5.3.3"
