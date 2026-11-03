@@ -376,9 +376,9 @@
           <div class="cs-callout cs-callout-info">
             <span>🔬</span>
             <div class="ag-header-body">
-              <div><strong>Portée :</strong> Antigravity IDE 2.5.5, Windows. Comportements vérifiés par une suite de régression (2026-10-21) ; tokens mesurés avec o200k (2026-10-22).</div>
-              <div><strong>Légende des sources :</strong> <span class="ag-legend-item">📏 mesuré (o200k)</span> · <span class="ag-legend-item">📰 recommandation Google (blog)</span> · <span class="ag-legend-item">📘 recommandation Anthropic pour Claude</span> · <span class="ag-legend-item">🧪 testé</span> · <span class="ag-legend-item">📄 documentation Antigravity</span> · <span class="ag-legend-item">🧮 calculé à partir des mesures</span> · <span class="ag-legend-item">❔ non vérifié</span></div>
-              <div><strong>Réserve :</strong> o200k est le découpage d'OpenAI. Gemini et Claude découpent un peu différemment : les chiffres sont de bonnes approximations, pas des valeurs exactes par modèle.</div>
+              <div><strong>Portée :</strong> Antigravity IDE 2.6.0 (testée le 2026-10-28 et le 2026-11-02) et Antigravity IDE 2.5.5 (testée le 2026-10-21), Windows. Chaque fait porte sa version ; quand les deux versions divergent, chacune a sa puce. Tokens mesurés avec o200k (2026-10-22). Les cartes et les jauges de l'extension suivent le profil affiché par la pastille « Profil : … » (réglage <code>skillsManager.antigravityProfile</code>, voir la section 8). Les chemins propres au CLI (<code>~/.gemini/antigravity-cli/…</code>) et à l'App ne sont pas couverts.</div>
+              <div><strong>Légende des sources :</strong> <span class="ag-legend-item">📏 mesuré (o200k)</span> · <span class="ag-legend-item">📰 recommandation Google (blog)</span> · <span class="ag-legend-item">📘 recommandation Anthropic pour Claude</span> · <span class="ag-legend-item">🧪 testé, suivi de la version : 2.5.5, IDE 2.6.0 ou les deux</span> · <span class="ag-legend-item">📄 documentation Antigravity</span> · <span class="ag-legend-item">🧮 calculé à partir des mesures</span> · <span class="ag-legend-item">🔎 déduit</span> · <span class="ag-legend-item">❔ non vérifié</span></div>
+              <div><strong>Réserve :</strong> o200k est le découpage d'OpenAI. Gemini et Claude découpent un peu différemment : les chiffres sont de bonnes approximations, pas des valeurs exactes par modèle. Les tests font foi : quand la documentation les contredit, le guide suit les tests.</div>
             </div>
           </div>
           <div class="cs-table-wrap">
@@ -403,24 +403,29 @@
                   <td data-label="Fichiers (global / local)">
                     <ul class="ag-points">
                       <li>Global : <code>~/.gemini/AGENTS.md</code>, <code>~/.gemini/GEMINI.md</code>, <code>~/.gemini/config/AGENTS.md</code>, <code>~/.gemini/config/GEMINI.md</code></li>
-                      <li>Projet : <code>/AGENTS.md</code>, <code>/GEMINI.md</code>, <code>/.agents/AGENTS.md</code>, <code>/.agents/GEMINI.md</code></li>
+                      <li>Projet : <code>/AGENTS.md</code>, <code>/GEMINI.md</code>, <code>/.agents/AGENTS.md</code>, <code>/.agents/GEMINI.md</code> (enveloppe des deux derniers non testée <span class="ag-src">❔</span>)</li>
                       <li>Dossiers parents, jusqu'à la racine du dépôt Git : mêmes noms</li>
                     </ul>
                   </td>
                   <td data-label="Taille &amp; tokens">
                     <ul class="ag-points">
-                      <li class="ag-reco"><strong>Recommandé : &lt; 200 lignes · ~1 800 – 2 800 tokens</strong> <span class="ag-src">📰📘🧮</span></li>
-                      <li>Présente en permanence : une seule copie de chaque fichier trouvé dans le contexte <span class="ag-src">🧪</span></li>
-                      <li>Cumul : tous les fichiers trouvés s'additionnent <span class="ag-src">🧪</span></li>
-                      <li>Plafond par fichier : 24 Ko, inclusions <code>@[label](path)</code> comprises ≈ 5 100 – 6 000 tokens <span class="ag-src">📄📏</span></li>
-                      <li>Budget commun : 20 000 tokens, partagés avec les règles permanentes <span class="ag-src">📄</span></li>
+                      <li class="ag-reco"><strong>Recommandé : &lt; 200 lignes · ~1 800 – 2 800 tokens</strong> <span class="ag-src">📰📘🧮</span></li>
+                      <li>Présente en permanence : une seule copie de chaque fichier trouvé dans le contexte <span class="ag-src">🧪 les deux</span></li>
+                      <li>Cumul : tous les fichiers trouvés s'additionnent <span class="ag-src">🧪 les deux</span></li>
+                      <li>Plafond par fichier : 24 000 octets, fichier entier (une âme n'a pas de frontmatter) ≈ 5 100 – 6 000 tokens <span class="ag-src">📏</span> ; inclusions <code>@[label](path)</code> comprises <span class="ag-src">📄❔</span></li>
+                      <li>Au-delà, la coupe d'une âme est déduite de celle des règles permanentes : aucune âme tronquée n'a été observée <span class="ag-src">🔎</span></li>
+                      <li>Budget commun : 20 000 tokens, partagés avec les règles permanentes <span class="ag-src">📄</span> ; affiché par le panneau Settings <span class="ag-src">🧪 IDE 2.6.0</span></li>
                     </ul>
                   </td>
                   <td data-label="Comportement">
                     <ul class="ag-points">
-                      <li>Jamais de frontmatter : toujours actif, contenu complet présent en permanence, en une seule copie <span class="ag-src">🧪</span></li>
-                      <li>Aussi chargé depuis les dossiers parents, jusqu'à la racine du dépôt Git <span class="ag-src">🧪</span></li>
-                      <li>Jamais chargé depuis un sous-dossier du dossier ouvert <span class="ag-src">🧪</span></li>
+                      <li>Jamais de frontmatter : toujours actif, contenu complet présent en permanence, en une seule copie <span class="ag-src">🧪 les deux</span></li>
+                      <li>Âmes globales : injectées dans une balise <code>&lt;RULE[user_global]&gt;</code>, sans chemin : pour les quatre fichiers <span class="ag-src">🧪 IDE 2.6.0</span>, pour <code>~/.gemini/GEMINI.md</code> seulement <span class="ag-src">🧪 2.5.5</span> ; les trois autres fichiers en 2.5.5 <span class="ag-src">❔</span></li>
+                      <li>Âmes du projet et des dossiers parents : balise <code>&lt;RULE[chemin]&gt;</code>, qui porte le chemin complet : âme du projet <span class="ag-src">🧪 les deux</span> ; âme d'un dossier parent <span class="ag-src">🧪 2.5.5</span> <span class="ag-src">❔ IDE 2.6.0</span> ; <code>/.agents/AGENTS.md</code> et <code>/.agents/GEMINI.md</code> <span class="ag-src">❔</span></li>
+                      <li><strong>IDE 2.6.0 :</strong> les quatre âmes globales sont lues et cumulées, dans l'ordre ci-contre, sans qu'aucune masque les autres <span class="ag-src">🧪 IDE 2.6.0</span></li>
+                      <li><strong>2.5.5 :</strong> seul <code>~/.gemini/GEMINI.md</code> a été vérifié ; les trois autres fichiers sont comptés par prudence <span class="ag-src">❔</span></li>
+                      <li>Aussi chargé depuis les dossiers parents, jusqu'à la racine du dépôt Git <span class="ag-src">🧪 2.5.5</span> ; non revérifié pour une âme parente <span class="ag-src">❔ IDE 2.6.0</span></li>
+                      <li>Jamais chargé depuis un sous-dossier du dossier ouvert <span class="ag-src">🧪 les deux</span></li>
                     </ul>
                   </td>
                 </tr>
@@ -430,24 +435,27 @@
                     <ul class="ag-points">
                       <li>Global : <code>~/.gemini/config/rules/*.md</code></li>
                       <li>Projet : <code>/.agents/rules/*.md</code>, <code>/.agent/rules/*.md</code> (ancien emplacement)</li>
+                      <li><strong>IDE 2.6.0 :</strong> aussi <code>/_agent/rules/*.md</code> et <code>/_agents/rules/*.md</code>, lus et cumulés, même sans <code>.agents/</code> <span class="ag-src">🧪 IDE 2.6.0</span> ; avec <code>.agents/</code> présent, ou pour un autre trigger qu'<code>always_on</code> <span class="ag-src">❔</span></li>
                       <li>Frontmatter : <code>trigger: always_on</code></li>
                     </ul>
                   </td>
                   <td data-label="Taille &amp; tokens">
                     <ul class="ag-points">
-                      <li class="ag-reco"><strong>Recommandé : &lt; 200 lignes · ~1 800 – 2 800 tokens par fichier</strong> <span class="ag-src">📰📘🧮</span></li>
-                      <li>Présente en permanence : une seule copie du corps de chaque fichier dans le contexte, sans le frontmatter <span class="ag-src">🧪</span></li>
-                      <li>Plafond par fichier : 24 000 octets du corps, frontmatter non compté ≈ 5 100 – 6 000 tokens, le surplus est coupé <span class="ag-src">🧪📏</span></li>
-                      <li>Budget commun : 20 000 tokens partagés avec l'Âme, soit environ 7 à 11 fichiers de 200 lignes <span class="ag-src">📄🧮</span></li>
-                      <li>Au-delà du budget : les plus gros fichiers deviennent des pointeurs <code>- &lt;chemin&gt;: &lt;description&gt;</code> <span class="ag-src">📄</span></li>
+                      <li class="ag-reco"><strong>Recommandé : &lt; 200 lignes · ~1 800 – 2 800 tokens par fichier</strong> <span class="ag-src">📰📘🧮</span></li>
+                      <li>Présente en permanence : une seule copie du corps de chaque fichier dans le contexte, sans le frontmatter <span class="ag-src">🧪 les deux</span></li>
+                      <li>Plafond par fichier : 24 000 octets du corps, frontmatter non compté ≈ 5 100 – 6 000 tokens <span class="ag-src">🧪 les deux 📏</span> ; inclusions <code>@[label](path)</code> comprises <span class="ag-src">📄❔</span></li>
+                      <li><strong>2.5.5 :</strong> le surplus est coupé à l'octet <span class="ag-src">🧪 2.5.5</span></li>
+                      <li><strong>IDE 2.6.0 :</strong> la coupe se fait à la dernière fin de ligne avant 24 000 octets, fin de ligne exclue, observée sur deux fichiers (5 960 et 15 090 octets coupés) <span class="ag-src">🧪 IDE 2.6.0</span> ; sans fin de ligne avant la limite, ou en CRLF, l'extension suppose une coupe à l'octet <span class="ag-src">❔</span></li>
+                      <li>Budget commun : 20 000 tokens partagés avec l'Âme, soit environ 7 à 11 fichiers de 200 lignes <span class="ag-src">📄🧮</span> ; affiché par le panneau Settings <span class="ag-src">🧪 IDE 2.6.0</span></li>
+                      <li>Au-delà du budget : les plus gros fichiers deviendraient des pointeurs <code>- &lt;chemin&gt;: &lt;description&gt;</code> <span class="ag-src">📄</span> ; jamais déclenché par les tests <span class="ag-src">❔</span></li>
                     </ul>
                   </td>
                   <td data-label="Comportement">
                     <ul class="ag-points">
-                      <li>Corps injecté dans une balise <code>&lt;RULE[chemin]&gt;</code>, coupé avec un marqueur <code>&lt;truncated N bytes&gt;</code> au-delà de 24 Ko <span class="ag-src">🧪</span></li>
-                      <li>Frontmatter <strong>obligatoire</strong> : sans frontmatter, ou avec un <code>trigger</code> invalide (ex. <code>alwaysOn</code>), la règle est ignorée <strong>silencieusement</strong> <span class="ag-src">🧪</span></li>
-                      <li>Seuls les <code>.md</code> directement sous <code>rules/</code> sont lus, sauf déclaration dans <code>.agents/rules.json</code> <span class="ag-src">📄</span></li>
-                      <li><code>description</code> recommandée : elle sert de repli si la règle devient un pointeur <span class="ag-src">📄</span></li>
+                      <li>Corps injecté dans une balise <code>&lt;RULE[chemin]&gt;</code>, coupé avec un marqueur <code>&lt;truncated N bytes&gt;</code> au-delà de 24 Ko <span class="ag-src">🧪 les deux</span></li>
+                      <li>Frontmatter <strong>obligatoire</strong> : sans frontmatter, ou avec un <code>trigger</code> invalide (ex. <code>alwaysOn</code>), la règle est ignorée <strong>silencieusement</strong> pour le modèle <span class="ag-src">🧪 les deux</span> ; le journal d'<code>agy</code> trace le rejet (« Invalid rule trigger ») <span class="ag-src">🧪 IDE 2.6.0</span></li>
+                      <li>Seuls les <code>.md</code> directement sous <code>rules/</code> sont lus, sauf déclaration dans <code>.agents/rules.json</code> <span class="ag-src">📄❔</span></li>
+                      <li><code>description</code> recommandée : elle sert de repli si la règle devient un pointeur <span class="ag-src">📄❔</span></li>
                     </ul>
                   </td>
                 </tr>
@@ -456,31 +464,35 @@
                   <td data-label="Fichiers (global / local)">
                     <ul class="ag-points">
                       <li>Global : <code>~/.gemini/config/rules/*.md</code></li>
-                      <li>Projet : <code>/.agents/rules/*.md</code></li>
+                      <li>Projet : <code>/.agents/rules/*.md</code> ; <strong>IDE 2.6.0 :</strong> les variantes <code>.agent/</code>, <code>_agent/</code> et <code>_agents/</code> ne sont vérifiées que pour <code>always_on</code> <span class="ag-src">❔</span></li>
                       <li>Frontmatter : <code>trigger: glob</code>, <code>model_decision</code> ou <code>manual</code></li>
                     </ul>
                   </td>
                   <td data-label="Taille &amp; tokens">
                     <ul class="ag-points">
-                      <li class="ag-reco"><strong>Recommandé <code>glob</code> : &lt; 30 lignes · ~270 – 420 tokens</strong> ⚠️ voir <a href="#ag-piege-glob">« Le piège <code>glob</code> »</a> <span class="ag-src">🧪🧮</span></li>
-                      <li class="ag-reco"><strong>Recommandé <code>model_decision</code> : &lt; 200 lignes · ~1 800 – 2 800 tokens</strong>, plus une description d'une phrase <span class="ag-src">📘🧮</span></li>
-                      <li>Au démarrage, <code>glob</code> : 0 token <span class="ag-src">🧪</span></li>
-                      <li>Au démarrage, <code>manual</code> : 0 token <span class="ag-src">🧪</span></li>
-                      <li>Au démarrage, <code>model_decision</code> : ≈ 40 – 90 tokens (chemin <code>file:///</code> + description) <span class="ag-src">🧮</span></li>
-                      <li>Par activation, <code>glob</code> : 100 % <strong>à chaque</strong> lecture, modification ou création d'un fichier correspondant <span class="ag-src">🧪</span></li>
-                      <li>Par activation, <code>model_decision</code> : 100 % quand l'agent lit la règle <span class="ag-src">📄</span></li>
-                      <li>Par activation, <code>manual</code> : 100 % par mention <code>@</code> <span class="ag-src">❔</span></li>
-                      <li>Plafond par fichier : 24 Ko <span class="ag-src">📄</span></li>
+                      <li class="ag-reco"><strong>Recommandé <code>glob</code> (2.5.5) : &lt; 30 lignes · ~270 – 420 tokens</strong> ⚠️ voir <a href="#ag-piege-glob">« Le piège <code>glob</code> »</a> <span class="ag-src">🧪 2.5.5 🧮</span></li>
+                      <li class="ag-reco"><strong>Recommandé <code>model_decision</code> : &lt; 200 lignes · ~1 800 – 2 800 tokens</strong>, plus une description d'une phrase <span class="ag-src">📘🧮</span></li>
+                      <li>Au démarrage, <code>glob</code> : 0 token <span class="ag-src">🧪 les deux</span></li>
+                      <li>Au démarrage, <code>manual</code> : 0 token <span class="ag-src">🧪 les deux</span></li>
+                      <li>Au démarrage, <code>model_decision</code> : ≈ 40 – 90 tokens (chemin <code>file:///</code> + description dans un index) <span class="ag-src">🧪 les deux 🧮</span></li>
+                      <li><strong>2.5.5 :</strong> par activation, <code>glob</code> : 100 % <strong>à chaque</strong> lecture, modification ou création d'un fichier correspondant <span class="ag-src">🧪 2.5.5</span></li>
+                      <li><strong>IDE 2.6.0 :</strong> une règle <code>glob</code> n'est jamais injectée : 0 token, au démarrage comme en cours de session <span class="ag-src">🧪 IDE 2.6.0</span></li>
+                      <li>Par activation, <code>model_decision</code> : 100 % quand l'agent lit la règle <span class="ag-src">🧪 IDE 2.6.0</span> <span class="ag-src">📄 2.5.5</span></li>
+                      <li>Par activation, <code>manual</code> : 100 % par mention <code>@</code> <span class="ag-src">📄❔</span></li>
+                      <li>Plafond par fichier : 24 Ko <span class="ag-src">📄</span>, avec la même coupe que les règles permanentes <span class="ag-src">🔎</span></li>
                     </ul>
                   </td>
                   <td data-label="Comportement">
                     <ul class="ag-points">
-                      <li><code>glob</code> : la règle est ajoutée à la fin du résultat de l'outil, après le préambule <code>The following text is not part of the file, it is a list of user-defined rules that you MUST follow:</code>, lors d'une lecture, modification ou création. Jamais lors d'un listing de dossier <span class="ag-src">🧪</span></li>
-                      <li>Le motif est comparé au <strong>nom de fichier seul</strong> : <code>*.ts</code>, <code>**/*.ts</code> et <code>app.ts</code> fonctionnent. Tout motif avec un dossier (<code>src/**/*.ts</code>, <code>dossier/*.ts</code>) ne se déclenche <strong>jamais</strong> <span class="ag-src">🧪</span></li>
-                      <li><code>globs</code> doit être une <strong>chaîne</strong> : <code>"*.ts, *.js"</code>. Une liste YAML est rejetée <strong>silencieusement</strong> <span class="ag-src">🧪</span></li>
-                      <li>Une clé <code>paths:</code> (format Claude Code) ajoutée en plus est ignorée sans casser la règle <span class="ag-src">🧪</span></li>
-                      <li><code>model_decision</code> : chemin et description dans un index au démarrage, corps lu par l'agent à la demande <span class="ag-src">🧪📄</span></li>
-                      <li><code>manual</code> : activée par une mention <code>@</code> dans le chat <span class="ag-src">❔</span></li>
+                      <li><strong>2.5.5 :</strong> <code>glob</code> : la règle est ajoutée à la fin du résultat de l'outil, après le préambule <code>The following text is not part of the file, it is a list of user-defined rules that you MUST follow:</code>, lors d'une lecture, modification ou création. Jamais lors d'un listing de dossier <span class="ag-src">🧪 2.5.5</span></li>
+                      <li><strong>2.5.5 :</strong> le motif est comparé au <strong>nom de fichier seul</strong> : <code>*.ts</code>, <code>**/*.ts</code> et <code>app.ts</code> fonctionnent. Tout motif avec un dossier (<code>src/**/*.ts</code>, <code>dossier/*.ts</code>) ne se déclenche <strong>jamais</strong> <span class="ag-src">🧪 2.5.5</span></li>
+                      <li><strong>IDE 2.6.0 :</strong> une règle <code>glob</code> est chargée sans erreur et listée dans le panneau Settings, mais <strong>jamais injectée</strong> : ni à la lecture, à la modification, à la création ou au listing d'un fichier, ni par l'onglet actif, ni par une mention <code>@</code>, avec <code>globs:</code> comme avec <code>glob:</code>, sur dix points d'entrée <span class="ag-src">🧪 IDE 2.6.0</span>. L'extension l'étend à tous les cas, et la cause reste déduite <span class="ag-src">🔎</span>. Elle porte le badge <code>⛔ Sans effet dans l'IDE 2.6.0</code> ; pour la convertir, voir l'exemple A bis</li>
+                      <li><code>globs</code> doit être une <strong>chaîne</strong> : <code>"*.ts, *.js"</code>. Une liste YAML est rejetée <strong>silencieusement</strong> au chargement <span class="ag-src">🧪 les deux</span></li>
+                      <li>Une clé <code>paths:</code> (format Claude Code) ajoutée en plus est ignorée sans casser la règle <span class="ag-src">🧪 2.5.5</span></li>
+                      <li><code>model_decision</code> : chemin et description dans un index au démarrage <span class="ag-src">🧪 les deux</span></li>
+                      <li><strong>IDE 2.6.0 :</strong> l'agent lit le corps (<code>read_file</code>) quand il juge que le sujet correspond, et ne le lit pas sinon ; le moteur ne l'injecte jamais (un modèle, un essai, pour une règle du projet et une règle globale) <span class="ag-src">🧪 IDE 2.6.0</span></li>
+                      <li><strong>2.5.5 :</strong> corps lu par l'agent à la demande <span class="ag-src">📄</span></li>
+                      <li><code>manual</code> : activée par une mention <code>@</code> dans le chat <span class="ag-src">📄❔</span></li>
                     </ul>
                   </td>
                 </tr>
@@ -493,15 +505,15 @@
                   </td>
                   <td data-label="Taille &amp; tokens">
                     <ul class="ag-points">
-                      <li class="ag-reco"><strong>Recommandé, sous-dossiers : ne pas utiliser · 0 token</strong>, mais aussi aucun effet <span class="ag-src">🧪</span></li>
-                      <li class="ag-reco"><strong>Recommandé, dossiers parents : &lt; 200 lignes · ~1 800 – 2 800 tokens</strong> <span class="ag-src">📰📘🧮</span></li>
-                      <li>Dossiers parents : présents en permanence, en une seule copie, comme l'Âme, et ils entament le même budget <span class="ag-src">🧪</span></li>
+                      <li class="ag-reco"><strong>Recommandé, sous-dossiers : ne pas utiliser · 0 token</strong>, mais aussi aucun effet <span class="ag-src">🧪 les deux</span></li>
+                      <li class="ag-reco"><strong>Recommandé, dossiers parents : &lt; 200 lignes · ~1 800 – 2 800 tokens</strong> <span class="ag-src">📰📘🧮</span></li>
+                      <li>Dossiers parents : présents en permanence, en une seule copie, comme l'Âme, et ils entament le même budget <span class="ag-src">🧪 les deux</span></li>
                     </ul>
                   </td>
                   <td data-label="Comportement">
                     <ul class="ag-points">
-                      <li>Sous-dossiers du dossier ouvert : <strong>jamais chargés</strong>, ni à la lecture d'un fichier, ni à la modification, ni au listing, contrairement à la documentation <span class="ag-src">🧪</span></li>
-                      <li>Dossiers parents, jusqu'à la racine du dépôt Git : chargés <span class="ag-src">🧪</span></li>
+                      <li>Sous-dossiers du dossier ouvert : <strong>jamais chargés</strong>, ni à la lecture d'un fichier, ni à la modification, ni au listing, contrairement à la documentation <span class="ag-src">🧪 les deux</span> ; pas même découverts <span class="ag-src">🧪 IDE 2.6.0</span></li>
+                      <li>Dossiers parents, jusqu'à la racine du dépôt Git : chargés, pour les règles <code>.agents/rules/</code> <span class="ag-src">🧪 les deux</span> ; pour une âme parente, non revérifié <span class="ag-src">❔ IDE 2.6.0</span></li>
                     </ul>
                   </td>
                 </tr>
@@ -511,26 +523,30 @@
                     <ul class="ag-points">
                       <li>Global : <code>~/.gemini/config/skills/&lt;nom&gt;/SKILL.md</code></li>
                       <li>Projet : <code>/.agents/skills/&lt;nom&gt;/SKILL.md</code></li>
-                      <li>Anciens emplacements : <code>/.agent/skills/</code>, <code>~/.gemini/antigravity/skills/</code> <span class="ag-src">📄</span></li>
-                      <li>Intégrés, en lecture seule : <code>~/.gemini/antigravity-ide/builtin/skills/</code> <span class="ag-src">🧪</span></li>
+                      <li>Ancien emplacement du projet : <code>/.agent/skills/</code> <span class="ag-src">📄❔</span></li>
+                      <li><strong>2.5.5 :</strong> ancien emplacement global <code>~/.gemini/antigravity/skills/</code> <span class="ag-src">📄❔</span></li>
+                      <li><strong>IDE 2.6.0 :</strong> <code>~/.gemini/antigravity/skills/</code> n'est <strong>pas lu</strong>, contrairement à la documentation <span class="ag-src">🧪 IDE 2.6.0</span> (badge <code>⛔ Non lu par l'IDE 2.6.0</code>)</li>
+                      <li><strong>2.5.5 :</strong> intégrés, en lecture seule : <code>~/.gemini/antigravity-ide/builtin/skills/</code> <span class="ag-src">🧪 2.5.5</span></li>
+                      <li><strong>IDE 2.6.0 :</strong> intégrés, en lecture seule : <code>~/.gemini/antigravity/builtin/skills/</code> <span class="ag-src">🧪 IDE 2.6.0</span></li>
                     </ul>
                   </td>
                   <td data-label="Taille &amp; tokens">
                     <ul class="ag-points">
-                      <li class="ag-reco"><strong>Recommandé, corps : &lt; 500 lignes · ~4 500 – 7 000 tokens</strong> (Anthropic vise moins de 5 000) <span class="ag-src">📘🧮</span></li>
+                      <li class="ag-reco"><strong>Recommandé, corps : &lt; 500 lignes · ~4 500 – 7 000 tokens</strong> (Anthropic vise moins de 5 000) <span class="ag-src">📘🧮</span></li>
                       <li class="ag-reco"><strong>Recommandé, description : 1 à 2 phrases</strong> <span class="ag-src">📘</span></li>
-                      <li>Au démarrage : une ligne par skill ≈ 50 – 110 tokens (nom + chemin absolu + description) <span class="ag-src">🧪🧮</span></li>
-                      <li>Exemple : 20 skills ≈ 1 000 – 2 200 tokens, présents en permanence dans l'index <span class="ag-src">🧮</span></li>
-                      <li>Skills intégrés : toujours présents, impossibles à retirer (3 sur ce poste en 2.5.5) <span class="ag-src">🧪</span></li>
-                      <li>Par activation : 100 % du corps, lu une fois <span class="ag-src">🧪</span></li>
+                      <li>Au démarrage : une ligne par skill ≈ 50 – 110 tokens (nom + chemin absolu + description) <span class="ag-src">🧪 les deux 🧮</span></li>
+                      <li>Exemple : 20 skills ≈ 1 000 – 2 200 tokens, présents en permanence dans l'index <span class="ag-src">🧮</span></li>
+                      <li><strong>2.5.5 :</strong> skills intégrés toujours présents, impossibles à retirer (3 lors des tests) <span class="ag-src">🧪 2.5.5</span></li>
+                      <li><strong>IDE 2.6.0 :</strong> 9 skills intégrés dans le dossier lors des tests, dont 7 dans l'index du prompt <span class="ag-src">🧪 IDE 2.6.0</span> ; l'extension compte tout le dossier, par prudence</li>
+                      <li>Par activation : 100 % du corps, lu une fois <span class="ag-src">🧪 les deux</span></li>
                       <li>Plafond : aucun documenté <span class="ag-src">📄</span></li>
                     </ul>
                   </td>
                   <td data-label="Comportement">
                     <ul class="ag-points">
-                      <li>Index au démarrage : <code>- &lt;nom&gt; (&lt;chemin absolu de SKILL.md&gt;): &lt;description&gt;</code> <span class="ag-src">🧪</span></li>
-                      <li>Corps chargé seulement quand l'agent lit le <code>SKILL.md</code> <span class="ag-src">🧪</span></li>
-                      <li><code>name</code> facultatif (nom du dossier par défaut), <code>description</code> obligatoire <span class="ag-src">📄</span></li>
+                      <li>Index au démarrage : <code>- &lt;nom&gt; (&lt;chemin absolu de SKILL.md&gt;): &lt;description&gt;</code> <span class="ag-src">🧪 les deux</span></li>
+                      <li>Corps chargé seulement quand l'agent lit le <code>SKILL.md</code> <span class="ag-src">🧪 les deux</span></li>
+                      <li><code>name</code> facultatif (nom du dossier par défaut), <code>description</code> obligatoire <span class="ag-src">📄❔</span></li>
                       <li>Commande <code>/nom-du-skill</code> : documentée pour l'App et le CLI, non vérifiée dans l'IDE <span class="ag-src">❔</span></li>
                     </ul>
                   </td>
@@ -545,17 +561,17 @@
                   </td>
                   <td data-label="Taille &amp; tokens">
                     <ul class="ag-points">
-                      <li class="ag-reco"><strong>Recommandé : un sujet par fichier, &lt; 300 lignes · ~2 700 – 4 200 tokens</strong> <span class="ag-src">🧮</span></li>
+                      <li class="ag-reco"><strong>Recommandé : un sujet par fichier, &lt; 300 lignes · ~2 700 – 4 200 tokens</strong> <span class="ag-src">🧮</span></li>
                       <li>Structure : table des matières au-delà de 100 lignes <span class="ag-src">📘</span></li>
-                      <li>Au démarrage : 0 token <span class="ag-src">🧪</span></li>
-                      <li>Par activation : 100 % du fichier, seulement s'il est lu <span class="ag-src">🧪</span></li>
+                      <li>Au démarrage : 0 token <span class="ag-src">🧪 les deux</span></li>
+                      <li>Par activation : 100 % du fichier, seulement s'il est lu <span class="ag-src">🧪 les deux</span></li>
                       <li>Scripts : seule la sortie coûte des tokens, pas le code <span class="ag-src">📄</span></li>
                       <li>Plafond : aucun documenté <span class="ag-src">📄</span></li>
                     </ul>
                   </td>
                   <td data-label="Comportement">
                     <ul class="ag-points">
-                      <li>Jamais chargés ni signalés, même à l'ouverture du <code>SKILL.md</code> <span class="ag-src">🧪</span></li>
+                      <li>Jamais chargés ni signalés, même à l'ouverture du <code>SKILL.md</code> <span class="ag-src">🧪 les deux</span></li>
                       <li>Lecture « seulement si le SKILL.md y renvoie » : non prouvé <span class="ag-src">❔</span></li>
                       <li>La documentation conseille d'exécuter les scripts avec <code>--help</code> plutôt que de lire leur code <span class="ag-src">📄</span></li>
                     </ul>
@@ -565,28 +581,31 @@
                   <td class="ag-comp"><strong>Serveurs MCP</strong></td>
                   <td data-label="Fichiers (global / local)">
                     <ul class="ag-points">
-                      <li>Global : <code>~/.gemini/config/mcp_config.json</code></li>
-                      <li>Projet : <code>/.agents/mcp_config.json</code></li>
+                      <li>Global : <code>~/.gemini/config/mcp_config.json</code> <span class="ag-src">📄</span></li>
+                      <li>Projet : <code>/.agents/mcp_config.json</code> <span class="ag-src">📄</span></li>
+                      <li><strong>2.5.5 :</strong> cache des outils lu par l'extension : <code>~/.gemini/antigravity-ide/mcp/</code> <span class="ag-src">🧪 2.5.5</span></li>
+                      <li><strong>IDE 2.6.0 :</strong> cache des outils lu par l'extension : <code>~/.gemini/antigravity/mcp/</code> ; sa correspondance avec les outils affichés n'est pas revérifiée <span class="ag-src">❔</span></li>
                     </ul>
                   </td>
                   <td data-label="Taille &amp; tokens">
                     <ul class="ag-points">
                       <li class="ag-reco"><strong>Recommandé : n'activer que les serveurs utiles, et masquer le reste avec <code>disabledTools</code></strong> <span class="ag-src">📄</span></li>
-                      <li>Au démarrage : noms des outils seulement ≈ 3 – 8 tokens par outil, plus un titre par serveur <span class="ag-src">🧪🧮</span></li>
+                      <li>Au démarrage : noms des outils seulement ≈ 3 – 8 tokens par outil, plus un titre par serveur <span class="ag-src">🧪 les deux 🧮</span></li>
                       <li>Exemple : 10 outils ≈ 30 – 80 tokens, plus les titres <span class="ag-src">🧮</span></li>
                       <li>Par utilisation, schéma : ≈ 100 – 500 tokens par outil, lu à la demande <span class="ag-src">❔</span></li>
                       <li>Par utilisation, résultat : variable, souvent le poste le plus coûteux <span class="ag-src">🧮</span></li>
                       <li>Outils <code>Eager</code> : coût au démarrage inconnu <span class="ag-src">❔</span></li>
+                      <li><strong>IDE 2.6.0 :</strong> un serveur absent du cache ne compte que son titre dans l'extension <span class="ag-src">❔</span></li>
                       <li>Plafond : aucun documenté <span class="ag-src">📄</span></li>
                     </ul>
                   </td>
                   <td data-label="Comportement">
                     <ul class="ag-points">
-                      <li>Au démarrage : noms des outils classés <code>Eager:</code> / <code>Lazy:</code>, aucune description <span class="ag-src">🧪</span></li>
-                      <li>Schéma lu sur disque à la demande, puis appel via <code>call_mcp_tool</code> <span class="ag-src">🧪</span></li>
+                      <li>Au démarrage : noms des outils classés <code>Eager:</code> / <code>Lazy:</code>, aucune description <span class="ag-src">🧪 les deux</span></li>
+                      <li>Schéma lu sur disque à la demande, puis appel via <code>call_mcp_tool</code> <span class="ag-src">🧪 2.5.5</span></li>
                       <li>Critère qui sépare <code>Eager</code> et <code>Lazy</code> : inconnu <span class="ag-src">❔</span></li>
-                      <li>Serveur distant : <code>serverUrl</code> obligatoire, <code>url</code> et <code>httpUrl</code> non supportés <span class="ag-src">📄</span></li>
-                      <li>Outils MCP en mode « Ask » (approbation) par défaut <span class="ag-src">📄</span></li>
+                      <li>Serveur distant : <code>serverUrl</code> <span class="ag-src">📄</span> ; la documentation (consultée le 2026-10-29) accepte aussi <code>url</code> pour le CLI, mais pas <code>httpUrl</code> <span class="ag-src">📄</span>. L'extension exclut un serveur <code>url</code> sans <code>serverUrl</code> : non testé dans l'IDE <span class="ag-src">❔</span></li>
+                      <li>Outils MCP en mode « Ask » (approbation) par défaut <span class="ag-src">📄❔</span></li>
                     </ul>
                   </td>
                 </tr>
@@ -596,20 +615,23 @@
                     <ul class="ag-points">
                       <li>Global : <code>~/.gemini/config/plugins/&lt;nom&gt;/</code></li>
                       <li>Projet : <code>/.agents/plugins/&lt;nom&gt;/</code></li>
-                      <li><code>plugin.json</code> obligatoire ; contenu possible : <code>skills/</code>, <code>rules/</code>, <code>agents/</code>, <code>mcp_config.json</code>, <code>hooks.json</code> <span class="ag-src">📄</span></li>
+                      <li><code>plugin.json</code> obligatoire ; contenu possible : <code>skills/</code>, <code>rules/</code>, <code>agents/</code>, <code>mcp_config.json</code>, <code>hooks.json</code> <span class="ag-src">📄</span> ; seul <code>skills/</code> est testé <span class="ag-src">🧪 les deux</span></li>
                     </ul>
                   </td>
                   <td data-label="Taille &amp; tokens">
                     <ul class="ag-points">
                       <li class="ag-reco"><strong>Recommandé : somme de ses composants, chacun suit sa propre ligne</strong> <span class="ag-src">📄</span></li>
-                      <li>Au démarrage, par skill de plugin : listé <strong>deux fois</strong> (liste des skills + section <code>&lt;plugins&gt;</code>) ≈ 100 – 220 tokens <span class="ag-src">🧪🧮</span></li>
-                      <li>Au démarrage, par plugin : ≈ 20 – 40 tokens d'en-tête <span class="ag-src">🧮</span></li>
-                      <li>Règles, MCP, hooks du plugin : comme leur ligne respective <span class="ag-src">📄</span></li>
+                      <li><strong>2.5.5 :</strong> au démarrage, par skill de plugin : listé <strong>deux fois</strong> (liste des skills + section <code>&lt;plugins&gt;</code>) ≈ 100 – 220 tokens ; observé pour un plugin du projet <span class="ag-src">🧪 2.5.5</span>, déduit pour un plugin global <span class="ag-src">🔎</span> <span class="ag-src">🧮</span></li>
+                      <li><strong>2.5.5 :</strong> au démarrage, par plugin : ≈ 20 – 40 tokens d'en-tête <span class="ag-src">🧮</span></li>
+                      <li><strong>IDE 2.6.0 :</strong> au démarrage, par skill de plugin : listé <strong>une fois</strong>, sans section ni en-tête <span class="ag-src">🧪 IDE 2.6.0</span></li>
+                      <li>Règles, MCP, hooks du plugin : comme leur ligne respective <span class="ag-src">📄</span> ; leur chargement n'est testé dans aucune version <span class="ag-src">❔</span> (badge <code>❔ Non vérifié</code> des règles de plugin)</li>
                     </ul>
                   </td>
                   <td data-label="Comportement">
                     <ul class="ag-points">
-                      <li>Skills d'un plugin listés <strong>sans préfixe</strong> (<code>nom-du-skill</code>, pas <code>plugin:skill</code>), avec une section <code>&lt;plugins&gt;</code> séparée <span class="ag-src">🧪</span></li>
+                      <li>Skills d'un plugin listés <strong>sans préfixe</strong> (<code>nom-du-skill</code>, pas <code>plugin:skill</code>) <span class="ag-src">🧪 les deux</span></li>
+                      <li><strong>2.5.5 :</strong> une section <code>&lt;plugins&gt;</code> séparée <span class="ag-src">🧪 2.5.5</span></li>
+                      <li><strong>IDE 2.6.0 :</strong> plus de section <code>&lt;plugins&gt;</code> <span class="ag-src">🧪 IDE 2.6.0</span> ; une section <code>&lt;featured_plugins&gt;</code> (15 entrées) ne liste pas les plugins de l'utilisateur, et l'extension ne la compte pas <span class="ag-src">❔</span></li>
                     </ul>
                   </td>
                 </tr>
@@ -617,48 +639,56 @@
                   <td class="ag-comp"><strong>Lifecycle Hooks</strong></td>
                   <td data-label="Fichiers (global / local)">
                     <ul class="ag-points">
-                      <li>Global : <code>~/.gemini/config/hooks.json</code></li>
-                      <li>Projet : <code>/.agents/hooks.json</code></li>
+                      <li>Global : <code>~/.gemini/config/hooks.json</code> <span class="ag-src">📄</span></li>
+                      <li>Projet : <code>/.agents/hooks.json</code> <span class="ag-src">📄</span></li>
                     </ul>
                   </td>
                   <td data-label="Taille &amp; tokens">
                     <ul class="ag-points">
                       <li class="ag-reco"><strong>Recommandé : messages injectés &lt; 10 lignes · ~90 – 140 tokens</strong> <span class="ag-src">🧮</span></li>
                       <li>Au démarrage : 0 token, la configuration JSON n'est pas dans le contexte <span class="ag-src">❔</span></li>
-                      <li><code>SessionStart</code> : ce qu'il injecte, une seule fois <span class="ag-src">📄</span> (documentation web ; absent de la documentation intégrée à l'IDE 2.5.5 <span class="ag-src">❔</span>)</li>
-                      <li><code>PreInvocation</code> : ce qu'il injecte, <strong>à chaque appel au modèle</strong> (ex. 100 tokens × 30 appels = 3 000) <span class="ag-src">📄🧮</span></li>
-                      <li><code>PostInvocation</code> : ce qu'il injecte, après chaque série d'appels d'outils <span class="ag-src">📄</span></li>
-                      <li><code>PreToolUse</code> : la <code>reason</code> renvoyée <span class="ag-src">📄</span></li>
+                      <li><code>SessionStart</code> : ce qu'il injecte, une seule fois <span class="ag-src">📄❔</span> (documentation web ; absent de la documentation intégrée à l'IDE 2.5.5, non relue dans l'IDE 2.6.0 <span class="ag-src">❔</span>)</li>
+                      <li><code>PreInvocation</code> : ce qu'il injecte, <strong>à chaque appel au modèle</strong> (ex. 100 tokens × 30 appels = 3 000) <span class="ag-src">📄❔🧮</span></li>
+                      <li><code>PostInvocation</code> : ce qu'il injecte, après chaque série d'appels d'outils <span class="ag-src">📄❔</span></li>
+                      <li><code>PreToolUse</code> : la <code>reason</code> renvoyée <span class="ag-src">📄❔</span></li>
+                      <li><code>Stop</code> : sa raison serait injectée comme message système <span class="ag-src">📄❔</span> ; l'extension ne signale pas ce coût</li>
                       <li>L'extension liste les hooks du projet et globaux, et signale ce coût dynamique pour <code>SessionStart</code>, <code>PreInvocation</code> et <code>PostInvocation</code>. Elle n'exécute jamais un hook, et ne peut donc pas mesurer ce qu'il injecte</li>
                     </ul>
                   </td>
                   <td data-label="Comportement">
                     <ul class="ag-points">
-                      <li>JSON qui lance des <strong>commandes shell</strong> (entrée et sortie en JSON), délai de 30 s par défaut <span class="ag-src">📄</span></li>
-                      <li><strong>5 ou 6 événements selon la source</strong> : PreToolUse, PostToolUse, PreInvocation, PostInvocation, Stop <span class="ag-src">📄</span>, et SessionStart <span class="ag-src">📄</span> (documentation web ; absent de la documentation intégrée à l'IDE 2.5.5 <span class="ag-src">❔</span>)</li>
+                      <li>JSON qui lance des <strong>commandes shell</strong> (entrée et sortie en JSON), délai de 30 s par défaut <span class="ag-src">📄❔</span></li>
+                      <li><strong>5 ou 6 événements selon la source</strong> : PreToolUse, PostToolUse, PreInvocation, PostInvocation, Stop <span class="ag-src">📄</span>, et SessionStart <span class="ag-src">📄</span> (documentation web ; absent de la documentation intégrée à l'IDE 2.5.5, non relue dans l'IDE 2.6.0 <span class="ag-src">❔</span>) ; aucun hook n'a été exécuté par les tests <span class="ag-src">❔</span></li>
                       <li>Format : un objet dont chaque clé est le nom d'un hook, qui associe à chaque événement ses gestionnaires ; <code>"enabled": false</code> désactive le hook <span class="ag-src">📄</span></li>
-                      <li>PreToolUse peut bloquer (<code>deny</code>) ou exiger une confirmation (<code>ask</code>, <code>force_ask</code>) <span class="ag-src">📄</span></li>
+                      <li>PreToolUse peut bloquer (<code>deny</code>) ou exiger une confirmation (<code>ask</code>, <code>force_ask</code>) <span class="ag-src">📄❔</span></li>
                     </ul>
                   </td>
                 </tr>
                 <tr>
-                  <td class="ag-comp"><strong>Workflows (obsolètes)</strong></td>
+                  <td class="ag-comp"><strong>Workflows Markdown</strong></td>
                   <td data-label="Fichiers (global / local)">
                     <ul class="ag-points">
-                      <li>Panneau Customizations de l'IDE</li>
+                      <li><strong>IDE 2.6.0, reconnus :</strong> <code>/.agents/workflows/&lt;nom&gt;.md</code> et <code>~/.gemini/config/global_workflows/&lt;nom&gt;.md</code> <span class="ag-src">🧪 IDE 2.6.0</span></li>
+                      <li><strong>IDE 2.6.0, ignorés :</strong> <code>~/.gemini/config/workflows/</code>, <code>~/.gemini/antigravity-ide/global_workflows/</code> et <code>~/.gemini/antigravity/global_workflows/</code> <span class="ag-src">🧪 IDE 2.6.0</span> (badge <code>⛔ Sans effet dans l'IDE 2.6.0</code>)</li>
+                      <li><strong>IDE 2.6.0 :</strong> les variantes <code>.agent/</code>, <code>_agent/</code> et <code>_agents/</code> <span class="ag-src">❔</span></li>
+                      <li>La documentation ne donne aucun chemin : on les crée dans le panneau Customizations de l'IDE <span class="ag-src">📄</span></li>
                     </ul>
                   </td>
                   <td data-label="Taille &amp; tokens">
                     <ul class="ag-points">
-                      <li class="ag-reco"><strong>Recommandé : migrer vers des skills · 0 token aujourd'hui</strong> (hors service) <span class="ag-src">📄</span></li>
-                      <li>Ancien plafond : 12 000 caractères ≈ 2 600 – 3 000 tokens <span class="ag-src">📄🧮</span></li>
+                      <li><strong>IDE 2.6.0 :</strong> au démarrage, 0 token : absents du prompt <span class="ag-src">🧪 IDE 2.6.0</span></li>
+                      <li><strong>IDE 2.6.0 :</strong> le panneau Settings compte leur nom et leur description dans « Other Customizations », sans le corps <span class="ag-src">🧪 IDE 2.6.0</span></li>
+                      <li><strong>IDE 2.6.0 :</strong> à l'invocation, 100 % du corps, sans frontmatter : pour <code>.agents/workflows/</code> <span class="ag-src">🧪 IDE 2.6.0</span>, pour un workflow global <span class="ag-src">🔎</span></li>
+                      <li>Plafond documenté : 12 000 caractères ≈ 2 600 – 3 000 tokens <span class="ag-src">📄❔🧮</span></li>
                     </ul>
                   </td>
                   <td data-label="Comportement">
                     <ul class="ag-points">
-                      <li><strong>Hors service depuis le 19 octobre 2026</strong> <span class="ag-src">📄</span></li>
-                      <li><code>/migrate-workflows</code>, annoncé par la documentation, est <strong>absent</strong> de l'IDE 2.5.5 <span class="ag-src">🧪</span></li>
-                      <li>Migrer manuellement vers des skills</li>
+                      <li><strong>2.5.5 :</strong> hors service depuis le 19 octobre 2026, selon la documentation <span class="ag-src">📄❔</span> ; migrer vers des skills</li>
+                      <li><strong>IDE 2.6.0 :</strong> encore listés dans « / » et invocables ; leur corps n'est injecté, par le moteur, qu'à l'<strong>invocation explicite</strong> (<code>/nom</code>) <span class="ag-src">🧪 IDE 2.6.0</span></li>
+                      <li><strong>IDE 2.6.0 :</strong> aucune migration automatique (ni <code>.md.bak</code>, ni skill créé) <span class="ag-src">🧪 IDE 2.6.0</span></li>
+                      <li><code>/migrate-workflows</code>, annoncé par la documentation, est <strong>absent</strong> des commandes slash de l'agent <span class="ag-src">🧪 les deux</span> ; <code>migrate-workflows</code> est un skill intégré <span class="ag-src">🧪 IDE 2.6.0</span></li>
+                      <li>Un skill de même nom l'emporterait sur le workflow <span class="ag-src">📄❔</span></li>
                       <li>Les « workflows » <code>wf-*</code> gérés par l'extension sont des skills (<code>skills/wf-*/SKILL.md</code>) : Antigravity les liste comme des skills, et ils restent comptés</li>
                     </ul>
                   </td>
@@ -684,7 +714,7 @@
               </thead>
               <tbody>
                 <tr>
-                  <td>1 Ko (1 000 octets)</td>
+                  <td>1 Ko (1 000 octets)</td>
                   <td><strong>≈ 215 – 250 tokens</strong> (médiane 240) : l'unité <strong>fiable</strong>, très stable</td>
                   <td class="ag-src-cell">📏</td>
                 </tr>
@@ -700,23 +730,23 @@
                 </tr>
                 <tr>
                   <td>200 lignes courtes</td>
-                  <td>≈ 1 800 – 2 800 tokens</td>
+                  <td>≈ 1 800 – 2 800 tokens</td>
                   <td class="ag-src-cell">🧮</td>
                 </tr>
                 <tr>
                   <td>24 Ko (plafond par fichier)</td>
-                  <td>≈ 5 100 – 6 000 tokens</td>
+                  <td>≈ 5 100 – 6 000 tokens</td>
                   <td class="ag-src-cell">📏🧮</td>
                 </tr>
                 <tr>
-                  <td>Budget de 20 000 tokens</td>
-                  <td>≈ 80 – 94 Ko, soit ≈ 1 400 – 2 200 lignes courtes, ou ≈ 720 lignes denses</td>
+                  <td>Budget de 20 000 tokens</td>
+                  <td>≈ 80 – 94 Ko, soit ≈ 1 400 – 2 200 lignes courtes, ou ≈ 720 lignes denses</td>
                   <td class="ag-src-cell">🧮</td>
                 </tr>
                 <tr>
                   <td>Frontmatter d'une règle</td>
                   <td>≈ 20 – 57 tokens, <strong>non injecté</strong> par Antigravity</td>
-                  <td class="ag-src-cell">📏🧪</td>
+                  <td class="ag-src-cell">📏🧪 les deux</td>
                 </tr>
               </tbody>
             </table>
@@ -729,9 +759,13 @@
         <!-- 3. Le piège glob -->
         <div class="cs-section" id="ag-piege-glob">
           <div class="cs-section-title">
-            <span>⚠️ 3. Le Piège <code>glob</code></span>
+            <span>⚠️ 3. Le Piège <code>glob</code> (Antigravity IDE 2.5.5)</span>
           </div>
-          <div class="ag-subtitle">Ce qu'on a observé <span class="ag-src">🧪</span></div>
+          <div class="cs-callout cs-callout-warning">
+            <span>⛔</span>
+            <div><strong>Sans effet dans l'IDE 2.6.0.</strong> Antigravity IDE 2.6.0 charge une règle <code>glob</code> sans erreur, mais ne l'injecte jamais : ni à la lecture, à la modification, à la création ou au listing d'un fichier, ni par l'onglet actif, ni par une mention <code>@</code>, avec <code>globs:</code> comme avec <code>glob:</code>, sur dix points d'entrée (tests du 2026-10-28) <span class="ag-src">🧪 IDE 2.6.0</span>. L'extension l'étend à tous les cas, et la cause reste déduite <span class="ag-src">🔎</span>. Une telle règle ne coûte donc rien, mais ne sert à rien : l'exemple A bis montre comment la convertir. Ce qui suit vaut pour la 2.5.5.</div>
+          </div>
+          <div class="ag-subtitle">Ce qu'on a observé dans Antigravity IDE 2.5.5 <span class="ag-src">🧪 2.5.5</span></div>
           <ul class="ag-list">
             <li><strong>Réinjection</strong> : la règle est recollée à la fin de <strong>chaque</strong> résultat d'outil qui lit, modifie ou crée un fichier dont le <strong>nom</strong> correspond. Elle n'est pas chargée une seule fois pour la conversation : une même règle est revenue 6 fois dans une seule conversation de test.</li>
             <li><strong>Empilement</strong> : toutes les règles correspondantes arrivent ensemble. Une seule lecture de fichier en a injecté 5.</li>
@@ -767,8 +801,8 @@
             </table>
           </div>
           <ul class="ag-list">
-            <li>Pour des fichiers que vous touchez souvent (<code>*.ts</code> dans un projet TypeScript), une règle <code>glob</code> coûte plus qu'une règle <code>always_on</code> de même taille dès la deuxième opération. <code>glob</code> est rentable pour des fichiers rares (<code>package.json</code>, <code>*.proto</code>). Cette comparaison suppose que chaque copie reste dans l'historique, ce qui est déduit mais non mesuré. <span class="ag-src">🧪❔</span></li>
-            <li>Dans l'extension, chaque carte <code>glob</code> active affiche son coût par fichier correspondant, et le panneau « ⏱️ Coûts dynamiques », sous la jauge, regroupe les règles <code>glob</code> par motif : vous voyez ce que coûte chaque fichier <code>.ts</code> lu ou modifié.</li>
+            <li>Pour des fichiers que vous touchez souvent (<code>*.ts</code> dans un projet TypeScript), une règle <code>glob</code> coûte plus qu'une règle <code>always_on</code> de même taille dès la deuxième opération. <code>glob</code> est rentable pour des fichiers rares (<code>package.json</code>, <code>*.proto</code>). Cette comparaison suppose que chaque copie reste dans l'historique, ce qui est déduit mais non mesuré. <span class="ag-src">🧪 2.5.5 ❔</span></li>
+            <li>Dans l'extension, avec le profil 2.5.5, chaque carte <code>glob</code> active affiche son coût par fichier correspondant, et le panneau « ⏱️ Coûts dynamiques », sous la jauge, regroupe les règles <code>glob</code> par motif : vous voyez ce que coûte chaque fichier <code>.ts</code> lu ou modifié. Avec le profil 2.6.0, ce panneau ne contient aucune règle <code>glob</code>.</li>
           </ul>
           <div class="ag-subtitle">Les règles d'or</div>
           <ul class="ag-list">
@@ -786,12 +820,13 @@
           </div>
           <div class="ag-subtitle">Exemple 1 — Le fichier trop gros</div>
           <ul class="ag-list">
-            <li>Une règle permanente de 39 Ko est coupée à 24 Ko.</li>
-            <li>Elle occupe en permanence ≈ <strong>5 250 tokens</strong>, soit <strong>26 % du budget</strong> de 20 000 tokens à elle seule.</li>
-            <li>Et ≈ <strong>3 100 tokens de fin sont perdus</strong>, coupés au milieu d'un titre : l'agent ne voit jamais la fin de la règle.</li>
-            <li>Leçon : double peine. Rester sous 24 Ko, et idéalement sous 200 lignes.</li>
+            <li><strong>2.5.5 :</strong> une règle permanente de 39 Ko est coupée à 24 Ko. <span class="ag-src">🧪 2.5.5</span></li>
+            <li><strong>2.5.5 :</strong> elle occupe en permanence ≈ <strong>5 250 tokens</strong>, soit <strong>26 % du budget</strong> de 20 000 tokens à elle seule. <span class="ag-src">📏 2.5.5</span></li>
+            <li><strong>2.5.5 :</strong> et ≈ <strong>3 100 tokens de fin sont perdus</strong>, coupés au milieu d'un titre : l'agent ne voit jamais la fin de la règle. <span class="ag-src">📏 2.5.5</span></li>
+            <li><strong>IDE 2.6.0 :</strong> la même règle perd 15 090 octets, coupée à la dernière fin de ligne avant 24 000 octets, juste après un titre complet. L'agent ne voit toujours pas la fin (sonde du 2026-11-02). <span class="ag-src">🧪 IDE 2.6.0</span></li>
+            <li>Leçon : double peine, dans les deux versions. Rester sous 24 Ko, et idéalement sous 200 lignes.</li>
           </ul>
-          <div class="ag-subtitle">Exemple 2 — Le coût d'une règle <code>glob</code> sur une session</div>
+          <div class="ag-subtitle">Exemple 2 — Le coût d'une règle <code>glob</code> sur une session (2.5.5)</div>
           <div class="cs-table-wrap">
             <table class="cs-table ag-simple-table">
               <thead>
@@ -805,20 +840,23 @@
                 <tr>
                   <td>Règle courte (130 tokens), session ordinaire : 15 lectures + 5 modifications</td>
                   <td class="ag-nowrap">130 × 20</td>
-                  <td class="ag-nowrap">≈ 2 600</td>
+                  <td class="ag-nowrap">≈ 2 600</td>
                 </tr>
                 <tr>
                   <td>Règle courte (130 tokens), relecture de 50 fichiers correspondants</td>
                   <td class="ag-nowrap">130 × 50</td>
-                  <td class="ag-nowrap">≈ 6 500</td>
+                  <td class="ag-nowrap">≈ 6 500</td>
                 </tr>
                 <tr>
-                  <td>Règle longue en paragraphes (2 000 tokens), même session ordinaire</td>
-                  <td class="ag-nowrap">2 000 × 20</td>
-                  <td class="ag-nowrap"><strong>≈ 40 000</strong> 🚨</td>
+                  <td>Règle longue en paragraphes (2 000 tokens), même session ordinaire</td>
+                  <td class="ag-nowrap">2 000 × 20</td>
+                  <td class="ag-nowrap"><strong>≈ 40 000</strong> 🚨</td>
                 </tr>
               </tbody>
             </table>
+          </div>
+          <div class="ag-note">
+            En IDE 2.6.0, ce coût est nul : la règle n'est jamais injectée.
           </div>
         </div>
 
@@ -828,7 +866,7 @@
             <span>💻 5. Exemples Concrets Prêts à l'Emploi</span>
           </div>
 
-          <div class="ag-example-title">Exemple A — Règle <code>glob</code> courte (&lt; 30 lignes)</div>
+          <div class="ag-example-title">Exemple A — Règle <code>glob</code> courte (&lt; 30 lignes, 2.5.5 seulement)</div>
           <div class="cs-code-box"><button type="button" class="btn-copy-code"
               data-code="---&#10;trigger: glob&#10;globs: &quot;*.ts, *.tsx&quot;&#10;description: Conventions TypeScript du projet&#10;---&#10;# Conventions TypeScript&#10;- Typage strict : pas de `any`.&#10;- Une fonction exportée = un commentaire JSDoc.">Copier</button>---
 trigger: glob
@@ -838,6 +876,19 @@ description: Conventions TypeScript du projet
 # Conventions TypeScript
 - Typage strict : pas de `any`.
 - Une fonction exportée = un commentaire JSDoc.</div>
+
+          <div class="ag-example-title">Exemple A bis — La même règle convertie en <code>model_decision</code> (IDE 2.6.0)</div>
+          <div class="cs-code-box"><button type="button" class="btn-copy-code"
+              data-code="---&#10;trigger: model_decision&#10;description: &quot;Conventions TypeScript du projet. À appliquer quand on lit ou modifie des fichiers *.ts ou des fichiers *.tsx (motifs d'origine : *.ts, *.tsx).&quot;&#10;---&#10;# Conventions TypeScript&#10;- Typage strict : pas de `any`.&#10;- Une fonction exportée = un commentaire JSDoc.">Copier</button>---
+trigger: model_decision
+description: "Conventions TypeScript du projet. À appliquer quand on lit ou modifie des fichiers *.ts ou des fichiers *.tsx (motifs d'origine : *.ts, *.tsx)."
+---
+# Conventions TypeScript
+- Typage strict : pas de `any`.
+- Une fonction exportée = un commentaire JSDoc.</div>
+          <div class="ag-note">
+            Pour l'IDE 2.6.0 : remplacez <code>trigger: glob</code> par <code>trigger: model_decision</code>, retirez <code>globs</code>, et écrivez une description qui nomme les fichiers visés. L'agent voit le chemin et la description au démarrage, puis lit le corps quand il juge que le sujet correspond (un modèle, un essai) <span class="ag-src">🧪 IDE 2.6.0</span>. À l'import d'une règle Claude Code à <code>paths:</code>, l'extension fait cette conversion elle-même : cet exemple est sa sortie exacte pour <code>paths: ["*.ts", "*.tsx"]</code>.
+          </div>
 
           <div class="ag-example-title">Exemple B — Règle <code>model_decision</code> (pour un contenu long)</div>
           <div class="cs-code-box"><button type="button" class="btn-copy-code"
@@ -860,7 +911,7 @@ description: Règles générales du projet
 - Ne jamais commiter de secret.</div>
 
           <div class="ag-note">
-            Format validé dans Antigravity IDE 2.5.5. Rappels : <code>globs</code> est une chaîne, jamais une liste ; les motifs portent sur le nom de fichier, jamais sur un dossier.
+            Formats validés dans Antigravity IDE 2.5.5 et IDE 2.6.0 ; l'exemple A n'a d'effet qu'en 2.5.5. Rappels : <code>globs</code> est une chaîne, jamais une liste ; en 2.5.5, les motifs portent sur le nom de fichier, jamais sur un dossier.
           </div>
         </div>
 
@@ -875,10 +926,10 @@ description: Règles générales du projet
           <div class="cs-callout cs-callout-warning">
             <span>📐</span>
             <div>
-              <strong>Organisation des emplacements :</strong> Antigravity cumule les règles de toutes les portées (globale, espace de travail, dossier). En cas de conflit d'instructions, la règle du dossier le plus spécifique l'emporte, puis celle de l'espace de travail, puis la règle globale.
+              <strong>Organisation des emplacements :</strong> Antigravity cumule les règles de toutes les portées (globale, espace de travail, dossier). En cas de conflit d'instructions, la règle du dossier le plus spécifique l'emporterait, puis celle de l'espace de travail, puis la règle globale <span class="ag-src">📄❔</span> : seul l'ordre du prompt est observé <span class="ag-src">🧪 IDE 2.6.0</span>.
             </div>
           </div>
-          <div class="cs-callout cs-callout-warning ag-revoir"><span>⚠️</span><div><strong>À revoir</strong> — contredit par les tests (2026-10-21) : Sous-dossiers du dossier ouvert : <strong>jamais chargés</strong>, ni à la lecture d'un fichier, ni à la modification, ni au listing, contrairement à la documentation 🧪<br>Dossiers parents, jusqu'à la racine du dépôt Git : chargés 🧪</div></div>
+          <div class="cs-callout cs-callout-warning ag-revoir"><span>⚠️</span><div><strong>À revoir</strong> — contredit par les tests (2026-10-21 en 2.5.5, 2026-10-28 en IDE 2.6.0) : Sous-dossiers du dossier ouvert : <strong>jamais chargés</strong>, ni à la lecture d'un fichier, ni à la modification, ni au listing, contrairement à la documentation 🧪<br>Dossiers parents, jusqu'à la racine du dépôt Git : chargés 🧪</div></div>
           <div class="cs-table-wrap">
             <table class="cs-table">
               <thead>
@@ -939,16 +990,16 @@ description: Règles générales du projet
             <div>
               <strong>1. Détection des Doublons (Global vs Local) :</strong>
               <div style="color: var(--muted-fg); margin-top: 2px;">
-                Lorsqu'une règle ou une compétence de <code>~/.gemini/config/</code> est dupliquée dans <code>.agents/</code>, laisser les deux copies actives consomme deux fois votre budget de démarrage. Le surcoût affiché est le plus petit des deux coûts au démarrage : l'enveloppe d'une règle permanente, l'entrée d'index d'une règle <code>model_decision</code>, la ligne d'index d'un skill. Une paire <code>glob</code> ou <code>manual</code> ne coûte rien au démarrage et porte la mention « coût dynamique » : les deux copies sont injectées quand elles s'appliquent. Une copie ⛔ ne compte jamais, et deux âmes (globale et du projet) ne forment un doublon que si leurs contenus sont identiques. Utilisez le bouton <em>« Éteindre »</em> du badge <code>⚠️ Doublon actif</code> pour supprimer instantanément cette redondance.
+                Lorsqu'une règle ou une compétence de <code>~/.gemini/config/</code> est dupliquée dans <code>.agents/</code>, laisser les deux copies actives consomme deux fois votre budget de démarrage. Le surcoût affiché est le plus petit des deux coûts au démarrage : l'enveloppe d'une règle permanente, l'entrée d'index d'une règle <code>model_decision</code>, la ligne d'index d'un skill. Une paire <code>glob</code> ou <code>manual</code> ne coûte rien au démarrage et porte la mention « coût dynamique » : les deux copies sont injectées quand elles s'appliquent (en IDE 2.6.0, une paire <code>glob</code> est ⛔ et ne compte pas). Une copie ⛔ ne compte jamais, et deux âmes (globale et du projet) ne forment un doublon que si leurs contenus sont identiques. Utilisez le bouton <em>« Éteindre »</em> du badge <code>⚠️ Doublon actif</code> pour supprimer instantanément cette redondance.
               </div>
             </div>
             <div>
               <strong>2. Les Alertes du Coach IA Proactif :</strong>
               <div style="color: var(--muted-fg); margin-top: 2px;">
-                • <strong style="color: #ef4444;">✂️ Tronquée :</strong> le corps dépasse 24 000 octets, frontmatter non compté, inclusions comprises. Antigravity coupe le surplus : la carte indique les octets coupés et les tokens jamais lus par l'agent.<br>
-                • <strong style="color: #f59e0b;">⚠️ N li. :</strong> le fichier dépasse la taille recommandée pour son type, en lignes de corps (frontmatter exclu, lignes vides comprises) : 200 lignes pour l'Âme, les règles permanentes et les dossiers parents ; 30 lignes ou environ 420 tokens pour une règle <code>glob</code>, réinjectée à chaque fichier correspondant ; 200 lignes pour une règle <code>model_decision</code> ; 500 lignes pour le corps d'un skill. L'infobulle donne la raison et la mesure. Une carte déjà <code>✂️ Tronquée</code> ne reçoit pas de second avertissement de taille. Pour alléger une grosse règle, préférez <code>model_decision</code> ou un skill : la découper en plusieurs règles <code>glob</code> peut multiplier son coût.<br>
+                • <strong style="color: #ef4444;">✂️ Tronquée :</strong> le corps d'une règle (frontmatter non compté) ou le fichier entier d'une âme dépasse 24 000 octets, inclusions comprises (documentation). Antigravity coupe le surplus : à l'octet en 2.5.5, à la dernière fin de ligne en IDE 2.6.0 (la coupe d'une âme en est déduite). La carte indique les octets coupés et les tokens jamais lus par l'agent. Sur une carte du catalogue, le badge décrit la coupe qu'Antigravity ferait une fois le fichier déployé.<br>
+                • <strong style="color: #f59e0b;">⚠️ N li. :</strong> le fichier dépasse la taille recommandée pour son type, en lignes de corps (frontmatter exclu, lignes vides comprises) : 200 lignes pour l'Âme, les règles permanentes et les dossiers parents ; 30 lignes ou environ 420 tokens pour une règle <code>glob</code>, réinjectée à chaque fichier correspondant en 2.5.5 ; 200 lignes pour une règle <code>model_decision</code> ; 500 lignes pour le corps d'un skill. L'infobulle donne la raison et la mesure. Une carte déjà <code>✂️ Tronquée</code> ne reçoit pas de second avertissement de taille. Pour alléger une grosse règle, préférez <code>model_decision</code> ou un skill : la découper en plusieurs règles <code>glob</code> peut multiplier son coût en 2.5.5, et la rend sans effet en IDE 2.6.0.<br>
                 • <strong style="color: #94a3b8;">ℹ️ Annexes :</strong> information seulement. Un fichier annexe de skill dépasse 300 lignes, ou dépasse 100 lignes sans table des matières repérée (détection approximative). Les annexes ne coûtent rien au démarrage.<br>
-                • <strong style="color: #ef4444;">⚠️ &gt; 24 Ko :</strong> règle ⛔, donc jamais lue, dont le corps dépasserait le plafond de 24 000 octets une fois corrigée. Aucun plafond n'est documenté pour un skill : les skills n'ont pas cette alerte.<br>
+                • <strong style="color: #ef4444;">⚠️ &gt; 24 Ko :</strong> règle ⛔, donc jamais lue, dont le corps dépasserait le plafond de 24 000 octets une fois corrigée ; sur une carte du catalogue, fichier qu'Antigravity tronquerait une fois déployé. Aucun plafond n'est documenté pour un skill : les skills n'ont pas cette alerte.<br>
                 • <strong style="color: #ef4444;">⚠️ MCP &gt; 2 Ko :</strong> Dépassement du cap de 2 048 car. par outil sous Claude Code.<br>
                 • <strong style="color: #f59e0b;">⚠️ Sans description :</strong> L'IA ne dispose d'aucun indice sémantique pour savoir quand invoquer cette ressource.
               </div>
@@ -972,20 +1023,46 @@ description: Règles générales du projet
             <div>
               <strong>Comment se calcule le total de tokens des règles (Antigravity) :</strong>
               <ul style="margin: 4px 0 0 0; padding-left: 18px; line-height: 1.5;">
-                <li><strong>Principe :</strong> l'extension compte ce qu'Antigravity injecte réellement au démarrage, sous la forme où il l'injecte (formats relevés par les tests du 2026-10-21), en tokens BPE o200k.</li>
-                <li><strong>Règles permanentes, Âme et règles héritées :</strong> le corps sans frontmatter, inclusions comprises, entre deux balises <code>&lt;RULE[chemin]&gt;</code> qui portent chacune le chemin complet du fichier. Au-delà de 24 000 octets de corps, seule la partie gardée compte : la carte porte le badge <code>✂️ Tronquée</code>, avec les octets coupés et les tokens perdus. <span class="ag-src">🧪</span></li>
-                <li><strong>Règles conditionnelles :</strong> <code>model_decision</code> coûte son entrée dans l'index (chemin <code>file:///</code> et description), plus l'en-tête de l'index, compté une seule fois en tout ; <code>glob</code> et <code>manual</code> ne coûtent rien au démarrage. Le poids du corps, lu quand la règle s'applique, est affiché à part (« plein », dans l'info-bulle et sur la carte). <span class="ag-src">🧪</span></li>
-                <li><strong>Règles ⛔ :</strong> 0 token au démarrage, et elles ne comptent ni dans les règles actives ni dans les doublons actifs (elles restent comptées dans les avertissements). Une règle sans <code>trigger</code> valide porte le badge <code>⛔ Ignorée par Antigravity</code> ; des <code>globs</code> en liste YAML, <code>⛔ Ignorée : liste YAML</code> ; des motifs qui contiennent tous un dossier, <code>⛔ Ne se déclenchera jamais</code> (<code>⚠️ Partiellement active</code> si seuls certains motifs sont concernés) ; une règle de sous-dossier, <code>⛔ Jamais chargée</code>, regroupée dans la section repliée « ⛔ Non chargées par Antigravity ». Un champ obligatoire manquant porte le badge <code>⚠️ Frontmatter</code>.</li>
+                <li><strong>Principe :</strong> l'extension compte ce qu'Antigravity injecte réellement au démarrage, sous la forme où il l'injecte (formats relevés par les tests du 2026-10-21 en 2.5.5, du 2026-10-28 et du 2026-11-02 en IDE 2.6.0), en tokens BPE o200k.</li>
+                <li><strong>🧭 Profil :</strong> l'extension applique un profil de comportement, affiché par la pastille « Profil : Antigravity IDE 2.6.0 (détecté) », « (forcé) » ou « (non détecté) », à côté de la jauge des règles. En <code>auto</code> (défaut), elle le déduit de la structure de <code>~/.gemini</code> : cette structure indique une génération d'Antigravity, et non une version exacte. Sans indice reconnu, elle applique le profil 2.6.0 et affiche « (non détecté) ». Pour garder le comportement de la 2.5.5, réglez <code>skillsManager.antigravityProfile</code> sur <code>2.5.5</code> ; la pastille affiche alors « (forcé) ». Après la migration, l'ancienne racine <code>~/.gemini/antigravity-ide/</code> reste en place ; sa lecture éventuelle par l'IDE 2.6.0 n'est pas vérifiée <span class="ag-src">❔</span>.</li>
+                <li><strong>Règles permanentes et règles héritées :</strong> le corps sans frontmatter, inclusions comprises (documentation), entre deux balises <code>&lt;RULE[chemin]&gt;</code> qui portent chacune le chemin complet du fichier. <span class="ag-src">🧪 les deux</span></li>
+                <li><strong>Âmes :</strong> le fichier entier, sans retrait de frontmatter. Les âmes globales sont comptées entre deux balises <code>&lt;RULE[user_global]&gt;</code>, sans chemin : pour les quatre fichiers <span class="ag-src">🧪 IDE 2.6.0</span>, pour <code>~/.gemini/GEMINI.md</code> seulement <span class="ag-src">🧪 2.5.5</span> ; en 2.5.5, les trois autres fichiers le sont par prudence <span class="ag-src">❔</span>. Les âmes du projet et des dossiers parents sont comptées entre deux balises qui portent leur chemin complet : âme du projet <span class="ag-src">🧪 les deux</span> ; pour une âme d'un dossier parent, ce format est observé en 2.5.5 et non revérifié en IDE 2.6.0 <span class="ag-src">❔</span> ; pour <code>/.agents/AGENTS.md</code> et <code>/.agents/GEMINI.md</code>, il n'est testé dans aucune version <span class="ag-src">❔</span>.</li>
+                <li><strong>Troncature :</strong> au-delà de 24 000 octets, seule la partie gardée compte : la carte porte le badge <code>✂️ Tronquée</code>, avec les octets coupés et les tokens perdus. Coupe à l'octet avec le profil 2.5.5 <span class="ag-src">🧪 2.5.5</span> ; à la dernière fin de ligne avec le profil 2.6.0 <span class="ag-src">🧪 IDE 2.6.0</span>, déduite pour une âme <span class="ag-src">🔎</span>.</li>
+                <li><strong>Règles conditionnelles :</strong> <code>model_decision</code> coûte son entrée dans l'index (chemin <code>file:///</code> et description), plus l'en-tête de l'index, compté une seule fois en tout ; <code>glob</code> et <code>manual</code> ne coûtent rien au démarrage. Le poids du corps, lu quand la règle s'applique, est affiché à part (« plein », dans l'info-bulle et sur la carte). La jauge garde l'entrée d'index d'une règle <code>model_decision</code>, qui figure dans le prompt <span class="ag-src">🧪 les deux</span>, même si le panneau Settings de l'IDE 2.6.0 ne la compte pas <span class="ag-src">🧪 IDE 2.6.0</span>.</li>
+                <li><strong>Règles ⛔ :</strong> 0 token au démarrage, et elles ne comptent ni dans les règles actives ni dans les doublons actifs (elles restent comptées dans les avertissements). Une règle sans <code>trigger</code> valide porte le badge <code>⛔ Ignorée par Antigravity</code> ; des <code>globs</code> en liste YAML, <code>⛔ Ignorée : liste YAML</code> ; en 2.5.5, des motifs qui contiennent tous un dossier, <code>⛔ Ne se déclenchera jamais</code> (<code>⚠️ Partiellement active</code> si seuls certains motifs sont concernés) ; en IDE 2.6.0, toute règle <code>glob</code>, <code>⛔ Sans effet dans l'IDE 2.6.0</code> ; une règle de sous-dossier, <code>⛔ Jamais chargée</code>, regroupée dans la section repliée « ⛔ Non chargées par Antigravity ». Un champ obligatoire manquant porte le badge <code>⚠️ Frontmatter</code>.</li>
+                <li><strong>Cas non vérifiés (<code>❔</code>) :</strong> comptés par prudence. En 2.5.5, les trois âmes globales autres que <code>~/.gemini/GEMINI.md</code> (<code>❔ Non vérifié en 2.5.5</code>) ; en IDE 2.6.0, les règles des variantes <code>.agent/</code>, <code>_agent/</code> et <code>_agents/</code> quand <code>.agents/</code> existe ou que la règle n'est pas en <code>always_on</code>, et les workflows de ces variantes (<code>❔ Non vérifié</code>) ; dans les deux profils, les règles d'un plugin (<code>❔ Non vérifié</code>).</li>
                 <li><strong>Règles héritées (<code>⬆️ Héritée</code>) :</strong> l'âme et les règles des dossiers parents, jusqu'à la racine du dépôt Git, comptent dans la jauge avec leur trigger habituel. Elles sont affichées dans le groupe « Dossiers parents » et verrouillées, car leurs fichiers sont hors du dossier ouvert.</li>
                 <li><strong>Conséquence sur la jauge :</strong> Additionner les tokens affichés sur les cartes des règles conditionnelles ne redonne pas le total des règles. C'est normal et voulu — le total reflète la consommation au démarrage, pas la consommation maximale si toutes les règles conditionnelles étaient déclenchées en même temps.</li>
-                <li><strong>Skills :</strong> chaque skill coûte sa ligne dans l'index (nom, chemin de <code>SKILL.md</code> et description). Un skill de plugin est listé deux fois (index et section du plugin), plus l'en-tête de la section. Les skills intégrés sont comptés et verrouillés ; ceux des anciens emplacements sont comptés avec le badge <code>❔ Ancien emplacement</code>. <span class="ag-src">🧪📄</span></li>
-                <li><strong>MCP :</strong> un titre par serveur actif, puis les noms de ses outils, lus dans le cache d'Antigravity moins <code>disabledTools</code> (observé, non documenté). Sans cache, la liste est inconnue : comptez environ 3 à 8 tokens par outil. Les serveurs <code>disabled</code> et les serveurs distants sans <code>serverUrl</code> sont exclus. <span class="ag-src">🧪📄</span></li>
-                <li><strong>Coûts dynamiques, hors jauge :</strong> le panneau repliable « ⏱️ Coûts dynamiques », sous la jauge, montre ce qu'Antigravity ajoute en cours de session. Chaque règle <code>glob</code> active y est regroupée par motif de nom de fichier, avec ce que coûte chaque fichier correspondant lu ou modifié (en-tête de réinjection compris) et une estimation sur une session ordinaire de 20 opérations. Au-delà de 20 000 tokens d'âme et de règles permanentes, il liste les fichiers que la documentation annonce transformés en pointeurs, sans modifier les totaux, car ce comportement n'a pas été testé. <span class="ag-src">🧪📄❔</span></li>
+                <li><strong>Skills :</strong> chaque skill coûte sa ligne dans l'index (nom, chemin de <code>SKILL.md</code> et description). Avec le profil 2.5.5, un skill de plugin est listé deux fois (index et section du plugin), plus l'en-tête de la section ; avec le profil 2.6.0, une seule fois, sans section. Les skills intégrés sont comptés et verrouillés. Les skills de <code>.agent/skills/</code> sont comptés avec le badge <code>❔ Ancien emplacement</code> ; ceux de <code>~/.gemini/antigravity/skills/</code> le sont aussi avec le profil 2.5.5, mais avec le profil 2.6.0, ils portent le badge <code>⛔ Non lu par l'IDE 2.6.0</code> et ne sont pas comptés. <span class="ag-src">🧪📄</span></li>
+                <li><strong>MCP :</strong> un titre par serveur actif, puis les noms de ses outils, lus dans le cache d'Antigravity (<code>~/.gemini/antigravity-ide/mcp/</code> en 2.5.5, <code>~/.gemini/antigravity/mcp/</code> en IDE 2.6.0) moins <code>disabledTools</code> (observé en 2.5.5, non documenté ; correspondance non revérifiée en IDE 2.6.0 <span class="ag-src">❔</span>). Sans cache, la liste est inconnue : seul le titre est compté, et l'infobulle indique environ 3 à 8 tokens par outil. Les serveurs <code>disabled</code> et les serveurs distants sans <code>serverUrl</code> sont exclus. <span class="ag-src">🧪📄</span></li>
+                <li><strong>Coûts dynamiques, hors jauge :</strong> le panneau repliable « ⏱️ Coûts dynamiques », sous la jauge, montre ce qu'Antigravity ajoute en cours de session. Avec le profil 2.5.5, chaque règle <code>glob</code> active y est regroupée par motif de nom de fichier, avec ce que coûte chaque fichier correspondant lu ou modifié (en-tête de réinjection compris) et une estimation sur une session ordinaire de 20 opérations ; avec le profil 2.6.0, aucune règle <code>glob</code> n'y figure. Au-delà de 20 000 tokens d'âme et de règles permanentes, il liste les fichiers que la documentation annonce transformés en pointeurs, sans modifier les totaux, car ce comportement n'a pas été testé. <span class="ag-src">🧪📄❔</span></li>
                 <li><strong>Hooks :</strong> 0 token au démarrage. Le panneau liste les hooks de <code>.agents/hooks.json</code> et de <code>~/.gemini/config/hooks.json</code> (nom, événements), signale un fichier au format non reconnu, et avertit d'un coût dynamique pour <code>SessionStart</code>, <code>PreInvocation</code> et <code>PostInvocation</code>. L'extension n'exécute jamais un hook, et refuse d'en installer un vers Antigravity depuis la Découverte. <span class="ag-src">📄❔</span></li>
-                <li><strong>Workflows <code>wf-*</code> :</strong> ce sont des skills, listés comme tels par Antigravity : ils sont comptés comme des skills. Les workflows d'Antigravity, eux, sont hors service depuis le 19 octobre 2026. <span class="ag-src">📄</span></li>
+                <li><strong>Workflows <code>wf-*</code> :</strong> ce sont des skills, listés comme tels par Antigravity : ils sont comptés comme des skills.</li>
+                <li><strong>Workflows Markdown :</strong> avec le profil 2.6.0, ceux de <code>.agents/workflows/</code> et de <code>~/.gemini/config/global_workflows/</code> sont affichés en lecture seule. Ils coûtent 0 au démarrage ; leur nom et leur description entrent dans la seconde jauge ; leur corps n'est compté qu'à l'invocation. Un emplacement ignoré porte <code>⛔ Sans effet dans l'IDE 2.6.0</code>, une variante <code>❔ Non vérifié</code>. Avec le profil 2.5.5, ils ne sont pas lus : la documentation les annonce hors service depuis le 19 octobre 2026. <span class="ag-src">🧪 IDE 2.6.0</span> <span class="ag-src">📄 2.5.5</span></li>
                 <li><strong>Totaux :</strong> le total de l'Âme et celui des skills correspondent à la somme des cartes actives, plus les en-têtes injectés une seule fois (détaillés dans les info-bulles). Sous Antigravity, la jauge de 20 000 tokens ne compte que l'âme et les règles : les skills et les MCP sont affichés hors de ce budget.</li>
+                <li><strong>Seconde jauge « Other Customizations » (profil 2.6.0) :</strong> un budget de 20 000 tokens, distinct de celui des règles, qui cumule les skills, les workflows Markdown (nom et description) et les serveurs MCP, globaux et du projet. Le plafond est affiché par le panneau Settings <span class="ag-src">🧪 IDE 2.6.0</span> ; l'exclusion des grosses personnalisations au-delà du budget est annoncée par l'IDE, mais non testée <span class="ag-src">❔</span>. Avec le profil 2.5.5, cette jauge n'est pas affichée.</li>
+                <li><strong>Jauges et panneau Settings de l'IDE 2.6.0 :</strong> les jauges de l'extension et le panneau ne comptent pas de la même façon. L'extension compte en tokens o200k ce que l'agent reçoit au démarrage. Le panneau semble compter des octets plutôt que des tokens <span class="ag-src">🔎</span>, ne compte pas l'entrée d'index des règles <code>model_decision</code>, qui figure pourtant dans le prompt <span class="ag-src">🧪 IDE 2.6.0</span>, et n'affiche pas les skills intégrés <span class="ag-src">🧪 IDE 2.6.0</span>. Les deux chiffres peuvent donc différer. L'extension garde son propre comptage.</li>
               </ul>
             </div>
+          </div>
+        </div>
+
+        <!-- 9. Sources de la documentation -->
+        <div class="cs-section">
+          <div class="cs-section-title">
+            <span>📚 9. Sources de la Documentation (consultées le 2026-10-29)</span>
+          </div>
+          <ul class="ag-list">
+            <li>Règles : <code>https://antigravity.google/docs/rules/</code></li>
+            <li>Skills : <code>https://antigravity.google/docs/skills/</code></li>
+            <li>Plugins : <code>https://antigravity.google/docs/plugins/</code></li>
+            <li>MCP : <code>https://antigravity.google/docs/mcp/</code></li>
+            <li>Hooks : <code>https://antigravity.google/docs/hooks/</code></li>
+            <li>Workflows de l'IDE : <code>https://antigravity.google/docs/ide/workflows/</code></li>
+            <li>Migration des workflows vers les skills : <code>https://antigravity.google/docs/migration/workflows-to-skills/</code></li>
+          </ul>
+          <div class="ag-note">
+            Aucune de ces pages n'affiche de date de mise à jour. Les faits marqués 📄 en viennent ; ils restent des hypothèses tant qu'un test ne les a pas confirmés, et le guide suit les tests en cas de contradiction.
           </div>
         </div>
 

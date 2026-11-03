@@ -437,12 +437,67 @@ describe('Suite de Tests : Intégrité & Synchronisation NAS vs Local', () => {
 
     // Guide Antigravity (chantier B) : contenu vérifié par la suite de régression du 2026-10-21
     const antigravityHtml = cheatsheetHtml.slice(cheatsheetHtml.indexOf('id="contentAntigravity"'));
-    assert.ok(antigravityHtml.includes('Antigravity IDE 2.5.5, Windows'), 'le guide Antigravity doit indiquer sa portée');
+    // Lot L10, 6b : les deux versions, chaque fait rattaché à la sienne (Antigravity IDE 2.6.0, jamais l'App)
+    assert.ok(
+      antigravityHtml.includes('Antigravity IDE 2.6.0 (testée le 2026-10-28 et le 2026-11-02) et Antigravity IDE 2.5.5 (testée le 2026-10-21), Windows'),
+      'le guide Antigravity doit indiquer sa portée, pour les deux versions'
+    );
     assert.ok(antigravityHtml.includes('❔ non vérifié'), 'le guide Antigravity doit contenir la légende des sources');
+    assert.ok(antigravityHtml.includes('🧪 testé, suivi de la version : 2.5.5, IDE 2.6.0 ou les deux'), 'la légende doit expliquer l\'étiquette de version');
+    assert.ok(antigravityHtml.includes('🔎 déduit'), 'la légende doit contenir le symbole des faits déduits');
     assert.ok(antigravityHtml.includes('id="ag-piege-glob"'), 'le guide Antigravity doit contenir la section « Le piège glob »');
-    assert.ok(antigravityHtml.includes('Workflows (obsolètes)'), 'le tableau Antigravity doit contenir la ligne Workflows');
+    assert.ok(antigravityHtml.includes('Le Piège <code>glob</code> (Antigravity IDE 2.5.5)'), '« Le piège glob » doit être marqué 2.5.5 (D-7)');
+    assert.ok(antigravityHtml.includes('<strong>Sans effet dans l\'IDE 2.6.0.</strong>'), '« Le piège glob » doit porter le bandeau IDE 2.6.0 (D-7)');
+    assert.ok(antigravityHtml.includes('<strong>Workflows Markdown</strong>'), 'le tableau Antigravity doit contenir la ligne Workflows Markdown');
+    assert.ok(!antigravityHtml.includes('Workflows (obsolètes)'), 'l\'ancien titre de la ligne Workflows doit disparaître');
     assert.ok(antigravityHtml.includes('globs: "*.ts, *.tsx"'), 'le guide Antigravity doit proposer un exemple glob sur le nom de fichier');
-    assert.ok(antigravityHtml.includes('À revoir</strong> — contredit par les tests (2026-10-21)'), 'les phrases conservées contredites doivent être signalées');
+    assert.ok(antigravityHtml.includes('Exemple A bis'), 'le guide doit montrer la conversion manuelle en model_decision');
+    assert.ok(
+      antigravityHtml.includes('description: "Conventions TypeScript du projet. À appliquer quand on lit ou modifie des fichiers *.ts ou des fichiers *.tsx (motifs d\'origine : *.ts, *.tsx)."'),
+      'l\'exemple A bis doit reprendre la sortie de la conversion D-6'
+    );
+    assert.ok(antigravityHtml.includes('&lt;RULE[user_global]&gt;'), 'le guide doit citer l\'enveloppe des âmes globales');
+    assert.ok(antigravityHtml.includes('À revoir</strong> — contredit par les tests (2026-10-21 en 2.5.5, 2026-10-28 en IDE 2.6.0)'), 'les phrases conservées contredites doivent être signalées');
+    assert.ok(!cheatsheetHtml.includes('_gl='), 'aucune adresse ne doit porter de traceur ?_gl=');
+    assert.ok(!/<a\s[^>]*href="https?:/.test(antigravityHtml), 'les sources sont écrites en texte, sans lien');
+    for (const page of ['rules/', 'skills/', 'plugins/', 'mcp/', 'hooks/', 'ide/workflows/', 'migration/workflows-to-skills/']) {
+      assert.ok(antigravityHtml.includes(`<code>https://antigravity.google/docs/${page}</code>`), `source officielle en texte : ${page}`);
+    }
+    // Chaque « 2.6.0 » désigne l'IDE, ou le profil de l'extension ; jamais l'App
+    for (const m of antigravityHtml.matchAll(/2\.6\.0/g)) {
+      const avant = antigravityHtml.slice(Math.max(0, m.index - 8), m.index);
+      assert.ok(/(IDE |profil )$/.test(avant), `« 2.6.0 » doit suivre « IDE » ou « profil » : …${avant}2.6.0`);
+    }
+    assert.ok(!/App[^.<]{0,20}2\.6\.0/.test(antigravityHtml), 'jamais « App » devant « IDE 2.6.0 »');
+    assert.ok(!antigravityHtml.includes('sur ce poste'), 'les nombres relevés sont datés par les tests, pas par le poste');
+    // Vérification visuelle du guide (2026-11-03) : statuts des âmes, des règles conditionnelles et de l'exemple 1
+    const section8 = antigravityHtml.slice(antigravityHtml.indexOf('8. Calcul de la Jauge'));
+    const puceAmes = section8.slice(section8.indexOf('<strong>Âmes :</strong>'), section8.indexOf('<strong>Troncature :</strong>'));
+    assert.ok(puceAmes.includes('pour les quatre fichiers <span class="ag-src">🧪 IDE 2.6.0</span>, pour <code>~/.gemini/GEMINI.md</code> seulement <span class="ag-src">🧪 2.5.5</span>'), 'section 8 : user_global observé pour les quatre fichiers en 2.6.0, pour un seul en 2.5.5');
+    assert.ok(puceAmes.includes('en 2.5.5, les trois autres fichiers le sont par prudence <span class="ag-src">❔</span>'), 'section 8 : les trois autres âmes globales non vérifiées en 2.5.5');
+    assert.ok(puceAmes.includes('non revérifié en IDE 2.6.0 <span class="ag-src">❔</span>'), 'section 8 : âme parente non revérifiée en IDE 2.6.0');
+    assert.ok(puceAmes.includes('<code>/.agents/AGENTS.md</code> et <code>/.agents/GEMINI.md</code>, il n\'est testé dans aucune version <span class="ag-src">❔</span>'), 'section 8 : enveloppe des âmes de .agents/ non testée');
+    const phraseAmesGlobales = puceAmes.slice(0, puceAmes.indexOf('Les âmes du projet'));
+    assert.ok(!phraseAmesGlobales.includes('🧪 les deux'), 'section 8 : plus de « 🧪 les deux » sur les âmes globales');
+    const ligneAme = antigravityHtml.slice(antigravityHtml.indexOf('<strong>Âme</strong>'), antigravityHtml.indexOf('<strong>Règles permanentes</strong>'));
+    assert.ok(ligneAme.includes('les trois autres fichiers en 2.5.5 <span class="ag-src">❔</span>'), 'tableau : les trois autres âmes globales non vérifiées en 2.5.5');
+    assert.ok(ligneAme.includes('âme d\'un dossier parent <span class="ag-src">🧪 2.5.5</span> <span class="ag-src">❔ IDE 2.6.0</span>'), 'tableau : âme parente non revérifiée en IDE 2.6.0');
+    assert.ok(ligneAme.includes('pour les quatre fichiers <span class="ag-src">🧪 IDE 2.6.0</span>, pour <code>~/.gemini/GEMINI.md</code> seulement <span class="ag-src">🧪 2.5.5</span>'), 'tableau : user_global par version');
+    // Étiquettes courtes (.ag-src est insécable) : symbole et version seulement, les précisions vont dans le texte
+    const etiquettes = [...antigravityHtml.matchAll(/<span class="ag-src">([\s\S]*?)<\/span>/g)].map((m) => m[1].replace(/<[^>]+>/g, ''));
+    assert.ok(etiquettes.length > 100, 'les étiquettes de l\'onglet Antigravity sont trouvées');
+    for (const etiquette of etiquettes) {
+      assert.ok([...etiquette].length <= 16, `étiquette trop longue (plus de 16 caractères) : « ${etiquette} »`);
+      assert.ok(!/[(·]/.test(etiquette), `étiquette avec une précision ou deux versions : « ${etiquette} »`);
+    }
+    assert.ok(antigravityHtml.includes('le moteur ne l\'injecte jamais (un modèle, un essai, pour une règle du projet et une règle globale) <span class="ag-src">🧪 IDE 2.6.0</span>'), 'les précisions passent dans le texte, juste avant l\'étiquette');
+    const puceCond = section8.slice(section8.indexOf('<strong>Règles conditionnelles :</strong>'), section8.indexOf('<strong>Règles ⛔ :</strong>'));
+    assert.ok(puceCond.includes('qui figure dans le prompt <span class="ag-src">🧪 les deux</span>, même si le panneau Settings de l\'IDE 2.6.0 ne la compte pas <span class="ag-src">🧪 IDE 2.6.0</span>'), 'section 8 : étiquettes séparées pour l\'index et le panneau');
+    const exemple1 = antigravityHtml.slice(antigravityHtml.indexOf('Exemple 1 — Le fichier trop gros'), antigravityHtml.indexOf('Exemple 2 —'));
+    assert.ok(exemple1.includes('<strong>2.5.5 :</strong> elle occupe en permanence ≈ <strong>5 250 tokens</strong>'), 'exemple 1 : 5 250 tokens rattachés à la 2.5.5');
+    assert.ok(exemple1.includes('<strong>2.5.5 :</strong> et ≈ <strong>3 100 tokens de fin sont perdus</strong>'), 'exemple 1 : 3 100 tokens rattachés à la 2.5.5');
+    const puce260 = exemple1.slice(exemple1.indexOf('<strong>IDE 2.6.0 :</strong>'));
+    assert.ok(!/\d\s?tokens/.test(puce260.slice(0, puce260.indexOf('</li>'))), 'exemple 1 : aucun nombre de tokens pour la 2.6.0');
     assert.ok(!antigravityHtml.includes('architecture hybride transparente'), 'la note MCP infondée doit être supprimée');
     assert.ok(!antigravityHtml.includes('src/components/**/*.tsx'), "l'exemple glob avec dossier (jamais déclenché) doit être supprimé");
     assert.ok(!antigravityHtml.includes('nom-pack:skill'), 'le préfixe de plugin infondé doit être supprimé');
