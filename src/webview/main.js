@@ -851,7 +851,7 @@
           w.title = '';
         }
       });
-      ['barPersonalizationSkillGlobal', 'barPersonalizationSkillLocal', 'barPersonalizationMcpGlobal', 'barPersonalizationMcpLocal'].forEach((id) => {
+      ['barPersonalizationSkillGlobal', 'barPersonalizationSkillLocal', 'barPersonalizationWorkflow', 'barPersonalizationMcpGlobal', 'barPersonalizationMcpLocal'].forEach((id) => {
         const el = targetDoc.getElementById(id);
         if (el) el.style.width = '0%';
       });
@@ -915,13 +915,17 @@
       else if (persAvailPct <= 25) track.classList.add('gauge-warning');
     });
 
-    const pctOf = (stat) => (stat ? Number(((stat.tokenCount / persBudget) * 100).toFixed(1)) : 0);
+    // Largeurs calculées sur le budget du profil, jamais sur stat.percentage (budget des règles)
+    const pctOfTokens = (tokens) => Number((((tokens || 0) / persBudget) * 100).toFixed(1));
+    const pctOf = (stat) => (stat ? pctOfTokens(stat.tokenCount) : 0);
     const setWidth = (id, pct) => {
       const el = targetDoc.getElementById(id);
       if (el) el.style.width = `${Math.max(0, pct)}%`;
     };
     setWidth('barPersonalizationSkillGlobal', pctOf(stats.skillsGlobal));
     setWidth('barPersonalizationSkillLocal', pctOf(stats.skillsLocal));
+    // Workflows Markdown, global et projet : nom et description seulement (sonde du 2026-11-02)
+    setWidth('barPersonalizationWorkflow', pctOfTokens(stats.personalizationWorkflowTokens));
     setWidth('barPersonalizationMcpGlobal', pctOf(stats.mcpGlobal));
     setWidth('barPersonalizationMcpLocal', pctOf(stats.mcpLocal));
   }
@@ -2246,23 +2250,39 @@
     if (truncatedBytes > 0) {
       const lost = (item.metadata.lostTokens || 0).toLocaleString('fr-FR');
       // Profil 2.6.0 : coupe à la dernière fin de ligne (observée) ou repli à l'octet (non vérifié)
+      // Une âme (globale, locale ou du catalogue) est mesurée fichier entier, sans retrait de frontmatter
+      // (measureAntigravitySoul) ; une règle, sur son corps sans frontmatter
+      const cutTarget = (item.type === 'soul' || item.metadata.isSoul)
+        ? { what: 'ce fichier', scope: '(fichier entier, inclusions @[label](path) comprises)' }
+        : { what: 'le corps de ce fichier', scope: '(frontmatter non compté, inclusions @[label](path) comprises)' };
       const cutRules = {
-        'line-end': `Antigravity coupe le corps de ce fichier à la dernière fin de ligne avant 24 000 octets (frontmatter non compté, inclusions @[label](path) comprises)`,
-        'byte-fallback': `Antigravity coupe le corps de ce fichier à 24 000 octets (frontmatter non compté, inclusions @[label](path) comprises)`,
+        'line-end': `Antigravity coupe ${cutTarget.what} à la dernière fin de ligne avant 24 000 octets ${cutTarget.scope}`,
+        'byte-fallback': `Antigravity coupe ${cutTarget.what} à 24 000 octets ${cutTarget.scope}`,
       };
       const cutNotes = {
         'line-end': `\n🧪 Règle de coupe observée dans Antigravity IDE 2.6.0 sur deux fichiers : r-tronque.md (5 960 octets coupés) et la règle 06 du banc d'essai (15 090 octets coupés, sonde du 2026-11-02).`,
         'byte-fallback': `\n❔ Non vérifié : aucune fin de ligne ne précède la limite. L'extension suppose une coupe à l'octet ; le comportement d'Antigravity IDE 2.6.0 dans ce cas n'a pas été observé.`,
       };
       const cutRule = item.metadata.truncationRule;
-      addBadge('pill-warn', '✂️ Tronquée',
-        `${cutRules[cutRule] || 'Antigravity coupe le corps de ce fichier à 24 000 octets (frontmatter non compté, inclusions @[label](path) comprises)'} : ${truncatedBytes.toLocaleString('fr-FR')} octets coupés, soit ≈ ${lost} tokens jamais lus par l'agent.\nLe coût affiché ne compte que la partie gardée.${cutNotes[cutRule] || ''}`);
+      // Catalogue NAS (règles et âme) : jamais chargé par Antigravity, la coupe n'existe qu'une fois déployé
+      const catalogueCutRules = {
+        'line-end': `Une fois déployé, Antigravity couperait ${cutTarget.what} à la dernière fin de ligne avant 24 000 octets ${cutTarget.scope}`,
+        'byte-fallback': `Une fois déployé, Antigravity couperait ${cutTarget.what} à 24 000 octets ${cutTarget.scope}`,
+      };
+      const truncatedLabel = `${truncatedBytes.toLocaleString('fr-FR')} octets coupés`;
+      const title = item.scope === 'nas'
+        ? `${catalogueCutRules[cutRule] || catalogueCutRules['byte-fallback']} : ${truncatedLabel}, soit ≈ ${lost} tokens que l'agent ne lirait pas.\nLe coût estimé ne compte que la partie gardée. Le catalogue lui-même n'est jamais chargé par Antigravity.${cutNotes[cutRule] || ''}`
+        : `${cutRules[cutRule] || cutRules['byte-fallback']} : ${truncatedLabel}, soit ≈ ${lost} tokens jamais lus par l'agent.\nLe coût affiché ne compte que la partie gardée.${cutNotes[cutRule] || ''}`;
+      addBadge('pill-warn', '✂️ Tronquée', title);
     } else if (item.metadata && item.metadata.warningSizeExceeded) {
       const warnBadge = targetDoc.createElement('span');
       warnBadge.className = 'item-badge-pill pill-warn';
       warnBadge.textContent = '⚠️ > 24 Ko';
       const bytes = typeof item.metadata.byteSize === 'number' ? ` (${item.metadata.byteSize.toLocaleString('fr-FR')} octets)` : '';
-      warnBadge.title = `Attention : ce fichier dépasse la limite de 24 000 octets d'Antigravity${bytes}, inclusions @[label](path) comprises. Antigravity le tronque.`;
+      // Catalogue NAS : jamais chargé ; une âme du catalogue en 2.5.5 est comptée en texte brut, sans inclusions
+      warnBadge.title = item.scope === 'nas'
+        ? `Attention : ce fichier du catalogue dépasse la limite de 24 000 octets d'Antigravity${bytes}. Une fois déployé, Antigravity le tronquerait.\nLe catalogue lui-même n'est jamais chargé par Antigravity.`
+        : `Attention : ce fichier dépasse la limite de 24 000 octets d'Antigravity${bytes}, inclusions @[label](path) comprises. Antigravity le tronque.`;
       badgesLine.appendChild(warnBadge);
     }
 

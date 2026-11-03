@@ -49,6 +49,8 @@ import {
 } from '../src/antigravity/behavior';
 import { countTokens, clearTokenCache } from '../src/utils/tokenizer';
 import { LocalScanner } from '../src/services/LocalScanner';
+import { NasScanner } from '../src/services/NasScanner';
+import { GlobalScanner } from '../src/services/GlobalScanner';
 import { DuplicateService } from '../src/services/DuplicateService';
 import { hasResourceWarning } from '../src/services/antigravityRuleItem';
 import { collectAnnexNotes } from '../src/services/antigravitySkillItem';
@@ -541,6 +543,9 @@ describe('Suite de Tests : alertes et coûts dynamiques d\'Antigravity (lot A3a)
     const tooltip = titles(card).find((t) => t.includes('ne l\'injecte jamais'))!;
     assert.match(tooltip, /mesuré, phase 2b/);
     assert.match(tooltip, /model_decision/);
+    // La conversion manuelle : une description qui nomme les fichiers visés, et le corps lu par l'agent
+    assert.match(tooltip, /• model_decision, avec une description qui nomme les fichiers visés/);
+    assert.match(tooltip, /lit le corps \(read_file\) quand il juge que le sujet correspond \(🧪 observé, sonde du 2026-11-02, Antigravity IDE 2\.6\.0\)/);
     assert.match(tooltip, /always_on/);
     assert.match(tooltip, /ne modifie pas la règle d'elle-même/);
     assert.ok(text.includes('0 tok au boot'));
@@ -718,5 +723,185 @@ describe('Suite de Tests : alertes et coûts dynamiques d\'Antigravity (lot A3a)
     assert.ok(nodes.personalizationUsedPercent.classList.contains('pct-critical'));
     assert.ok(nodes.personalizationProgressTrack.classList.contains('gauge-critical'));
     assert.ok(!nodes.personalizationProgressTrack.classList.contains('gauge-warning'));
+  });
+
+  // Lot L10, partie 6a, commit 1 : les largeurs de la seconde jauge suivent le budget du profil, jamais
+  // stat.percentage (calculé sur le budget des règles), et un cinquième segment porte les workflows Markdown
+  test('19. Seconde jauge (lot L10) : largeurs sur le budget du profil, segment des workflows, tout à 0 % une fois masquée', () => {
+    const nodes: Record<string, MockEl> = {};
+    const doc = mockDoc(nodes);
+    const segments = [
+      'barPersonalizationSkillGlobal',
+      'barPersonalizationSkillLocal',
+      'barPersonalizationWorkflow',
+      'barPersonalizationMcpGlobal',
+      'barPersonalizationMcpLocal',
+    ];
+    const widths = () => segments.map((id) => nodes[id].style.width);
+    const sumOfWidths = () => segments.reduce((acc, id) => acc + parseFloat(nodes[id].style.width), 0);
+    // percentage volontairement faux : un calcul fondé sur stat.percentage donnerait 99 % ou 50 %
+    const stat = (type: string, scope: string, tokenCount: number, percentage: number) => ({
+      type, scope, activeCount: 1, totalCount: 1, charCount: 0, tokenCount, percentage, directoryPath: '/virtuel',
+    });
+    const stats260 = {
+      budgetExcludesPersonalization: true,
+      personalizationBudgetTotal: 20000,
+      personalizationUsedTokensTotal: 3000,
+      personalizationAvailablePercentage: 85,
+      personalizationWorkflowTokens: 300,
+      skillsGlobal: stat('skill', 'global', 2000, 99),
+      skillsLocal: stat('skill', 'local', 500, 50),
+      mcpGlobal: stat('mcp', 'global', 100, 99),
+      mcpLocal: stat('mcp', 'local', 100, 50),
+    };
+
+    // 1. Profil 2.6.0, budget de 20 000 : tokenCount / budget, workflows compris ; la somme égale le pourcentage utilisé
+    main.renderPersonalizationGauge({ workspace: { tool: 'antigravity' }, stats: stats260 }, doc);
+    assert.deepStrictEqual(widths(), ['10%', '2.5%', '1.5%', '0.5%', '0.5%']);
+    assert.strictEqual(nodes.personalizationUsedPercent.textContent, '15%');
+    assert.ok(Math.abs(sumOfWidths() - 15) < 0.1, 'Les cinq segments somment au pourcentage utilisé');
+
+    // 2. Budget fictif de 10 000 : les largeurs suivent personalizationBudgetTotal
+    main.renderPersonalizationGauge({ workspace: { tool: 'antigravity' }, stats: { ...stats260, personalizationBudgetTotal: 10000 } }, doc);
+    assert.deepStrictEqual(widths(), ['20%', '5%', '3%', '1%', '1%']);
+    assert.strictEqual(nodes.personalizationUsedPercent.textContent, '30%');
+    assert.ok(Math.abs(sumOfWidths() - 30) < 0.1);
+
+    // 3. Sans personalizationWorkflowTokens : segment des workflows à 0 %
+    const { personalizationWorkflowTokens: _ignore, ...sansWorkflows } = stats260;
+    main.renderPersonalizationGauge({ workspace: { tool: 'antigravity' }, stats: { ...sansWorkflows, personalizationUsedTokensTotal: 2700 } }, doc);
+    assert.strictEqual(nodes.barPersonalizationWorkflow.style.width, '0%');
+
+    // 4. Profil 2.5.5 (pas de budget) et Claude Code : jauge masquée, les cinq segments remis à 0 %
+    main.renderPersonalizationGauge({ workspace: { tool: 'antigravity' }, stats: stats260 }, doc);
+    assert.strictEqual(nodes.barPersonalizationWorkflow.style.width, '1.5%');
+    const { personalizationBudgetTotal: _budget, ...stats255 } = stats260;
+    main.renderPersonalizationGauge({ workspace: { tool: 'antigravity' }, stats: stats255 }, doc);
+    assert.strictEqual(nodes.personalizationGaugeWrap.style.display, 'none');
+    assert.deepStrictEqual(widths(), ['0%', '0%', '0%', '0%', '0%'], '2.5.5 : segments remis à 0 %');
+    main.renderPersonalizationGauge({ workspace: { tool: 'antigravity' }, stats: stats260 }, doc);
+    main.renderPersonalizationGauge({ workspace: { tool: 'claude-code' }, stats: stats260 }, doc);
+    assert.strictEqual(nodes.personalizationGaugeWrap.style.display, 'none');
+    assert.deepStrictEqual(widths(), ['0%', '0%', '0%', '0%', '0%'], 'Claude Code : segments remis à 0 %');
+
+    // 5. Les deux pages déclarent le segment, entre les skills et les MCP, avec sa classe de couleur
+    const webview = path.resolve(__dirname, '../../src/webview');
+    for (const page of ['dashboard.html', 'sidebar.html']) {
+      const html = fs.readFileSync(path.join(webview, page), 'utf8');
+      const ids = [...html.matchAll(/id="(barPersonalization[A-Za-z]+)"/g)].map((m) => m[1]);
+      assert.deepStrictEqual(ids, segments, `${page} : cinq segments dans l'ordre`);
+      assert.match(html, /id="barPersonalizationWorkflow" class="segment segment-workflow"/);
+    }
+    assert.match(fs.readFileSync(path.join(webview, 'styles.css'), 'utf8'), /\.segment-workflow \{/);
+  });
+
+  // Lot L10, partie 6a, commit 1 : une carte du catalogue n'est jamais chargée ; ses badges « ✂️ Tronquée »
+  // et « ⚠️ > 24 Ko » parlent au conditionnel du déploiement. Une âme tronquée (globale, locale ou du catalogue)
+  // est mesurée fichier entier ; les règles globales et locales gardent leur texte exact.
+  test('20. Badges « ✂️ Tronquée » et « ⚠️ > 24 Ko » (lot L10) : conditionnel du déploiement pour le catalogue, âmes en fichier entier, règles locales inchangées', async () => {
+    const base = path.join(tempBaseDir, 'l10-catalogue-tronque');
+    const nasDir = path.join(base, 'catalogue');
+    const longBody = bodyOf(300, (i) => `${i} ${'x'.repeat(95)}`);
+    const longRule = `---\ntrigger: always_on\ndescription: Longue\n---\n${longBody}\n`;
+    await writeFile(path.join(nasDir, 'rules', 'longue.md'), longRule);
+    await writeFile(path.join(base, 'backup_cerveau_ia', '.gemini', 'GEMINI.md'), `${longBody}\n`);
+    const projet = path.join(base, 'projet');
+    await writeFile(path.join(projet, '.agents', 'rules', 'longue.md'), longRule);
+    await writeFile(path.join(projet, 'GEMINI.md'), `${longBody}\n`);
+    const globalConfigDir = path.join(base, 'global-home', '.gemini', 'config');
+    await writeFile(path.join(base, 'global-home', '.gemini', 'GEMINI.md'), `${longBody}\n`);
+
+    const pillOf = (item: ResourceItem) => pillsOf(main.createItemCard(item, true, mockDoc())).find((p) => p.text === '✂️ Tronquée');
+    const fmt = (n?: number) => (n || 0).toLocaleString('fr-FR');
+    const scope = '(frontmatter non compté, inclusions @[label](path) comprises)';
+    const catalogueTail = 'que l\'agent ne lirait pas.\nLe coût estimé ne compte que la partie gardée. Le catalogue lui-même n\'est jamais chargé par Antigravity.';
+    const lineEndNote = '\n🧪 Règle de coupe observée dans Antigravity IDE 2.6.0 sur deux fichiers : r-tronque.md (5 960 octets coupés) et la règle 06 du banc d\'essai (15 090 octets coupés, sonde du 2026-11-02).';
+    const byteNote = '\n❔ Non vérifié : aucune fin de ligne ne précède la limite. L\'extension suppose une coupe à l\'octet ; le comportement d\'Antigravity IDE 2.6.0 dans ce cas n\'a pas été observé.';
+
+    // 1. Profil 2.5.5 : règle du catalogue coupée à l'octet, au conditionnel ; la règle locale garde son texte exact
+    const nas255 = (await NasScanner.scan(nasDir, 'antigravity', ANTIGRAVITY_PROFILES['2.5.5'])).items.find((i) => i.id === 'longue')!;
+    assert.strictEqual(nas255.scope, 'nas');
+    assert.ok((nas255.metadata?.truncatedBytes ?? 0) > 0 && nas255.metadata?.truncationRule === undefined);
+    assert.strictEqual(
+      pillOf(nas255)!.title,
+      `Une fois déployé, Antigravity couperait le corps de ce fichier à 24 000 octets ${scope} : ${fmt(nas255.metadata?.truncatedBytes)} octets coupés, soit ≈ ${fmt(nas255.metadata?.lostTokens)} tokens ${catalogueTail}`
+    );
+    const local255 = (await LocalScanner.scan(workspaceFor(projet), ANTIGRAVITY_PROFILES['2.5.5'])).items.find((i) => i.id === 'longue')!;
+    assert.strictEqual(
+      pillOf(local255)!.title,
+      `Antigravity coupe le corps de ce fichier à 24 000 octets ${scope} : ${fmt(local255.metadata?.truncatedBytes)} octets coupés, soit ≈ ${fmt(local255.metadata?.lostTokens)} tokens jamais lus par l'agent.\nLe coût affiché ne compte que la partie gardée.`
+    );
+
+    // 2. Profil 2.6.0 : règle et âme du catalogue coupées sur fin de ligne, au conditionnel, avec la note de coupe.
+    // L'âme est mesurée fichier entier (measureAntigravitySoul) : pas de « frontmatter non compté »
+    const scan260 = await NasScanner.scan(nasDir, 'antigravity', ANTIGRAVITY_PROFILES['2.6.0']);
+    const nasRule260 = scan260.items.find((i) => i.id === 'longue')!;
+    const nasSoul260 = scan260.items.find((i) => i.type === 'soul' && i.id === 'GEMINI.md')!;
+    const expected260 = [
+      [nasRule260, `Une fois déployé, Antigravity couperait le corps de ce fichier à la dernière fin de ligne avant 24 000 octets ${scope}`],
+      [nasSoul260, 'Une fois déployé, Antigravity couperait ce fichier à la dernière fin de ligne avant 24 000 octets (fichier entier, inclusions @[label](path) comprises)'],
+    ] as const;
+    for (const [item, head] of expected260) {
+      assert.ok(item, 'Carte du catalogue présente');
+      assert.strictEqual(item.metadata?.truncationRule, 'line-end', `${item.type} : coupe sur fin de ligne`);
+      const title = pillOf(item)!.title;
+      assert.strictEqual(
+        title,
+        `${head} : ${fmt(item.metadata?.truncatedBytes)} octets coupés, soit ≈ ${fmt(item.metadata?.lostTokens)} tokens ${catalogueTail}${lineEndNote}`
+      );
+      assert.doesNotMatch(title, /jamais lus par l'agent/);
+    }
+    assert.doesNotMatch(pillOf(nasSoul260)!.title, /frontmatter non compté/, 'Âme du catalogue : fichier entier');
+    const scanLocal260 = await LocalScanner.scan(workspaceFor(projet), ANTIGRAVITY_PROFILES['2.6.0']);
+    const local260 = scanLocal260.items.find((i) => i.id === 'longue')!;
+    assert.strictEqual(
+      pillOf(local260)!.title,
+      `Antigravity coupe le corps de ce fichier à la dernière fin de ligne avant 24 000 octets ${scope} : ${fmt(local260.metadata?.truncatedBytes)} octets coupés, soit ≈ ${fmt(local260.metadata?.lostTokens)} tokens jamais lus par l'agent.\nLe coût affiché ne compte que la partie gardée.${lineEndNote}`
+    );
+    // Âmes locale et globale tronquées : mesurées fichier entier (measureAntigravitySoul), comme l'âme du catalogue ;
+    // la règle locale ci-dessus garde « le corps de ce fichier » et « frontmatter non compté »
+    const localSoul260 = scanLocal260.items.find((i) => i.type === 'soul')!;
+    const globalSoul260 = (await GlobalScanner.scan(globalConfigDir, 'antigravity', ANTIGRAVITY_PROFILES['2.6.0'])).items
+      .find((i) => i.type === 'soul' && i.id === 'GEMINI.md')!;
+    for (const [soul, portee] of [[localSoul260, 'locale'], [globalSoul260, 'globale']] as const) {
+      assert.ok(soul && (soul.metadata?.truncatedBytes ?? 0) > 0, `Âme ${portee} tronquée présente`);
+      assert.strictEqual(soul.metadata?.truncationRule, 'line-end');
+      const title = pillOf(soul)!.title;
+      assert.strictEqual(
+        title,
+        `Antigravity coupe ce fichier à la dernière fin de ligne avant 24 000 octets (fichier entier, inclusions @[label](path) comprises) : ${fmt(soul.metadata?.truncatedBytes)} octets coupés, soit ≈ ${fmt(soul.metadata?.lostTokens)} tokens jamais lus par l'agent.\nLe coût affiché ne compte que la partie gardée.${lineEndNote}`,
+        `Âme ${portee} : fichier entier`
+      );
+      assert.doesNotMatch(title, /frontmatter non compté/);
+    }
+    assert.match(pillOf(local260)!.title, /^Antigravity coupe le corps de ce fichier .*\(frontmatter non compté, /, 'Règle locale : texte inchangé');
+
+    // 2b. Profil 2.5.5 : l'âme du catalogue de plus de 24 000 caractères n'est pas mesurée (texte brut) ;
+    // son badge « ⚠️ > 24 Ko » parle au conditionnel du déploiement
+    const sizePillOf = (item: ResourceItem) => pillsOf(main.createItemCard(item, true, mockDoc())).find((p) => p.text === '⚠️ > 24 Ko');
+    const nasSoul255 = (await NasScanner.scan(nasDir, 'antigravity', ANTIGRAVITY_PROFILES['2.5.5'])).items.find((i) => i.type === 'soul' && i.id === 'GEMINI.md')!;
+    assert.strictEqual(nasSoul255.metadata?.warningSizeExceeded, true);
+    assert.strictEqual(nasSoul255.metadata?.truncatedBytes, undefined, '2.5.5 : âme du catalogue non mesurée');
+    const nasSizeTitle = sizePillOf(nasSoul255)!.title;
+    assert.strictEqual(
+      nasSizeTitle,
+      'Attention : ce fichier du catalogue dépasse la limite de 24 000 octets d\'Antigravity. Une fois déployé, Antigravity le tronquerait.\nLe catalogue lui-même n\'est jamais chargé par Antigravity.'
+    );
+    assert.doesNotMatch(nasSizeTitle, /Antigravity le tronque\./);
+    // Témoin : une règle locale ignorée (sans frontmatter) de plus de 24 000 octets garde son texte exact
+    await writeFile(path.join(projet, '.agents', 'rules', 'sans-trigger.md'), `${longBody}\n`);
+    const ignoree = (await LocalScanner.scan(workspaceFor(projet), ANTIGRAVITY_PROFILES['2.5.5'])).items.find((i) => i.id === 'sans-trigger')!;
+    assert.ok(typeof ignoree.metadata?.byteSize === 'number', 'Taille en octets connue');
+    assert.strictEqual(
+      sizePillOf(ignoree)!.title,
+      `Attention : ce fichier dépasse la limite de 24 000 octets d'Antigravity (${fmt(ignoree.metadata?.byteSize)} octets), inclusions @[label](path) comprises. Antigravity le tronque.`
+    );
+
+    // 3. Repli à l'octet (byte-fallback) : catalogue au conditionnel, avec la note « non vérifié »
+    const nasFallback = { ...nas255, metadata: { ...nas255.metadata, truncationRule: 'byte-fallback' as const } };
+    assert.strictEqual(
+      pillOf(nasFallback)!.title,
+      `Une fois déployé, Antigravity couperait le corps de ce fichier à 24 000 octets ${scope} : ${fmt(nas255.metadata?.truncatedBytes)} octets coupés, soit ≈ ${fmt(nas255.metadata?.lostTokens)} tokens ${catalogueTail}${byteNote}`
+    );
   });
 });

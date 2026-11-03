@@ -12,6 +12,7 @@ Le format s'inspire de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) 
 ### Modifications
 
 - Avec le profil Antigravity IDE 2.6.0, l'aide-mémoire et l'infobulle des skills `wf-*` ne disent plus que les workflows sont retirés : l'IDE liste encore ceux de `.agents/workflows/` et de `~/.gemini/config/global_workflows/` (observé). La coupe sur fin de ligne est donnée comme observée, et l'import des `paths:` précise que l'agent lit le corps d'une règle `model_decision` quand le sujet correspond (observé). Rien ne change avec le profil 2.5.5.
+- Les badges « ✂️ Tronquée » et « ⚠️ > 24 Ko » d'une carte du catalogue NAS (règle ou âme `GEMINI.md`) ne disent plus « jamais lus par l'agent » ni « Antigravity le tronque » : le catalogue n'est jamais chargé, et les badges décrivent la coupe qu'Antigravity ferait une fois le fichier déployé. Le badge « ✂️ Tronquée » d'une âme, globale, locale ou du catalogue, dit « fichier entier » au lieu de « frontmatter non compté » : une âme est mesurée sans retrait de frontmatter. Les règles globales et locales gardent leur texte. Avec le profil Antigravity IDE 2.6.0, la barre de la seconde jauge « Other Customizations » a un segment pour les workflows Markdown (nom et description) : ses segments somment désormais au pourcentage affiché.
 
 ### Développement
 

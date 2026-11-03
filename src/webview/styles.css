@@ -368,6 +368,11 @@ body {
   background: repeating-linear-gradient(45deg, #a855f7, #a855f7 4px, #7e22ce 4px, #7e22ce 8px);
 }
 
+/* Workflows Markdown (seconde jauge, IDE 2.6.0) : un seul segment, global et projet cumulés, couleur des cartes de workflow */
+.segment-workflow {
+  background-color: #ca8a04;
+}
+
 /* Légende détaillée */
 .token-breakdown-list {
   display: flex;
