@@ -151,7 +151,7 @@ describe('Suite de Tests : workflows Markdown d\'Antigravity IDE 2.6.0 (lot LW-2
     const pill = findAll(main.createItemCard(item, true, mockDoc()), 'item-badge-pill').find((p) => p.text === '✂️ Tronquée')!;
     assert.strictEqual(
       pill.title,
-      `Antigravity coupe le corps de ce fichier à 24 000 octets (frontmatter non compté, inclusions @[label](path) comprises) : ${truncated.toLocaleString('fr-FR')} octets coupés, soit ≈ ${lost.toLocaleString('fr-FR')} tokens jamais lus par l'agent.\nLe coût affiché ne compte que la partie gardée.`
+      `Antigravity coupe le corps de ce fichier à 24 000 octets (frontmatter non compté, inclusions @[label](path) comprises (documentation)) : ${truncated.toLocaleString('fr-FR')} octets coupés, soit ≈ ${lost.toLocaleString('fr-FR')} tokens jamais lus par l'agent.\nLe coût affiché ne compte que la partie gardée.`
     );
   });
 
@@ -370,6 +370,10 @@ describe('Suite de Tests : workflows Markdown d\'Antigravity IDE 2.6.0 (lot LW-2
     // Workflow global : injection déduite
     assert.match(pills(global).find((p) => p.text === '⚡ Sur invocation')!.title,
       /serait injecté en entier quand on l'invoque par \/deploy : déduit du mécanisme observé pour \.agents\/workflows\//);
+    // Lot L10, 6b : 🧪 pour la présence dans « / » (observée), 🔎 pour l'injection du corps (déduite)
+    assert.match(main.describeMarkdownWorkflowCost(global),
+      /🧪 Il est listé dans « \/ » \(observé\)\. 🔎 Son corps \(\d+ tokens, sans frontmatter\) serait injecté en entier quand on l'invoque par \/deploy : déduit du mécanisme observé pour \.agents\/workflows\/ \(sonde du 2026-11-02, Antigravity IDE 2\.6\.0\)\./);
+    assert.doesNotMatch(main.describeMarkdownWorkflowCost(projet), /🔎/, 'Workflow du projet : injection observée, sans marque de déduction');
 
     // Variante : badge « ❔ Non vérifié », comptée par prudence
     assert.match(pills(variante).find((p) => p.text === '❔ Non vérifié')!.title, /compté par prudence dans le budget « Other Customizations »/);

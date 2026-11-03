@@ -433,9 +433,9 @@
       <ul class="cheat-sheet-list">
         <li><span class="cs-icon">📏</span><span><strong>Tailles :</strong> Âme &amp; règles permanentes &lt; 200 li. • Règles <code>glob</code> &lt; 30 li. • Skills &lt; 500 li. • Plafond 24 Ko par fichier</span></li>
         <li><span class="cs-icon">⚡</span><span><strong>Âme (GEMINI.md / AGENTS.md) :</strong> Une seule copie, présente en permanence • Dossiers parents chargés, sous-dossiers jamais</span></li>
-        <li><span class="cs-icon">🎯</span><span><strong>Règles :</strong> <code>trigger</code> obligatoire • Budget de 20 000 tokens partagé avec l'Âme • <code>glob</code> : nom de fichier seul, réinjectée à chaque lecture ou modification</span></li>
+        ${antigravityRulesCheatSheetItem(currentAntigravityVersion())}
         <li><span class="cs-icon">🧠</span><span><strong>Skills :</strong> Une ligne par skill au démarrage (nom, chemin, description) • Corps lu à la demande</span></li>
-        <li><span class="cs-icon">🔌</span><span><strong>MCP &amp; Plugins :</strong> Noms des outils MCP seuls au démarrage • Skills de plugin listés deux fois, sans préfixe</span></li>
+        ${antigravityMcpPluginsCheatSheetItem(currentAntigravityVersion())}
         ${antigravityWorkflowsCheatSheetItem(currentAntigravityVersion())}
         <li><span class="cs-icon">🏛️</span><span><strong>Hiérarchie :</strong> N0 (Global) → N1 (Projet) → N2 (PC) → N3 (NAS)</span></li>
       </ul>
@@ -825,7 +825,7 @@
       `🗂️ Workflows Markdown : ${(workflowTokens || 0).toLocaleString('fr-FR')} tokens, pour leur nom et leur description (🧪 le panneau Settings les compte sans leur corps, sonde du 2026-11-02, Antigravity IDE 2.6.0). Ceux de .agent/, _agent/ et _agents/ sont comptés par prudence (❔ non vérifié).\n` +
       '🧪 Plafond de 20 000 tokens observé dans le panneau Settings d\'Antigravity IDE 2.6.0 (2026-10-28), distinct du budget de 20 000 tokens des règles.\n' +
       '📏 Estimation de l\'extension (tokeniseur o200k_base) : le panneau de l\'IDE peut afficher un autre chiffre.\n' +
-      '🧩 Les skills intégrés et les skills présents à la fois en global et dans le projet sont comptés par prudence ; le panneau de l\'IDE semble les exclure (déduit, non vérifié).\n' +
+      '🧩 Les skills intégrés sont comptés par prudence : le panneau de l\'IDE ne les affiche pas (🧪 observé, sonde du 2026-11-02, Antigravity IDE 2.6.0). Les skills présents à la fois en global et dans le projet sont comptés deux fois : leur traitement par le panneau n\'est pas vérifié (❔).\n' +
       '❔ Au-delà du budget, l\'IDE annonce que les grosses personnalisations sont exclues : annoncé par l\'IDE, non testé.'
     );
   }
@@ -1048,6 +1048,30 @@
       : '<li><span class="cs-icon">⏹️</span><span><strong>Workflows :</strong> Hors service depuis le 19 octobre 2026 • Migrer vers des skills • Les <code>wf-*</code> de l\'extension sont déjà des skills</span></li>';
   }
 
+  /**
+   * Ligne « Règles » de l'aide-mémoire Antigravity, selon la version du profil (texte statique ; 2.6.0 sans état).
+   * Antigravity IDE 2.6.0 n'injecte jamais une règle glob (phase 2b, dix points d'entrée) ; le profil 2.5.5 garde
+   * le texte du glob réinjecté, à l'identique.
+   */
+  function antigravityRulesCheatSheetItem(version) {
+    const prefix = '<li><span class="cs-icon">🎯</span><span><strong>Règles :</strong> <code>trigger</code> obligatoire • Budget de 20 000 tokens partagé avec l\'Âme • ';
+    return usesAntigravity260Texts(version)
+      ? `${prefix}<code>glob</code> : sans effet dans l'IDE 2.6.0 (observé), préférez <code>model_decision</code></span></li>`
+      : `${prefix}<code>glob</code> : nom de fichier seul, réinjectée à chaque lecture ou modification</span></li>`;
+  }
+
+  /**
+   * Ligne « MCP & Plugins » de l'aide-mémoire Antigravity, selon la version du profil (texte statique ; 2.6.0 sans
+   * état). Antigravity IDE 2.6.0 liste un skill de plugin une seule fois, sans section (phases 2b et 2c) ; le profil
+   * 2.5.5 garde les deux copies, à l'identique.
+   */
+  function antigravityMcpPluginsCheatSheetItem(version) {
+    const prefix = '<li><span class="cs-icon">🔌</span><span><strong>MCP &amp; Plugins :</strong> Noms des outils MCP seuls au démarrage • ';
+    return usesAntigravity260Texts(version)
+      ? `${prefix}Skills de plugin listés une fois, sans préfixe ni section (IDE 2.6.0, observé)</span></li>`
+      : `${prefix}Skills de plugin listés deux fois, sans préfixe</span></li>`;
+  }
+
   /** Workflow Markdown d'Antigravity IDE 2.6.0 (src/services/antigravityWorkflowItem.ts), distinct des skills wf-*. */
   function isMarkdownWorkflow(item) {
     return !!(item && item.metadata && item.metadata.markdownWorkflow);
@@ -1074,7 +1098,7 @@
     const invocation = meta.markdownWorkflowSource === 'workspace'
       ? `🧪 Son corps (${fmt(item.tokenCount)} tokens, sans frontmatter) est injecté en entier quand on l'invoque par /${item.name}, et seulement alors (observé, sonde du 2026-11-02, Antigravity IDE 2.6.0).`
       : meta.markdownWorkflowSource === 'global'
-        ? `🧪 Il est listé dans « / » (observé). Son corps (${fmt(item.tokenCount)} tokens, sans frontmatter) serait injecté en entier quand on l'invoque par /${item.name} : déduit du mécanisme observé pour .agents/workflows/ (sonde du 2026-11-02, Antigravity IDE 2.6.0).`
+        ? `🧪 Il est listé dans « / » (observé). 🔎 Son corps (${fmt(item.tokenCount)} tokens, sans frontmatter) serait injecté en entier quand on l'invoque par /${item.name} : déduit du mécanisme observé pour .agents/workflows/ (sonde du 2026-11-02, Antigravity IDE 2.6.0).`
         : `❔ Non vérifié : seule la lecture de .agents/workflows/ a été observée (sonde du 2026-11-02, Antigravity IDE 2.6.0). S'il est lu, son corps (${fmt(item.tokenCount)} tokens, sans frontmatter) serait injecté à l'invocation /${item.name}.`;
     return (
       'Workflow Markdown :\n' +
@@ -1291,14 +1315,20 @@
     return session || { reads: 15, writes: 5 };
   }
 
-  /** Lignes d'infobulle propres à Antigravity : en-têtes injectés, troncatures, détail des serveurs MCP. */
-  function antigravityStatNotes(stat) {
+  /**
+   * Lignes d'infobulle propres à Antigravity : en-têtes injectés, troncatures, détail des serveurs MCP.
+   * `version` est celle du profil actif (vide avant le premier état : texte de la 2.6.0).
+   */
+  function antigravityStatNotes(stat, version) {
     const lines = [];
     const fmt = (n) => (n || 0).toLocaleString('fr-FR');
     if (stat.overheadTokens > 0) {
       lines.push(stat.type === 'rule'
         ? `• En-tête de l'index des règles conditionnelles : ${fmt(stat.overheadTokens)} tok (injecté une seule fois)`
-        : `• En-têtes injectés : ${fmt(stat.overheadTokens)} tok (« Available skills: » et sections de plugin)`);
+        : usesAntigravity260Texts(version)
+          // IDE 2.6.0 : un skill de plugin est listé une fois, sans section de plugin (phases 2b et 2c)
+          ? `• En-tête injecté : ${fmt(stat.overheadTokens)} tok (« Available skills: » ; aucune section de plugin dans l'IDE 2.6.0, observé)`
+          : `• En-têtes injectés : ${fmt(stat.overheadTokens)} tok (« Available skills: » et sections de plugin)`);
     }
     if (stat.truncatedCount > 0) {
       lines.push(`✂️ ${stat.truncatedCount} fichier(s) tronqué(s) à 24 000 octets : ≈ ${fmt(stat.lostTokens)} tokens jamais lus par l'agent`);
@@ -1316,7 +1346,10 @@
           lines.push(`• ${server.name} : ${fmt(server.tokenCount)} tok (${server.toolCount} outil(s))`);
         }
       }
-      lines.push('🧪 Noms d\'outils lus dans le cache d\'Antigravity (observé, non documenté). Le coût réel dépend de la connexion du serveur : sans connexion, ses outils ne sont pas listés.');
+      // Correspondance entre le cache et les outils affichés : observée en 2.5.5 seulement (phase-3-1, Q4 point 11)
+      lines.push(usesAntigravity260Texts(version)
+        ? '🧪 Noms d\'outils lus dans le cache d\'Antigravity (~/.gemini/antigravity/mcp/) : la correspondance avec les outils affichés a été observée dans Antigravity IDE 2.5.5, et n\'est pas revérifiée dans l\'IDE 2.6.0 (❔). Non documenté. Le coût réel dépend de la connexion du serveur : sans connexion, ses outils ne sont pas listés.'
+        : '🧪 Noms d\'outils lus dans le cache d\'Antigravity (observé dans Antigravity IDE 2.5.5, non documenté). Le coût réel dépend de la connexion du serveur : sans connexion, ses outils ne sont pas listés.');
     }
     return lines.length > 0 ? `\n${lines.join('\n')}` : '';
   }
@@ -1368,7 +1401,7 @@
       const isClaude = activeState?.workspace?.tool === 'claude-code';
       const warningNote = ((stat.warningCount && stat.warningCount > 0)
         ? `\n\n⚠️ ${stat.warningCount} ressource(s) dépassent les recommandations techniques dans cette catégorie (voir badges sur les cartes).`
-        : '') + (isClaude ? '' : antigravityStatNotes(stat));
+        : '') + (isClaude ? '' : antigravityStatNotes(stat, activeState?.antigravityBehavior?.version || ''));
       // Antigravity : model_decision coûte son entrée d'index, glob et manual rien au démarrage
       const conditionalBootNote = isClaude
         ? '~20 tok au boot'
@@ -2300,8 +2333,8 @@
       // Une âme (globale, locale ou du catalogue) est mesurée fichier entier, sans retrait de frontmatter
       // (measureAntigravitySoul) ; une règle, sur son corps sans frontmatter
       const cutTarget = (item.type === 'soul' || item.metadata.isSoul)
-        ? { what: 'ce fichier', scope: '(fichier entier, inclusions @[label](path) comprises)' }
-        : { what: 'le corps de ce fichier', scope: '(frontmatter non compté, inclusions @[label](path) comprises)' };
+        ? { what: 'ce fichier', scope: '(fichier entier, inclusions @[label](path) comprises (documentation))' }
+        : { what: 'le corps de ce fichier', scope: '(frontmatter non compté, inclusions @[label](path) comprises (documentation))' };
       const cutRules = {
         'line-end': `Antigravity coupe ${cutTarget.what} à la dernière fin de ligne avant 24 000 octets ${cutTarget.scope}`,
         'byte-fallback': `Antigravity coupe ${cutTarget.what} à 24 000 octets ${cutTarget.scope}`,
@@ -2310,6 +2343,10 @@
         'line-end': `\n🧪 Règle de coupe observée dans Antigravity IDE 2.6.0 sur deux fichiers : r-tronque.md (5 960 octets coupés) et la règle 06 du banc d'essai (15 090 octets coupés, sonde du 2026-11-02).`,
         'byte-fallback': `\n❔ Non vérifié : aucune fin de ligne ne précède la limite. L'extension suppose une coupe à l'octet ; le comportement d'Antigravity IDE 2.6.0 dans ce cas n'a pas été observé.`,
       };
+      // Âme : aucune âme tronquée n'a été observée, la coupe en est déduite (règles r-tronque.md et 06 seulement)
+      if (item.type === 'soul' || item.metadata.isSoul) {
+        cutNotes['line-end'] += '\n🔎 Pour une âme, cette coupe est déduite de celle de ces deux règles : aucune âme tronquée n\'a été observée.';
+      }
       const cutRule = item.metadata.truncationRule;
       // Catalogue NAS (règles et âme) : jamais chargé par Antigravity, la coupe n'existe qu'une fois déployé
       const catalogueCutRules = {
@@ -2329,7 +2366,7 @@
       // Catalogue NAS : jamais chargé ; une âme du catalogue en 2.5.5 est comptée en texte brut, sans inclusions
       warnBadge.title = item.scope === 'nas'
         ? `Attention : ce fichier du catalogue dépasse la limite de 24 000 octets d'Antigravity${bytes}. Une fois déployé, Antigravity le tronquerait.\nLe catalogue lui-même n'est jamais chargé par Antigravity.`
-        : `Attention : ce fichier dépasse la limite de 24 000 octets d'Antigravity${bytes}, inclusions @[label](path) comprises. Antigravity le tronque.`;
+        : `Attention : ce fichier dépasse la limite de 24 000 octets d'Antigravity${bytes}, inclusions @[label](path) comprises (documentation). Antigravity le tronque.`;
       badgesLine.appendChild(warnBadge);
     }
 
@@ -3112,6 +3149,8 @@
       formatPersonalizationBudgetTooltip,
       wfSkillNote,
       antigravityWorkflowsCheatSheetItem,
+      antigravityRulesCheatSheetItem,
+      antigravityMcpPluginsCheatSheetItem,
       antigravityProfileLabel,
       renderAntigravityProfilePill,
       describeMarkdownWorkflowCost,

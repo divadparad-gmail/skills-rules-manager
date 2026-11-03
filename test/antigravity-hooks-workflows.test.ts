@@ -319,7 +319,7 @@ describe('Suite de Tests : hooks et workflows d\'Antigravity (lot A3b)', () => {
   // Sonde du 2026-11-02, Antigravity IDE 2.6.0 : les workflows Markdown sont encore listés dans « / ».
   // Le profil 2.5.5 garde le texte de la documentation, à l'identique ; l'état encore inconnu prend le
   // texte de la 2.6.0, profil du défaut « auto » quand il détecte la 2.6.0 ou se replie (lot L10, D-2).
-  test('10. Textes selon la version : infobulle des skills wf-* et ligne Workflows de l\'aide-mémoire', () => {
+  test('10. Textes selon la version : infobulle des skills wf-* et lignes Workflows, Règles et MCP & Plugins de l\'aide-mémoire', () => {
     const v255 = 'Antigravity IDE 2.5.5';
     const v260 = 'Antigravity IDE 2.6.0';
     const note255 = 'Skill dont le nom commence par wf- : Antigravity le liste comme un skill, et il reste compté. Ce n\'est pas un workflow, format retiré le 19 octobre 2026.';
@@ -338,5 +338,20 @@ describe('Suite de Tests : hooks et workflows d\'Antigravity (lot A3b)', () => {
     assert.match(ligne260, /encore listés dans « \/ » par l'IDE 2\.6\.0 \(observé\)/);
     assert.match(ligne260, /<code>\.agents\/workflows\/<\/code> et <code>~\/\.gemini\/config\/global_workflows\/<\/code>/);
     assert.match(ligne260, /Corps injecté à l'invocation seulement \(observé pour <code>\.agents\/workflows\/<\/code>, déduit pour le global\)/);
+
+    // Lot L10, 6b : lignes « Règles » et « MCP & Plugins » (glob sans effet, skill de plugin listé une fois en 2.6.0)
+    const regles255 = '<li><span class="cs-icon">🎯</span><span><strong>Règles :</strong> <code>trigger</code> obligatoire • Budget de 20 000 tokens partagé avec l\'Âme • <code>glob</code> : nom de fichier seul, réinjectée à chaque lecture ou modification</span></li>';
+    assert.strictEqual(main.antigravityRulesCheatSheetItem(v255), regles255, '2.5.5 : ligne Règles inchangée');
+    const regles260 = '<li><span class="cs-icon">🎯</span><span><strong>Règles :</strong> <code>trigger</code> obligatoire • Budget de 20 000 tokens partagé avec l\'Âme • <code>glob</code> : sans effet dans l\'IDE 2.6.0 (observé), préférez <code>model_decision</code></span></li>';
+    assert.strictEqual(main.antigravityRulesCheatSheetItem(v260), regles260, '2.6.0 : glob sans effet');
+    assert.strictEqual(main.antigravityRulesCheatSheetItem(''), regles260, 'Sans état : ligne Règles de la 2.6.0');
+    assert.doesNotMatch(regles260, /réinjectée/);
+
+    const plugins255 = '<li><span class="cs-icon">🔌</span><span><strong>MCP &amp; Plugins :</strong> Noms des outils MCP seuls au démarrage • Skills de plugin listés deux fois, sans préfixe</span></li>';
+    assert.strictEqual(main.antigravityMcpPluginsCheatSheetItem(v255), plugins255, '2.5.5 : ligne MCP & Plugins inchangée');
+    const plugins260 = '<li><span class="cs-icon">🔌</span><span><strong>MCP &amp; Plugins :</strong> Noms des outils MCP seuls au démarrage • Skills de plugin listés une fois, sans préfixe ni section (IDE 2.6.0, observé)</span></li>';
+    assert.strictEqual(main.antigravityMcpPluginsCheatSheetItem(v260), plugins260, '2.6.0 : skill de plugin listé une fois');
+    assert.strictEqual(main.antigravityMcpPluginsCheatSheetItem(''), plugins260, 'Sans état : ligne MCP & Plugins de la 2.6.0');
+    assert.doesNotMatch(plugins260, /deux fois/);
   });
 });

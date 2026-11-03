@@ -663,7 +663,7 @@ describe('Suite de Tests : alertes et coûts dynamiques d\'Antigravity (lot A3a)
       '🗂️ Workflows Markdown : 0 tokens, pour leur nom et leur description (🧪 le panneau Settings les compte sans leur corps, sonde du 2026-11-02, Antigravity IDE 2.6.0). Ceux de .agent/, _agent/ et _agents/ sont comptés par prudence (❔ non vérifié).\n' +
       '🧪 Plafond de 20 000 tokens observé dans le panneau Settings d\'Antigravity IDE 2.6.0 (2026-10-28), distinct du budget de 20 000 tokens des règles.\n' +
       '📏 Estimation de l\'extension (tokeniseur o200k_base) : le panneau de l\'IDE peut afficher un autre chiffre.\n' +
-      '🧩 Les skills intégrés et les skills présents à la fois en global et dans le projet sont comptés par prudence ; le panneau de l\'IDE semble les exclure (déduit, non vérifié).\n' +
+      '🧩 Les skills intégrés sont comptés par prudence : le panneau de l\'IDE ne les affiche pas (🧪 observé, sonde du 2026-11-02, Antigravity IDE 2.6.0). Les skills présents à la fois en global et dans le projet sont comptés deux fois : leur traitement par le panneau n\'est pas vérifié (❔).\n' +
       '❔ Au-delà du budget, l\'IDE annonce que les grosses personnalisations sont exclues : annoncé par l\'IDE, non testé.';
     assert.strictEqual(main.formatPersonalizationBudgetTooltip(2717, 20000), expectedTooltip);
     assert.strictEqual(nodes.personalizationGaugeWrap.title, expectedTooltip);
@@ -813,10 +813,12 @@ describe('Suite de Tests : alertes et coûts dynamiques d\'Antigravity (lot A3a)
 
     const pillOf = (item: ResourceItem) => pillsOf(main.createItemCard(item, true, mockDoc())).find((p) => p.text === '✂️ Tronquée');
     const fmt = (n?: number) => (n || 0).toLocaleString('fr-FR');
-    const scope = '(frontmatter non compté, inclusions @[label](path) comprises)';
+    const scope = '(frontmatter non compté, inclusions @[label](path) comprises (documentation))';
     const catalogueTail = 'que l\'agent ne lirait pas.\nLe coût estimé ne compte que la partie gardée. Le catalogue lui-même n\'est jamais chargé par Antigravity.';
     const lineEndNote = '\n🧪 Règle de coupe observée dans Antigravity IDE 2.6.0 sur deux fichiers : r-tronque.md (5 960 octets coupés) et la règle 06 du banc d\'essai (15 090 octets coupés, sonde du 2026-11-02).';
     const byteNote = '\n❔ Non vérifié : aucune fin de ligne ne précède la limite. L\'extension suppose une coupe à l\'octet ; le comportement d\'Antigravity IDE 2.6.0 dans ce cas n\'a pas été observé.';
+    // Lot L10, 6b : une âme n'a jamais été observée tronquée, sa coupe est déduite de celle des deux règles
+    const soulNote = '\n🔎 Pour une âme, cette coupe est déduite de celle de ces deux règles : aucune âme tronquée n\'a été observée.';
 
     // 1. Profil 2.5.5 : règle du catalogue coupée à l'octet, au conditionnel ; la règle locale garde son texte exact
     const nas255 = (await NasScanner.scan(nasDir, 'antigravity', ANTIGRAVITY_PROFILES['2.5.5'])).items.find((i) => i.id === 'longue')!;
@@ -831,6 +833,13 @@ describe('Suite de Tests : alertes et coûts dynamiques d\'Antigravity (lot A3a)
       pillOf(local255)!.title,
       `Antigravity coupe le corps de ce fichier à 24 000 octets ${scope} : ${fmt(local255.metadata?.truncatedBytes)} octets coupés, soit ≈ ${fmt(local255.metadata?.lostTokens)} tokens jamais lus par l'agent.\nLe coût affiché ne compte que la partie gardée.`
     );
+    // Âme locale en 2.5.5 : coupe à l'octet, sans note de coupe ni de déduction (texte 2.5.5 inchangé)
+    const localSoul255 = (await LocalScanner.scan(workspaceFor(projet), ANTIGRAVITY_PROFILES['2.5.5'])).items.find((i) => i.type === 'soul')!;
+    assert.ok((localSoul255.metadata?.truncatedBytes ?? 0) > 0 && localSoul255.metadata?.truncationRule === undefined);
+    assert.strictEqual(
+      pillOf(localSoul255)!.title,
+      `Antigravity coupe ce fichier à 24 000 octets (fichier entier, inclusions @[label](path) comprises (documentation)) : ${fmt(localSoul255.metadata?.truncatedBytes)} octets coupés, soit ≈ ${fmt(localSoul255.metadata?.lostTokens)} tokens jamais lus par l'agent.\nLe coût affiché ne compte que la partie gardée.`
+    );
 
     // 2. Profil 2.6.0 : règle et âme du catalogue coupées sur fin de ligne, au conditionnel, avec la note de coupe.
     // L'âme est mesurée fichier entier (measureAntigravitySoul) : pas de « frontmatter non compté »
@@ -838,19 +847,20 @@ describe('Suite de Tests : alertes et coûts dynamiques d\'Antigravity (lot A3a)
     const nasRule260 = scan260.items.find((i) => i.id === 'longue')!;
     const nasSoul260 = scan260.items.find((i) => i.type === 'soul' && i.id === 'GEMINI.md')!;
     const expected260 = [
-      [nasRule260, `Une fois déployé, Antigravity couperait le corps de ce fichier à la dernière fin de ligne avant 24 000 octets ${scope}`],
-      [nasSoul260, 'Une fois déployé, Antigravity couperait ce fichier à la dernière fin de ligne avant 24 000 octets (fichier entier, inclusions @[label](path) comprises)'],
+      [nasRule260, `Une fois déployé, Antigravity couperait le corps de ce fichier à la dernière fin de ligne avant 24 000 octets ${scope}`, ''],
+      [nasSoul260, 'Une fois déployé, Antigravity couperait ce fichier à la dernière fin de ligne avant 24 000 octets (fichier entier, inclusions @[label](path) comprises (documentation))', soulNote],
     ] as const;
-    for (const [item, head] of expected260) {
+    for (const [item, head, tail] of expected260) {
       assert.ok(item, 'Carte du catalogue présente');
       assert.strictEqual(item.metadata?.truncationRule, 'line-end', `${item.type} : coupe sur fin de ligne`);
       const title = pillOf(item)!.title;
       assert.strictEqual(
         title,
-        `${head} : ${fmt(item.metadata?.truncatedBytes)} octets coupés, soit ≈ ${fmt(item.metadata?.lostTokens)} tokens ${catalogueTail}${lineEndNote}`
+        `${head} : ${fmt(item.metadata?.truncatedBytes)} octets coupés, soit ≈ ${fmt(item.metadata?.lostTokens)} tokens ${catalogueTail}${lineEndNote}${tail}`
       );
       assert.doesNotMatch(title, /jamais lus par l'agent/);
     }
+    assert.doesNotMatch(pillOf(nasRule260)!.title, /🔎|déduite/, 'Règle du catalogue : coupe observée, sans note de déduction');
     assert.doesNotMatch(pillOf(nasSoul260)!.title, /frontmatter non compté/, 'Âme du catalogue : fichier entier');
     const scanLocal260 = await LocalScanner.scan(workspaceFor(projet), ANTIGRAVITY_PROFILES['2.6.0']);
     const local260 = scanLocal260.items.find((i) => i.id === 'longue')!;
@@ -858,6 +868,7 @@ describe('Suite de Tests : alertes et coûts dynamiques d\'Antigravity (lot A3a)
       pillOf(local260)!.title,
       `Antigravity coupe le corps de ce fichier à la dernière fin de ligne avant 24 000 octets ${scope} : ${fmt(local260.metadata?.truncatedBytes)} octets coupés, soit ≈ ${fmt(local260.metadata?.lostTokens)} tokens jamais lus par l'agent.\nLe coût affiché ne compte que la partie gardée.${lineEndNote}`
     );
+    assert.doesNotMatch(pillOf(local260)!.title, /🔎|déduite/, 'Règle locale : coupe observée, sans note de déduction');
     // Âmes locale et globale tronquées : mesurées fichier entier (measureAntigravitySoul), comme l'âme du catalogue ;
     // la règle locale ci-dessus garde « le corps de ce fichier » et « frontmatter non compté »
     const localSoul260 = scanLocal260.items.find((i) => i.type === 'soul')!;
@@ -869,7 +880,7 @@ describe('Suite de Tests : alertes et coûts dynamiques d\'Antigravity (lot A3a)
       const title = pillOf(soul)!.title;
       assert.strictEqual(
         title,
-        `Antigravity coupe ce fichier à la dernière fin de ligne avant 24 000 octets (fichier entier, inclusions @[label](path) comprises) : ${fmt(soul.metadata?.truncatedBytes)} octets coupés, soit ≈ ${fmt(soul.metadata?.lostTokens)} tokens jamais lus par l'agent.\nLe coût affiché ne compte que la partie gardée.${lineEndNote}`,
+        `Antigravity coupe ce fichier à la dernière fin de ligne avant 24 000 octets (fichier entier, inclusions @[label](path) comprises (documentation)) : ${fmt(soul.metadata?.truncatedBytes)} octets coupés, soit ≈ ${fmt(soul.metadata?.lostTokens)} tokens jamais lus par l'agent.\nLe coût affiché ne compte que la partie gardée.${lineEndNote}${soulNote}`,
         `Âme ${portee} : fichier entier`
       );
       assert.doesNotMatch(title, /frontmatter non compté/);
@@ -894,7 +905,13 @@ describe('Suite de Tests : alertes et coûts dynamiques d\'Antigravity (lot A3a)
     assert.ok(typeof ignoree.metadata?.byteSize === 'number', 'Taille en octets connue');
     assert.strictEqual(
       sizePillOf(ignoree)!.title,
-      `Attention : ce fichier dépasse la limite de 24 000 octets d'Antigravity (${fmt(ignoree.metadata?.byteSize)} octets), inclusions @[label](path) comprises. Antigravity le tronque.`
+      `Attention : ce fichier dépasse la limite de 24 000 octets d'Antigravity (${fmt(ignoree.metadata?.byteSize)} octets), inclusions @[label](path) comprises (documentation). Antigravity le tronque.`
+    );
+    // Même texte en profil 2.6.0 : le statut documentaire des inclusions ne dépend pas de la version
+    const ignoree260 = (await LocalScanner.scan(workspaceFor(projet), ANTIGRAVITY_PROFILES['2.6.0'])).items.find((i) => i.id === 'sans-trigger')!;
+    assert.strictEqual(
+      sizePillOf(ignoree260)!.title,
+      `Attention : ce fichier dépasse la limite de 24 000 octets d'Antigravity (${fmt(ignoree260.metadata?.byteSize)} octets), inclusions @[label](path) comprises (documentation). Antigravity le tronque.`
     );
 
     // 3. Repli à l'octet (byte-fallback) : catalogue au conditionnel, avec la note « non vérifié »
@@ -903,5 +920,68 @@ describe('Suite de Tests : alertes et coûts dynamiques d\'Antigravity (lot A3a)
       pillOf(nasFallback)!.title,
       `Une fois déployé, Antigravity couperait le corps de ce fichier à 24 000 octets ${scope} : ${fmt(nas255.metadata?.truncatedBytes)} octets coupés, soit ≈ ${fmt(nas255.metadata?.lostTokens)} tokens ${catalogueTail}${byteNote}`
     );
+    // Repli à l'octet d'une âme : la note « non vérifié » suffit, sans note de déduction propre à la fin de ligne
+    const soulFallback = { ...localSoul260, metadata: { ...localSoul260.metadata, truncationRule: 'byte-fallback' as const } };
+    assert.ok(pillOf(soulFallback)!.title.endsWith(byteNote), 'Âme en repli : note « non vérifié » en dernier');
+    assert.doesNotMatch(pillOf(soulFallback)!.title, /🔎/);
+  });
+
+  // Lot L10, 6b : la correspondance entre le cache MCP et les outils affichés n'est observée qu'en 2.5.5
+  test('21. Infobulle MCP : cache observé dans Antigravity IDE 2.5.5, non revérifié dans l\'IDE 2.6.0 (et sans état)', () => {
+    const nodes: Record<string, MockEl> = {};
+    const doc = mockDoc(nodes);
+    const statMcp = {
+      type: 'mcp', scope: 'global', activeCount: 1, totalCount: 1,
+      charCount: 40, tokenCount: 10, percentage: 0.1, directoryPath: '/virtuel/mcp-global',
+      mcpServers: [{ name: 'serveur-a', status: 'active', toolCount: 2, tokenCount: 10 }],
+    };
+    const stateOf = (version?: string) => ({
+      workspace: { tool: 'antigravity' },
+      ...(version ? { antigravityBehavior: { version, testedOn: '', source: 'forced', reason: '' } } : {}),
+      stats: { budgetExcludesPersonalization: true, mcpGlobal: statMcp },
+    });
+    const note255 = '🧪 Noms d\'outils lus dans le cache d\'Antigravity (observé dans Antigravity IDE 2.5.5, non documenté). Le coût réel dépend de la connexion du serveur : sans connexion, ses outils ne sont pas listés.';
+    const note260 = '🧪 Noms d\'outils lus dans le cache d\'Antigravity (~/.gemini/antigravity/mcp/) : la correspondance avec les outils affichés a été observée dans Antigravity IDE 2.5.5, et n\'est pas revérifiée dans l\'IDE 2.6.0 (❔). Non documenté. Le coût réel dépend de la connexion du serveur : sans connexion, ses outils ne sont pas listés.';
+    const tooltipFor = (state: unknown) => {
+      main.updateBreakdownRow('McpGlobal', statMcp, 'MCP (global)', doc, state);
+      return nodes.tooltipMcpGlobal.textContent;
+    };
+
+    const t255 = tooltipFor(stateOf('Antigravity IDE 2.5.5'));
+    assert.ok(t255.includes(`\n${note255}`), 'Profil 2.5.5 : cache observé dans la 2.5.5');
+    assert.ok(!t255.includes('revérifiée'));
+    const t260 = tooltipFor(stateOf('Antigravity IDE 2.6.0'));
+    assert.ok(t260.includes(`\n${note260}`), 'Profil 2.6.0 : correspondance non revérifiée');
+    assert.ok(!t260.includes(note255));
+    assert.ok(tooltipFor(stateOf()).includes(`\n${note260}`), 'Sans version connue : texte de la 2.6.0');
+    assert.ok(t255.includes('• serveur-a : 10 tok (2 outil(s))') && t260.includes('• serveur-a : 10 tok (2 outil(s))'), 'Détail du serveur inchangé');
+  });
+
+  // Lot L10, 6b : en IDE 2.6.0, un skill de plugin est listé une fois, sans section de plugin (observé)
+  test('22. Infobulle des skills : en-tête « Available skills: » avec les sections de plugin en 2.5.5 seulement', () => {
+    const nodes: Record<string, MockEl> = {};
+    const doc = mockDoc(nodes);
+    const statSkill = {
+      type: 'skill', scope: 'global', activeCount: 2, totalCount: 2,
+      charCount: 200, tokenCount: 60, percentage: 0.3, overheadTokens: 4, directoryPath: '/virtuel/skills-global',
+    };
+    const stateOf = (version?: string) => ({
+      workspace: { tool: 'antigravity' },
+      ...(version ? { antigravityBehavior: { version, testedOn: '', source: 'forced', reason: '' } } : {}),
+      stats: { budgetExcludesPersonalization: true, skillsGlobal: statSkill },
+    });
+    const tooltipFor = (state: unknown) => {
+      main.updateBreakdownRow('SkillGlobal', statSkill, 'Skills (global)', doc, state);
+      return nodes.tooltipSkillGlobal.textContent;
+    };
+    const head255 = '\n• En-têtes injectés : 4 tok (« Available skills: » et sections de plugin)';
+    const head260 = '\n• En-tête injecté : 4 tok (« Available skills: » ; aucune section de plugin dans l\'IDE 2.6.0, observé)';
+
+    const t255 = tooltipFor(stateOf('Antigravity IDE 2.5.5'));
+    assert.ok(t255.includes(head255), 'Profil 2.5.5 : texte inchangé');
+    const t260 = tooltipFor(stateOf('Antigravity IDE 2.6.0'));
+    assert.ok(t260.includes(head260), 'Profil 2.6.0 : sans section de plugin');
+    assert.ok(!t260.includes('et sections de plugin'));
+    assert.ok(tooltipFor(stateOf()).includes(head260), 'Sans version connue : texte de la 2.6.0');
   });
 });
