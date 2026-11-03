@@ -23,6 +23,7 @@ import { NasPathService, FileSystemPort } from '../src/settings/NasPathService';
 import { ConfigurationPort, ScopedSettingValue } from '../src/settings/RegistryConfigService';
 import { ManifestProvenance, SkillSearchResult } from '../src/common/discoveryTypes';
 import { extractFrontmatter } from '../src/utils/frontmatter';
+import { ANTIGRAVITY_PROFILES, AntigravityBehaviorProfile } from '../src/antigravity/behavior';
 import { ExtensionEventBus } from '../src/common/ExtensionEventBus';
 
 class FakeMemento implements MementoPort {
@@ -813,7 +814,12 @@ describe('Suite de Tests : Favoris hors ligne et déploiement multi-cible', () =
   });
 
   // Lot A1 : une règle déployée vers Antigravity doit se déclencher vraiment (R3, R4, R6)
-  const deployRule = async (runtime: 'antigravity' | 'claude-code', manifest: string) => {
+  // Le profil d'Antigravity est injecté (lot L10) : le résultat ne dépend jamais de <home>/.gemini
+  const deployRule = async (
+    runtime: 'antigravity' | 'claude-code',
+    manifest: string,
+    antigravityProfile: AntigravityBehaviorProfile = ANTIGRAVITY_PROFILES['2.5.5']
+  ) => {
     const files = new MemoryFileSystem();
     const service = new MultiTargetDeployService(
       new NasPathService(new FakeConfiguration(), CONNECTED_NAS, {} as NodeJS.ProcessEnv),
@@ -848,12 +854,13 @@ describe('Suite de Tests : Favoris hors ligne et déploiement multi-cible', () =
       conflictPolicy: 'overwrite',
       context: { runtime, workspaceRoot: path.join('/projet'), agentsDirName: '.agents' },
       now: () => new Date('2026-10-22T12:00:00.000Z'),
+      antigravityProfile,
     }, ui);
     const written = files.files.get(result?.targetPath ?? '') ?? '';
     return { result, shown, details, errors, written };
   };
 
-  test('32. Règle Discovery vers Antigravity : convertie avant l\'aperçu, avertissement visible', async () => {
+  test('32. Règle Discovery vers Antigravity : convertie avant l\'aperçu selon le profil injecté (glob en 2.5.5, model_decision en 2.6.0), avertissement visible', async () => {
     const manifest = '---\npaths:\n  - "src/**/*.ts"\n---\n# Règles API\n- Valider les entrées.\n';
     const run = await deployRule('antigravity', manifest);
 
@@ -864,6 +871,14 @@ describe('Suite de Tests : Favoris hors ligne et déploiement multi-cible', () =
     assert.strictEqual(previewed.description, 'Règles API');
     assert.match(run.details[0], /Portée élargie/);
     assert.strictEqual(extractFrontmatter(run.written).metadata.globs, '*.ts');
+
+    // Profil 2.6.0 injecté : une règle glob n'y aurait aucun effet, la conversion donne model_decision (D-6)
+    const run260 = await deployRule('antigravity', manifest, ANTIGRAVITY_PROFILES['2.6.0']);
+    assert.strictEqual(run260.result?.success, true);
+    const previewed260 = extractFrontmatter(run260.shown[0]).metadata;
+    assert.strictEqual(previewed260.trigger, 'model_decision', "L'aperçu montre le contenu converti pour le profil 2.6.0.");
+    assert.strictEqual(previewed260.globs, undefined);
+    assert.strictEqual(extractFrontmatter(run260.written).metadata.trigger, 'model_decision');
 
     const invalid = await deployRule('antigravity', '---\ntrigger: alwaysOn\n---\n# R\n');
     assert.strictEqual(invalid.result?.success, false, 'Un trigger invalide est refusé avant tout aperçu.');

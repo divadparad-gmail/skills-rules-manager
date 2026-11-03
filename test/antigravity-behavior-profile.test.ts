@@ -222,10 +222,11 @@ describe('Suite de Tests : profil de comportement d\'Antigravity (chantier 2.6.0
     }
   });
 
-  test('4. Réglage forcé : il l\'emporte sur les indices ; une valeur invalide reprend le défaut 2.5.5', () => {
+  test('4. Réglage forcé : il l\'emporte sur les indices ; une valeur invalide reprend le défaut « auto » (détection)', () => {
     const tous: ProfileSignals = { newStructure: true, migrationMarker: true, oldStructure: true };
     const aucun: ProfileSignals = { newStructure: false, migrationMarker: false, oldStructure: false };
-    assert.strictEqual(ANTIGRAVITY_PROFILE_SETTING_DEFAULT, '2.5.5');
+    const ancienne: ProfileSignals = { newStructure: false, migrationMarker: false, oldStructure: true };
+    assert.strictEqual(ANTIGRAVITY_PROFILE_SETTING_DEFAULT, 'auto');
     for (const indices of [tous, aucun]) {
       assert.deepStrictEqual(
         [resolveAntigravityProfile('2.5.5', indices).profile.id, resolveAntigravityProfile('2.5.5', indices).source],
@@ -236,13 +237,24 @@ describe('Suite de Tests : profil de comportement d\'Antigravity (chantier 2.6.0
         ['2.6.0', 'forced']
       );
     }
+    // Une valeur absente ou invalide vaut « auto » : la structure des données décide, avec repli sur 2.6.0
     for (const invalide of ['2.6', '2.5', 'AUTO', '', ' 2.6.0', 42, null, undefined, {}]) {
-      const resolu = resolveAntigravityProfile(invalide, tous);
-      assert.strictEqual(resolu.profile.id, '2.5.5', `valeur ${JSON.stringify(invalide)}`);
-      assert.strictEqual(resolu.source, 'forced');
-      assert.match(resolu.reason, /valeur par défaut/);
+      const avecTous = resolveAntigravityProfile(invalide, tous);
+      assert.deepStrictEqual([avecTous.profile.id, avecTous.source], ['2.6.0', 'detected'], `valeur ${JSON.stringify(invalide)}, indices 2.6.0`);
+      const avecAncienne = resolveAntigravityProfile(invalide, ancienne);
+      assert.deepStrictEqual([avecAncienne.profile.id, avecAncienne.source], ['2.5.5', 'detected'], `valeur ${JSON.stringify(invalide)}, ancienne racine`);
+      const avecAucun = resolveAntigravityProfile(invalide, aucun);
+      assert.deepStrictEqual([avecAucun.profile.id, avecAucun.source], ['2.6.0', 'fallback'], `valeur ${JSON.stringify(invalide)}, aucun indice`);
+      assert.doesNotMatch(avecAucun.reason, /valeur par défaut/);
     }
     assert.match(resolveAntigravityProfile('2.6.0', aucun).reason, /imposé par le réglage skillsManager\.antigravityProfile/);
+    // La raison de détection ne dit plus « sans effet » de l'ancienne racine
+    const raison = resolveAntigravityProfile('auto', tous).reason;
+    assert.strictEqual(
+      raison,
+      'Données de la génération 2.6.0 trouvées dans .gemini (antigravity/builtin/ et antigravity-ide/.ide_migration). L\'ancienne racine antigravity-ide/ est encore présente (ancienne génération).'
+    );
+    assert.doesNotMatch(raison, /sans effet/);
   });
 
   test('5. Garde : un dossier global vide ou un chemin relatif ne touche jamais au disque', () => {
@@ -259,18 +271,27 @@ describe('Suite de Tests : profil de comportement d\'Antigravity (chantier 2.6.0
     assert.deepStrictEqual([resolu.profile.id, resolu.source, appels], ['2.6.0', 'fallback', []]);
   });
 
-  test('6. Lecture du réglage : défaut 2.5.5 hors de VS Code ; la structure n\'est lue qu\'en « auto »', () => {
-    assert.strictEqual(readAntigravityProfileSetting(), '2.5.5');
+  test('6. Lecture du réglage : défaut « auto » hors de VS Code ; la structure n\'est lue qu\'en « auto »', () => {
+    assert.strictEqual(readAntigravityProfileSetting(), 'auto');
     const globalPath = path.join(tempBaseDir, 'lecture', '.gemini', 'config');
 
-    const force = espionStat();
-    const resoluForce = resolveConfiguredAntigravityProfile(globalPath, undefined, force.stat);
-    assert.deepStrictEqual([resoluForce.profile.id, resoluForce.source, force.appels.length], ['2.5.5', 'forced', 0]);
+    // Sans réglage (défaut « auto ») : les trois indices sont sondés, sous <gemini> seulement
+    const defaut = espionStat();
+    const resoluDefaut = resolveConfiguredAntigravityProfile(globalPath, undefined, defaut.stat);
+    assert.strictEqual(defaut.appels.length, 3, 'Défaut « auto » : trois indices sondés');
+    assert.ok(defaut.appels.every((cible) => cible.startsWith(path.dirname(globalPath))), 'Seul <gemini> est sondé');
+    assert.deepStrictEqual([resoluDefaut.profile.id, resoluDefaut.source], ['2.6.0', 'fallback'], 'Dossier absent : repli sur 2.6.0');
+
+    // Un profil forcé explicitement ne touche jamais au disque
+    for (const force of ['2.5.5', '2.6.0'] as const) {
+      const espion = espionStat();
+      const resolu = resolveConfiguredAntigravityProfile(globalPath, force, espion.stat);
+      assert.deepStrictEqual([resolu.profile.id, resolu.source, espion.appels.length], [force, 'forced', 0]);
+    }
 
     const auto = espionStat();
     resolveConfiguredAntigravityProfile(globalPath, 'auto', auto.stat);
     assert.strictEqual(auto.appels.length, 3, 'En « auto », trois indices sont sondés');
-    assert.ok(auto.appels.every((cible) => cible.startsWith(path.dirname(globalPath))), 'Seul <gemini> est sondé');
   });
 
   test('7. package.json : skillsManager.antigravityProfile, ses trois valeurs, son défaut et sa portée', () => {
@@ -283,7 +304,7 @@ describe('Suite de Tests : profil de comportement d\'Antigravity (chantier 2.6.0
     assert.strictEqual(reglage.enumDescriptions.length, 3);
     assert.match(reglage.enumDescriptions[0], /génération/, 'La description de « auto » doit parler de génération, pas de version exacte');
     assert.strictEqual(reglage.default, ANTIGRAVITY_PROFILE_SETTING_DEFAULT);
-    assert.strictEqual(reglage.default, '2.5.5');
+    assert.strictEqual(reglage.default, 'auto');
     assert.strictEqual(reglage.scope, 'machine', 'Portée machine : un dépôt ne peut pas fixer le profil');
   });
 
@@ -359,27 +380,139 @@ describe('Suite de Tests : profil de comportement d\'Antigravity (chantier 2.6.0
     assert.deepStrictEqual(reference.mcpGlobal.mcpServers!.map((s) => s.toolCount), [1], 'Cache antigravity-ide/mcp');
   });
 
-  test('9. État envoyé au webview : le réglage par défaut transmet le profil 2.5.5 et ne change ni antigravityBehavior ni les clés', async () => {
+  test('9. État envoyé au webview : défaut « auto » sur un faux <gemini> (2.6.0 détecté, 2.5.5 détecté, repli), profil forcé, et antigravityBehavior avec source et raison', async () => {
     const sansHorloge = (etat: Record<string, any>) => {
       const copie = JSON.parse(JSON.stringify(etat));
       for (const cle of ['lastTimingLog', 'isDebugTiming', 'timingHistory']) delete copie[cle];
       if (copie.nasStatus) delete copie.nasStatus.checkedAt;
       return copie;
     };
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const vscodeMock = require('vscode');
+    const origGetConfig = vscodeMock.workspace.getConfiguration;
+    // Chaque cas pointe skillsManager.globalPath vers un faux <gemini>/config : le vrai <home>/.gemini n'est jamais sondé
+    const configurer = (globalPath: string, profil?: string) => {
+      vscodeMock.workspace.getConfiguration = () => ({
+        get: (key: string, def: any) => {
+          if (key === 'globalPath') return globalPath;
+          if (key === 'nasPath') return '';
+          if (key === ANTIGRAVITY_PROFILE_SETTING) return profil;
+          return def;
+        },
+      });
+    };
+    const cas = [
+      { nom: 'nouvelle-structure', dossiers: ['antigravity/builtin', 'antigravity-ide'], fichiers: ['antigravity-ide/.ide_migration'], profil: '2.6.0', source: 'detected' },
+      { nom: 'ancienne-structure', dossiers: ['antigravity-ide'], fichiers: [], profil: '2.5.5', source: 'detected' },
+      { nom: 'aucune-structure', dossiers: [], fichiers: [], profil: '2.6.0', source: 'fallback' },
+    ] as const;
 
-    StateManager.setAntigravityProfileForTesting(null);
-    const parDefaut = await StateManager.loadFullState(true);
-    assert.deepStrictEqual(
-      [StateManager.lastAntigravityProfile?.profile.id, StateManager.lastAntigravityProfile?.source],
-      ['2.5.5', 'forced'],
-      'Sans réglage, le profil 2.5.5 est transmis aux scanners'
-    );
-    assert.deepStrictEqual(parDefaut.antigravityBehavior, { version: 'Antigravity IDE 2.5.5', testedOn: '2026-10-21' });
-    assert.ok(!Object.keys(parDefaut).some((cle) => /profil|profile/i.test(cle)), 'Aucune clé de profil n\'est envoyée au webview en L3');
+    try {
+      StateManager.setAntigravityProfileForTesting(null);
+      for (const c of cas) {
+        const gemini = path.join(tempBaseDir, `etat-${c.nom}`, '.gemini');
+        await construire(gemini, [...c.dossiers, 'config'], [...c.fichiers]);
+        configurer(path.join(gemini, 'config'));
+        const etat = await StateManager.loadFullState(true);
+        const attendu = ANTIGRAVITY_PROFILES[c.profil];
+        assert.deepStrictEqual(
+          [StateManager.lastAntigravityProfile?.profile.id, StateManager.lastAntigravityProfile?.source],
+          [c.profil, c.source],
+          `${c.nom} : profil transmis aux scanners`
+        );
+        assert.deepStrictEqual(Object.keys(etat.antigravityBehavior!).sort(), ['reason', 'source', 'testedOn', 'version']);
+        assert.strictEqual(etat.antigravityBehavior?.version, attendu.testedVersion);
+        assert.strictEqual(etat.antigravityBehavior?.testedOn, attendu.testedOn);
+        assert.strictEqual(etat.antigravityBehavior?.source, c.source);
+        assert.strictEqual(etat.antigravityBehavior?.reason, StateManager.lastAntigravityProfile?.reason);
+        assert.ok(
+          !etat.antigravityBehavior!.reason.includes(tempBaseDir) && !etat.antigravityBehavior!.reason.includes(os.homedir()),
+          `${c.nom} : raison sans chemin absolu`
+        );
+        assert.ok(!Object.keys(etat).some((cle) => /profil|profile/i.test(cle)), 'Aucune clé de profil de premier niveau');
+      }
 
-    StateManager.setAntigravityProfileForTesting(resolveAntigravityProfile('2.5.5', { newStructure: false, migrationMarker: false, oldStructure: false }));
-    const force255 = await StateManager.loadFullState(true);
-    assert.deepStrictEqual(sansHorloge(force255), sansHorloge(parDefaut));
-    StateManager.setAntigravityProfileForTesting(null);
+      // Profil forcé par le réglage : aucune lecture de la structure, source « forced »
+      const gemini = path.join(tempBaseDir, 'etat-nouvelle-structure', '.gemini');
+      configurer(path.join(gemini, 'config'), '2.5.5');
+      const force255 = await StateManager.loadFullState(true);
+      assert.deepStrictEqual(force255.antigravityBehavior, {
+        version: 'Antigravity IDE 2.5.5',
+        testedOn: '2026-10-21',
+        source: 'forced',
+        reason: 'Profil 2.5.5 imposé par le réglage skillsManager.antigravityProfile.',
+      });
+      // Le même profil imposé par le port de test donne exactement le même état
+      configurer(path.join(gemini, 'config'));
+      StateManager.setAntigravityProfileForTesting(resolveAntigravityProfile('2.5.5', { newStructure: true, migrationMarker: true, oldStructure: true }));
+      const override255 = await StateManager.loadFullState(true);
+      assert.deepStrictEqual(sansHorloge(override255), sansHorloge(force255));
+    } finally {
+      StateManager.setAntigravityProfileForTesting(null);
+      vscodeMock.workspace.getConfiguration = origGetConfig;
+    }
+  });
+
+  // Lot L10, D-1 : pastille « Profil : … » dans le Grand Dashboard et la barre latérale
+  test('10. Pastille du profil : détecté, forcé, non détecté (jamais « détecté » sur un repli), masquée en Claude Code et sans état', () => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const main = require(path.resolve(__dirname, '../../src/webview/main.js'));
+    const titreCommun = 'La structure du dossier .gemini indique une génération d\'Antigravity, et non une version exacte.';
+    const reglage = 'Réglage : skillsManager.antigravityProfile (auto, 2.5.5 ou 2.6.0).';
+    const comportement = (resolu: ReturnType<typeof resolveAntigravityProfile>) => ({
+      version: resolu.profile.testedVersion,
+      testedOn: resolu.profile.testedOn,
+      source: resolu.source,
+      reason: resolu.reason,
+    });
+    const tous: ProfileSignals = { newStructure: true, migrationMarker: true, oldStructure: true };
+    const ancienne: ProfileSignals = { newStructure: false, migrationMarker: false, oldStructure: true };
+    const aucun: ProfileSignals = { newStructure: false, migrationMarker: false, oldStructure: false };
+    const cas = [
+      { resolu: resolveAntigravityProfile('auto', tous), texte: 'Profil : Antigravity IDE 2.6.0 (détecté)' },
+      { resolu: resolveAntigravityProfile('auto', ancienne), texte: 'Profil : Antigravity IDE 2.5.5 (détecté)' },
+      { resolu: resolveAntigravityProfile('auto', aucun), texte: 'Profil : Antigravity IDE 2.6.0 (non détecté)' },
+      { resolu: resolveAntigravityProfile('2.5.5', tous), texte: 'Profil : Antigravity IDE 2.5.5 (forcé)' },
+      { resolu: resolveAntigravityProfile('2.6.0', aucun), texte: 'Profil : Antigravity IDE 2.6.0 (forcé)' },
+    ];
+    for (const { resolu, texte } of cas) {
+      const label = main.antigravityProfileLabel(comportement(resolu));
+      assert.strictEqual(label.text, texte);
+      assert.strictEqual(
+        label.title,
+        [titreCommun, resolu.reason, `Comportement de ${resolu.profile.testedVersion} testé le ${resolu.profile.testedOn}.`, reglage].join('\n')
+      );
+      assert.doesNotMatch(label.title, /retour à la 2\.5\.5|laisse cette structure/, 'Phrase non vérifiée absente');
+    }
+    const repli = main.antigravityProfileLabel(comportement(resolveAntigravityProfile('auto', aucun)));
+    assert.doesNotMatch(repli.text, /\(détecté\)/, 'Un repli ne dit jamais « (détecté) »');
+    assert.strictEqual(main.antigravityProfileLabel(undefined), null);
+    assert.strictEqual(main.antigravityProfileLabel({ version: 'Antigravity IDE 2.6.0', testedOn: '2026-10-28' }), null, 'Sans source : pas de pastille');
+
+    // Rendu : textContent et title, dans les deux pages ; masquée en Claude Code et sans état
+    const noeuds: Record<string, { style: Record<string, string>; textContent: string; title: string; innerHTML: string }> = {};
+    const doc = {
+      getElementById: (id: string) => (noeuds[id] = noeuds[id] ?? { style: {}, textContent: '', title: '', innerHTML: '' }),
+    };
+    const ids = ['antigravityProfilePill', 'antigravityProfilePillSide'];
+    const behavior = comportement(resolveAntigravityProfile('auto', tous));
+    main.renderAntigravityProfilePill({ workspace: { tool: 'antigravity' }, antigravityBehavior: behavior }, doc);
+    for (const id of ids) {
+      assert.strictEqual(noeuds[id].style.display, '');
+      assert.strictEqual(noeuds[id].textContent, 'Profil : Antigravity IDE 2.6.0 (détecté)');
+      assert.ok(noeuds[id].title.startsWith(titreCommun));
+      assert.strictEqual(noeuds[id].innerHTML, '', 'Jamais innerHTML');
+    }
+    for (const etat of [{ workspace: { tool: 'claude-code' }, antigravityBehavior: behavior }, null, { workspace: { tool: 'antigravity' } }]) {
+      main.renderAntigravityProfilePill(etat, doc);
+      for (const id of ids) {
+        assert.deepStrictEqual([noeuds[id].style.display, noeuds[id].textContent, noeuds[id].title], ['none', '', ''], JSON.stringify(etat));
+      }
+    }
+    // Les deux pages déclarent la pastille, masquée par défaut
+    for (const [page, id] of [['dashboard.html', 'antigravityProfilePill'], ['sidebar.html', 'antigravityProfilePillSide']]) {
+      const html = fs.readFileSync(path.join(ROOT, 'src', 'webview', page), 'utf8');
+      assert.match(html, new RegExp(`id="${id}" style="display: none;"`), page);
+    }
   });
 });

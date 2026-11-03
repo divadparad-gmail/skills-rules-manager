@@ -271,11 +271,10 @@ describe('Suite de Tests : Règles Antigravity conformes à la documentation off
     assert.throws(() => ensureAntigravityTrigger('---\ntrigger: alwaysOn\n---\n# R'), /trigger/);
   });
 
-  test('12. ImportService : la règle importée dans un projet Antigravity est complétée', async () => {
-    const dir = path.join(tempBaseDir, 'import-target');
+  // Lot L10 : le profil est un port facultatif (options.antigravityProfile) ; sans lui, c'est le profil actif
+  test('12. ImportService : la règle importée dans un projet Antigravity est complétée, selon le profil injecté ou le profil actif', async () => {
     const source = path.join(tempBaseDir, 'import-source', 'claude-rule.md');
     await writeFile(source, '---\npaths: "src/**/*.ts"\n---\n# Règle venue de Claude Code');
-    await fs.promises.mkdir(dir, { recursive: true });
 
     const item: ResourceItem = {
       id: 'claude-rule',
@@ -288,11 +287,38 @@ describe('Suite de Tests : Règles Antigravity conformes à la documentation off
       targetTool: 'claude-code',
       isFolder: false,
     };
-    const result = await ImportService.importResource(item, 'local', workspaceFor(dir));
-    assert.strictEqual(result.success, true, result.error);
-    assert.ok(result.notice && result.notice.includes('trigger: glob'));
-    const written = await fs.promises.readFile(result.targetPath!, 'utf8');
-    assert.strictEqual(checkAntigravityRuleFrontmatter(written).trigger, 'glob');
+    const importer = async (cible: string, options?: Parameters<typeof ImportService.importResource>[3]) => {
+      const dir = path.join(tempBaseDir, cible);
+      await fs.promises.mkdir(dir, { recursive: true });
+      const result = await ImportService.importResource(item, 'local', workspaceFor(dir), options);
+      assert.strictEqual(result.success, true, result.error);
+      const written = await fs.promises.readFile(result.targetPath!, 'utf8');
+      return { result, trigger: checkAntigravityRuleFrontmatter(written).trigger };
+    };
+
+    // 1. Profil 2.5.5 injecté : paths: devient trigger: glob
+    const v255 = await importer('import-target', { antigravityProfile: ANTIGRAVITY_PROFILES['2.5.5'] });
+    assert.ok(v255.result.notice && v255.result.notice.includes('trigger: glob'));
+    assert.strictEqual(v255.trigger, 'glob');
+
+    // 2. Profil 2.6.0 injecté : paths: devient trigger: model_decision (D-6)
+    const v260 = await importer('import-target-260', { antigravityProfile: ANTIGRAVITY_PROFILES['2.6.0'] });
+    assert.strictEqual(v260.trigger, 'model_decision');
+
+    // 3. Sans option : le profil actif, ici forcé par le réglage (aucune lecture de <home>/.gemini)
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const vscodeMock = require('vscode');
+    const origGetConfig = vscodeMock.workspace.getConfiguration;
+    try {
+      for (const [profil, trigger] of [['2.5.5', 'glob'], ['2.6.0', 'model_decision']] as const) {
+        vscodeMock.workspace.getConfiguration = () => ({
+          get: (key: string, def: any) => (key === 'skillsManager.antigravityProfile' ? profil : def),
+        });
+        assert.strictEqual((await importer(`import-target-actif-${profil}`)).trigger, trigger, `Profil actif ${profil}`);
+      }
+    } finally {
+      vscodeMock.workspace.getConfiguration = origGetConfig;
+    }
   });
 
   // Chantier 2.6.0, lot L7, D-6 : Antigravity IDE 2.6.0 n'injecte jamais une règle glob (phase 2b)

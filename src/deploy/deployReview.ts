@@ -16,6 +16,7 @@ import { DeployTarget, DiscoveryResourceType } from '../common/eventTypes';
 import { antigravityHookRefusal, DeployContext, MultiTargetDeployService } from './MultiTargetDeployService';
 import { ensureAntigravityTrigger } from '../utils/antigravityRules';
 import { resolveActiveAntigravityProfile } from '../antigravity/behaviorProfile';
+import { AntigravityBehaviorProfile } from '../antigravity/behavior';
 
 /** Ressource proposée à l'installation, avec son registre d'origine. */
 export interface ReviewableResource {
@@ -46,6 +47,8 @@ export interface DeployReviewOptions {
   conflictPolicy: ConflictPolicy;
   /** Horloge injectable, pour un horodatage de provenance déterministe. */
   now?: () => Date;
+  /** Profil d'Antigravity injectable (conversion d'une règle, D-6) ; par défaut, le profil actif. */
+  antigravityProfile?: AntigravityBehaviorProfile;
 }
 
 const TARGET_DESCRIPTIONS: Record<DeployTarget, string> = {
@@ -78,7 +81,8 @@ export async function reviewAndDeploy(
   let ruleNotes: string[] = [];
   if (options.context.runtime === 'antigravity' && original.type === 'rules') {
     try {
-      const prepared = ensureAntigravityTrigger(original.manifest, resolveActiveAntigravityProfile().profile);
+      const profile = options.antigravityProfile ?? resolveActiveAntigravityProfile().profile;
+      const prepared = ensureAntigravityTrigger(original.manifest, profile);
       resource = { ...original, manifest: prepared.content };
       ruleNotes = [
         ...(prepared.addedTrigger

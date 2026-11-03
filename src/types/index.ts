@@ -354,8 +354,12 @@ export interface ManagerFullState {
   isCheatSheetOpen?: boolean;
   /** Remontée vers les dossiers parents (mode Antigravity seulement). */
   antigravityParents?: AntigravityParentsInfo;
-  /** Version d'Antigravity et date des tests qui fondent les badges (src/antigravity/behavior.ts). */
-  antigravityBehavior?: { version: string; testedOn: string };
+  /**
+   * Profil de comportement d'Antigravity (src/antigravity/behavior.ts) : version et date des tests
+   * qui fondent les badges ; origine du choix (réglage forcé, structure détectée ou repli sur la
+   * version actuelle, src/antigravity/behaviorProfile.ts) et raison en une phrase, sans chemin absolu.
+   */
+  antigravityBehavior?: { version: string; testedOn: string; source: 'forced' | 'detected' | 'fallback'; reason: string };
   userHome?: string;
   isDebugTiming?: boolean;
   lastTimingLog?: string | null;

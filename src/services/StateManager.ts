@@ -326,7 +326,12 @@ export class StateManager {
       isDashboardOpen: this._isDashboardOpen,
       isCheatSheetOpen: this._isCheatSheetOpen,
       ...(localResult.antigravityParents ? { antigravityParents: localResult.antigravityParents } : {}),
-      antigravityBehavior: { version: antigravityProfile.testedVersion, testedOn: antigravityProfile.testedOn },
+      antigravityBehavior: {
+        version: antigravityProfile.testedVersion,
+        testedOn: antigravityProfile.testedOn,
+        source: resolvedProfile.source,
+        reason: resolvedProfile.reason,
+      },
       userHome: getUserHome(),
       ...(workspace.workspacePath ? { bancEssai: presenterBanc(ScenarioManager.lireEtat(workspace.workspacePath)) } : {}),
     };

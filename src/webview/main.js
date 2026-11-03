@@ -501,6 +501,9 @@
 
     renderCheatSheetCard(isClaude);
 
+    // Pastille du profil de comportement d'Antigravity (masquée en Claude Code)
+    renderAntigravityProfilePill(state);
+
     // Gestion du statut et chemin Catalogue (NAS) dans la sidebar
     const sidebarNasPathEl = document.getElementById('sidebarNasPathText');
     const sidebarNasBadgeEl = document.getElementById('sidebarNasStatusBadge');
@@ -977,26 +980,70 @@
   /** Version du profil 2.6.0, telle que transmise dans `state.antigravityBehavior.version` (src/antigravity/behavior.ts). */
   const ANTIGRAVITY_260_VERSION = 'Antigravity IDE 2.6.0';
 
+  /** Mentions de la pastille du profil, selon l'origine du choix (src/antigravity/behaviorProfile.ts). */
+  const PROFILE_SOURCE_LABELS = { detected: 'détecté', forced: 'forcé', fallback: 'non détecté' };
+
+  /**
+   * Pastille « Profil : … » (lot L10, D-1) : texte et infobulle, ou null sans profil transmis.
+   * Un repli (aucune donnée reconnue) dit « (non détecté) », jamais « (détecté) ». Le texte est
+   * destiné à `textContent` et à `title`, jamais à `innerHTML`.
+   */
+  function antigravityProfileLabel(behavior) {
+    if (!behavior || !behavior.version || !PROFILE_SOURCE_LABELS[behavior.source]) return null;
+    return {
+      text: `Profil : ${behavior.version} (${PROFILE_SOURCE_LABELS[behavior.source]})`,
+      title: [
+        'La structure du dossier .gemini indique une génération d\'Antigravity, et non une version exacte.',
+        behavior.reason || '',
+        `Comportement de ${behavior.version} testé le ${behavior.testedOn}.`,
+        'Réglage : skillsManager.antigravityProfile (auto, 2.5.5 ou 2.6.0).',
+      ].filter(Boolean).join('\n'),
+    };
+  }
+
+  /** Pose la pastille du profil dans le Grand Dashboard et la barre latérale ; masquée en Claude Code et sans état. */
+  function renderAntigravityProfilePill(state, doc) {
+    const targetDoc = doc || (typeof document !== 'undefined' ? document : null);
+    if (!targetDoc) return;
+    const isAntigravity = !!(state && state.workspace && state.workspace.tool === 'antigravity');
+    const label = isAntigravity ? antigravityProfileLabel(state.antigravityBehavior) : null;
+    ['antigravityProfilePill', 'antigravityProfilePillSide'].forEach((id) => {
+      const el = targetDoc.getElementById(id);
+      if (!el) return;
+      el.style.display = label ? '' : 'none';
+      el.textContent = label ? label.text : '';
+      el.title = label ? label.title : '';
+    });
+  }
+
   /** Version du profil actif transmise par l'extension (vide avant le premier état). */
   function currentAntigravityVersion() {
     return (currentState && currentState.antigravityBehavior && currentState.antigravityBehavior.version) || '';
   }
 
   /**
+   * Texte de la 2.6.0 pour le profil 2.6.0, et tant que l'état n'est pas connu (version vide) :
+   * c'est le profil qu'applique le défaut « auto » quand il détecte la 2.6.0 et quand il se replie (D-2).
+   */
+  function usesAntigravity260Texts(version) {
+    return !version || version === ANTIGRAVITY_260_VERSION;
+  }
+
+  /**
    * Antigravity : ce que la catégorie « Workflows » contient réellement (src/antigravity/behavior.ts).
-   * Profil 2.6.0 : les workflows Markdown ne sont pas retirés de l'IDE (sonde du 2026-11-02,
-   * Antigravity IDE 2.6.0) ; les autres profils gardent le texte de la documentation.
+   * Profil 2.6.0 et état inconnu : les workflows Markdown ne sont pas retirés de l'IDE (sonde du
+   * 2026-11-02, Antigravity IDE 2.6.0) ; le profil 2.5.5 garde le texte de la documentation.
    */
   function wfSkillNote(version) {
     const prefix = 'Skill dont le nom commence par wf- : Antigravity le liste comme un skill, et il reste compté.';
-    return version === ANTIGRAVITY_260_VERSION
+    return usesAntigravity260Texts(version)
       ? `${prefix} Ce n'est pas un workflow Markdown (.agents/workflows/ ou ~/.gemini/config/global_workflows/), qu'Antigravity IDE 2.6.0 liste encore dans « / » (observé).`
       : `${prefix} Ce n'est pas un workflow, format retiré le 19 octobre 2026.`;
   }
 
-  /** Ligne « Workflows » de l'aide-mémoire Antigravity, selon la version du profil (texte statique). */
+  /** Ligne « Workflows » de l'aide-mémoire Antigravity, selon la version du profil (texte statique ; 2.6.0 sans état). */
   function antigravityWorkflowsCheatSheetItem(version) {
-    return version === ANTIGRAVITY_260_VERSION
+    return usesAntigravity260Texts(version)
       ? '<li><span class="cs-icon">⏹️</span><span><strong>Workflows :</strong> Retirés selon la documentation, mais encore listés dans « / » par l\'IDE 2.6.0 (observé) • <code>.agents/workflows/</code> et <code>~/.gemini/config/global_workflows/</code> • Corps injecté à l\'invocation seulement (observé pour <code>.agents/workflows/</code>, déduit pour le global) • Les <code>wf-*</code> de l\'extension sont des skills</span></li>'
       : '<li><span class="cs-icon">⏹️</span><span><strong>Workflows :</strong> Hors service depuis le 19 octobre 2026 • Migrer vers des skills • Les <code>wf-*</code> de l\'extension sont déjà des skills</span></li>';
   }
@@ -3065,6 +3112,8 @@
       formatPersonalizationBudgetTooltip,
       wfSkillNote,
       antigravityWorkflowsCheatSheetItem,
+      antigravityProfileLabel,
+      renderAntigravityProfilePill,
       describeMarkdownWorkflowCost,
       markdownWorkflowPathItem,
       updateBreakdownRow,

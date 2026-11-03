@@ -5,21 +5,29 @@ import { ResourceItem, WorkspaceContext } from '../types';
 import { getEffectiveGlobalAntigravityPath, getEffectiveGlobalClaudePath } from '../utils/paths';
 import { ensureAntigravityTrigger } from '../utils/antigravityRules';
 import { resolveActiveAntigravityProfile } from '../antigravity/behaviorProfile';
+import { AntigravityBehaviorProfile } from '../antigravity/behavior';
+
+/** Options de l'import. `antigravityProfile` : port injectable ; par défaut, le profil actif. */
+export interface ImportOptions {
+  antigravityProfile?: AntigravityBehaviorProfile;
+}
 
 export class ImportService {
   /**
-   * Importe une ressource (depuis le NAS ou Global) vers Global ou Local.
+   * Importe une ressource (depuis le NAS ou Global) vers Global ou Local. Le profil d'Antigravity
+   * (conversion des `paths:` d'une règle, D-6) est celui de `options`, sinon le profil actif.
    */
   public static async importResource(
     item: ResourceItem,
     destinationScope: 'global' | 'local',
-    workspace: WorkspaceContext
+    workspace: WorkspaceContext,
+    options: ImportOptions = {}
   ): Promise<{ success: boolean; targetPath?: string; error?: string; notice?: string }> {
     try {
       if (destinationScope === 'global') {
-        return await this.importToGlobal(item);
+        return await this.importToGlobal(item, options);
       } else {
-        return await this.importToLocal(item, workspace);
+        return await this.importToLocal(item, workspace, options);
       }
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
@@ -34,7 +42,8 @@ export class ImportService {
    * Import vers la configuration globale PC
    */
   private static async importToGlobal(
-    item: ResourceItem
+    item: ResourceItem,
+    options: ImportOptions = {}
   ): Promise<{ success: boolean; targetPath: string; notice?: string }> {
     const globalPath = getEffectiveGlobalAntigravityPath();
 
@@ -85,7 +94,7 @@ export class ImportService {
       }
 
       const targetFile = activeFile;
-      const notice = await this.copyRuleForAntigravity(item.path, targetFile);
+      const notice = await this.copyRuleForAntigravity(item.path, targetFile, options);
 
       return { success: true, targetPath: targetFile, notice };
     }
@@ -96,7 +105,8 @@ export class ImportService {
    */
   private static async importToLocal(
     item: ResourceItem,
-    workspace: WorkspaceContext
+    workspace: WorkspaceContext,
+    options: ImportOptions = {}
   ): Promise<{ success: boolean; targetPath: string; notice?: string }> {
     if (!workspace.hasWorkspace || !workspace.workspacePath) {
       throw new Error('Aucun espace de travail ouvert pour importer en local.');
@@ -107,7 +117,7 @@ export class ImportService {
     if (workspace.tool === 'claude-code') {
       return await this.importToClaudeLocal(item, rootPath);
     } else {
-      return await this.importToAntigravityLocal(item, rootPath, workspace.agentsDir || '.agents');
+      return await this.importToAntigravityLocal(item, rootPath, workspace.agentsDir || '.agents', options);
     }
   }
 
@@ -117,7 +127,8 @@ export class ImportService {
   private static async importToAntigravityLocal(
     item: ResourceItem,
     workspaceRoot: string,
-    agentsDirName: string
+    agentsDirName: string,
+    options: ImportOptions = {}
   ): Promise<{ success: boolean; targetPath: string; notice?: string }> {
     if (item.type === 'soul') {
       const targetFile = path.join(workspaceRoot, 'GEMINI.md');
@@ -166,7 +177,7 @@ export class ImportService {
       }
 
       const targetFile = activeFile;
-      const notice = await this.copyRuleForAntigravity(item.path, targetFile);
+      const notice = await this.copyRuleForAntigravity(item.path, targetFile, options);
 
       return { success: true, targetPath: targetFile, notice };
     }
@@ -233,9 +244,14 @@ export class ImportService {
    * complété ou si les motifs `globs` posent problème (portée élargie, motifs morts, liste YAML,
    * règle glob sans effet). La conversion des `paths:` suit le profil actif (D-6).
    */
-  private static async copyRuleForAntigravity(sourcePath: string, targetFile: string): Promise<string | undefined> {
+  private static async copyRuleForAntigravity(
+    sourcePath: string,
+    targetFile: string,
+    options: ImportOptions = {}
+  ): Promise<string | undefined> {
     const content = await fs.promises.readFile(sourcePath, 'utf8');
-    const prepared = ensureAntigravityTrigger(content, resolveActiveAntigravityProfile().profile);
+    const profile = options.antigravityProfile ?? resolveActiveAntigravityProfile().profile;
+    const prepared = ensureAntigravityTrigger(content, profile);
     await fs.promises.writeFile(targetFile, prepared.content, 'utf8');
     const notices = [
       ...(prepared.addedTrigger

@@ -310,27 +310,30 @@ describe('Suite de Tests : hooks et workflows d\'Antigravity (lot A3b)', () => {
       return find(card)!;
     };
     assert.match(typeBadge(workflow).title, /Skill dont le nom commence par wf- : Antigravity le liste comme un skill/);
-    assert.match(typeBadge(workflow).title, /format retiré le 19 octobre 2026/);
+    // Sans état (avant le premier stateUpdate), le texte est celui de la 2.6.0 (lot L10, défaut « auto »)
+    assert.match(typeBadge(workflow).title, /qu'Antigravity IDE 2\.6\.0 liste encore dans « \/ » \(observé\)/);
+    assert.doesNotMatch(typeBadge(workflow).title, /format retiré le 19 octobre 2026/);
     assert.strictEqual(typeBadge({ ...workflow, targetTool: 'claude-code' }).title, '', 'Claude Code : aucune infobulle ajoutée');
   });
 
   // Sonde du 2026-11-02, Antigravity IDE 2.6.0 : les workflows Markdown sont encore listés dans « / ».
-  // Le profil 2.5.5 (et l'état encore inconnu) garde le texte de la documentation, à l'identique.
+  // Le profil 2.5.5 garde le texte de la documentation, à l'identique ; l'état encore inconnu prend le
+  // texte de la 2.6.0, profil du défaut « auto » quand il détecte la 2.6.0 ou se replie (lot L10, D-2).
   test('10. Textes selon la version : infobulle des skills wf-* et ligne Workflows de l\'aide-mémoire', () => {
     const v255 = 'Antigravity IDE 2.5.5';
     const v260 = 'Antigravity IDE 2.6.0';
     const note255 = 'Skill dont le nom commence par wf- : Antigravity le liste comme un skill, et il reste compté. Ce n\'est pas un workflow, format retiré le 19 octobre 2026.';
     assert.strictEqual(main.wfSkillNote(v255), note255, '2.5.5 : texte inchangé');
-    assert.strictEqual(main.wfSkillNote(''), note255, 'Sans état : texte de la 2.5.5');
     const note260 = main.wfSkillNote(v260);
+    assert.strictEqual(main.wfSkillNote(''), note260, 'Sans état : texte de la 2.6.0');
     assert.doesNotMatch(note260, /retiré/);
     assert.match(note260, /^Skill dont le nom commence par wf- : Antigravity le liste comme un skill, et il reste compté\./);
     assert.match(note260, /\.agents\/workflows\/ ou ~\/\.gemini\/config\/global_workflows\/\), qu'Antigravity IDE 2\.6\.0 liste encore dans « \/ » \(observé\)/);
 
     const ligne255 = '<li><span class="cs-icon">⏹️</span><span><strong>Workflows :</strong> Hors service depuis le 19 octobre 2026 • Migrer vers des skills • Les <code>wf-*</code> de l\'extension sont déjà des skills</span></li>';
     assert.strictEqual(main.antigravityWorkflowsCheatSheetItem(v255), ligne255, '2.5.5 : ligne inchangée');
-    assert.strictEqual(main.antigravityWorkflowsCheatSheetItem(''), ligne255, 'Sans état : ligne de la 2.5.5');
     const ligne260 = main.antigravityWorkflowsCheatSheetItem(v260);
+    assert.strictEqual(main.antigravityWorkflowsCheatSheetItem(''), ligne260, 'Sans état : ligne de la 2.6.0');
     assert.doesNotMatch(ligne260, /Hors service/);
     assert.match(ligne260, /encore listés dans « \/ » par l'IDE 2\.6\.0 \(observé\)/);
     assert.match(ligne260, /<code>\.agents\/workflows\/<\/code> et <code>~\/\.gemini\/config\/global_workflows\/<\/code>/);

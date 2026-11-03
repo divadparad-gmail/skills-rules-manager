@@ -982,10 +982,17 @@ describe('Suite de Tests : comptage des tokens au démarrage d\'Antigravity (lot
       });
       vscodeMock.env.appName = 'Antigravity IDE';
 
+      // Défaut « auto » (lot L10) : le faux <gemini> (parent de globalConfigDir) n'a aucun indice, d'où le repli sur 2.6.0
       StateManager.setAntigravityProfileForTesting(null);
       const stateDefaut = await StateManager.loadFullState(true);
-      assert.strictEqual(stateDefaut.antigravityBehavior?.version, 'Antigravity IDE 2.5.5');
-      assert.deepStrictEqual(stateDefaut.nasResources, scanDefaut.items, 'StateManager (défaut 2.5.5) : nasResources égal au scan direct');
+      assert.strictEqual(stateDefaut.antigravityBehavior?.version, 'Antigravity IDE 2.6.0');
+      assert.strictEqual(stateDefaut.antigravityBehavior?.source, 'fallback');
+      assert.deepStrictEqual(stateDefaut.nasResources, scan260.items, 'StateManager (défaut « auto », repli 2.6.0) : nasResources égal au scan 2.6.0');
+
+      StateManager.setAntigravityProfileForTesting(resolveAntigravityProfile('2.5.5', indicesVides));
+      const state255 = await StateManager.loadFullState(true);
+      assert.strictEqual(state255.antigravityBehavior?.version, 'Antigravity IDE 2.5.5');
+      assert.deepStrictEqual(state255.nasResources, scanDefaut.items, 'StateManager (2.5.5 forcé) : nasResources égal au scan sans profil (2.5.5)');
 
       StateManager.setAntigravityProfileForTesting(resolveAntigravityProfile('2.6.0', indicesVides));
       const state260 = await StateManager.loadFullState(true);

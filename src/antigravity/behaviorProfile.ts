@@ -2,7 +2,8 @@
  * Choix du profil de comportement d'Antigravity (src/antigravity/behavior.ts) : le réglage
  * skillsManager.antigravityProfile, puis, en « auto », la structure des données du dossier
  * `<gemini>` (~/.gemini). Cette structure indique une génération d'Antigravity, et non sa version
- * exacte : un retour à la 2.5.5 après une 2.6.0 laisse la structure 2.6.0 en place.
+ * exacte : un retour à la 2.5.5 après une 2.6.0 laisserait la structure 2.6.0 en place (déduit, non
+ * vérifié ; l'infobulle du profil ne l'affirme pas).
  *
  * Indices observés le 2026-10-28 sous Windows (chantier « Antigravity 2.6.0 », phase 1) :
  * - `antigravity/builtin/` : la 2.6.0 y écrit ses skills intégrés à chaque lancement ;
@@ -26,8 +27,11 @@ export type AntigravityProfileSetting = 'auto' | AntigravityProfileId;
 
 /** Réglage de portée `machine` : un dépôt ne peut pas le fixer, et Settings Sync ne le recopie pas. */
 export const ANTIGRAVITY_PROFILE_SETTING = 'skillsManager.antigravityProfile';
-/** Forcé à 2.5.5 tant que les faits de la 2.6.0 ne sont pas tous en place dans l'extension. */
-export const ANTIGRAVITY_PROFILE_SETTING_DEFAULT: AntigravityProfileSetting = '2.5.5';
+/**
+ * « auto » (décisions D-1 et D-2, lot L10) : le profil est déduit de la structure des données, avec
+ * un repli sur la 2.6.0. Une valeur absente ou invalide mène donc à la détection.
+ */
+export const ANTIGRAVITY_PROFILE_SETTING_DEFAULT: AntigravityProfileSetting = 'auto';
 const PROFILE_SETTINGS: readonly AntigravityProfileSetting[] = ['auto', '2.5.5', '2.6.0'];
 
 export type ProfileSource = 'forced' | 'detected' | 'fallback';
@@ -107,15 +111,13 @@ export function normalizeProfileSetting(value: unknown): AntigravityProfileSetti
  * et rien de reconnu mène au repli sur la 2.6.0, version actuelle.
  */
 export function resolveAntigravityProfile(setting: unknown, signals: ProfileSignals): ResolvedAntigravityProfile {
-  const valid = typeof setting === 'string' && (PROFILE_SETTINGS as readonly string[]).includes(setting);
+  // Le défaut étant « auto », un profil n'est forcé que par une valeur explicite et valide du réglage
   const choice = normalizeProfileSetting(setting);
   if (choice !== 'auto') {
     return {
       profile: ANTIGRAVITY_PROFILES[choice],
       source: 'forced',
-      reason: valid
-        ? `Profil ${choice} imposé par le réglage ${ANTIGRAVITY_PROFILE_SETTING}.`
-        : `Profil ${choice} : valeur par défaut du réglage ${ANTIGRAVITY_PROFILE_SETTING}.`,
+      reason: `Profil ${choice} imposé par le réglage ${ANTIGRAVITY_PROFILE_SETTING}.`,
     };
   }
   if (signals.newStructure || signals.migrationMarker) {
@@ -123,7 +125,7 @@ export function resolveAntigravityProfile(setting: unknown, signals: ProfileSign
       signals.newStructure ? 'antigravity/builtin/' : '',
       signals.migrationMarker ? 'antigravity-ide/.ide_migration' : '',
     ].filter(Boolean).join(' et ');
-    const leftover = signals.oldStructure ? ' L\'ancienne racine antigravity-ide/ est encore présente, sans effet.' : '';
+    const leftover = signals.oldStructure ? ' L\'ancienne racine antigravity-ide/ est encore présente (ancienne génération).' : '';
     return {
       profile: ANTIGRAVITY_PROFILES['2.6.0'],
       source: 'detected',

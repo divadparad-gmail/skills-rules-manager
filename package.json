@@ -197,7 +197,7 @@
             "Comportement mesuré dans Antigravity IDE 2.5.5 (tests du 2026-10-21).",
             "Comportement mesuré dans Antigravity IDE 2.6.0 (tests du 2026-10-28)."
           ],
-          "default": "2.5.5",
+          "default": "auto",
           "scope": "machine",
           "description": "Profil de comportement d'Antigravity utilisé pour compter ce que l'agent charge réellement (chemins, règles et coûts au démarrage)."
         },
