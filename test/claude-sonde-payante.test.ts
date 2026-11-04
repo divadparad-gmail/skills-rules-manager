@@ -483,11 +483,15 @@ describe('Suite de Tests : Partie payante de la sonde Claude Code (lot I3, sans 
       const environnements = sortie.split('\n').filter((l) => l.startsWith('  environnement nettoyé ('));
       assert.strictEqual(environnements.length, 38);
       for (const l of environnements) {
-        assert.match(l, /CANARI_VARIABLE_TEMOIN/);
         assert.match(l, /CLAUDE_CONFIG_DIR/);
         assert.match(l, /DISABLE_AUTOUPDATER/);
-        assert.doesNotMatch(l, /ANTHROPIC/);
+        assert.match(l, /\bPATH\b|\bPath\b/i);
+        assert.doesNotMatch(l, /ANTHROPIC|CANARI_VARIABLE_TEMOIN/, 'liste blanche : aucune variable arbitraire');
       }
+      const transmis = sortie.split('\n').find((l) => l.startsWith('[a-sec] Variables transmises à claude (liste blanche'));
+      assert.ok(transmis && !/CANARI_VARIABLE_TEMOIN|ANTHROPIC/.test(transmis), 'la liste complète des noms transmis est affichée');
+      const noms = (transmis as string).split(' : ').pop()!.split(', ');
+      assert.ok(noms.every((n) => S.VARIABLES_POSEES.includes(n) || S.nomPermis(n)), 'seulement des noms de la liste blanche');
       assert.ok(!sortie.includes('a-ne-pas-afficher'), 'aucune valeur de variable');
       assert.strictEqual(sortie.split('\n').filter((l) => l.startsWith('  argv : ')).length, 71);
       assert.ok(!fs.existsSync(path.join(racine, 'espace')) && !fs.existsSync(path.join(racine, 'config')), 'rien n\'est écrit dans l\'espace ni le profil');

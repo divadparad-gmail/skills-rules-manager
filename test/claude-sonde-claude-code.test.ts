@@ -177,20 +177,23 @@ describe('Suite de Tests : Lanceur de la sonde Claude Code (lot I2, sans lancer 
     assert.strictEqual(S.resoudreExe({ env: { PATH: '/usr/bin:/opt/c' }, plateforme: 'linux', existe: existe(['/opt/c/claude']) }), '/opt/c/claude');
   });
 
-  test('4. Environnement nettoyé : aucune variable CLAUDE* ni ANTHROPIC*, seules deux variables posées', () => {
+  test('4. Environnement nettoyé : liste blanche du système, aucune variable CLAUDE* ni ANTHROPIC*, deux variables posées', () => {
     const parent = {
-      PATH: 'p', HOME: 'h', CLAUDECODE: '1', CLAUDE_CODE_ENTRYPOINT: 'cli', claude_pid: '3', CLAUDE_CODE_USE_BEDROCK: '1',
+      PATH: 'p', HOME: 'h', SystemRoot: 's', CLAUDECODE: '1', CLAUDE_CODE_ENTRYPOINT: 'cli', claude_pid: '3', CLAUDE_CODE_USE_BEDROCK: '1',
       ANTHROPIC_API_KEY: 'k', Anthropic_Base_Url: 'u', CLAUDE_CONFIG_DIR: 'autre', DISABLE_AUTOUPDATER: '0', disable_autoupdater: '0',
     };
     const avant = clone(parent);
-    const env = S.environnementNettoye(parent, CONFIG_W);
-    assert.deepStrictEqual(Object.keys(env).sort(), ['CLAUDE_CONFIG_DIR', 'DISABLE_AUTOUPDATER', 'HOME', 'PATH']);
-    assert.strictEqual(env.CLAUDE_CONFIG_DIR, CONFIG_W);
-    assert.strictEqual(env.DISABLE_AUTOUPDATER, '1');
+    for (const [plateforme, attendus] of [['win32', ['CLAUDE_CONFIG_DIR', 'DISABLE_AUTOUPDATER', 'PATH', 'SystemRoot']], ['linux', ['CLAUDE_CONFIG_DIR', 'DISABLE_AUTOUPDATER', 'HOME', 'PATH']]] as [string, string[]][]) {
+      const env = S.environnementNettoye(parent, CONFIG_W, plateforme);
+      assert.deepStrictEqual(Object.keys(env).sort(), attendus, plateforme);
+      assert.strictEqual(env.CLAUDE_CONFIG_DIR, CONFIG_W);
+      assert.strictEqual(env.DISABLE_AUTOUPDATER, '1');
+      assert.deepStrictEqual(S.problemesEnvironnement(env, CONFIG_W, plateforme), [], plateforme);
+    }
     assert.deepStrictEqual(parent, avant, "l'environnement du parent n'est pas modifié");
-    assert.deepStrictEqual(S.problemesEnvironnement(env, CONFIG_W), []);
+    const env = S.environnementNettoye(parent, CONFIG_W, 'win32');
     for (const ajout of [{ ANTHROPIC_AUTH_TOKEN: 'x' }, { anthropic_api_key: 'x' }, { CLAUDE_CODE_USE_VERTEX: '1' }, { CLAUDE_CONFIG_DIR: HOME_W }, { DISABLE_AUTOUPDATER: '0' }]) {
-      assert.ok(S.problemesEnvironnement({ ...env, ...ajout }, CONFIG_W).length > 0, JSON.stringify(Object.keys(ajout)));
+      assert.ok(S.problemesEnvironnement({ ...env, ...ajout }, CONFIG_W, 'win32').length > 0, JSON.stringify(Object.keys(ajout)));
     }
   });
 
@@ -573,6 +576,44 @@ describe('Suite de Tests : Lanceur de la sonde Claude Code (lot I2, sans lancer 
       assert.strictEqual(JSON.parse(fs.readFileSync(journal, 'utf8')).etat, 'retrait-incomplet');
     } finally {
       supprimer(racine);
+    }
+  });
+
+  test('17. Liste blanche : un parent avec jetons, clés, proxy et certificats n\'en transmet aucun, et lancerClaude refuse tout nom ajouté', () => {
+    const systemeW: Record<string, string> = {
+      Path: 'p', SystemRoot: 's', windir: 'w', ComSpec: 'c', PATHEXT: '.EXE', TEMP: 't', TMP: 't', USERPROFILE: 'u', HOMEDRIVE: 'h', HOMEPATH: 'h',
+      APPDATA: 'a', LOCALAPPDATA: 'l', ProgramFiles: 'pf', 'ProgramFiles(x86)': 'pf', ProgramW6432: 'pf', ProgramData: 'pd', SystemDrive: 'C:',
+      OS: 'Windows_NT', NUMBER_OF_PROCESSORS: '8', PROCESSOR_ARCHITECTURE: 'AMD64', processor_level: '6',
+    };
+    const systemeP: Record<string, string> = { HOME: 'h', PATH: 'p', LANG: 'fr_CA.UTF-8', LC_ALL: 'fr', LC_CTYPE: 'fr', TERM: 'xterm', TMPDIR: 't', USER: 'u', SHELL: '/bin/sh' };
+    const arbitraires: Record<string, string> = {
+      EXEMPLE_ACCESS_TOKEN: 'secret-1', SERVICE_API_KEY: 'secret-2', GITHUB_TOKEN: 'secret-3', AWS_SECRET_ACCESS_KEY: 'secret-4', OPENAI_API_KEY: 'secret-5',
+      MOT_DE_PASSE_EXEMPLE: 'secret-6', HTTP_PROXY: 'secret-7', HTTPS_PROXY: 'secret-8', https_proxy: 'secret-9', NO_PROXY: 'secret-10', ALL_PROXY: 'secret-11',
+      NODE_EXTRA_CA_CERTS: 'secret-12', SSL_CERT_FILE: 'secret-13', REQUESTS_CA_BUNDLE: 'secret-14', CURL_CA_BUNDLE: 'secret-15', NODE_OPTIONS: 'secret-16',
+      ANTHROPIC_API_KEY: 'secret-17', CLAUDECODE: 'secret-18', SSH_AUTH_SOCK: 'secret-19', PROCESSORX: 'secret-20', LCX: 'secret-21',
+    };
+    for (const [plateforme, systeme, posees] of [['win32', systemeW, ['CLAUDE_CONFIG_DIR', 'DISABLE_AUTOUPDATER']], ['linux', systemeP, ['CLAUDE_CONFIG_DIR', 'DISABLE_AUTOUPDATER']]] as [string, Record<string, string>, string[]][]) {
+      const env = S.environnementNettoye({ ...systeme, ...arbitraires }, CONFIG_W, plateforme);
+      assert.deepStrictEqual(Object.keys(env).sort(), [...Object.keys(systeme), ...posees].sort(), plateforme);
+      assert.doesNotMatch(JSON.stringify(env), /secret-/, `${plateforme} : aucune valeur arbitraire transmise`);
+      assert.deepStrictEqual(S.problemesEnvironnement(env, CONFIG_W, plateforme), [], plateforme);
+      for (const [nom, valeur] of Object.entries(arbitraires)) {
+        const pb = S.problemesEnvironnement({ ...env, [nom]: valeur }, CONFIG_W, plateforme);
+        assert.ok(pb.length > 0, `${plateforme} ${nom}`);
+        assert.ok(!pb.join(' ').includes(nom), 'le message ne cite pas le nom');
+      }
+    }
+    // Les noms système d'une plateforme ne passent pas sur l'autre
+    assert.ok(!('HOME' in S.environnementNettoye({ HOME: 'h' }, CONFIG_W, 'win32')));
+    assert.ok(!('SystemRoot' in S.environnementNettoye({ SystemRoot: 's' }, CONFIG_W, 'linux')));
+    // lancerClaude refuse un environnement augmenté, avant tout lancement et sans rien compter
+    const brut = tmp('liste-blanche');
+    try {
+      const env = { ...S.environnementNettoye(systemeW, CONFIG_W, 'win32'), GITHUB_TOKEN: 'secret' };
+      assert.throws(() => S.lancerClaude({ exe: 'x', argv: ['--version'], env, cwd: brut, espace: ESPACE_W, configDir: CONFIG_W, dossierBrut: brut, plateforme: 'win32' }), /environnement non conforme : 1 variable\(s\) hors de la liste blanche/);
+      assert.deepStrictEqual(fs.readdirSync(brut), []);
+    } finally {
+      supprimer(brut);
     }
   });
 

@@ -22,8 +22,10 @@
  *   - seuls « claude --version », « claude auth status --json », « claude -p /context » (ou
  *     « /context all ») et, pour la partie payante, « claude -p <invite de SONDE.md vérifiée par son
  *     empreinte> » peuvent être lancés : verifierArgv() refuse tout le reste, sans shell ;
- *   - environnement nettoyé : toutes les variables CLAUDE* et ANTHROPIC* sont retirées, seules
- *     CLAUDE_CONFIG_DIR et DISABLE_AUTOUPDATER=1 sont posées ;
+ *   - environnement en liste blanche : seules les variables système nécessaires au démarrage de claude
+ *     et du shell des hooks sont transmises (ni jeton, ni clé, ni proxy, ni certificat), puis
+ *     CLAUDE_CONFIG_DIR et DISABLE_AUTOUPDATER=1 sont posées ; tout autre nom est refusé avant chaque
+ *     lancement ;
  *   - profil connecté par claude.ai, sur un abonnement, avec le bon configDirectory, avant chaque série ;
  *   - après chaque /context : apiKeySource=none, usage nul, num_turns=0, coût nul ; après chaque appel
  *     au modèle : apiKeySource=none (aussi dès l'initialisation, avant la première requête) ; sinon le
@@ -186,12 +188,37 @@ function resoudreExe({ env = process.env, plateforme = process.platform, existe 
   throw new Refus('claude introuvable dans le PATH (ou seulement sous forme de .cmd sans claude.exe) : définir CANARI_CLAUDE_EXE');
 }
 
-const MOTIF_RETIRE = /^(CLAUDE|ANTHROPIC)/i;
-/** L'environnement du processus enfant : rien de CLAUDE* ni d'ANTHROPIC*, puis deux variables posées. */
-function environnementNettoye(env, configDir) {
+/**
+ * Liste blanche de l'environnement du processus enfant : les seules variables système nécessaires au
+ * démarrage de claude et du shell des hooks. Tout le reste est retiré, en particulier les jetons et
+ * clés d'autres services, et les variables de proxy et de certificats (exclues à dessein). Sous
+ * Windows, la casse des noms est ignorée.
+ */
+const LISTE_BLANCHE = {
+  win32: {
+    noms: ['SystemRoot', 'windir', 'ComSpec', 'PATH', 'PATHEXT', 'TEMP', 'TMP', 'USERPROFILE', 'HOMEDRIVE', 'HOMEPATH', 'APPDATA', 'LOCALAPPDATA',
+      'ProgramFiles', 'ProgramFiles(x86)', 'ProgramW6432', 'ProgramData', 'SystemDrive', 'OS', 'NUMBER_OF_PROCESSORS'],
+    prefixes: ['PROCESSOR_'],
+  },
+  posix: { noms: ['HOME', 'PATH', 'LANG', 'TERM', 'TMPDIR', 'USER', 'SHELL'], prefixes: ['LC_'] },
+};
+const VARIABLES_POSEES = ['CLAUDE_CONFIG_DIR', 'DISABLE_AUTOUPDATER'];
+
+/** Vrai si le nom figure dans la liste blanche de la plateforme (les deux variables posées exclues). */
+function nomPermis(nom, plateforme = process.platform) {
+  const l = LISTE_BLANCHE[plateforme === 'win32' ? 'win32' : 'posix'];
+  if (plateforme === 'win32') {
+    const n = nom.toUpperCase();
+    return l.noms.some((x) => x.toUpperCase() === n) || l.prefixes.some((p) => n.startsWith(p.toUpperCase()));
+  }
+  return l.noms.includes(nom) || l.prefixes.some((p) => nom.startsWith(p));
+}
+
+/** L'environnement du processus enfant : la liste blanche du système, puis deux variables posées. */
+function environnementNettoye(env, configDir, plateforme = process.platform) {
   const out = {};
   for (const [k, v] of Object.entries(env)) {
-    if (v === undefined || MOTIF_RETIRE.test(k) || /^DISABLE_AUTOUPDATER$/i.test(k)) continue;
+    if (v === undefined || !nomPermis(k, plateforme)) continue;
     out[k] = v;
   }
   out.CLAUDE_CONFIG_DIR = configDir;
@@ -199,13 +226,14 @@ function environnementNettoye(env, configDir) {
   return out;
 }
 
-/** Contrôle de l'environnement de l'enfant, refait juste avant chaque lancement. */
-function problemesEnvironnement(env, configDir) {
+/**
+ * Contrôle de l'environnement de l'enfant, refait juste avant chaque lancement : tout nom hors de la
+ * liste blanche est refusé. Les messages ne citent aucun nom de variable hors de la liste.
+ */
+function problemesEnvironnement(env, configDir, plateforme = process.platform) {
   const out = [];
-  for (const k of Object.keys(env)) {
-    if (/^ANTHROPIC/i.test(k)) out.push(`variable ${k} présente après le nettoyage`);
-    else if (/^CLAUDE/i.test(k) && k !== 'CLAUDE_CONFIG_DIR') out.push(`variable ${k} présente après le nettoyage`);
-  }
+  const hors = Object.keys(env).filter((k) => !VARIABLES_POSEES.includes(k) && !nomPermis(k, plateforme));
+  if (hors.length > 0) out.push(`${hors.length} variable(s) hors de la liste blanche`);
   if (env.CLAUDE_CONFIG_DIR !== configDir) out.push('CLAUDE_CONFIG_DIR ne désigne pas le profil isolé');
   if (env.DISABLE_AUTOUPDATER !== '1') out.push('DISABLE_AUTOUPDATER différent de 1');
   return out;
@@ -815,7 +843,7 @@ function arreterArbre(enfant, plateforme = process.platform) {
 function lancerClaude({ exe, argv, env, cwd, espace, configDir, dossierBrut, plateforme = process.platform, delaiMs = DELAI_MS, lot = null, invites = null, garde = null }) {
   verifierArret(dossierBrut);
   const forme = verifierArgv(argv, { espace, plateforme, invites });
-  const pb = problemesEnvironnement(env, configDir);
+  const pb = problemesEnvironnement(env, configDir, plateforme);
   if (pb.length > 0) throw new Refus(`environnement non conforme : ${pb.join(' ; ')}`);
   if (forme === 'modele' && typeof garde !== 'function') throw new Refus('appel au modèle sans garde de flux');
   if ((forme === 'context' || forme === 'modele') && !lot) throw new Refus('lot du compteur absent');
@@ -932,8 +960,8 @@ function preparer({ aSec = false } = {}) {
     if (!aSec) throw err;
     exe = '<claude introuvable : CANARI_CLAUDE_EXE à définir>';
   }
-  const env = environnementNettoye(process.env, configDir);
-  const pbEnv = problemesEnvironnement(env, configDir);
+  const env = environnementNettoye(process.env, configDir, plateforme);
+  const pbEnv = problemesEnvironnement(env, configDir, plateforme);
   if (pbEnv.length > 0) throw new Refus(pbEnv.join(' ; '));
   if (!aSec && !fs.existsSync(configDir)) throw new Refus("le profil isolé n'existe pas : le connecter d'abord (README de la suite)");
   const pbEspace = problemesEspace(espace, { home: os.homedir(), depot: RACINE_DEPOT, configDir, plateforme });
@@ -1226,6 +1254,7 @@ function commandeASec({ etapes, compte, invites, envoyables }) {
   const sortie = [];
   sortie.push(`[a-sec] Partie payante à sec : rien n'est lancé ni écrit. Lot ${payant.LOT_PAYANT}, modèle ${MODELE}, effort ${EFFORT}.`);
   sortie.push(`[a-sec] Compteurs actuels : context ${resumeCompteur(BRUT, 'context')} ; modèle ${resumeCompteur(BRUT, 'modele')}.`);
+  sortie.push(`[a-sec] Variables transmises à claude (liste blanche, ${noms.length} noms, valeurs non affichées) : ${noms.join(', ')}`);
   if (ctx.pbEspace.length > 0) sortie.push(`[a-sec] Préconditions de l'espace non remplies (bloquantes en vrai) : ${ctx.pbEspace.join(' ; ')}`);
   let m = 0;
   let c = 0;
@@ -1540,6 +1569,7 @@ async function principal(argv) {
 module.exports = {
   LOTS_CONTEXT, PROMPTS, ABONNEMENTS, BASES, COMBINAISONS, FICHIER_ARRET, FICHIER_COMPTEUR, FICHIER_JOURNAL,
   Refus, RefusArgv, Arret, SerieRejetee,
+  LISTE_BLANCHE, VARIABLES_POSEES, nomPermis,
   estSousOuEgal, estSousStrict, cheminsParDefaut, resoudreExe, environnementNettoye, problemesEnvironnement,
   problemesEspace, problemesAuth, verifierPrompt, argumentsContext, argumentsAppel, verifierArgv, lireFlux, sommeUsage,
   controlerAppel, verifierArret, ecrireArret, lireCompteur, verifierBudget, reserverContext, ouvrirLotAnnonce,
