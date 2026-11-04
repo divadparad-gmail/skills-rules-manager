@@ -1,0 +1,20 @@
+{
+  "nom": "canari-mcp-a2",
+  "version": "0.0.1",
+  "instructions": "Instructions du serveur de mesure. Elles sont les mêmes dans chaque serveur de mesure. Instructions du serveur de mesure. Elles sont les mêmes dans chaque serveur de mesure.",
+  "outils": [
+    {
+      "nom": "canari_outil",
+      "description": "Outil de mesure, il ne fait rien.",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "texte": {
+            "type": "string",
+            "description": "Texte libre"
+          }
+        }
+      }
+    }
+  ]
+}

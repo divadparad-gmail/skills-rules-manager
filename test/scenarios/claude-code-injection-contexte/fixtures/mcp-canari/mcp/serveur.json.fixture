@@ -1,0 +1,23 @@
+{
+  "nom": "canari-mcp",
+  "version": "0.0.1",
+  "instructions": "Instructions du serveur de fixture. Canari : CANARI-CC-MCPINSTR-76MH.",
+  "outils": [
+    {
+      "nom": "canari_outil",
+      "description": "Outil de fixture, il ne fait rien. Canari : CANARI-CC-MCPOUTIL-S65X.",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "texte": {
+            "type": "string",
+            "description": "Texte libre"
+          }
+        }
+      }
+    }
+  ],
+  "env": {
+    "CANARI_ENV": "CANARI-CC-MCPENV-KGUZ"
+  }
+}

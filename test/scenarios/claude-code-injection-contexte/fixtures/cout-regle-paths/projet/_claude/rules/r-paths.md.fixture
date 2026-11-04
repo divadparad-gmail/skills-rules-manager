@@ -1,0 +1,7 @@
+---
+paths:
+  - "src/**/*.ts"
+---
+# Règle de mesure
+
+Ce texte est le même dans chaque règle de mesure. Il sert à mesurer le coût d'une règle et celui de son chemin.

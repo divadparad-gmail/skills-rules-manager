@@ -1,0 +1,9 @@
+# Fixture de code
+
+```ts
+export function somme(a: number, b: number): number {
+  return a + b;
+}
+
+export const liste = [1, 2, 3].map((n) => somme(n, 1));
+```

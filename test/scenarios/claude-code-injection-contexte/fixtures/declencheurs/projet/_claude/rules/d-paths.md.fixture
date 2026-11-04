@@ -1,0 +1,7 @@
+---
+paths:
+  - "src/**/*.ts"
+---
+# Règle déclenchée par les fichiers TypeScript
+
+Canari : CANARI-CC-DPATHS-9C2L.

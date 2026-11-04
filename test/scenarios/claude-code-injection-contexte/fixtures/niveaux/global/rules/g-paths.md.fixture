@@ -1,0 +1,7 @@
+---
+paths:
+  - "**/*.txt"
+---
+# Règle globale conditionnelle
+
+Canari : CANARI-CC-GPATHS-DE25.

@@ -1,0 +1,19 @@
+{
+  "nom": "canari-mcp-b1",
+  "version": "0.0.1",
+  "outils": [
+    {
+      "nom": "canari_outil",
+      "description": "Outil de mesure, il ne fait rien.",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "texte": {
+            "type": "string",
+            "description": "Texte libre"
+          }
+        }
+      }
+    }
+  ]
+}

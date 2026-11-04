@@ -1,0 +1,7 @@
+---
+name: canari-paths
+description: Skill de fixture pour la sonde, il ne fait rien. Canari CANARI-CC-DSKPATHS-Q9PG
+paths:
+  - "src/**/*.ts"
+---
+Corps : CANARI-CC-DSKCORPS-ZLKX.

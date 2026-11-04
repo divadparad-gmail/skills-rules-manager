@@ -1,0 +1,6 @@
+---
+name: canari-cache
+description: Skill de fixture pour la sonde, il ne fait rien. Canari CANARI-CC-SKCACHE-9Q9U
+disable-model-invocation: true
+---
+Corps caché.

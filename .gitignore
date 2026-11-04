@@ -68,3 +68,6 @@ scripts/hooks/*.log
 /.claude/skills/skill-claude-disabled/SKILL.md.disabled
 /.claude/skills/skill-claude-traduction/SKILL.md
 /.claude/skills/skill-claude-traduction/SKILL.md.disabled
+
+# Suite d'injection Claude Code : sorties brutes de la sonde (chemins et données locales).
+/test/scenarios/claude-code-injection-contexte/brut/

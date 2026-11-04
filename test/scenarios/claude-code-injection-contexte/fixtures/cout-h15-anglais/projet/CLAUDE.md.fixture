@@ -1,0 +1,3 @@
+# Measurement fixture
+
+This text is written in plain English. It is used to compare the token count reported by Claude Code with the o200k count of the same content, for a typical paragraph about coding conventions and project structure.
