@@ -47,6 +47,11 @@ Le format s'inspire de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) 
 - `npm run test:deploy-*` et `npm run test:clean` refusent une option inconnue, un argument en trop, une cible inconnue ou une racine invalide avec un message qui nomme l'argument en cause, sans pile d'appels (code de sortie 1).
 - Un vrai `CLAUDE.md` ou `GEMINI.md`, ou tout fichier dont le frontmatter porte `scenario_fixture` ou `isScenarioFixture`, n'est plus présenté comme « 🧪 Test Scénario » ni supprimable par la corbeille sans copie dans le catalogue NAS. Une fixture du banc d'essai se reconnaît désormais à son contenu, identique à la fixture déployée ou à sa source, et non plus à son chemin, à son nom ou à un marqueur.
 
+### Limites connues
+
+- Les jauges restent des approximations, comptées avec le découpage o200k d'OpenAI ; elles peuvent différer du panneau Settings d'Antigravity IDE 2.6.0.
+- Avec le profil Antigravity IDE 2.6.0, un serveur MCP dont le cache ne contient pas la liste des outils ne compte que son titre (sous-estimation), et les skills intégrés `permissioned-github` et `run-workflow` (87 tokens) sont comptés alors qu'ils étaient absents du prompt lors des tests (surestimation). Leur correction est reportée à un prochain chantier.
+
 ## [0.4.0] — 2026-10-22
 
 ### Changement d'identifiant
