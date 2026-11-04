@@ -190,6 +190,7 @@ describe('Suite de Tests : Chaîne de construction et contributions du manifeste
     assert.match(ignore, /^!src\/webview\/\*\*$/m, 'Les gabarits de vue restent embarqués.');
     assert.match(ignore, /^node_modules\/\*\*$/m, 'Les dépendances sont intégrées au paquet par esbuild.');
     assert.match(ignore, /^out\/\*\*$/m, "La sortie tsc n'est plus distribuée.");
+    assert.match(ignore, /^dist\/\*\*\/\*\.map$/m, "Une sourcemap périmée de dist/ n'entre pas dans le paquet.");
     assert.match(ignore, /^test\/\*\*$/m);
   });
 

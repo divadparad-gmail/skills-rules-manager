@@ -22,5 +22,6 @@ scripts/**
 .mcp.json
 out/**
 esbuild.js
+dist/**/*.map
 
 node_modules/**
