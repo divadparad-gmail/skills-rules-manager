@@ -128,7 +128,7 @@ Dans l'hôte, ouvrez l'extension, puis cliquez sur « ⚡ Tous » dans le banc d
 Attendu :
 
 - Une fenêtre annonce le déploiement et liste `.mcp.json` et `CLAUDE.md`, qui seront sauvegardés puis restaurés au vidage. Cliquez sur « Déployer ».
-- Une notification annonce « 🧪 Scénarios « all » injectés (31 fichiers). » et les 2 vrais fichiers sauvegardés.
+- Une notification annonce « 🧪 Scénarios « all » injectés (31 fichiers). » et les 2 vrais fichiers sauvegardés. Elle se masque d'elle-même : si elle a disparu, retrouvez-la dans le centre de notifications (l'icône de cloche de la barre d'état).
 - La barre d'état affiche « ⚠️ Banc d'essai actif ».
 - Un bandeau « ⚠️ Banc d'essai actif » s'affiche en haut de la barre latérale, avec un bouton « Vider et restaurer ».
 - Le même bandeau s'affiche dans le Grand Dashboard.
@@ -394,4 +394,5 @@ Attendu : la pastille et son infobulle sont de nouveau celles de l'étape 9.1. R
 
 | Date | Commit ou version | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | Remarques |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 2026-10-23 | `2dde2ba` | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | ❌ | ✅ | – | 9 : partie ajoutée le 2026-11-03. 5 : date de `.mcp.json` restaurée avec 1 ms d'avance (arrondi). 7 : commande collée deux fois, pile d'appels affichée ; `--force` non essayé. 8 : le dossier temporaire s'appelait alors `vscode-hote-l2b`. Les écarts des parties 5 et 7 sont corrigés par `1a9f18c` et couverts par des tests automatiques, mais pas encore revérifiés à la main : à contrôler au prochain passage. |
+| 2026-10-23 | `2dde2ba` | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | ❌ | ✅ | – | 9 : partie ajoutée le 2026-11-03. 5 : date de `.mcp.json` restaurée avec 1 ms d'avance (arrondi). 7 : commande collée deux fois, pile d'appels affichée ; `--force` non essayé. 8 : le dossier temporaire s'appelait alors `vscode-hote-l2b`. Les écarts des parties 5 et 7 sont corrigés par `1a9f18c` et couverts par des tests automatiques ; ils ont été revérifiés à la main le 2026-11-04. |
+| 2026-11-04 | `1851945` | ✅ | ✅ | ✅ | – | ✅ | ✅ | – | ✅ | ✅ | ✅ | 2 : la notification de déploiement se masque d'elle-même ; elle reste dans le centre de notifications (cloche). 3 et 6 : non jouées, code inchangé depuis le passage conforme du 2026-10-23 (inspection L11). 5 : empreintes et dates identiques à la milliseconde, correctif `1a9f18c` vérifié ; fin de la notification coupée à l'écran, non lue. 7 : `--force` et commande collée deux fois, erreur nommée sans pile d'appels, correctif `1a9f18c` vérifié. 9 : premier passage ; `auto` (2.6.0 détecté), `2.5.5` forcé, `2.6.0` forcé et retour à `auto` conformes, sans rechargement. Faute cosmétique dans l'infobulle de la pastille : « Comportement de Antigravity » (reportée). |
