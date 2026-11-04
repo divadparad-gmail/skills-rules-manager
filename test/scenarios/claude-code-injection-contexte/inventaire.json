@@ -1,0 +1,386 @@
+{
+  "format": 1,
+  "role": "Inventaire figé des fixtures : chemin sous fixtures/, empreinte SHA-256 du contenu en LF, canaris attendus.",
+  "fixtures": [
+    {
+      "chemin": "agents-avec-claude/projet/AGENTS.md.fixture",
+      "sha256": "edffa7ef3c30ca4511e30659b2de8c135faee8045b487d1dec96d18482955717",
+      "canaris": [
+        "CANARI-CC-AGAVEC-MJPA"
+      ]
+    },
+    {
+      "chemin": "agents-avec-claude/projet/CLAUDE.md.fixture",
+      "sha256": "b8917ebc0a9ffeab4a5dcade4c14838e64bfc6e2099b8311a51539b10a84b30c",
+      "canaris": [
+        "CANARI-CC-AGCLAUDE-KGA8"
+      ]
+    },
+    {
+      "chemin": "agents-seul/projet/AGENTS.md.fixture",
+      "sha256": "fb068ce8048671a27bc6ddb44f1ee4f29656a2e001278e83499dd2cb1a6c2b26",
+      "canaris": [
+        "CANARI-CC-AGSEUL-3QUN"
+      ]
+    },
+    {
+      "chemin": "cout-f-global/global/CLAUDE.md.fixture",
+      "sha256": "399e76edebcd4426fcd8af976ab2cdeda5c279bb608d1693a33cc2904d4074e1",
+      "canaris": []
+    },
+    {
+      "chemin": "cout-f-parent/parent/CLAUDE.md.fixture",
+      "sha256": "399e76edebcd4426fcd8af976ab2cdeda5c279bb608d1693a33cc2904d4074e1",
+      "canaris": []
+    },
+    {
+      "chemin": "cout-f-projet-claude/projet/_claude/CLAUDE.md.fixture",
+      "sha256": "399e76edebcd4426fcd8af976ab2cdeda5c279bb608d1693a33cc2904d4074e1",
+      "canaris": []
+    },
+    {
+      "chemin": "cout-f-projet/projet/CLAUDE.md.fixture",
+      "sha256": "399e76edebcd4426fcd8af976ab2cdeda5c279bb608d1693a33cc2904d4074e1",
+      "canaris": []
+    },
+    {
+      "chemin": "cout-f2-projet/projet/CLAUDE.md.fixture",
+      "sha256": "3884c3cd6f90ced88f6ea96dde1c64341f1361d4aa7213c8dd48534fbb8fe4cc",
+      "canaris": []
+    },
+    {
+      "chemin": "cout-h15-anglais/projet/CLAUDE.md.fixture",
+      "sha256": "6f8bc9316725f65bd328c05fc4ee5223b561142e63b24e6afd357ddcef717bab",
+      "canaris": []
+    },
+    {
+      "chemin": "cout-h15-code/projet/CLAUDE.md.fixture",
+      "sha256": "e79672a0bb31d4bd9df76b226bb557127e5859b423c69eb913d7ca81a675773a",
+      "canaris": []
+    },
+    {
+      "chemin": "cout-mcp-a1/mcp/serveur.json.fixture",
+      "sha256": "17b08b9b45eb94cb715506cb34e38640fb0b658f22852822b8962b2b4ff3fabc",
+      "canaris": []
+    },
+    {
+      "chemin": "cout-mcp-a2/mcp/serveur.json.fixture",
+      "sha256": "c5023d33cd244d488621cf3b85d0b82d11da13a71a9c2e6b7ba2d1cca17e3b5e",
+      "canaris": []
+    },
+    {
+      "chemin": "cout-mcp-b1/mcp/serveur.json.fixture",
+      "sha256": "bf34b38cedb90cdcce35f5d1399e61df3c56f47390a2c1ccd96fc4ecafdb72c1",
+      "canaris": []
+    },
+    {
+      "chemin": "cout-regle-court/projet/_claude/rules/r.md.fixture",
+      "sha256": "1f13c607496b09f600b91215267dde0216ceb9186c24322909701f1c8a083096",
+      "canaris": []
+    },
+    {
+      "chemin": "cout-regle-long/projet/_claude/rules/regle-au-nom-volontairement-tres-long-pour-mesurer-le-cout-du-chemin.md.fixture",
+      "sha256": "1f13c607496b09f600b91215267dde0216ceb9186c24322909701f1c8a083096",
+      "canaris": []
+    },
+    {
+      "chemin": "cout-regle-paths/projet/_claude/rules/r-paths.md.fixture",
+      "sha256": "a53da43e35870ad48a920523639fdf3ae3a2b1289b24bf9244ab1fe759b90c98",
+      "canaris": []
+    },
+    {
+      "chemin": "cout-skill-global/global/skills/canari-s2/SKILL.md.fixture",
+      "sha256": "3207078c6a1775024511a99dc63dc580d6fed2ff68b0a6b3eda2bd6782d11fae",
+      "canaris": []
+    },
+    {
+      "chemin": "cout-skill-projet/projet/_claude/skills/canari-s1/SKILL.md.fixture",
+      "sha256": "d8b6e91bcd3c55014aefae01096c9974b6db46f61e3bce1f5b6d6c943406620c",
+      "canaris": []
+    },
+    {
+      "chemin": "cout-skill-x2/projet/_claude/skills/canari-s1/SKILL.md.fixture",
+      "sha256": "89bb469d6eccdcfe5a503a1351798b7d00acdafcfbc4176d21f30e345c144cc6",
+      "canaris": []
+    },
+    {
+      "chemin": "declencheurs/projet/_claude/rules/d-paths.md.fixture",
+      "sha256": "be0b38434504bbc6a36d51bec0fa9df94ad8f2863d88cdae13074af13432f4ed",
+      "canaris": [
+        "CANARI-CC-DPATHS-9C2L"
+      ]
+    },
+    {
+      "chemin": "declencheurs/projet/_claude/skills/canari-paths/SKILL.md.fixture",
+      "sha256": "3e483f1ea89a182d12829e2f7fa8c7268fdb30cdc5bdae7afd73327efd83bd0a",
+      "canaris": [
+        "CANARI-CC-DSKPATHS-Q9PG",
+        "CANARI-CC-DSKCORPS-ZLKX"
+      ]
+    },
+    {
+      "chemin": "declencheurs/projet/b.txt.fixture",
+      "sha256": "c18665044cf4d00aeaee9d06f608eceee0307e5cbb341e46f2989cc8c9e6b84e",
+      "canaris": []
+    },
+    {
+      "chemin": "declencheurs/projet/sous/CLAUDE.md.fixture",
+      "sha256": "fe798830ee8c2ed077b3c810a23b69832717181b2ac83bb5026922aabfe886ea",
+      "canaris": [
+        "CANARI-CC-DSOUS-7VJB"
+      ]
+    },
+    {
+      "chemin": "declencheurs/projet/sous/note.txt.fixture",
+      "sha256": "38266c6895b1e262a06ab0ad07676e4000bea382dcbfdc13e911e208bfcf99bf",
+      "canaris": []
+    },
+    {
+      "chemin": "declencheurs/projet/src/a.ts.fixture",
+      "sha256": "037ecd1db38c230c248787e60fd7bfc0cb0101b187b59535b6e7483be762d350",
+      "canaris": []
+    },
+    {
+      "chemin": "hook-muet/projet/_claude/settings.json.fixture",
+      "sha256": "622162b72cf622d722dc8e259becf19c208304bffc58a31a52475a48c778b0e5",
+      "canaris": []
+    },
+    {
+      "chemin": "hook-sortie/projet/_claude/settings.json.fixture",
+      "sha256": "befd4edd52c43fc71bbcd7f5edcb5fb27146b99f36460264c08b13416f0f25d8",
+      "canaris": [
+        "CANARI-CC-HOOK-C2QM"
+      ]
+    },
+    {
+      "chemin": "mcp-canari/mcp/serveur.json.fixture",
+      "sha256": "36ffd76c82a30d7c9070a661cbcb60d496f36fd9a143dfbee665e7d16f801e01",
+      "canaris": [
+        "CANARI-CC-MCPINSTR-76MH",
+        "CANARI-CC-MCPOUTIL-S65X",
+        "CANARI-CC-MCPENV-KGUZ"
+      ]
+    },
+    {
+      "chemin": "mcp-long/mcp/serveur.json.fixture",
+      "sha256": "f4e520ebd1464b5911dd8e75e1cb0f2ab6812c973bc1e78eebd970b78602609b",
+      "canaris": [
+        "CANARI-CC-MCPLONGDEBUT-9MAD",
+        "CANARI-CC-MCPLONGFIN-8J26",
+        "CANARI-CC-MCPOUTLONGDEBUT-FGAX",
+        "CANARI-CC-MCPOUTLONGFIN-HK5X"
+      ]
+    },
+    {
+      "chemin": "niveaux/global/CLAUDE.md.fixture",
+      "sha256": "e41a2799736e5acc2ee42032884c90b03c74ad87042705d70f13ea2a9169cdbe",
+      "canaris": [
+        "CANARI-CC-GLOB-XJ6U"
+      ]
+    },
+    {
+      "chemin": "niveaux/global/projects/__projet__/memory/MEMORY.md.fixture",
+      "sha256": "6e39fd8a5dafb8819194303d81e3a778c2912d6e28b30e8c2238479f33c17d49",
+      "canaris": [
+        "CANARI-CC-MEMORY-93KS"
+      ]
+    },
+    {
+      "chemin": "niveaux/global/rules/g-paths.md.fixture",
+      "sha256": "e53826163a652f40a006662c9738660dd1bd621d76f580ff8bfafcd4f24edf46",
+      "canaris": [
+        "CANARI-CC-GPATHS-DE25"
+      ]
+    },
+    {
+      "chemin": "niveaux/global/rules/g-perm.md.fixture",
+      "sha256": "064d5383df008ad8eae3bdd6045fafe13fd7642929e37fd1f3727697e98fc634",
+      "canaris": [
+        "CANARI-CC-GRULE-BFJK"
+      ]
+    },
+    {
+      "chemin": "niveaux/parent/CLAUDE.md.fixture",
+      "sha256": "9462d77340564d8f2f88af282ae335c7584457971c3b267999833da8b2651003",
+      "canaris": [
+        "CANARI-CC-PAR-7A67"
+      ]
+    },
+    {
+      "chemin": "niveaux/parent/_claude/CLAUDE.md.fixture",
+      "sha256": "fe665eb6f5dad5891bf40919389c15073f7a33f4703705a5ffc9861eaa4b27e5",
+      "canaris": [
+        "CANARI-CC-PARDOT-3AQ4"
+      ]
+    },
+    {
+      "chemin": "niveaux/parent/_claude/rules/par-regle.md.fixture",
+      "sha256": "1abd37c6016f7557ce8e8ac92934d6c05b97d33502086fea0d6d101c31f76bd7",
+      "canaris": [
+        "CANARI-CC-PARRULE-8WLE"
+      ]
+    },
+    {
+      "chemin": "niveaux/projet/CLAUDE.local.md.fixture",
+      "sha256": "cdaf35e875c5692a3ad7e308ebbbe365f414eb7ea3f01c2d80ad7e4383f4bad7",
+      "canaris": [
+        "CANARI-CC-LOCAL-T44S"
+      ]
+    },
+    {
+      "chemin": "niveaux/projet/CLAUDE.md.fixture",
+      "sha256": "5707292c466a6e39dadc7c5507b47552cf9e4ad1a7c9506a9c1f5c16f019d1f6",
+      "canaris": [
+        "CANARI-CC-PROJFM-XHPP",
+        "CANARI-CC-PROJ-QQV9",
+        "CANARI-CC-COMM-5ZDP"
+      ]
+    },
+    {
+      "chemin": "niveaux/projet/_claude/CLAUDE.md.fixture",
+      "sha256": "be21a5da39ae9ea5272ae5924b84b348b4966e1e3dec6ab2ff2781ec70ac77ad",
+      "canaris": [
+        "CANARI-CC-PROJDOT-CKZL"
+      ]
+    },
+    {
+      "chemin": "niveaux/projet/_claude/rules/p-paths.md.fixture",
+      "sha256": "0a883db0d16457b8012c36bc8d991895c7a471f386edc62efb4f2ce5dde21112",
+      "canaris": [
+        "CANARI-CC-RPATHS-2PL9"
+      ]
+    },
+    {
+      "chemin": "niveaux/projet/_claude/rules/p-perm.md.fixture",
+      "sha256": "2c58636b99e6f0538571365f328823f2acb5f1df847403da39725a4c976e9b32",
+      "canaris": [
+        "CANARI-CC-RFM-MCUC",
+        "CANARI-CC-RULE-PNK5"
+      ]
+    },
+    {
+      "chemin": "niveaux/projet/_claude/rules/p-yaml-invalide.md.fixture",
+      "sha256": "361caff67503fe313e6ddef84baf9aafddfbb682e74d5d0bfeef02e356c668c3",
+      "canaris": [
+        "CANARI-CC-RYAML-4GQU"
+      ]
+    },
+    {
+      "chemin": "niveaux/projet/_claude/rules/sous/p-sous.md.fixture",
+      "sha256": "41df139798404d7fc7aeeb4c6feb8ff00c2c2ebb266dd149a524fbabc6e78077",
+      "canaris": [
+        "CANARI-CC-RSOUS-UDFQ"
+      ]
+    },
+    {
+      "chemin": "niveaux/projet/import-1.md.fixture",
+      "sha256": "0200975c1705d76eb3e5e99eacd733b32ff55b17c9d2ff7aa8e66d26aa483256",
+      "canaris": [
+        "CANARI-CC-IMP1-JK6J"
+      ]
+    },
+    {
+      "chemin": "niveaux/projet/import-2.md.fixture",
+      "sha256": "79ae1840afe829d7c23396abb7d94e684178504422536456ef3b46c3252856c5",
+      "canaris": [
+        "CANARI-CC-IMP2-PZWT"
+      ]
+    },
+    {
+      "chemin": "niveaux/projet/import-3.md.fixture",
+      "sha256": "e49d572d18c28df1c292bfc95f30415e5c92b8f82d9452bf6aab757f77cc4e55",
+      "canaris": [
+        "CANARI-CC-IMP3-WJ9W"
+      ]
+    },
+    {
+      "chemin": "niveaux/projet/import-4.md.fixture",
+      "sha256": "7406cf01f1739bb42cefc2357a9f07afe132fba413530db4826571fc5a890782",
+      "canaris": [
+        "CANARI-CC-IMP4-BKHE"
+      ]
+    },
+    {
+      "chemin": "niveaux/projet/import-5.md.fixture",
+      "sha256": "c41d25ddbde1aeed8ae45615440f3a0269703ced0e8c900ad84a320238b39921",
+      "canaris": [
+        "CANARI-CC-IMP5-569U"
+      ]
+    },
+    {
+      "chemin": "skill-long-1500/projet/_claude/skills/canari-long/SKILL.md.fixture",
+      "sha256": "050e19448006afb863dc1e6095cad0f47871e4c5100818e4a0c5c75f494c2943",
+      "canaris": [
+        "CANARI-CC-SKL15DEBUT-J5GB",
+        "CANARI-CC-SKL15FIN-PNK8"
+      ]
+    },
+    {
+      "chemin": "skills/global/skills/canari-g1/SKILL.md.fixture",
+      "sha256": "ba28a744ade4f49d288e078a8b40ce7d3210146817c4afa1a724f0f669f98413",
+      "canaris": [
+        "CANARI-CC-SKG1-FJS4",
+        "CANARI-CC-SKCORPSG1-A7AT"
+      ]
+    },
+    {
+      "chemin": "skills/global/skills/canari-homo/SKILL.md.fixture",
+      "sha256": "e7c4f8ddcaeeedbc148653d47321f3fce93ccd161c604c174ef863db9e51a275",
+      "canaris": [
+        "CANARI-CC-HOMOGL-LMBV"
+      ]
+    },
+    {
+      "chemin": "skills/parent/_claude/skills/canari-parent/SKILL.md.fixture",
+      "sha256": "764c37644f740857fa40c139f3b514185bbb56052abb93f2449f80a15f4d4599",
+      "canaris": [
+        "CANARI-CC-SKPAR-C34N"
+      ]
+    },
+    {
+      "chemin": "skills/plugin/canari-plugin/_claude-plugin/plugin.json.fixture",
+      "sha256": "4ba1b97d78a1b7857892c9ced322a55b3a359b710c46641c3f06b99f046e5bc0",
+      "canaris": [
+        "CANARI-CC-PLUGDESC-FTXJ"
+      ]
+    },
+    {
+      "chemin": "skills/plugin/canari-plugin/skills/canari-plug/SKILL.md.fixture",
+      "sha256": "824d91ee7a1a390ccdecae0eee8410d320c0fc123878354f7159e30cc7522021",
+      "canaris": [
+        "CANARI-CC-SKPLUG-5KME",
+        "CANARI-CC-SKCORPSPLUG-EG37"
+      ]
+    },
+    {
+      "chemin": "skills/projet/_claude/skills/canari-cache/SKILL.md.fixture",
+      "sha256": "92143cc11f06eaa344786d708f258943c5680b65eafb479e2d1f9a2539cb59ac",
+      "canaris": [
+        "CANARI-CC-SKCACHE-9Q9U"
+      ]
+    },
+    {
+      "chemin": "skills/projet/_claude/skills/canari-homo/SKILL.md.fixture",
+      "sha256": "61fdf3f07f0dd634572cb7b7ecfc25098bc84f02a9cffd1436102646ef3a8026",
+      "canaris": [
+        "CANARI-CC-HOMOPR-6VX3"
+      ]
+    },
+    {
+      "chemin": "skills/projet/_claude/skills/canari-long/SKILL.md.fixture",
+      "sha256": "ce1f49f4eed1f0d8020f6ec9562c3c4564525c01a7ba82c991ba46d6a28b9d48",
+      "canaris": [
+        "CANARI-CC-SKLONGDEBUT-EG4Q",
+        "CANARI-CC-SKLONGFIN-ACDU"
+      ]
+    },
+    {
+      "chemin": "skills/projet/_claude/skills/canari-p1/SKILL.md.fixture",
+      "sha256": "fde55fda81b753e5e2905b59b2e79fc206a5ffba381170b92f06380ed9c2cdda",
+      "canaris": [
+        "CANARI-CC-SKP1-PDW6",
+        "CANARI-CC-SKCORPSP1-KUQQ"
+      ]
+    }
+  ]
+}

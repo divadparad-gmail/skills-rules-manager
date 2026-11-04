@@ -16,69 +16,13 @@ const SERVEUR = path.join(SUITE, 'mcp', 'serveur-fixture.js');
 
 /**
  * Inventaire figé : chemin sous fixtures/ (<jeu>/<cible>/<miroir>), empreinte SHA-256 du contenu en LF,
- * canaris attendus (chacun exactement une fois). Une fixture modifiée rend la baseline caduque : toute
- * modification volontaire passe par la mise à jour de cette table.
+ * canaris attendus (chacun exactement une fois). Source unique : inventaire.json de la suite, lu aussi par
+ * le lanceur, qui refuse de déployer une fixture dont l'empreinte diffère. Une fixture modifiée rend la
+ * baseline caduque : toute modification volontaire passe par la mise à jour de ce fichier.
  */
-const INVENTAIRE: [string, string, string[]][] = [
-  ['agents-avec-claude/projet/AGENTS.md.fixture', 'edffa7ef3c30ca4511e30659b2de8c135faee8045b487d1dec96d18482955717', ['CANARI-CC-AGAVEC-MJPA']],
-  ['agents-avec-claude/projet/CLAUDE.md.fixture', 'b8917ebc0a9ffeab4a5dcade4c14838e64bfc6e2099b8311a51539b10a84b30c', ['CANARI-CC-AGCLAUDE-KGA8']],
-  ['agents-seul/projet/AGENTS.md.fixture', 'fb068ce8048671a27bc6ddb44f1ee4f29656a2e001278e83499dd2cb1a6c2b26', ['CANARI-CC-AGSEUL-3QUN']],
-  ['cout-f-global/global/CLAUDE.md.fixture', '399e76edebcd4426fcd8af976ab2cdeda5c279bb608d1693a33cc2904d4074e1', []],
-  ['cout-f-parent/parent/CLAUDE.md.fixture', '399e76edebcd4426fcd8af976ab2cdeda5c279bb608d1693a33cc2904d4074e1', []],
-  ['cout-f-projet-claude/projet/_claude/CLAUDE.md.fixture', '399e76edebcd4426fcd8af976ab2cdeda5c279bb608d1693a33cc2904d4074e1', []],
-  ['cout-f-projet/projet/CLAUDE.md.fixture', '399e76edebcd4426fcd8af976ab2cdeda5c279bb608d1693a33cc2904d4074e1', []],
-  ['cout-f2-projet/projet/CLAUDE.md.fixture', '3884c3cd6f90ced88f6ea96dde1c64341f1361d4aa7213c8dd48534fbb8fe4cc', []],
-  ['cout-h15-anglais/projet/CLAUDE.md.fixture', '6f8bc9316725f65bd328c05fc4ee5223b561142e63b24e6afd357ddcef717bab', []],
-  ['cout-h15-code/projet/CLAUDE.md.fixture', 'e79672a0bb31d4bd9df76b226bb557127e5859b423c69eb913d7ca81a675773a', []],
-  ['cout-mcp-a1/mcp/serveur.json.fixture', '17b08b9b45eb94cb715506cb34e38640fb0b658f22852822b8962b2b4ff3fabc', []],
-  ['cout-mcp-a2/mcp/serveur.json.fixture', 'c5023d33cd244d488621cf3b85d0b82d11da13a71a9c2e6b7ba2d1cca17e3b5e', []],
-  ['cout-mcp-b1/mcp/serveur.json.fixture', 'bf34b38cedb90cdcce35f5d1399e61df3c56f47390a2c1ccd96fc4ecafdb72c1', []],
-  ['cout-regle-court/projet/_claude/rules/r.md.fixture', '1f13c607496b09f600b91215267dde0216ceb9186c24322909701f1c8a083096', []],
-  ['cout-regle-long/projet/_claude/rules/regle-au-nom-volontairement-tres-long-pour-mesurer-le-cout-du-chemin.md.fixture', '1f13c607496b09f600b91215267dde0216ceb9186c24322909701f1c8a083096', []],
-  ['cout-regle-paths/projet/_claude/rules/r-paths.md.fixture', 'a53da43e35870ad48a920523639fdf3ae3a2b1289b24bf9244ab1fe759b90c98', []],
-  ['cout-skill-global/global/skills/canari-s2/SKILL.md.fixture', '3207078c6a1775024511a99dc63dc580d6fed2ff68b0a6b3eda2bd6782d11fae', []],
-  ['cout-skill-projet/projet/_claude/skills/canari-s1/SKILL.md.fixture', 'd8b6e91bcd3c55014aefae01096c9974b6db46f61e3bce1f5b6d6c943406620c', []],
-  ['cout-skill-x2/projet/_claude/skills/canari-s1/SKILL.md.fixture', '89bb469d6eccdcfe5a503a1351798b7d00acdafcfbc4176d21f30e345c144cc6', []],
-  ['declencheurs/projet/_claude/rules/d-paths.md.fixture', 'be0b38434504bbc6a36d51bec0fa9df94ad8f2863d88cdae13074af13432f4ed', ['CANARI-CC-DPATHS-9C2L']],
-  ['declencheurs/projet/_claude/skills/canari-paths/SKILL.md.fixture', '3e483f1ea89a182d12829e2f7fa8c7268fdb30cdc5bdae7afd73327efd83bd0a', ['CANARI-CC-DSKPATHS-Q9PG', 'CANARI-CC-DSKCORPS-ZLKX']],
-  ['declencheurs/projet/b.txt.fixture', 'c18665044cf4d00aeaee9d06f608eceee0307e5cbb341e46f2989cc8c9e6b84e', []],
-  ['declencheurs/projet/sous/CLAUDE.md.fixture', 'fe798830ee8c2ed077b3c810a23b69832717181b2ac83bb5026922aabfe886ea', ['CANARI-CC-DSOUS-7VJB']],
-  ['declencheurs/projet/sous/note.txt.fixture', '38266c6895b1e262a06ab0ad07676e4000bea382dcbfdc13e911e208bfcf99bf', []],
-  ['declencheurs/projet/src/a.ts.fixture', '037ecd1db38c230c248787e60fd7bfc0cb0101b187b59535b6e7483be762d350', []],
-  ['hook-muet/projet/_claude/settings.json.fixture', '622162b72cf622d722dc8e259becf19c208304bffc58a31a52475a48c778b0e5', []],
-  ['hook-sortie/projet/_claude/settings.json.fixture', 'befd4edd52c43fc71bbcd7f5edcb5fb27146b99f36460264c08b13416f0f25d8', ['CANARI-CC-HOOK-C2QM']],
-  ['mcp-canari/mcp/serveur.json.fixture', '36ffd76c82a30d7c9070a661cbcb60d496f36fd9a143dfbee665e7d16f801e01', ['CANARI-CC-MCPINSTR-76MH', 'CANARI-CC-MCPOUTIL-S65X', 'CANARI-CC-MCPENV-KGUZ']],
-  ['mcp-long/mcp/serveur.json.fixture', 'f4e520ebd1464b5911dd8e75e1cb0f2ab6812c973bc1e78eebd970b78602609b', ['CANARI-CC-MCPLONGDEBUT-9MAD', 'CANARI-CC-MCPLONGFIN-8J26', 'CANARI-CC-MCPOUTLONGDEBUT-FGAX', 'CANARI-CC-MCPOUTLONGFIN-HK5X']],
-  ['niveaux/global/CLAUDE.md.fixture', 'e41a2799736e5acc2ee42032884c90b03c74ad87042705d70f13ea2a9169cdbe', ['CANARI-CC-GLOB-XJ6U']],
-  ['niveaux/global/projects/__projet__/memory/MEMORY.md.fixture', '6e39fd8a5dafb8819194303d81e3a778c2912d6e28b30e8c2238479f33c17d49', ['CANARI-CC-MEMORY-93KS']],
-  ['niveaux/global/rules/g-paths.md.fixture', 'e53826163a652f40a006662c9738660dd1bd621d76f580ff8bfafcd4f24edf46', ['CANARI-CC-GPATHS-DE25']],
-  ['niveaux/global/rules/g-perm.md.fixture', '064d5383df008ad8eae3bdd6045fafe13fd7642929e37fd1f3727697e98fc634', ['CANARI-CC-GRULE-BFJK']],
-  ['niveaux/parent/CLAUDE.md.fixture', '9462d77340564d8f2f88af282ae335c7584457971c3b267999833da8b2651003', ['CANARI-CC-PAR-7A67']],
-  ['niveaux/parent/_claude/CLAUDE.md.fixture', 'fe665eb6f5dad5891bf40919389c15073f7a33f4703705a5ffc9861eaa4b27e5', ['CANARI-CC-PARDOT-3AQ4']],
-  ['niveaux/parent/_claude/rules/par-regle.md.fixture', '1abd37c6016f7557ce8e8ac92934d6c05b97d33502086fea0d6d101c31f76bd7', ['CANARI-CC-PARRULE-8WLE']],
-  ['niveaux/projet/CLAUDE.local.md.fixture', 'cdaf35e875c5692a3ad7e308ebbbe365f414eb7ea3f01c2d80ad7e4383f4bad7', ['CANARI-CC-LOCAL-T44S']],
-  ['niveaux/projet/CLAUDE.md.fixture', '5707292c466a6e39dadc7c5507b47552cf9e4ad1a7c9506a9c1f5c16f019d1f6', ['CANARI-CC-PROJFM-XHPP', 'CANARI-CC-PROJ-QQV9', 'CANARI-CC-COMM-5ZDP']],
-  ['niveaux/projet/_claude/CLAUDE.md.fixture', 'be21a5da39ae9ea5272ae5924b84b348b4966e1e3dec6ab2ff2781ec70ac77ad', ['CANARI-CC-PROJDOT-CKZL']],
-  ['niveaux/projet/_claude/rules/p-paths.md.fixture', '0a883db0d16457b8012c36bc8d991895c7a471f386edc62efb4f2ce5dde21112', ['CANARI-CC-RPATHS-2PL9']],
-  ['niveaux/projet/_claude/rules/p-perm.md.fixture', '2c58636b99e6f0538571365f328823f2acb5f1df847403da39725a4c976e9b32', ['CANARI-CC-RFM-MCUC', 'CANARI-CC-RULE-PNK5']],
-  ['niveaux/projet/_claude/rules/p-yaml-invalide.md.fixture', '361caff67503fe313e6ddef84baf9aafddfbb682e74d5d0bfeef02e356c668c3', ['CANARI-CC-RYAML-4GQU']],
-  ['niveaux/projet/_claude/rules/sous/p-sous.md.fixture', '41df139798404d7fc7aeeb4c6feb8ff00c2c2ebb266dd149a524fbabc6e78077', ['CANARI-CC-RSOUS-UDFQ']],
-  ['niveaux/projet/import-1.md.fixture', '0200975c1705d76eb3e5e99eacd733b32ff55b17c9d2ff7aa8e66d26aa483256', ['CANARI-CC-IMP1-JK6J']],
-  ['niveaux/projet/import-2.md.fixture', '79ae1840afe829d7c23396abb7d94e684178504422536456ef3b46c3252856c5', ['CANARI-CC-IMP2-PZWT']],
-  ['niveaux/projet/import-3.md.fixture', 'e49d572d18c28df1c292bfc95f30415e5c92b8f82d9452bf6aab757f77cc4e55', ['CANARI-CC-IMP3-WJ9W']],
-  ['niveaux/projet/import-4.md.fixture', '7406cf01f1739bb42cefc2357a9f07afe132fba413530db4826571fc5a890782', ['CANARI-CC-IMP4-BKHE']],
-  ['niveaux/projet/import-5.md.fixture', 'c41d25ddbde1aeed8ae45615440f3a0269703ced0e8c900ad84a320238b39921', ['CANARI-CC-IMP5-569U']],
-  ['skill-long-1500/projet/_claude/skills/canari-long/SKILL.md.fixture', '050e19448006afb863dc1e6095cad0f47871e4c5100818e4a0c5c75f494c2943', ['CANARI-CC-SKL15DEBUT-J5GB', 'CANARI-CC-SKL15FIN-PNK8']],
-  ['skills/global/skills/canari-g1/SKILL.md.fixture', 'ba28a744ade4f49d288e078a8b40ce7d3210146817c4afa1a724f0f669f98413', ['CANARI-CC-SKG1-FJS4', 'CANARI-CC-SKCORPSG1-A7AT']],
-  ['skills/global/skills/canari-homo/SKILL.md.fixture', 'e7c4f8ddcaeeedbc148653d47321f3fce93ccd161c604c174ef863db9e51a275', ['CANARI-CC-HOMOGL-LMBV']],
-  ['skills/parent/_claude/skills/canari-parent/SKILL.md.fixture', '764c37644f740857fa40c139f3b514185bbb56052abb93f2449f80a15f4d4599', ['CANARI-CC-SKPAR-C34N']],
-  ['skills/plugin/canari-plugin/_claude-plugin/plugin.json.fixture', '4ba1b97d78a1b7857892c9ced322a55b3a359b710c46641c3f06b99f046e5bc0', ['CANARI-CC-PLUGDESC-FTXJ']],
-  ['skills/plugin/canari-plugin/skills/canari-plug/SKILL.md.fixture', '824d91ee7a1a390ccdecae0eee8410d320c0fc123878354f7159e30cc7522021', ['CANARI-CC-SKPLUG-5KME', 'CANARI-CC-SKCORPSPLUG-EG37']],
-  ['skills/projet/_claude/skills/canari-cache/SKILL.md.fixture', '92143cc11f06eaa344786d708f258943c5680b65eafb479e2d1f9a2539cb59ac', ['CANARI-CC-SKCACHE-9Q9U']],
-  ['skills/projet/_claude/skills/canari-homo/SKILL.md.fixture', '61fdf3f07f0dd634572cb7b7ecfc25098bc84f02a9cffd1436102646ef3a8026', ['CANARI-CC-HOMOPR-6VX3']],
-  ['skills/projet/_claude/skills/canari-long/SKILL.md.fixture', 'ce1f49f4eed1f0d8020f6ec9562c3c4564525c01a7ba82c991ba46d6a28b9d48', ['CANARI-CC-SKLONGDEBUT-EG4Q', 'CANARI-CC-SKLONGFIN-ACDU']],
-  ['skills/projet/_claude/skills/canari-p1/SKILL.md.fixture', 'fde55fda81b753e5e2905b59b2e79fc206a5ffba381170b92f06380ed9c2cdda', ['CANARI-CC-SKP1-PDW6', 'CANARI-CC-SKCORPSP1-KUQQ']],
-];
+const INVENTAIRE_JSON = path.join(SUITE, 'inventaire.json');
+const INVENTAIRE: [string, string, string[]][] = (JSON.parse(fs.readFileSync(INVENTAIRE_JSON, 'utf8')).fixtures as { chemin: string; sha256: string; canaris: string[] }[])
+  .map((e) => [e.chemin, e.sha256, e.canaris]);
 
 /** Les jeux : l'unité que le lanceur déploie et que la baseline cite. Les jeux cout-* ne portent aucun canari. */
 const JEUX: Record<string, { cibles: string[]; scenarios: string[] }> = {
@@ -114,10 +58,23 @@ const CIBLES = ['global', 'parent', 'projet', 'plugin', 'mcp'];
 const JEU_COMPLET = ['niveaux', 'skills', 'hook-sortie', 'mcp-canari'];
 const NOMBRE_CANARIS = 52;
 
-/** Contrat de conversion, appliqué par le lanceur dans l'espace isolé seulement. */
-const SUFFIXE = '.fixture';
-const SEGMENTS_CONVERTIS: Record<string, string> = { _claude: '.claude', '_claude-plugin': '.claude-plugin' };
-const ESPACE_RESERVE_PROJET = '__projet__';
+/**
+ * Contrat de conversion et garde de confidentialité : module partagé avec le lanceur (lot I2), qui
+ * l'applique dans l'espace isolé seulement.
+ */
+interface Poste { home: string; compte: string; hote: string }
+interface Commun {
+  SUFFIXE: string;
+  SEGMENTS_CONVERTIS: Record<string, string>;
+  ESPACE_RESERVE_PROJET: string;
+  convertir: (rel: string, nomProjet?: string) => { jeu: string; cible: string; chemin: string };
+  collisions: (rels: string[], jeux: string[]) => string[];
+  lirePoste: () => Poste;
+  problemesTexte: (texte: string, poste: Poste, interdits?: string[]) => string[];
+  garder: (rel: string, texte: string, poste: Poste, interdits?: string[]) => string[];
+}
+const commun = require(path.join(ROOT, 'test', 'scenarios', 'scripts', 'sonde-claude-code-commun.js')) as Commun;
+const { SUFFIXE, SEGMENTS_CONVERTIS, ESPACE_RESERVE_PROJET, convertir, lirePoste, problemesTexte, garder } = commun;
 /** Noms que Claude Code, Antigravity ou l'extension chargeraient : interdits dans fixtures/. */
 const NOMS_ACTIFS = new Set([
   'CLAUDE.md', 'CLAUDE.local.md', 'AGENTS.md', 'GEMINI.md', 'SKILL.md', 'MEMORY.md', 'settings.json',
@@ -141,29 +98,8 @@ const lire = (rel: string) => fs.readFileSync(path.join(FIXTURES, rel), 'utf8').
 const sha256 = (texte: string) => crypto.createHash('sha256').update(texte, 'utf8').digest('hex');
 const jsonDe = (rel: string) => JSON.parse(lire(rel));
 
-const convertir = (rel: string, nomProjet = '<projet>') => {
-  const [jeu, cible, ...miroir] = rel.split('/');
-  const segments = miroir.map((s, i) => {
-    if (i === miroir.length - 1) return s.endsWith(SUFFIXE) ? s.slice(0, -SUFFIXE.length) : s;
-    if (s === ESPACE_RESERVE_PROJET) return nomProjet;
-    return SEGMENTS_CONVERTIS[s] ?? s;
-  });
-  return { jeu, cible, chemin: segments.join('/') };
-};
-
-/** Collisions de chemins déployés quand plusieurs jeux sont réunis. */
-const collisions = (jeux: string[]): string[] => {
-  const vus = new Map<string, string>();
-  const out: string[] = [];
-  for (const [rel] of INVENTAIRE) {
-    const { jeu, cible, chemin } = convertir(rel);
-    if (!jeux.includes(jeu)) continue;
-    const cle = `${cible}:${chemin}`;
-    if (vus.has(cle)) out.push(`${cle} (${vus.get(cle)} et ${jeu})`);
-    else vus.set(cle, jeu);
-  }
-  return out;
-};
+/** Collisions de chemins déployés quand plusieurs jeux sont réunis (contrat partagé). */
+const collisions = (jeux: string[]): string[] => commun.collisions(INVENTAIRE.map(([rel]) => rel), jeux);
 
 /** Découpe un frontmatter `---` : lignes du frontmatter (ou null) et corps. */
 const decouper = (texte: string): { fm: string[] | null; corps: string } => {
@@ -191,96 +127,7 @@ interface ServeurFixture {
 }
 const serveur = () => require(SERVEUR) as ServeurFixture;
 
-// --- Garde de confidentialité ----------------------------------------------------------------
-
-const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}/;
-const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
-/** Mêmes motifs que la garde de la suite Antigravity (test 8) : lecteur, réseau, /home ou /Users, ~ hors liste. */
-const CHEMINS_UTILISATEUR = [
-  /(?:^|[^A-Za-z0-9])[A-Za-z]:(?:\\|\/)/,
-  /(?:^|[\s"'`(])(?:\\\\){1,2}[A-Za-z0-9][\w.-]*\\{1,2}\S/,
-  /\/(home|Users)\/[^\/<\s]+/,
-  /(?:~|<HOME>|%USERPROFILE%|\$HOME|\$\{HOME\}|\$env:USERPROFILE)(?:\\{1,2}|\/)(?!\.(?:gemini|claude)(?:[\\/"'\s`]|$))[^\s"'`]/i,
-];
-/** Clés interdites dans un JSON de attendu/ ou resultats/, quelle que soit leur valeur. */
-const CLES_INTERDITES = new Set(['session_id', 'sessionid', 'uuid', 'orgid', 'organizationid', 'organizationuuid', 'accountuuid', 'email', 'emailaddress', 'useremail', 'orgname', 'organizationname']);
-/** Clés qui désignent des skills, plugins, serveurs ou outils : leurs noms doivent être des noms de fixture. */
-const CLES_DE_NOMS = new Set(['skill', 'skills', 'plugin', 'plugins', 'serveur', 'serveurs', 'server', 'servers', 'mcp_server', 'mcp_servers', 'mcp_tools', 'outil_mcp', 'outils_mcp', 'tool', 'tools']);
-const CHAMPS_DE_NOM = new Set(['name', 'nom', 'plugin', 'server', 'serveur']);
-const NOM_PERMIS = /^(?:mcp__)?canari/i;
-
-interface Poste { home: string; compte: string; hote: string }
-const lirePoste = (): Poste => {
-  let compte = '';
-  try {
-    compte = os.userInfo().username;
-  } catch {
-    compte = process.env.USERNAME ?? process.env.USER ?? '';
-  }
-  return { home: os.homedir(), compte, hote: os.hostname() };
-};
-const echapper = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-/** Mot entier ou segment de chemin, sans tenir compte de la casse ; ignoré sous 3 caractères (faux positifs). */
-const motEntier = (mot: string) =>
-  mot.length >= 3 ? new RegExp(`(?<![A-Za-z0-9_])${echapper(mot)}(?![A-Za-z0-9_])`, 'i') : null;
-/** Le dossier personnel avec les deux séparateurs, et avec les antislashs doublés d'un JSON. */
-const variantesHome = (home: string) => {
-  const parties = home.split(/[\\/]+/).filter(Boolean);
-  const prefixe = /^[\\/]/.test(home) ? '/' : '';
-  return [...new Set(['\\', '/', '\\\\'].map((sep) => (sep === '/' ? prefixe : prefixe.replace('/', sep)) + parties.join(sep)))]
-    .filter((v) => v.length >= 3)
-    .map((v) => v.toLowerCase());
-};
-
-/** Problèmes de texte : adresse, chemins, identifiants et données du poste lues à l'exécution. */
-const problemesTexte = (texte: string, poste: Poste): string[] => {
-  const out: string[] = [];
-  const homes = variantesHome(poste.home);
-  const compte = motEntier(poste.compte);
-  const hote = motEntier(poste.hote);
-  texte.split(/\r?\n/).forEach((ligne, i) => {
-    const n = i + 1;
-    if (EMAIL.test(ligne)) out.push(`${n}: adresse électronique`);
-    if (UUID.test(ligne)) out.push(`${n}: identifiant (uuid)`);
-    if (CHEMINS_UTILISATEUR.some((motif) => motif.test(ligne))) out.push(`${n}: chemin personnel, de lecteur ou réseau`);
-    if (homes.some((h) => ligne.toLowerCase().includes(h))) out.push(`${n}: dossier personnel du poste`);
-    if (compte?.test(ligne)) out.push(`${n}: nom du compte du poste`);
-    if (hote?.test(ligne)) out.push(`${n}: nom d'hôte du poste`);
-  });
-  return out;
-};
-
-/** Problèmes d'un JSON de rapport : clés interdites et noms hors de la liste blanche « canari* ». */
-const problemesJson = (texte: string): string[] => {
-  let racine: unknown;
-  try {
-    racine = JSON.parse(texte);
-  } catch {
-    return ['JSON invalide'];
-  }
-  const out: string[] = [];
-  const parcourir = (valeur: unknown, chemin: string, cle: string, dansNoms: boolean) => {
-    if (Array.isArray(valeur)) {
-      valeur.forEach((v, i) => parcourir(v, `${chemin}[${i}]`, cle, dansNoms));
-    } else if (valeur !== null && typeof valeur === 'object') {
-      for (const [k, v] of Object.entries(valeur)) {
-        const kb = k.toLowerCase();
-        if (CLES_INTERDITES.has(kb)) out.push(`${chemin}.${k}: clé interdite`);
-        parcourir(v, `${chemin}.${k}`, kb, dansNoms || CLES_DE_NOMS.has(kb));
-      }
-    } else if (typeof valeur === 'string' && dansNoms && (CLES_DE_NOMS.has(cle) || CHAMPS_DE_NOM.has(cle)) && !NOM_PERMIS.test(valeur)) {
-      out.push(`${chemin}: nom hors de la liste blanche (${valeur.length} caractères, non recopié)`);
-    }
-  };
-  parcourir(racine, '$', '', false);
-  return out;
-};
-
-/** Garde complète d'un fichier : texte pour tous, et JSON pour les rapports de attendu/ et resultats/. */
-const garder = (rel: string, texte: string, poste: Poste): string[] => {
-  const rapport = /^(attendu|resultats)\//.test(rel) && rel.endsWith('.json');
-  return [...problemesTexte(texte, poste), ...(rapport ? problemesJson(texte) : [])].map((p) => `${rel}:${p}`);
-};
+// La garde de confidentialité (problemesTexte, problemesJson, garder) vient du module partagé.
 
 // --- Serveur MCP en processus ------------------------------------------------------------------
 
@@ -369,6 +216,7 @@ describe('Suite de Tests : Injection de contexte Claude Code (fixtures inertes, 
     const permis = new Set([
       ...INVENTAIRE.map(([rel]) => `fixtures/${rel}`),
       'mcp/serveur-fixture.js',
+      'inventaire.json',
       'attendu/.gitkeep',
       'resultats/.gitkeep',
     ]);
@@ -631,7 +479,7 @@ describe('Suite de Tests : Injection de contexte Claude Code (fixtures inertes, 
     assert.strictEqual(sansArgument.code, 2);
   });
 
-  test('11. Confidentialité : attendu/, resultats/, fixtures/ et mcp/ ne contiennent aucune donnée locale', () => {
+  test('11. Confidentialité : attendu/, resultats/, fixtures/, mcp/ et inventaire.json ne contiennent aucune donnée locale', () => {
     const poste = lirePoste();
     const fuites: string[] = [];
     for (const dossier of ['attendu', 'resultats', 'fixtures', 'mcp']) {
@@ -639,6 +487,7 @@ describe('Suite de Tests : Injection de contexte Claude Code (fixtures inertes, 
       if (!fs.existsSync(abs)) continue;
       for (const rel of listFiles(abs, dossier)) fuites.push(...garder(rel, fs.readFileSync(path.join(SUITE, rel), 'utf8'), poste));
     }
+    fuites.push(...garder('inventaire.json', fs.readFileSync(INVENTAIRE_JSON, 'utf8'), poste));
     assert.deepStrictEqual(fuites, [], 'Donnée locale ou nom hors liste blanche : caviarder avant de commiter.');
   });
 
