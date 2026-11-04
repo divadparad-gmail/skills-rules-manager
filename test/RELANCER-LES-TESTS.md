@@ -34,6 +34,17 @@ Les faits testés font foi, et non la documentation d'Antigravity. Après une mi
 3. Lis le résultat : section « Lire le résultat de la comparaison ».
 4. En cas d'écart, suis la colonne « Si ça change » du scénario touché dans [SCENARIOS.md](scenarios/antigravity-injection-contexte/SCENARIOS.md), puis la section « Quand un écart est confirmé » du README : ne modifie jamais une baseline existante, crée une nouvelle baseline datée, et reporte le fait observé dans le profil de comportement de la version (`src/antigravity/behavior.ts`).
 
+## 2 bis. Après une mise à jour de Claude Code : la suite d'injection Claude Code
+
+La jauge Claude Code de l'extension s'appuie sur la suite `scenarios/claude-code-injection-contexte/`. Après une mise à jour de Claude Code, et avant de modifier la jauge :
+
+1. Respecte les préconditions et connecte le profil isolé si besoin : [README de la suite](scenarios/claude-code-injection-contexte/README.md), sections « Les préconditions » et « Connecter le profil isolé ».
+2. Lance d'abord la partie gratuite (`/context`, sans appel au modèle), puis la comparaison : même README, section « La procédure », point 1.
+3. La partie payante (appels au modèle sur le quota de l'abonnement) ne se relance que sur décision, toujours précédée de son mode à sec : même README, point 2.
+4. Lis le résultat et, en cas d'écart, suis la colonne « Si ça change » de [SCENARIOS-CLAUDE-CODE.md](scenarios/claude-code-injection-contexte/SCENARIOS-CLAUDE-CODE.md) : ne modifie jamais une baseline existante.
+
+`npm run test:injection-claude` compare le dernier rapport à sa baseline ; comme `test:injection`, cette comparaison est ignorée dans `npm test`.
+
 ## 3. Le test manuel
 
 Avant une publication, ou après une modification du banc d'essai ou du profil Antigravity, joue [TEST-MANUEL.md](scenarios/TEST-MANUEL.md) dans l'hôte de développement (instance séparée de VS Code), puis remplis sa grille de résultats.
