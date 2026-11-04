@@ -1,5 +1,5 @@
 /**
- * Contrat partagé de la suite d'injection Claude Code (lots I1 et I2).
+ * Contrat partagé de la suite d'injection Claude Code (lots I1 à I3).
  *
  * Utilisé par le lanceur (sonde-claude-code.js) et par les tests claude-injection-contexte et
  * claude-sonde-claude-code. Fonctions pures, modules intégrés de Node seulement, aucune écriture.
@@ -16,6 +16,31 @@
 const crypto = require('crypto');
 const os = require('os');
 const path = require('path');
+
+// --- Erreurs partagées par le lanceur et la partie payante ---------------------------------------
+
+/** Refus avant tout lancement (préconditions, options, budget) : code de sortie 2. */
+class Refus extends Error {}
+/** Arguments de claude refusés par la liste blanche. */
+class RefusArgv extends Refus {}
+/** Arrêt définitif : le fichier ARRET.txt est écrit ou présent ; code de sortie 4. */
+class Arret extends Error {}
+/** Série rejetée (base différente, contrôle échoué, retrait incomplet) : code de sortie 3. */
+class SerieRejetee extends Error {}
+
+// --- Comparaison de chemins (casse ignorée sous Windows, via path.win32) --------------------------
+
+const modChemin = (plateforme) => (plateforme === 'win32' ? path.win32 : path.posix);
+
+/** Vrai si `enfant` est `parent` ou se trouve dessous. */
+function estSousOuEgal(enfant, parent, plateforme = process.platform) {
+  const p = modChemin(plateforme);
+  const rel = p.relative(p.resolve(parent), p.resolve(enfant));
+  return rel === '' || (rel !== '..' && !rel.startsWith(`..${p.sep}`) && !p.isAbsolute(rel));
+}
+const estSousStrict = (enfant, parent, plateforme = process.platform) =>
+  estSousOuEgal(enfant, parent, plateforme) && !estSousOuEgal(parent, enfant, plateforme);
+const memeChemin = (a, b, plateforme = process.platform) => estSousOuEgal(a, b, plateforme) && estSousOuEgal(b, a, plateforme);
 
 // --- Inventaire figé (source unique : inventaire.json de la suite) --------------------------------
 
@@ -261,6 +286,14 @@ function garder(rel, texte, poste, interdits = []) {
 }
 
 module.exports = {
+  Refus,
+  RefusArgv,
+  Arret,
+  SerieRejetee,
+  modChemin,
+  estSousOuEgal,
+  estSousStrict,
+  memeChemin,
   SUFFIXE,
   SEGMENTS_CONVERTIS,
   ESPACE_RESERVE_PROJET,

@@ -433,6 +433,8 @@
     "test:injection-reset": "node test/scenarios/scripts/reset-injection-contexte.js",
     "sonde:claude-etat": "node test/scenarios/scripts/sonde-claude-code.js etat",
     "sonde:claude-context": "node test/scenarios/scripts/sonde-claude-code.js context",
+    "sonde:claude": "node test/scenarios/scripts/sonde-claude-code.js payant",
+    "test:injection-claude": "tsc -p tsconfig.test.json && node test/scenarios/scripts/compare-injection-claude.js",
     "prepare": "node scripts/activer-hooks.js",
     "package": "vsce package --no-git-tag-version",
     "bundle": "node esbuild.js --production",

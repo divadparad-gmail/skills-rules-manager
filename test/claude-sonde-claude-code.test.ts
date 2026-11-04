@@ -351,20 +351,21 @@ describe('Suite de Tests : Lanceur de la sonde Claude Code (lot I2, sans lancer 
   test('10. Fichier ARRET et compteur persistant : refus au plafond, série trop longue refusée avant tout appel', () => {
     const brut = tmp('brut');
     try {
-      assert.deepStrictEqual(S.lireCompteur(brut), { lot: 'I2', plafond: 50, utilises: 0 });
-      S.verifierBudget(brut, 50);
-      assert.throws(() => S.verifierBudget(brut, 51), S.Refus);
-      assert.strictEqual(S.reserverContext(brut), 1);
-      assert.deepStrictEqual(JSON.parse(fs.readFileSync(path.join(brut, S.FICHIER_COMPTEUR), 'utf8')), { lot: 'I2', plafond: 50, utilises: 1 });
-      fs.writeFileSync(path.join(brut, S.FICHIER_COMPTEUR), JSON.stringify({ lot: 'I2', plafond: 50, utilises: 49 }));
-      assert.strictEqual(S.reserverContext(brut), 50);
-      assert.throws(() => S.reserverContext(brut), S.Arret);
-      assert.throws(() => S.verifierBudget(brut, 1), S.Refus);
-      fs.writeFileSync(path.join(brut, S.FICHIER_COMPTEUR), JSON.stringify({ lot: 'E1', plafond: 50, utilises: 0 }));
-      assert.throws(() => S.lireCompteur(brut), S.Arret, 'compteur d\'un autre lot');
-      fs.writeFileSync(path.join(brut, S.FICHIER_COMPTEUR), JSON.stringify({ lot: 'I2', plafond: 500, utilises: 0 }));
-      assert.throws(() => S.lireCompteur(brut), S.Arret, 'plafond modifié');
-      fs.writeFileSync(path.join(brut, S.FICHIER_COMPTEUR), JSON.stringify({ lot: 'I2', plafond: 50, utilises: 3 }));
+      assert.deepStrictEqual(S.lireCompteur(brut, 'context', 'E1'), { lot: 'E1', plafond: 50, utilises: 0 });
+      S.verifierBudget(brut, 50, 'E1');
+      assert.throws(() => S.verifierBudget(brut, 51, 'E1'), S.Refus);
+      assert.strictEqual(S.reserverContext(brut, 'E1'), 1);
+      assert.deepStrictEqual(JSON.parse(fs.readFileSync(path.join(brut, S.FICHIER_COMPTEUR), 'utf8')), { lot: 'E1', plafond: 50, utilises: 1 });
+      fs.writeFileSync(path.join(brut, S.FICHIER_COMPTEUR), JSON.stringify({ lot: 'E1', plafond: 50, utilises: 49 }));
+      assert.strictEqual(S.reserverContext(brut, 'E1'), 50);
+      assert.throws(() => S.reserverContext(brut, 'E1'), S.Arret);
+      assert.throws(() => S.verifierBudget(brut, 1, 'E1'), S.Refus);
+      fs.writeFileSync(path.join(brut, S.FICHIER_COMPTEUR), JSON.stringify({ lot: 'I2', plafond: 50, utilises: 0 }));
+      assert.throws(() => S.lireCompteur(brut, 'context', 'E1'), S.Arret, 'compteur d\'un autre lot');
+      fs.writeFileSync(path.join(brut, S.FICHIER_COMPTEUR), JSON.stringify({ lot: 'E1', plafond: 500, utilises: 0 }));
+      assert.throws(() => S.lireCompteur(brut, 'context', 'E1'), S.Arret, 'plafond modifié');
+      assert.throws(() => S.lireCompteur(brut, 'context', 'I2'), S.Refus, 'lot inconnu');
+      fs.writeFileSync(path.join(brut, S.FICHIER_COMPTEUR), JSON.stringify({ lot: 'E1', plafond: 50, utilises: 3 }));
 
       // lancerClaude refuse avant tout lancement, sans toucher au compteur
       const env = S.environnementNettoye({ PATH: 'p' }, CONFIG_W);
@@ -376,7 +377,7 @@ describe('Suite de Tests : Lanceur de la sonde Claude Code (lot I2, sans lancer 
       assert.throws(() => S.verifierArret(brut), S.Arret);
       assert.throws(appel(['--version']), S.Arret, 'ARRET bloque même --version');
       assert.throws(appel(S.argumentsContext({})), S.Arret);
-      assert.strictEqual(S.lireCompteur(brut).utilises, 3, 'aucun appel compté');
+      assert.strictEqual(S.lireCompteur(brut, 'context', 'E1').utilises, 3, 'aucun appel compté');
     } finally {
       supprimer(brut);
     }
@@ -548,7 +549,7 @@ describe('Suite de Tests : Lanceur de la sonde Claude Code (lot I2, sans lancer 
       assert.deepStrictEqual(j.dossiers, [path.join(espace, 'projet', '.claude'), path.join(espace, 'projet', '.claude', 'rules'), path.join(config, 'rules')]);
       assert.ok(fichiers.every((f) => fs.readFileSync(f.destination, 'utf8') === f.contenu));
       assert.throws(() => S.deployer(fichiers, journal, [espace, config]), /journal/);
-      assert.deepStrictEqual(S.retirer(journal), { problemes: [] });
+      assert.deepStrictEqual(S.retirer(journal), { problemes: [], attendus: [] });
       assert.ok(!fs.existsSync(journal));
       assert.deepStrictEqual(fs.readdirSync(espace), ['projet']);
       assert.deepStrictEqual(fs.readdirSync(path.join(espace, 'projet')), []);

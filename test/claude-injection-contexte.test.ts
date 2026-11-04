@@ -13,6 +13,11 @@ const SUITE_REL = 'test/scenarios/claude-code-injection-contexte';
 const SUITE = path.join(ROOT, SUITE_REL);
 const FIXTURES = path.join(SUITE, 'fixtures');
 const SERVEUR = path.join(SUITE, 'mcp', 'serveur-fixture.js');
+/** Les documents de la suite (lot I3), soumis à la garde de confidentialité du test 11. */
+const DOCUMENTS = ['README.md', 'SONDE.md', 'SCENARIOS-CLAUDE-CODE.md'];
+/** Les rapports normalisés (context ou payant) et les baselines permis dans resultats/ et attendu/. */
+const RAPPORT_PERMIS = /^resultats\/(context|payant)-\d{4}-\d{2}-\d{2}-\d{4}\.json$/;
+const BASELINE_PERMISE = /^attendu\/baseline-\d{4}-\d{2}-\d{2}\.json$/;
 
 /**
  * Inventaire figé : chemin sous fixtures/ (<jeu>/<cible>/<miroir>), empreinte SHA-256 du contenu en LF,
@@ -219,9 +224,19 @@ describe('Suite de Tests : Injection de contexte Claude Code (fixtures inertes, 
       'inventaire.json',
       'attendu/.gitkeep',
       'resultats/.gitkeep',
+      ...DOCUMENTS,
     ]);
-    const parasites = listFiles(SUITE).filter((rel) => !rel.startsWith('brut/') && !permis.has(rel));
+    // Les rapports normalisés et les baselines (lots E1 et E2) passent par la garde du test 11.
+    const rapportOuBaseline = (rel: string) => RAPPORT_PERMIS.test(rel) || BASELINE_PERMISE.test(rel);
+    const parasites = listFiles(SUITE).filter((rel) => !rel.startsWith('brut/') && !permis.has(rel) && !rapportOuBaseline(rel));
     assert.deepStrictEqual(parasites, []);
+    for (const [motif, exemples, refuses] of [
+      [RAPPORT_PERMIS, ['resultats/context-2026-11-05-0930.json', 'resultats/payant-2026-11-05-1012.json'], ['resultats/brouillon.json', 'resultats/context-2026-11-05.json', 'resultats/payant-2026-11-05-1012.jsonl']],
+      [BASELINE_PERMISE, ['attendu/baseline-2026-11-05.json'], ['attendu/baseline.json', 'attendu/baseline-2026-11-05-v2.json']],
+    ] as [RegExp, string[], string[]][]) {
+      for (const e of exemples) assert.ok(motif.test(e), e);
+      for (const e of refuses) assert.ok(!motif.test(e), e);
+    }
   });
 
   test('3. Noms inertes : suffixe .fixture, aucun nom actif, jeux et cibles connus, conversion des noms', () => {
@@ -479,7 +494,7 @@ describe('Suite de Tests : Injection de contexte Claude Code (fixtures inertes, 
     assert.strictEqual(sansArgument.code, 2);
   });
 
-  test('11. Confidentialité : attendu/, resultats/, fixtures/, mcp/ et inventaire.json ne contiennent aucune donnée locale', () => {
+  test('11. Confidentialité : attendu/, resultats/, fixtures/, mcp/, inventaire.json et les documents ne contiennent aucune donnée locale', () => {
     const poste = lirePoste();
     const fuites: string[] = [];
     for (const dossier of ['attendu', 'resultats', 'fixtures', 'mcp']) {
@@ -488,6 +503,9 @@ describe('Suite de Tests : Injection de contexte Claude Code (fixtures inertes, 
       for (const rel of listFiles(abs, dossier)) fuites.push(...garder(rel, fs.readFileSync(path.join(SUITE, rel), 'utf8'), poste));
     }
     fuites.push(...garder('inventaire.json', fs.readFileSync(INVENTAIRE_JSON, 'utf8'), poste));
+    for (const doc of DOCUMENTS) {
+      if (fs.existsSync(path.join(SUITE, doc))) fuites.push(...garder(doc, fs.readFileSync(path.join(SUITE, doc), 'utf8'), poste));
+    }
     assert.deepStrictEqual(fuites, [], 'Donnée locale ou nom hors liste blanche : caviarder avant de commiter.');
   });
 

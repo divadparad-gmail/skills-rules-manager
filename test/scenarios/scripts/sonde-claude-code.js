@@ -1,29 +1,38 @@
 #!/usr/bin/env node
 /**
- * Lanceur de la suite d'injection Claude Code — lot I2 : partie gratuite (/context seulement).
+ * Lanceur de la suite d'injection Claude Code — lots I2 (partie gratuite) et I3 (partie payante).
  *
  * Usage (depuis la racine du dépôt) :
- *   npm run sonde:claude-etat                 version, auth status et préconditions ; aucun /context
- *   npm run sonde:claude-context [-- options] déploiement, /context par combinaison, retrait, rapport
- *   node test/scenarios/scripts/sonde-claude-code.js retirer   retrait d'un déploiement interrompu
+ *   npm run sonde:claude-etat                       version, auth status et préconditions ; aucun /context
+ *   npm run sonde:claude-context -- --lot <E1|E2>   déploiement, /context par combinaison, retrait, rapport
+ *   npm run sonde:claude-context -- --preparer-h14  déploie le jeu de H14 et affiche les gestes (aucun /context)
+ *   npm run sonde:claude -- --a-sec                 affiche les 38 appels prévus, sans rien lancer ni écrire
+ *   npm run sonde:claude -- --confirmer --plafond <n> [--series 1,3] [--resultats]   partie payante
+ *   node test/scenarios/scripts/sonde-claude-code.js retirer   retrait d'un déploiement (interrompu, ou H14)
  * Options de « context » :
+ *   --lot <E1|E2>           lot du compteur de /context (obligatoire) ; au changement de lot, l'ancien
+ *                           compteur est archivé dans brut/, et un lot archivé ne peut pas être rouvert
  *   --combinaisons <id,id>  ne mesure que ces combinaisons (les quatre bases sont toujours mesurées)
- *   --resultats             écrit le rapport normalisé dans resultats/ (lot E1) au lieu de brut/
+ *   --resultats             écrit le rapport normalisé dans resultats/ au lieu de brut/
  *
  * Chemins par défaut calculés (aucun chemin local en dur), remplaçables par CANARI_CLAUDE_CONFIG_DIR,
  * CANARI_CLAUDE_ESPACE et CANARI_CLAUDE_EXE.
  *
  * Protections, par construction :
- *   - seuls « claude --version », « claude auth status --json » et « claude -p /context » (ou
- *     « /context all ») peuvent être lancés : verifierArgv() refuse tout le reste, sans shell ;
+ *   - seuls « claude --version », « claude auth status --json », « claude -p /context » (ou
+ *     « /context all ») et, pour la partie payante, « claude -p <invite de SONDE.md vérifiée par son
+ *     empreinte> » peuvent être lancés : verifierArgv() refuse tout le reste, sans shell ;
  *   - environnement nettoyé : toutes les variables CLAUDE* et ANTHROPIC* sont retirées, seules
  *     CLAUDE_CONFIG_DIR et DISABLE_AUTOUPDATER=1 sont posées ;
- *   - profil connecté par claude.ai, sur un abonnement, avec le bon configDirectory, avant la série ;
- *   - après chaque /context : apiKeySource=none, usage nul, num_turns=0, coût nul, sinon le fichier
- *     brut/ARRET.txt est écrit et bloque tout lancement suivant de claude ;
+ *   - profil connecté par claude.ai, sur un abonnement, avec le bon configDirectory, avant chaque série ;
+ *   - après chaque /context : apiKeySource=none, usage nul, num_turns=0, coût nul ; après chaque appel
+ *     au modèle : apiKeySource=none (aussi dès l'initialisation, avant la première requête) ; sinon le
+ *     fichier brut/ARRET.txt est écrit et bloque tout lancement suivant de claude ;
+ *   - deux compteurs persistants et distincts, liés au lot, incrémentés avant chaque lancement :
+ *     /context (50 en E1, 40 en E2) et appels au modèle (40 en E2, ou moins avec --plafond) ;
+ *   - garde de flux pendant chaque appel au modèle : tours, outils, chemins et commande Bash ;
  *   - empreintes SHA-256 (en LF) de chaque fixture comparées à inventaire.json avant tout déploiement :
  *     un écart refuse le déploiement et nomme le fichier ;
- *   - plafond de 50 /context pour le lot, compteur persistant dans brut/ ;
  *   - rapport normalisé écrit seulement après la garde de confidentialité ; sorties brutes dans brut/.
  *
  * Codes de sortie : 0 succès, 1 erreur, 2 préconditions non remplies ou refus, 3 série rejetée,
@@ -37,28 +46,37 @@ const os = require('os');
 const path = require('path');
 const { spawn, spawnSync } = require('child_process');
 const commun = require('./sonde-claude-code-commun');
+const payant = require('./sonde-claude-code-payant');
 
 const RACINE_DEPOT = path.resolve(__dirname, '..', '..', '..');
 const SUITE = path.join(RACINE_DEPOT, 'test', 'scenarios', 'claude-code-injection-contexte');
 const FIXTURES = path.join(SUITE, 'fixtures');
 const SERVEUR = path.join(SUITE, 'mcp', 'serveur-fixture.js');
 const INVENTAIRE = path.join(SUITE, 'inventaire.json');
+const SONDE = path.join(SUITE, 'SONDE.md');
 const BRUT = path.join(SUITE, 'brut');
 const RESULTATS = path.join(SUITE, 'resultats');
 
-const LOT = 'I2';
-const PLAFOND = 50;
+const LOTS_CONTEXT = Object.keys(payant.COMPTEURS.context.plafonds);
 const MODELE = 'claude-opus-5';
 const EFFORT = 'high';
 const PROMPTS = ['/context', '/context all'];
 const ABONNEMENTS = ['pro', 'max', 'team', 'enterprise'];
 const OUTILS_CONNUS = new Set(['Skill', 'ToolSearch', 'Read', 'Write', 'Edit', 'Glob', 'Grep', 'Bash']);
+const OUTILS_FICHIERS = new Set(['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Bash']);
 const OPTIONS_SEULES = new Set(['--verbose', '--no-session-persistence', '--strict-mcp-config', '--include-hook-events']);
-const OPTIONS_FIXES = { '--model': MODELE, '--effort': EFFORT, '--output-format': 'stream-json' };
+const OPTIONS_FIXES = {
+  '--model': MODELE, '--effort': EFFORT, '--output-format': 'stream-json', '--permission-prompts': 'none', '--permission-mode': 'dontAsk',
+};
+const OPTIONS_CHEMINS = new Set(['--mcp-config', '--plugin-dir', '--settings']);
+const TOURS_PERMIS = new Set(['1', '3']);
+const AUTORISATIONS_PERMISES = new Set(Object.values(payant.AUTORISATIONS));
 const OPTIONS_OBLIGATOIRES = ['--model', '--effort', '--output-format', '--verbose', '--tools', '--no-session-persistence', '--strict-mcp-config'];
+const OPTIONS_OBLIGATOIRES_MODELE = [...OPTIONS_OBLIGATOIRES, '--permission-prompts', '--max-turns'];
 const DELAI_MS = 120000;
+const DELAI_MODELE_MS = 300000;
 const FICHIER_ARRET = 'ARRET.txt';
-const FICHIER_COMPTEUR = 'compteur-context.json';
+const FICHIER_COMPTEUR = payant.COMPTEURS.context.fichier;
 const FICHIER_JOURNAL = 'journal-deploiement.json';
 /** Catégories intégrées de /context : toute autre est réduite à un total. */
 const CATEGORIES_CONNUES = new Set([
@@ -98,12 +116,9 @@ const COMBINAISONS = [
   { id: 'jeu-complet', jeux: ['niveaux', 'skills', 'hook-sortie', 'mcp-canari'], outils: 'Skill', hookEvents: true },
 ];
 
-class Refus extends Error {}
-class RefusArgv extends Refus {}
-class Arret extends Error {}
-class SerieRejetee extends Error {}
+const { Refus, RefusArgv, Arret, SerieRejetee, estSousOuEgal, estSousStrict, memeChemin } = commun;
 
-const mod = (plateforme) => (plateforme === 'win32' ? path.win32 : path.posix);
+const mod = commun.modChemin;
 
 /** Lecture d'une variable, sans tenir compte de la casse sous Windows. */
 function lireVar(env, nom, plateforme = process.platform) {
@@ -112,16 +127,6 @@ function lireVar(env, nom, plateforme = process.platform) {
   const cle = Object.keys(env).find((k) => k.toLowerCase() === nom.toLowerCase());
   return cle === undefined ? undefined : env[cle];
 }
-
-/** Vrai si `enfant` est `parent` ou se trouve dessous (casse ignorée sous Windows, via path.win32). */
-function estSousOuEgal(enfant, parent, plateforme = process.platform) {
-  const p = mod(plateforme);
-  const rel = p.relative(p.resolve(parent), p.resolve(enfant));
-  return rel === '' || (rel !== '..' && !rel.startsWith(`..${p.sep}`) && !p.isAbsolute(rel));
-}
-const estSousStrict = (enfant, parent, plateforme = process.platform) =>
-  estSousOuEgal(enfant, parent, plateforme) && !estSousOuEgal(parent, enfant, plateforme);
-const memeChemin = (a, b, plateforme = process.platform) => estSousOuEgal(a, b, plateforme) && estSousOuEgal(b, a, plateforme);
 
 // --- Chemins, exécutable, environnement ----------------------------------------------------------
 
@@ -285,18 +290,54 @@ function argumentsContext({ prompt = '/context', outils = '', mcpConfig, pluginD
 }
 
 /**
- * Seconde barrière, appliquée à l'argv final dans lancerClaude : « --version », « auth status --json »,
- * ou « -p /context » avec ses options connues. --mcp-config et --plugin-dir doivent désigner un
- * chemin absolu sous l'espace. Renvoie la forme reconnue.
+ * Les arguments d'une étape de la partie payante (appel au modèle, ou /context avec les mêmes options) :
+ * --permission-prompts none et --max-turns toujours ; pour un déclencheur, --permission-mode dontAsk et
+ * --settings (un fichier de l'espace, jamais du JSON dans l'argv) ; --allowedTools seulement s'il le faut.
  */
-function verifierArgv(argv, { espace, plateforme = process.platform }) {
+function argumentsAppel({ prompt, outils = '', toursMax, declencheur = false, settings, autorisation, mcpConfig, pluginDir, hookEvents = false }) {
+  if (typeof prompt !== 'string' || prompt === '') throw new RefusArgv('invite absente');
+  if (!outilsValides(outils)) throw new RefusArgv('jeu d\'outils inconnu');
+  const argv = ['-p', prompt, '--model', MODELE, '--effort', EFFORT, '--output-format', 'stream-json', '--verbose',
+    '--tools', outils, '--no-session-persistence', '--strict-mcp-config', '--permission-prompts', 'none', '--max-turns', String(toursMax)];
+  if (declencheur) {
+    if (!settings) throw new RefusArgv('déclencheur sans fichier de réglages');
+    argv.push('--permission-mode', 'dontAsk', '--settings', settings);
+  }
+  if (autorisation) argv.push('--allowedTools', autorisation);
+  if (mcpConfig) argv.push('--mcp-config', mcpConfig);
+  if (pluginDir) argv.push('--plugin-dir', pluginDir);
+  if (hookEvents) argv.push('--include-hook-events');
+  return argv;
+}
+
+/** L'autorisation exigée pour un jeu d'outils de déclencheur : Edit(./**) pour Write ou Edit, Bash(cat *) pour Bash. */
+function autorisationAttendue(outils) {
+  const liste = outils.split(',');
+  if (liste.includes('Write') || liste.includes('Edit')) return payant.AUTORISATIONS.edit;
+  if (liste.includes('Bash')) return payant.AUTORISATIONS.cat;
+  return null;
+}
+
+/**
+ * Seconde barrière, appliquée à l'argv final dans lancerClaude : « --version », « auth status --json »,
+ * « -p /context », ou « -p <invite> » si `invites` (texte → identifiant, vérifiées par leur empreinte)
+ * la contient. --mcp-config, --plugin-dir et --settings doivent désigner un chemin absolu sous
+ * l'espace. Un appel au modèle doit avoir des options cohérentes avec son jeu d'outils.
+ * Renvoie la forme reconnue : version, auth, context ou modele.
+ */
+function verifierArgv(argv, { espace, plateforme = process.platform, invites = null }) {
   if (!Array.isArray(argv) || argv.some((a) => typeof a !== 'string')) throw new RefusArgv('arguments invalides');
   if (argv.length === 1 && argv[0] === '--version') return 'version';
   if (argv.length === 3 && argv[0] === 'auth' && argv[1] === 'status' && argv[2] === '--json') return 'auth';
-  if (argv[0] !== '-p') throw new RefusArgv('seuls « --version », « auth status --json » et « -p /context » sont permis');
-  verifierPrompt(argv[1]);
+  if (argv[0] !== '-p') throw new RefusArgv('seuls « --version », « auth status --json », « -p /context » et « -p <invite de SONDE.md> » sont permis');
+  let forme;
+  if (PROMPTS.includes(argv[1])) forme = 'context';
+  else if (invites instanceof Map && invites.has(argv[1])) forme = 'modele';
+  else if (invites instanceof Map) throw new RefusArgv('invite refusée : elle ne figure pas dans SONDE.md avec une empreinte vérifiée');
+  else verifierPrompt(argv[1]);
   const p = mod(plateforme);
   const vus = new Set();
+  const valeurs = new Map();
   for (let i = 2; i < argv.length; i++) {
     const a = argv[i];
     if (vus.has(a)) throw new RefusArgv(`option répétée : ${a}`);
@@ -305,16 +346,36 @@ function verifierArgv(argv, { espace, plateforme = process.platform }) {
       if (argv[++i] !== OPTIONS_FIXES[a]) throw new RefusArgv(`${a} : valeur refusée`);
     } else if (a === '--tools') {
       if (!outilsValides(argv[++i])) throw new RefusArgv('--tools : jeu d\'outils refusé');
-    } else if (a === '--mcp-config' || a === '--plugin-dir') {
+    } else if (OPTIONS_CHEMINS.has(a)) {
       const v = argv[++i];
       if (typeof v !== 'string' || !p.isAbsolute(v) || !estSousStrict(v, espace, plateforme)) throw new RefusArgv(`${a} : le chemin doit être sous l'espace`);
+    } else if (a === '--max-turns') {
+      if (!TOURS_PERMIS.has(argv[++i])) throw new RefusArgv('--max-turns : valeur refusée (1 ou 3)');
+    } else if (a === '--allowedTools') {
+      if (!AUTORISATIONS_PERMISES.has(argv[++i])) throw new RefusArgv('--allowedTools : autorisation refusée');
     } else if (!OPTIONS_SEULES.has(a)) {
       throw new RefusArgv(`option refusée : ${a}`);
     }
+    if (!OPTIONS_SEULES.has(a)) valeurs.set(a, argv[i]);
   }
-  const manquantes = OPTIONS_OBLIGATOIRES.filter((o) => !vus.has(o));
+  const obligatoires = forme === 'modele' ? OPTIONS_OBLIGATOIRES_MODELE : OPTIONS_OBLIGATOIRES;
+  const manquantes = obligatoires.filter((o) => !vus.has(o));
   if (manquantes.length > 0) throw new RefusArgv(`option obligatoire absente : ${manquantes.join(', ')}`);
-  return 'context';
+  if (valeurs.has('--allowedTools') && !valeurs.has('--permission-mode')) throw new RefusArgv('--allowedTools sans --permission-mode dontAsk');
+  if (forme === 'modele') {
+    const outils = valeurs.get('--tools');
+    const fichiers = outils !== '' && outils.split(',').some((t) => OUTILS_FICHIERS.has(t));
+    if (fichiers) {
+      if (!payant.OUTILS_DECLENCHEURS.has(outils)) throw new RefusArgv('déclencheur : un seul outil par appel (Read et Edit pour Edit)');
+      if (valeurs.get('--max-turns') !== '3') throw new RefusArgv('déclencheur : --max-turns 3 attendu');
+      if (!valeurs.has('--permission-mode') || !valeurs.has('--settings')) throw new RefusArgv('déclencheur : --permission-mode dontAsk et --settings obligatoires');
+      if ((valeurs.get('--allowedTools') ?? null) !== autorisationAttendue(outils)) throw new RefusArgv('déclencheur : autorisation incohérente avec le jeu d\'outils');
+    } else {
+      if (valeurs.get('--max-turns') !== '1') throw new RefusArgv('appel sans outil de fichier : --max-turns 1 attendu');
+      if (['--permission-mode', '--settings', '--allowedTools'].some((o) => valeurs.has(o))) throw new RefusArgv('options de déclencheur refusées hors de la série 5');
+    }
+  }
+  return forme;
 }
 
 // --- Lecture et contrôle d'un /context ---------------------------------------------------------------
@@ -390,38 +451,17 @@ function ecrireArret(dossier, raison) {
   fs.appendFileSync(path.join(dossier, FICHIER_ARRET), `${new Date().toISOString()} ${raison}\n`, 'utf8');
 }
 
-function lireCompteur(dossier) {
-  const f = path.join(dossier, FICHIER_COMPTEUR);
-  if (!fs.existsSync(f)) return { lot: LOT, plafond: PLAFOND, utilises: 0 };
-  let c;
-  try {
-    c = JSON.parse(fs.readFileSync(f, 'utf8'));
-  } catch {
-    throw new Arret('compteur illisible : arrêt');
-  }
-  if (!c || c.lot !== LOT || c.plafond !== PLAFOND || !Number.isInteger(c.utilises) || c.utilises < 0) throw new Arret("compteur d'un autre lot ou invalide : arrêt");
-  return c;
-}
+// Les compteurs (/context et modèle) sont dans sonde-claude-code-payant.js : lireCompteur(dossier,
+// type, lot), ouvrirLot, verifierBudget, reserver. Ces raccourcis gardent les noms du lot I2.
+const lireCompteur = (dossier, type, lot) => payant.lireCompteur(dossier, type, lot);
+const verifierBudget = (dossier, prevus, lot) => payant.verifierBudget(dossier, 'context', lot, prevus);
+const reserverContext = (dossier, lot) => payant.reserver(dossier, 'context', lot);
 
-/** Refuse une série qui dépasserait le plafond, avant son premier appel. */
-function verifierBudget(dossier, prevus) {
-  const c = lireCompteur(dossier);
-  if (c.utilises + prevus > c.plafond) {
-    throw new Refus(`plafond : ${c.utilises} /context utilisés, ${prevus} prévus, plafond de ${c.plafond} pour le lot ${LOT}`);
-  }
-  return c;
-}
-
-/** Réserve un /context : le compteur est incrémenté AVANT le lancement. */
-function reserverContext(dossier) {
-  const c = lireCompteur(dossier);
-  if (c.utilises >= c.plafond) throw new Arret(`plafond de ${c.plafond} /context atteint`);
-  const suivant = { ...c, utilises: c.utilises + 1 };
-  fs.mkdirSync(dossier, { recursive: true });
-  const f = path.join(dossier, FICHIER_COMPTEUR);
-  fs.writeFileSync(`${f}.tmp`, `${JSON.stringify(suivant)}\n`, 'utf8');
-  fs.renameSync(`${f}.tmp`, f);
-  return suivant.utilises;
+/** Ouvre un lot de compteur ; un archivage est toujours annoncé en console. */
+function ouvrirLotAnnonce(dossier, type, lot) {
+  const r = payant.ouvrirLot(dossier, type, lot);
+  if (r) console.log(`[sonde-claude] Compteur ${type} du lot ${r.ancien.lot} (${r.ancien.utilises} sur ${r.ancien.plafond}) archivé sous brut/${r.archive} ; lot ${lot} ouvert, sans remise à zéro de l'ancien.`);
+  return r;
 }
 
 // --- Normalisation ------------------------------------------------------------------------------------
@@ -468,8 +508,28 @@ function fixturesAttendues(plan) {
   return { memoire, skills: [...new Set(skills)] };
 }
 
+/**
+ * Le compte o200k de chaque fichier de mémoire (fichier entier, en LF) et de chaque skill de fixture
+ * (ligne « - nom: description ») d'un plan, pour le rapport r = /context ÷ o200k de H15.
+ */
+function o200kDuPlan(plan, lireTexte = (f) => fs.readFileSync(f, 'utf8')) {
+  const memoire = new Map();
+  const skills = new Map();
+  for (const e of plan) {
+    const nom = e.chemin.split('/').pop();
+    if (nom === 'SKILL.md') {
+      const ligne = payant.ligneSkill(lireTexte(e.source));
+      const dossier = e.chemin.split('/').slice(-2)[0];
+      if (ligne) skills.set(e.cible === 'plugin' ? `${e.chemin.split('/')[0]}:${dossier}` : dossier, payant.o200k(ligne));
+    } else if (nom.endsWith('.md') && ['global', 'parent', 'projet'].includes(e.cible)) {
+      memoire.set(e.normalise.toLowerCase(), payant.o200k(enLf(lireTexte(e.source))));
+    }
+  }
+  return { memoire, skills };
+}
+
 /** Une entrée de rapport : fixtures par leur nom, tout le reste en totaux, aucun chemin absolu. */
-function normaliserCombinaison(flux, { racines, nomMemoire, plan = [], plateforme = process.platform }) {
+function normaliserCombinaison(flux, { racines, nomMemoire, plan = [], plateforme = process.platform, o200k = null }) {
   const cu = flux.contextUsage || {};
   const deployes = new Set(plan.map((e) => e.normalise.toLowerCase()));
   const attendues = fixturesAttendues(plan);
@@ -483,13 +543,19 @@ function normaliserCombinaison(flux, { racines, nomMemoire, plan = [], plateform
   const memoryFiles = [];
   for (const f of cu.memory_files || []) {
     const chemin = reecrireChemin(f.path, racines, nomMemoire, plateforme);
-    if (chemin && deployes.has(chemin.toLowerCase()) && TYPES_MEMOIRE.has(f.type)) memoryFiles.push({ chemin, type: f.type, tokens: f.tokens });
+    if (chemin && deployes.has(chemin.toLowerCase()) && TYPES_MEMOIRE.has(f.type)) {
+      const compte = o200k && o200k.memoire ? o200k.memoire.get(chemin.toLowerCase()) : undefined;
+      memoryFiles.push({ chemin, type: f.type, tokens: f.tokens, ...(compte !== undefined ? { o200k: compte } : {}) });
+    }
     else ajouter(hors.memoire_hors, f.tokens);
   }
   const skills = [];
   for (const s of cu.skills || []) {
     const pluginOk = s.plugin_name === undefined || s.plugin_name === null || estNomFixture(s.plugin_name);
-    if (estNomFixture(s.name) && pluginOk) skills.push({ name: s.name, source: s.source, ...(s.plugin_name ? { plugin: s.plugin_name } : {}), tokens: s.tokens });
+    if (estNomFixture(s.name) && pluginOk) {
+      const compte = o200k && o200k.skills ? o200k.skills.get(s.name) : undefined;
+      skills.push({ name: s.name, source: s.source, ...(s.plugin_name ? { plugin: s.plugin_name } : {}), tokens: s.tokens, ...(compte !== undefined ? { o200k: compte } : {}) });
+    }
     else ajouter(hors.skills_hors, s.tokens);
   }
   const mcpTools = [];
@@ -695,17 +761,30 @@ function deployer(fichiers, journalPath, racinesPermises) {
 
 /**
  * Retire un déploiement d'après son journal : seuls les fichiers identiques à ce qui a été écrit
- * sont supprimés, puis les dossiers créés, s'ils sont vides. Un fichier modifié est conservé.
+ * sont supprimés, puis les dossiers créés, s'ils sont vides. Un fichier modifié est conservé, sauf
+ * s'il figure dans `modifsPermises` (effet attendu d'un déclencheur). Les fichiers de `creesPermis`
+ * (créés par un déclencheur, chemins exacts) sont supprimés d'abord ; rien d'autre ne l'est.
  */
-function retirer(journalPath) {
-  if (!fs.existsSync(journalPath)) return { problemes: [] };
+function retirer(journalPath, { modifsPermises = [], creesPermis = [] } = {}) {
+  if (!fs.existsSync(journalPath)) return { problemes: [], attendus: [] };
   const journal = JSON.parse(fs.readFileSync(journalPath, 'utf8'));
   const problemes = [];
+  const attendus = [];
+  for (const c of creesPermis) {
+    if (journal.fichiers.some((f) => memeChemin(f.destination, c))) continue;
+    if (fs.existsSync(c) && fs.lstatSync(c).isFile()) {
+      avecReprise(() => fs.unlinkSync(c));
+      attendus.push(c);
+    }
+  }
   for (const f of [...journal.fichiers].reverse()) {
     if (!fs.existsSync(f.destination)) continue;
     if (sha256(fs.readFileSync(f.destination, 'utf8')) !== f.sha256) {
-      problemes.push(`fichier modifié conservé : ${f.destination}`);
-      continue;
+      if (!modifsPermises.some((m) => memeChemin(m, f.destination))) {
+        problemes.push(`fichier modifié conservé : ${f.destination}`);
+        continue;
+      }
+      attendus.push(f.destination);
     }
     avecReprise(() => fs.unlinkSync(f.destination));
   }
@@ -716,7 +795,7 @@ function retirer(journalPath) {
   }
   if (problemes.length === 0) fs.unlinkSync(journalPath);
   else ecrireJournal(journalPath, { ...journal, etat: 'retrait-incomplet' });
-  return { problemes };
+  return { problemes, attendus };
 }
 
 // --- Lancement de claude ---------------------------------------------------------------------------------
@@ -727,23 +806,52 @@ function arreterArbre(enfant, plateforme = process.platform) {
 }
 
 /**
- * Le seul point de lancement de claude : fichier ARRET, liste blanche des arguments, environnement
- * contrôlé, réservation du compteur pour un /context, aucun shell, entrée standard fermée.
+ * Le seul point de lancement de claude : fichier ARRET, liste blanche des arguments (invites de
+ * SONDE.md comprises si `invites` est fourni), environnement contrôlé, réservation du compteur du
+ * lot (/context ou modèle) AVANT le lancement, aucun shell, entrée standard fermée. Pour un appel au
+ * modèle, la garde de flux examine chaque ligne du stream-json et tue l'arbre de processus au
+ * premier écart.
  */
-function lancerClaude({ exe, argv, env, cwd, espace, configDir, dossierBrut, plateforme = process.platform, delaiMs = DELAI_MS }) {
+function lancerClaude({ exe, argv, env, cwd, espace, configDir, dossierBrut, plateforme = process.platform, delaiMs = DELAI_MS, lot = null, invites = null, garde = null }) {
   verifierArret(dossierBrut);
-  const forme = verifierArgv(argv, { espace, plateforme });
+  const forme = verifierArgv(argv, { espace, plateforme, invites });
   const pb = problemesEnvironnement(env, configDir);
   if (pb.length > 0) throw new Refus(`environnement non conforme : ${pb.join(' ; ')}`);
-  const numero = forme === 'context' ? reserverContext(dossierBrut) : null;
+  if (forme === 'modele' && typeof garde !== 'function') throw new Refus('appel au modèle sans garde de flux');
+  if ((forme === 'context' || forme === 'modele') && !lot) throw new Refus('lot du compteur absent');
+  let numero = null;
+  if (forme === 'context') numero = reserverContext(dossierBrut, lot);
+  else if (forme === 'modele') numero = payant.reserver(dossierBrut, 'modele', lot);
   return new Promise((resolve) => {
     let stdout = '';
     let stderr = '';
+    let reste = '';
     let expire = false;
+    let violation = null;
     const enfant = spawn(exe, argv, { cwd, env, shell: false, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
     enfant.stdout.setEncoding('utf8');
     enfant.stderr.setEncoding('utf8');
-    enfant.stdout.on('data', (d) => (stdout += d));
+    enfant.stdout.on('data', (d) => {
+      stdout += d;
+      if (!garde || violation) return;
+      reste += d;
+      const lignes = reste.split(/\r?\n/);
+      reste = lignes.pop();
+      for (const ligne of lignes) {
+        let obj = null;
+        try {
+          obj = JSON.parse(ligne);
+        } catch {
+          continue;
+        }
+        const v = garde(obj);
+        if (v) {
+          violation = v;
+          arreterArbre(enfant, plateforme);
+          break;
+        }
+      }
+    });
     enfant.stderr.on('data', (d) => (stderr += d));
     const minuteur = setTimeout(() => {
       expire = true;
@@ -751,11 +859,11 @@ function lancerClaude({ exe, argv, env, cwd, espace, configDir, dossierBrut, pla
     }, delaiMs);
     enfant.on('error', (err) => {
       clearTimeout(minuteur);
-      resolve({ forme, numero, code: null, stdout, stderr: `${stderr}${err.message}`, expire });
+      resolve({ forme, numero, code: null, stdout, stderr: `${stderr}${err.message}`, expire, violation });
     });
     enfant.on('close', (code) => {
       clearTimeout(minuteur);
-      resolve({ forme, numero, code, stdout, stderr, expire });
+      resolve({ forme, numero, code, stdout, stderr, expire, violation });
     });
   });
 }
@@ -775,7 +883,7 @@ function processusFixtureRestants(espace, plateforme = process.platform) {
 /** Écrit le rapport normalisé après la garde ; rien n'est écrit au moindre problème. */
 function ecrireRapport(rapport, { destination, nom, poste, interdits, dossiers = { brut: BRUT, resultats: RESULTATS } }) {
   if (!['brut', 'resultats'].includes(destination)) throw new Refus('destination du rapport refusée (brut ou resultats seulement)');
-  if (!/^context-\d{4}-\d{2}-\d{2}-\d{4}\.json$/.test(nom)) throw new Refus('nom de rapport refusé');
+  if (!/^(context|payant)-\d{4}-\d{2}-\d{2}-\d{4}\.json$/.test(nom)) throw new Refus('nom de rapport refusé');
   const texte = `${JSON.stringify(rapport, null, 2)}\n`;
   const problemes = [...commun.problemesTexte(texte, poste, interdits), ...commun.problemesJson(texte)];
   if (problemes.length > 0) throw new Refus(`garde de confidentialité : rapport non écrit (${problemes.join(' ; ')})`);
@@ -798,14 +906,36 @@ function horodatage(d = new Date()) {
   return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}-${z(d.getHours())}${z(d.getMinutes())}`;
 }
 
-function preparer() {
+/** Résumé d'un compteur pour l'affichage, sans le valider (lot, utilisés, plafond, archives). */
+function resumeCompteur(dossier, type) {
+  const f = path.join(dossier, payant.COMPTEURS[type].fichier);
+  const archives = fs.existsSync(dossier) ? fs.readdirSync(dossier).filter((n) => n.startsWith(`compteur-${type}-`)).sort() : [];
+  let texte = 'aucun';
+  if (fs.existsSync(f)) {
+    try {
+      const c = JSON.parse(fs.readFileSync(f, 'utf8'));
+      texte = `lot ${c.lot}, ${c.utilises} sur ${c.plafond}${c.series_rejetees !== undefined ? `, ${c.series_rejetees} série(s) rejetée(s)` : ''}`;
+    } catch {
+      texte = 'illisible';
+    }
+  }
+  return `${texte}${archives.length > 0 ? ` ; archives : ${archives.join(', ')}` : ''}`;
+}
+
+function preparer({ aSec = false } = {}) {
   const plateforme = process.platform;
   const { configDir, espace } = cheminsParDefaut();
-  const exe = resoudreExe();
+  let exe;
+  try {
+    exe = resoudreExe();
+  } catch (err) {
+    if (!aSec) throw err;
+    exe = '<claude introuvable : CANARI_CLAUDE_EXE à définir>';
+  }
   const env = environnementNettoye(process.env, configDir);
   const pbEnv = problemesEnvironnement(env, configDir);
   if (pbEnv.length > 0) throw new Refus(pbEnv.join(' ; '));
-  if (!fs.existsSync(configDir)) throw new Refus("le profil isolé n'existe pas : le connecter d'abord (README de la suite)");
+  if (!aSec && !fs.existsSync(configDir)) throw new Refus("le profil isolé n'existe pas : le connecter d'abord (README de la suite)");
   const pbEspace = problemesEspace(espace, { home: os.homedir(), depot: RACINE_DEPOT, configDir, plateforme });
   return { plateforme, configDir, espace, projet: path.join(espace, 'projet'), exe, env, pbEspace, journal: path.join(BRUT, FICHIER_JOURNAL) };
 }
@@ -837,11 +967,10 @@ async function commandeEtat() {
   verifierArret(BRUT);
   const cwd = fs.existsSync(ctx.projet) ? ctx.projet : fs.existsSync(ctx.espace) ? ctx.espace : os.tmpdir();
   const etat = await lireEtat(ctx, cwd);
-  const compteur = lireCompteur(BRUT);
   console.log(`[sonde-claude] version : ${etat.version}`);
   console.log(`[sonde-claude] connexion : ${JSON.stringify(etat.resume)}`);
   console.log(`[sonde-claude] configDirectory : ${etat.problemes.some((p) => p.startsWith('configDirectory')) ? 'NON CONFORME' : 'le profil isolé'}`);
-  console.log(`[sonde-claude] /context du lot ${LOT} : ${compteur.utilises} sur ${compteur.plafond}`);
+  for (const type of ['context', 'modele']) console.log(`[sonde-claude] compteur ${type} : ${resumeCompteur(BRUT, type)}`);
   console.log(`[sonde-claude] journal de déploiement en attente : ${fs.existsSync(ctx.journal) ? 'oui' : 'non'}`);
   const problemes = [...etat.problemes, ...ctx.pbEspace];
   if (problemes.length > 0) {
@@ -864,12 +993,19 @@ async function commandeRetirer() {
 }
 
 function lireOptions(args) {
-  const opts = { combinaisons: null, resultats: false };
+  const opts = { combinaisons: null, resultats: false, lot: null, preparerH14: false };
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--resultats') opts.resultats = true;
+    else if (args[i] === '--preparer-h14') opts.preparerH14 = true;
     else if (args[i] === '--combinaisons' && args[i + 1]) opts.combinaisons = args[++i].split(',').filter(Boolean);
+    else if (args[i] === '--lot' && args[i + 1]) opts.lot = args[++i];
     else throw new Refus(`option inconnue : ${args[i]}`);
   }
+  if (opts.preparerH14) {
+    if (opts.combinaisons || opts.resultats || opts.lot) throw new Refus('--preparer-h14 ne lance aucun /context : il refuse --lot, --combinaisons et --resultats');
+    return opts;
+  }
+  if (!LOTS_CONTEXT.includes(opts.lot)) throw new Refus(`--lot <${LOTS_CONTEXT.join('|')}> est obligatoire`);
   if (opts.combinaisons) {
     const inconnues = opts.combinaisons.filter((id) => !COMBINAISONS.some((c) => c.id === id));
     if (inconnues.length > 0) throw new Refus(`combinaison inconnue : ${inconnues.join(', ')}`);
@@ -877,15 +1013,41 @@ function lireOptions(args) {
   return opts;
 }
 
+/**
+ * Préparation de H14 (conception, section 8) : auth status seulement, puis déploiement du jeu complet
+ * sans MCP, laissé en place avec son journal ; les gestes sont affichés. Retrait par « retirer ».
+ */
+async function commandePreparerH14() {
+  const ctx = preparer();
+  verifierArret(BRUT);
+  if (ctx.pbEspace.length > 0) throw new Refus(ctx.pbEspace.join(' ; '));
+  if (fs.existsSync(ctx.journal)) throw new Refus('un journal de déploiement existe : lancer « retirer »');
+  const invites = payant.verifierInvites(fs.readFileSync(SONDE, 'utf8'));
+  const rels = listerFixtures();
+  const inventaire = commun.lireInventaire(fs.readFileSync(INVENTAIRE, 'utf8'));
+  const plan = commun.planDeploiement(rels, payant.JEUX_H14, { configDir: ctx.configDir, espace: ctx.espace, fixturesDir: FIXTURES });
+  const { fichiers } = fichiersADeployer(plan, { espace: ctx.espace, inventaire, jeux: payant.JEUX_H14 });
+  fs.mkdirSync(ctx.projet, { recursive: true });
+  const etat = await lireEtat(ctx, ctx.projet);
+  if (etat.problemes.length > 0) throw new Refus(`connexion non conforme : ${etat.problemes.join(' ; ')}`);
+  deployer(fichiers, ctx.journal, [ctx.espace, ctx.configDir]);
+  console.log(`[sonde-claude] H14 : ${fichiers.length} fichiers déployés (jeux ${payant.JEUX_H14.join(', ')}, sans MCP), laissés en place. CLI ${etat.version}.`);
+  console.log('[sonde-claude] Gestes à faire (les chemins ci-dessous sont ceux de ce poste ; ne les recopie dans aucun fichier du dépôt) :');
+  for (const l of payant.gestesH14({ configDir: ctx.configDir, projet: ctx.projet, invite: invites.get('h14-panneau') })) console.log(l);
+  return 0;
+}
+
 async function commandeContext(args) {
   const opts = lireOptions(args);
+  if (opts.preparerH14) return commandePreparerH14();
   const combinaisons = opts.combinaisons ? COMBINAISONS.filter((c) => opts.combinaisons.includes(c.id)) : COMBINAISONS;
   const ctx = preparer();
   verifierArret(BRUT);
   if (ctx.pbEspace.length > 0) throw new Refus(ctx.pbEspace.join(' ; '));
   if (fs.existsSync(ctx.journal)) throw new Refus('un journal de déploiement existe : lancer « retirer »');
+  ouvrirLotAnnonce(BRUT, 'context', opts.lot);
   const prevus = BASES.length * 2 + combinaisons.length;
-  verifierBudget(BRUT, prevus);
+  verifierBudget(BRUT, prevus, opts.lot);
   const rels = listerFixtures();
   const inventaire = commun.lireInventaire(fs.readFileSync(INVENTAIRE, 'utf8'));
   // Contrôle préalable de toutes les combinaisons (plans et empreintes), avant le premier appel.
@@ -916,7 +1078,7 @@ async function commandeContext(args) {
     try {
       if (fichiers.length > 0) deployer(fichiers, ctx.journal, [ctx.espace, ctx.configDir]);
       const argv = argumentsContext({ outils: c.outils, mcpConfig, pluginDir, hookEvents: c.hookEvents });
-      const r = await lancerClaude({ exe: ctx.exe, argv, env: ctx.env, cwd: ctx.projet, espace: ctx.espace, configDir: ctx.configDir, dossierBrut: BRUT, plateforme: ctx.plateforme });
+      const r = await lancerClaude({ exe: ctx.exe, argv, env: ctx.env, cwd: ctx.projet, espace: ctx.espace, configDir: ctx.configDir, dossierBrut: BRUT, plateforme: ctx.plateforme, lot: opts.lot });
       numero++;
       const base = path.join(dossierSerie, `${String(numero).padStart(2, '0')}-${c.id}`);
       fs.writeFileSync(`${base}.jsonl`, r.stdout, 'utf8');
@@ -953,7 +1115,7 @@ async function commandeContext(args) {
       mcp: plan.filter((e) => e.cible === 'mcp').map((e) => e.jeu),
       hook_events: Boolean(c.hookEvents),
       controle: { apiKeySource: flux.init.apiKeySource, usage: sommeUsage(flux.result.usage), num_turns: flux.result.num_turns },
-      ...normaliserCombinaison(flux, { racines, nomMemoire, plan, plateforme: ctx.plateforme }),
+      ...normaliserCombinaison(flux, { racines, nomMemoire, plan, plateforme: ctx.plateforme, o200k: o200kDuPlan(plan) }),
     };
     return { entree, flux };
   };
@@ -997,11 +1159,11 @@ async function commandeContext(args) {
   fs.writeFileSync(path.join(dossierSerie, 'ecarts-profil.json'), `${JSON.stringify(ecarts, null, 2)}\n`);
   if (ecarts.inconnus.length > 0) raisonsRejet.push(`${ecarts.inconnus.length} écart(s) inconnu(s) du profil (détail dans brut/)`);
 
-  const compteur = lireCompteur(BRUT);
+  const compteur = lireCompteur(BRUT, 'context', opts.lot);
   const rapport = {
     rapport: 'claude-code-context',
     format: 1,
-    lot: LOT,
+    lot: opts.lot,
     environnement: {
       outil: 'Claude Code', entree: 'cli -p', os: ctx.plateforme === 'win32' ? 'Windows' : ctx.plateforme,
       version_avant: avant.version, version_apres: apres.version, modele: MODELE, effort: EFFORT,
@@ -1026,13 +1188,336 @@ async function commandeContext(args) {
   return 0;
 }
 
+// --- Partie payante (lot I3, exécutée au lot E2) -----------------------------------------------------
+
+/** Un message de rejet sans chemin : tout chemin de lecteur ou absolu devient <chemin>. */
+const nettoyerRaison = (texte) => String(texte).replace(/(?:[A-Za-z]:[\\/]|\\\\|\/)[^\s;,)]*/g, '<chemin>');
+
+/** Les fichiers d'une étape, avec le réglage des déclencheurs ; la liste normalisée sert à l'affichage. */
+function preparerEtape(ctx, etape, { rels, inventaire, invites }) {
+  const plan = etape.jeux.length > 0 ? commun.planDeploiement(rels, etape.jeux, { configDir: ctx.configDir, espace: ctx.espace, fixturesDir: FIXTURES }) : [];
+  const dep = fichiersADeployer(plan, { espace: ctx.espace, inventaire, jeux: etape.jeux });
+  const settings = etape.declencheur ? path.join(ctx.espace, ...payant.CHEMIN_REGLAGES) : null;
+  const fichiers = settings ? [...dep.fichiers, { destination: settings, contenu: payant.REGLAGES_DECLENCHEURS }] : dep.fichiers;
+  const prompt = etape.type === 'context' ? '/context' : invites.get(etape.invite);
+  if (typeof prompt !== 'string') throw new Refus(`${etape.id} : invite ${etape.invite} absente de SONDE.md`);
+  const argv = argumentsAppel({
+    prompt, outils: etape.outils, toursMax: etape.toursMax, declencheur: etape.declencheur, settings,
+    autorisation: etape.autorisation, mcpConfig: dep.mcpConfig, pluginDir: dep.pluginDir, hookEvents: etape.hookEvents,
+  });
+  const normalises = [
+    ...plan.map((e) => e.normalise),
+    ...(dep.mcpConfig ? ['<mcp>/serveur-fixture.js', '<mcp>/mcp-config.json'] : []),
+    ...(settings ? [`<parent>/${payant.CHEMIN_REGLAGES.join('/')}`] : []),
+  ];
+  return { plan, fichiers, argv, normalises, mcp: plan.some((e) => e.cible === 'mcp'), pluginDir: dep.pluginDir };
+}
+
+/**
+ * --a-sec : construit le plan exact de la vraie exécution, vérifie chaque argv avec verifierArgv, et
+ * l'affiche avec l'environnement nettoyé (noms seulement) et les fichiers déployés. Aucun processus
+ * n'est lancé, aucun fichier n'est écrit, auth status n'est pas lu.
+ */
+function commandeASec({ etapes, compte, invites, envoyables }) {
+  const ctx = preparer({ aSec: true });
+  const rels = listerFixtures();
+  const inventaire = commun.lireInventaire(fs.readFileSync(INVENTAIRE, 'utf8'));
+  const noms = Object.keys(ctx.env).sort();
+  const sortie = [];
+  sortie.push(`[a-sec] Partie payante à sec : rien n'est lancé ni écrit. Lot ${payant.LOT_PAYANT}, modèle ${MODELE}, effort ${EFFORT}.`);
+  sortie.push(`[a-sec] Compteurs actuels : context ${resumeCompteur(BRUT, 'context')} ; modèle ${resumeCompteur(BRUT, 'modele')}.`);
+  if (ctx.pbEspace.length > 0) sortie.push(`[a-sec] Préconditions de l'espace non remplies (bloquantes en vrai) : ${ctx.pbEspace.join(' ; ')}`);
+  let m = 0;
+  let c = 0;
+  for (const etape of etapes) {
+    const e = preparerEtape(ctx, etape, { rels, inventaire, invites });
+    const forme = verifierArgv(e.argv, { espace: ctx.espace, plateforme: ctx.plateforme, invites: envoyables });
+    if (forme !== (etape.type === 'modele' ? 'modele' : 'context')) throw new Refus(`${etape.id} : forme ${forme} inattendue`);
+    if (etape.type === 'modele') {
+      m++;
+      sortie.push(`[a-sec] Appel au modèle ${m}/${compte.modele} · série ${etape.serie} · ${etape.id} · invite ${etape.invite} (${payant.sha256(invites.get(etape.invite)).slice(0, 12)}) · outils « ${etape.outils} » · ${etape.toursMax} tour(s) au plus`);
+      sortie.push(`  argv : ${JSON.stringify(e.argv)}`);
+      sortie.push(`  environnement nettoyé (${noms.length} noms) : ${noms.join(', ')}`);
+    } else {
+      c++;
+      sortie.push(`[a-sec] /context ${c}/${compte.context} · série ${etape.serie} · ${etape.id} · outils « ${etape.outils} »`);
+      sortie.push(`  argv : ${JSON.stringify(e.argv)}`);
+      sortie.push('  environnement nettoyé : le même');
+    }
+    sortie.push(`  déployé : ${e.normalises.length > 0 ? e.normalises.join(', ') : 'rien'}`);
+  }
+  const parSerie = Object.entries(compte.parSerie).map(([n, v]) => `série ${n} : ${v}`).join(', ');
+  sortie.push(`[a-sec] Total : ${compte.modele} appels au modèle (${parSerie}) et ${compte.context} /context. Aucun processus lancé.`);
+  console.log(sortie.map(masquer).join('\n'));
+  return 0;
+}
+
+/**
+ * Exécute une étape : déploiement, lancement (garde de flux pour un appel au modèle), contrôles,
+ * effet attendu d'un déclencheur, retrait, espace revenu à l'état initial, serveurs MCP arrêtés.
+ */
+async function executerEtape(ctx, etape, x) {
+  const e = preparerEtape(ctx, etape, x);
+  const effet = etape.effet ? path.join(ctx.projet, ...etape.effet.chemin.split('/')) : null;
+  let fluxCtx = null;
+  let fluxP = null;
+  let usage = null;
+  let effetObserve = null;
+  try {
+    if (e.fichiers.length > 0) deployer(e.fichiers, ctx.journal, [ctx.espace, ctx.configDir]);
+    const garde = etape.type === 'modele' ? payant.creerGardeFlux(etape, { modele: MODELE, projet: ctx.projet, plateforme: ctx.plateforme }) : null;
+    const r = await lancerClaude({
+      exe: ctx.exe, argv: e.argv, env: ctx.env, cwd: ctx.projet, espace: ctx.espace, configDir: ctx.configDir, dossierBrut: BRUT,
+      plateforme: ctx.plateforme, lot: payant.LOT_PAYANT, invites: x.envoyables, garde, delaiMs: etape.type === 'modele' ? DELAI_MODELE_MS : DELAI_MS,
+    });
+    const base = path.join(x.dossierSerie, `${String(x.suivant()).padStart(2, '0')}-${etape.id.replace(/[^A-Za-z0-9-]/g, '_')}`);
+    fs.writeFileSync(`${base}.jsonl`, r.stdout, 'utf8');
+    if (r.stderr.trim()) fs.writeFileSync(`${base}.stderr.txt`, r.stderr, 'utf8');
+    if (r.violation) {
+      if (r.violation.gravite === 'arret') {
+        ecrireArret(BRUT, `${etape.id} : ${r.violation.raison}`);
+        throw new Arret(`${etape.id} : ${r.violation.raison}`);
+      }
+      throw new SerieRejetee(`${etape.id} : garde de flux (${r.violation.raison})`);
+    }
+    const controle = etape.type === 'context'
+      ? controlerAppel((fluxCtx = lireFlux(r.stdout)), { versionAttendue: x.version })
+      : payant.controlerAppelPayant((fluxP = payant.lireFluxPayant(r.stdout)), (usage = payant.lireUsage(fluxP)), etape, { versionAttendue: x.version });
+    if (controle.arret.length > 0) {
+      ecrireArret(BRUT, `${etape.id} : ${controle.arret.join(' ; ')}`);
+      throw new Arret(`${etape.id} : ${controle.arret.join(' ; ')}`);
+    }
+    if (r.expire) throw new SerieRejetee(`${etape.id} : délai dépassé`);
+    if (controle.autres.length > 0) throw new SerieRejetee(`${etape.id} : ${controle.autres.join(' ; ')}`);
+    if (effet) {
+      effetObserve = fs.existsSync(effet) && enLf(fs.readFileSync(effet, 'utf8')).trimEnd() === etape.effet.contenu;
+      if (!effetObserve) throw new SerieRejetee(`${etape.id} : effet attendu non observé (${etape.effet.chemin})`);
+    }
+  } finally {
+    const { problemes } = retirer(ctx.journal, {
+      modifsPermises: etape.effet && etape.effet.type === 'modifie' ? [effet] : [],
+      creesPermis: etape.effet && etape.effet.type === 'cree' ? [effet] : [],
+    });
+    if (problemes.length > 0) throw new SerieRejetee(`${etape.id} : retrait incomplet (${problemes.map(masquer).join(' ; ')})`);
+  }
+  const contenu = fs.readdirSync(ctx.espace);
+  if (contenu.length !== 1 || contenu[0] !== 'projet' || fs.readdirSync(ctx.projet).length > 0) throw new SerieRejetee(`${etape.id} : l'espace n'est pas revenu à son état initial`);
+  if (e.mcp) {
+    let restants = processusFixtureRestants(ctx.espace, ctx.plateforme);
+    for (let essai = 1; essai < 5 && restants > 0; essai++) {
+      attendre(500);
+      restants = processusFixtureRestants(ctx.espace, ctx.plateforme);
+    }
+    if (restants === null || restants > 0) throw new SerieRejetee(`${etape.id} : serveur(s) MCP de fixture encore actif(s) ou invérifiable(s)`);
+  }
+  const commun_ = { id: etape.id, serie: etape.serie, jeux: etape.jeux, outils: etape.outils === '' ? 'vide' : etape.outils };
+  if (etape.type === 'context') {
+    return {
+      flux: fluxCtx,
+      combinaison: {
+        ...commun_,
+        controle: { apiKeySource: fluxCtx.init.apiKeySource, usage: sommeUsage(fluxCtx.result.usage), num_turns: fluxCtx.result.num_turns },
+        ...normaliserCombinaison(fluxCtx, { racines: x.racines, nomMemoire: x.nomMemoire, plan: e.plan, plateforme: ctx.plateforme, o200k: o200kDuPlan(e.plan) }),
+      },
+    };
+  }
+  const reponse = payant.lireReponse(fluxP.result.result, etape, x.canarisConnus);
+  if (etape.mode !== 'usage' && !reponse.lisible) throw new SerieRejetee(`${etape.id} : réponse illisible (JSON attendu)`);
+  return {
+    flux: fluxP,
+    appel: {
+      ...commun_,
+      invite: etape.invite,
+      empreinte_invite: payant.EMPREINTES_INVITES[etape.invite],
+      base: etape.base,
+      num_turns: usage.num_turns,
+      usage: { entree: usage.total.entree, sortie: usage.total.sortie, somme4: usage.total.somme4, par_tour: usage.par_tour },
+      cout_liste_usd: usage.cout_liste_usd,
+      modeles: usage.modeles,
+      outils_appeles: payant.outilsAppeles(fluxP),
+      effet_observe: effetObserve,
+      reponse,
+    },
+  };
+}
+
+/** Compare les bornes d'une série : entrée d'usage (séries 1 à 3) et /context, tolérance 0. */
+function comparerBornesSerie(serie, appels, combinaisons) {
+  const ecarts = [];
+  const parId = (liste, id) => liste.find((x) => x.id === id);
+  if (serie.mode === 'usage') {
+    const [a, b] = [serie.appels[0].id, serie.appels[serie.appels.length - 1].id];
+    const ua = parId(appels, a);
+    const ub = parId(appels, b);
+    if (!ua || !ub) ecarts.push('base manquante');
+    else if (ua.usage.entree !== ub.usage.entree) ecarts.push(`entrée ${a} ${ua.usage.entree} → ${b} ${ub.usage.entree}`);
+    const ca = parId(combinaisons, `ctx:${a}`);
+    const cb = parId(combinaisons, `ctx:${b}`);
+    ecarts.push(...comparerBases(ca, cb).map((x) => `/context ${x}`));
+  } else {
+    for (const borne of serie.bornes) {
+      ecarts.push(...comparerBases(parId(combinaisons, `ctx:debut-${borne.cle}`), parId(combinaisons, `ctx:fin-${borne.cle}`)).map((x) => `/context ${borne.cle} ${x}`));
+    }
+  }
+  return [...new Set(ecarts)];
+}
+
+/** La partie payante : refus sans --confirmer, plafond, séries avec bornes, rapport même après un arrêt. */
+async function commandePayant(args) {
+  const opts = payant.lireOptionsPayant(args);
+  const etapes = payant.planPayant(opts.series);
+  const compte = payant.compterPlan(etapes);
+  const invites = payant.verifierInvites(fs.readFileSync(SONDE, 'utf8'));
+  const envoyables = payant.invitesEnvoyables(invites);
+  if (opts.aSec) return commandeASec({ etapes, compte, invites, envoyables });
+
+  const ctx = preparer();
+  verifierArret(BRUT);
+  if (ctx.pbEspace.length > 0) throw new Refus(ctx.pbEspace.join(' ; '));
+  if (fs.existsSync(ctx.journal)) throw new Refus('un journal de déploiement existe : lancer « retirer »');
+  const lot = payant.LOT_PAYANT;
+  payant.verifierBudget(BRUT, 'modele', lot, compte.modele, opts.plafond);
+  ouvrirLotAnnonce(BRUT, 'context', lot);
+  payant.verifierBudget(BRUT, 'context', lot, compte.context);
+  const rels = listerFixtures();
+  const inventaire = commun.lireInventaire(fs.readFileSync(INVENTAIRE, 'utf8'));
+  // Contrôle préalable de chaque étape (plans, empreintes, argv), avant le premier lancement.
+  for (const etape of etapes) verifierArgv(preparerEtape(ctx, etape, { rels, inventaire, invites }).argv, { espace: ctx.espace, plateforme: ctx.plateforme, invites: envoyables });
+
+  const stamp = horodatage();
+  const dossierSerie = path.join(BRUT, `payant-${stamp}`);
+  fs.mkdirSync(dossierSerie, { recursive: true });
+  let numero = 0;
+  const x = {
+    rels, inventaire, invites, envoyables, dossierSerie, suivant: () => ++numero,
+    racines: racinesNormalisation(ctx), nomMemoire: commun.nomDossierMemoire(ctx.projet),
+    canarisConnus: new Set([...inventaire.values()].flatMap((v) => v.canaris)), version: null,
+  };
+  fs.mkdirSync(ctx.projet, { recursive: true });
+  const avant = await lireEtat(ctx, ctx.projet);
+  if (avant.problemes.length > 0) throw new Refus(`connexion non conforme : ${avant.problemes.join(' ; ')}`);
+  x.version = avant.version;
+  const sensibles = new Set(avant.sensibles);
+  const profilAvant = listerProfil(ctx.configDir);
+  fs.writeFileSync(path.join(dossierSerie, 'profil-avant.txt'), [...profilAvant].map(([r, e]) => `${e.type} ${e.taille} ${r}`).join('\n') + '\n');
+  console.log(`[sonde-claude] Partie payante ${stamp} : version ${avant.version}, abonnement ${avant.resume.subscriptionType}, ${compte.modele} appels au modèle et ${compte.context} /context prévus.`);
+
+  const appels = [];
+  const combinaisons = [];
+  const series = [];
+  let arret = null;
+  let memoireVerifiee = false;
+  try {
+    for (const numeroSerie of [...new Set(etapes.map((e) => e.serie))]) {
+      const serie = payant.SERIES.find((s) => s.numero === numeroSerie);
+      const bilan = { numero: serie.numero, titre: serie.titre, valide: true, raisons_rejet: [] };
+      series.push(bilan);
+      const etat = await lireEtat(ctx, ctx.projet);
+      etat.sensibles.forEach((v) => sensibles.add(v));
+      if (etat.problemes.length > 0) {
+        ecrireArret(BRUT, `série ${serie.numero} : connexion non conforme avant la série`);
+        throw new Arret(`série ${serie.numero} : connexion non conforme (${etat.problemes.join(' ; ')})`);
+      }
+      try {
+        for (const etape of etapes.filter((e) => e.serie === serie.numero)) {
+          const r = await executerEtape(ctx, etape, x);
+          if (!memoireVerifiee) {
+            const auto = r.flux.init && r.flux.init.memory_paths && r.flux.init.memory_paths.auto;
+            // La première étape de chaque série est un /context gratuit : ce contrôle précède tout appel au modèle.
+            if (typeof auto !== 'string' || !memeChemin(auto, path.join(ctx.configDir, 'projects', x.nomMemoire, 'memory'), ctx.plateforme)) {
+              ecrireArret(BRUT, 'dossier de mémoire calculé différent de memory_paths.auto');
+              throw new Arret('le dossier de mémoire calculé ne correspond pas à memory_paths.auto : arrêt avant tout appel au modèle');
+            }
+            memoireVerifiee = true;
+          }
+          if (r.appel) appels.push(r.appel);
+          else combinaisons.push(r.combinaison);
+          console.log(`[sonde-claude] ${etape.id} : ${r.appel ? `entrée ${r.appel.usage.entree}, ${r.appel.num_turns} tour(s)` : `/context ${r.combinaison.total}`}.`);
+        }
+        const ecarts = comparerBornesSerie(serie, appels, combinaisons);
+        if (ecarts.length > 0) throw new SerieRejetee(`bornes différentes au début et à la fin : ${ecarts.join(', ')}`);
+        const apres = await lireEtat(ctx, ctx.projet);
+        apres.sensibles.forEach((v) => sensibles.add(v));
+        if (apres.version !== avant.version) throw new SerieRejetee(`version ${avant.version} avant, ${apres.version} après`);
+        if (apres.problemes.length > 0) throw new SerieRejetee(`connexion non conforme après la série : ${apres.problemes.join(' ; ')}`);
+      } catch (err) {
+        if (!(err instanceof SerieRejetee)) throw err;
+        bilan.valide = false;
+        bilan.raisons_rejet.push(nettoyerRaison(err.message));
+        const n = payant.noterSerieRejetee(BRUT);
+        console.error(`[sonde-claude] Série ${serie.numero} REJETÉE (${n} sur ${payant.MAX_SERIES_REJETEES} permises pour le lot) : ${masquer(err.message)}`);
+        if (n >= payant.MAX_SERIES_REJETEES) {
+          ecrireArret(BRUT, `${n} séries rejetées dans le lot ${lot}`);
+          throw new Arret(`${n} séries rejetées dans le lot ${lot} : arrêt avec rapport`);
+        }
+      }
+    }
+  } catch (err) {
+    if (!(err instanceof Arret)) throw err;
+    arret = nettoyerRaison(err.message);
+    console.error(`[sonde-claude] ARRÊT DÉFINITIF : ${masquer(err.message)}`);
+  }
+
+  if (fs.existsSync(ctx.projet) && fs.readdirSync(ctx.projet).length === 0) fs.rmdirSync(ctx.projet);
+  const profilApres = listerProfil(ctx.configDir);
+  fs.writeFileSync(path.join(dossierSerie, 'profil-apres.txt'), [...profilApres].map(([r, e]) => `${e.type} ${e.taille} ${r}`).join('\n') + '\n');
+  const ecartsP = ecartsProfil(profilAvant, profilApres, x.nomMemoire);
+  fs.writeFileSync(path.join(dossierSerie, 'ecarts-profil.json'), `${JSON.stringify(ecartsP, null, 2)}\n`);
+
+  const valides = new Set(series.filter((s) => s.valide).map((s) => s.numero));
+  const appelsValides = appels.filter((a) => valides.has(a.serie));
+  const combosValides = combinaisons.filter((c) => valides.has(c.serie));
+  const { total, el } = payant.elementsContext(combosValides);
+  const decomposition = payant.decomposer({
+    U: Object.fromEntries(appelsValides.map((a) => [a.id, a.usage.entree])),
+    ctx: Object.fromEntries(appelsValides.map((a) => [a.id, total(`ctx:${a.id}`)])),
+    el,
+    L: payant.longueursChemins(rels, { configDir: ctx.configDir, espace: ctx.espace, fixturesDir: FIXTURES }),
+    o: payant.o200kMesures((rel) => fs.readFileSync(path.join(FIXTURES, ...rel.split('/')), 'utf8')),
+  });
+  const rapport = {
+    rapport: 'claude-code-payant',
+    format: 1,
+    lot,
+    environnement: {
+      outil: 'Claude Code', entree: 'cli -p', os: ctx.plateforme === 'win32' ? 'Windows' : ctx.plateforme,
+      version_avant: avant.version, modele: MODELE, effort: EFFORT,
+      methode: avant.resume.authMethod, fournisseur: avant.resume.apiProvider, abonnement: avant.resume.subscriptionType,
+      sonde: 'v1', date_mesure: stamp.slice(0, 10),
+    },
+    execution: {
+      series_demandees: [...new Set(etapes.map((e) => e.serie))], plafond_demande: opts.plafond,
+      appels_modele_prevus: compte.modele, context_prevus: compte.context, appels_modele: appels.length, context: combinaisons.length,
+      compteur_modele: lireCompteur(BRUT, 'modele', lot), compteur_context: lireCompteur(BRUT, 'context', lot), arret,
+    },
+    series,
+    appels,
+    combinaisons,
+    decomposition,
+    profil: { ecarts_connus: ecartsP.connus, ecarts_inconnus: ecartsP.inconnus.length },
+  };
+  const poste = commun.lirePoste();
+  const interdits = [...new Set([...sensibles, ctx.espace, ctx.configDir, ctx.exe, x.nomMemoire, process.env.LOCALAPPDATA].filter(Boolean))];
+  const fichier = ecrireRapport(rapport, { destination: opts.resultats ? 'resultats' : 'brut', nom: `payant-${stamp}.json`, poste, interdits });
+  console.log(`[sonde-claude] Rapport normalisé : ${path.relative(RACINE_DEPOT, fichier).replace(/\\/g, '/')}`);
+  console.log(`[sonde-claude] Appels au modèle : ${appels.length} ; /context : ${combinaisons.length} ; compteur modèle : ${resumeCompteur(BRUT, 'modele')}.`);
+  if (arret) return 4;
+  if (series.some((s) => !s.valide) || ecartsP.inconnus.length > 0) {
+    if (ecartsP.inconnus.length > 0) console.error(`[sonde-claude] ${ecartsP.inconnus.length} écart(s) inconnu(s) du profil (détail dans brut/).`);
+    return 3;
+  }
+  console.log('[sonde-claude] Toutes les séries sont valides.');
+  return 0;
+}
+
 async function principal(argv) {
   const [commande, ...reste] = argv;
   try {
     if (commande === 'etat' && reste.length === 0) return await commandeEtat();
     if (commande === 'context') return await commandeContext(reste);
+    if (commande === 'payant') return await commandePayant(reste);
     if (commande === 'retirer' && reste.length === 0) return await commandeRetirer();
-    throw new Refus('Usage : node test/scenarios/scripts/sonde-claude-code.js <etat|context|retirer> [--combinaisons a,b] [--resultats]');
+    throw new Refus('Usage : node test/scenarios/scripts/sonde-claude-code.js <etat|context|payant|retirer> (voir l\'en-tête du fichier)');
   } catch (err) {
     const message = masquer(err && err.message ? err.message : String(err));
     if (err instanceof Arret) {
@@ -1053,13 +1538,14 @@ async function principal(argv) {
 }
 
 module.exports = {
-  LOT, PLAFOND, PROMPTS, ABONNEMENTS, BASES, COMBINAISONS, FICHIER_ARRET, FICHIER_COMPTEUR,
+  LOTS_CONTEXT, PROMPTS, ABONNEMENTS, BASES, COMBINAISONS, FICHIER_ARRET, FICHIER_COMPTEUR, FICHIER_JOURNAL,
   Refus, RefusArgv, Arret, SerieRejetee,
   estSousOuEgal, estSousStrict, cheminsParDefaut, resoudreExe, environnementNettoye, problemesEnvironnement,
-  problemesEspace, problemesAuth, verifierPrompt, argumentsContext, verifierArgv, lireFlux, sommeUsage,
-  controlerAppel, verifierArret, ecrireArret, lireCompteur, verifierBudget, reserverContext,
-  racinesNormalisation, reecrireChemin, fixturesAttendues, normaliserCombinaison, comparerBases,
+  problemesEspace, problemesAuth, verifierPrompt, argumentsContext, argumentsAppel, verifierArgv, lireFlux, sommeUsage,
+  controlerAppel, verifierArret, ecrireArret, lireCompteur, verifierBudget, reserverContext, ouvrirLotAnnonce,
+  racinesNormalisation, reecrireChemin, fixturesAttendues, o200kDuPlan, normaliserCombinaison, comparerBases,
   listerProfil, ecartsProfil, listerFixtures, fichiersADeployer, deployer, retirer, lancerClaude, ecrireRapport,
+  lireOptions, nettoyerRaison, preparerEtape, comparerBornesSerie, principal,
 };
 
 if (require.main === module) {
