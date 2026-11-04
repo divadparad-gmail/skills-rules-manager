@@ -4,8 +4,8 @@
 
 | Version | Correctifs de sécurité |
 |---|---|
-| 0.4.x | ✅ |
-| < 0.4 | ❌ |
+| 0.5.x | ✅ |
+| < 0.5 | ❌ |
 
 ## Signaler une faille
 

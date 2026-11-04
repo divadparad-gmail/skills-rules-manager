@@ -11,7 +11,7 @@
   <strong>Gestionnaire visuel haute performance pour compétences (skills, workflows) et règles sous Google Antigravity IDE et Claude Code.</strong>
 </p>
 
-[ [⬇️ Télécharger la v0.4.0 (.vsix)](https://github.com/divadparad-gmail/skills-rules-manager/releases/latest) ] •
+[ [⬇️ Télécharger la dernière version (.vsix)](https://github.com/divadparad-gmail/skills-rules-manager/releases/latest) ] •
 [ [🐛 Signaler un problème](https://github.com/divadparad-gmail/skills-rules-manager/issues) ] •
 [ [📖 Guide des Bonnes Pratiques IA](#4-coach-ia--alertes-de-surcharge) ]
 
@@ -127,10 +127,10 @@ Des limites connues, comme la destination absente de la fenêtre de confirmation
 ## ⚡ Installation Express (.vsix)
 
 ### Option 1 : En ligne de commande (CLI)
-Téléchargez le fichier `skills-rules-manager-0.4.0.vsix` depuis les [Releases GitHub](https://github.com/divadparad-gmail/skills-rules-manager/releases/latest) et exécutez :
+Téléchargez le fichier `skills-rules-manager-<version>.vsix` depuis les [Releases GitHub](https://github.com/divadparad-gmail/skills-rules-manager/releases/latest) et exécutez la commande suivante, en remplaçant `<version>` par celle du fichier téléchargé :
 
 ```powershell
-code --install-extension skills-rules-manager-0.4.0.vsix
+code --install-extension skills-rules-manager-<version>.vsix
 ```
 
 > L'identifiant de l'extension est `divadparad.skills-rules-manager` depuis la 0.4.0. Si la 0.3.0 (`antigravity.skills-rules-manager`) est installée, désinstallez-la d'abord. Les évolutions de chaque version sont décrites dans le [CHANGELOG](CHANGELOG.md).
@@ -138,7 +138,7 @@ code --install-extension skills-rules-manager-0.4.0.vsix
 ### Option 2 : Depuis l'interface VS Code / Antigravity IDE
 1. Ouvrez l'onglet Extensions (`Ctrl+Shift+X` ou `Cmd+Shift+X`).
 2. Cliquez sur l'icône `...` (More Actions en haut à droite du panneau d'extensions).
-3. Choisissez **Install from VSIX...** et sélectionnez `skills-rules-manager-0.4.0.vsix`.
+3. Choisissez **Install from VSIX...** et sélectionnez `skills-rules-manager-<version>.vsix`.
 
 ---
 

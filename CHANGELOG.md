@@ -5,6 +5,8 @@ Le format s'inspire de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) 
 
 ## [Non publié]
 
+## [0.5.0] — 2026-11-04
+
 ### Ajouts
 
 - Prise en charge d'Antigravity IDE 2.6.0 à côté de la 2.5.5, par un profil de comportement : les profils 2.5.5 et 2.6.0 (version et date testées), le réglage `skillsManager.antigravityProfile` (`auto`, `2.5.5` ou `2.6.0`, portée `machine`) et la détection de la génération par la structure de `~/.gemini` (`antigravity/builtin/`, `antigravity-ide/.ide_migration`, `antigravity-ide/`). Le réglage vaut `auto` par défaut : le profil est déduit de cette structure, qui indique une génération d'Antigravity et non une version exacte, avec un repli sur Antigravity IDE 2.6.0 si rien n'est reconnu. Une valeur invalide mène aussi à la détection. Le profil est transmis aux scanners, et un changement du réglage ou de `skillsManager.globalPath` relance le scan. Une pastille « Profil : Antigravity IDE … (détecté) », « (forcé) » ou « (non détecté) » s'affiche à côté de la jauge des règles, dans le Grand Dashboard et la barre latérale, avec la raison du choix et la date des tests dans son infobulle ; elle est masquée en mode Claude Code. Avant le premier état, l'aide-mémoire et l'infobulle des skills `wf-*` prennent le texte de la 2.6.0. Pour garder le comportement de la 2.5.5, réglez `skillsManager.antigravityProfile` sur `2.5.5`.
@@ -87,6 +89,7 @@ Le format s'inspire de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) 
 
 Première version publique : prise en charge des profils utilisateurs, suivi des tokens au démarrage, détection des doublons entre les niveaux global et local, alertes du Coach IA et synchronisation avec le catalogue NAS.
 
-[Non publié]: https://github.com/divadparad-gmail/skills-rules-manager/compare/v0.4.0...HEAD
+[Non publié]: https://github.com/divadparad-gmail/skills-rules-manager/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/divadparad-gmail/skills-rules-manager/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/divadparad-gmail/skills-rules-manager/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/divadparad-gmail/skills-rules-manager/releases/tag/v0.3.0

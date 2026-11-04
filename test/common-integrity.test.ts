@@ -398,10 +398,10 @@ describe('Suite de Tests : Intégrité & Synchronisation NAS vs Local', () => {
     assert.strictEqual(NasScanner.getUncHost('C:\\Users\\LocalUser'), null);
   });
 
-  test('18. Guide & Bonnes Pratiques IA (v0.4.0) : intégrité des templates et composants webview', () => {
+  test('18. Guide & Bonnes Pratiques IA (v0.5.0) : intégrité des templates et composants webview', () => {
     const rootDir = path.resolve(__dirname, '../..');
     const pkg = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8'));
-    assert.strictEqual(pkg.version, '0.4.0', 'package.json doit être en version 0.4.0');
+    assert.strictEqual(pkg.version, '0.5.0', 'package.json doit être en version 0.5.0');
     assert.strictEqual(pkg.publisher, 'divadparad', "l'éditeur doit être divadparad (identifiant divadparad.skills-rules-manager)");
 
     const sidebarHtml = fs.readFileSync(path.join(rootDir, 'src/webview/sidebar.html'), 'utf8');
