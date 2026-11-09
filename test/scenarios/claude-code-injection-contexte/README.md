@@ -53,6 +53,8 @@ Le lanceur les vérifie et refuse de partir si l'une manque.
 
 Les chemins par défaut sont calculés : le profil est `%LOCALAPPDATA%\canari-claude-code\config`, l'espace `<lecteur système>\canari-claude-code\espace`, et l'exécutable est cherché dans le `PATH` (jamais un `.cmd`). Les variables `CANARI_CLAUDE_CONFIG_DIR`, `CANARI_CLAUDE_ESPACE` et `CANARI_CLAUDE_EXE` les remplacent.
 
+Après chaque série, le profil isolé est comparé à son état du début. Un écart inconnu rejette la série. Les écarts connus sont tolérés et comptés par motif et par nature (ajoutés, modifiés, retirés), sans nom de fichier : ce sont les caches de Claude Code et, depuis le 2026-11-09, la synchronisation du compte, qui modifie `skills/synced/` et `policy-limits.json` pendant une série. Aucune fixture ne peut viser ces deux chemins.
+
 ## Connecter le profil isolé (une seule fois)
 
 Dans un nouveau terminal PowerShell ordinaire, hors de VS Code :
@@ -105,11 +107,11 @@ Le déroulement :
 
 | Partie | Appels au modèle | `/context` | Plafond |
 |---|---|---|---|
-| Gratuite (E1) | 0 | 26 | 50 `/context` pour le lot E1 |
+| Gratuite (E1) | 0 | 26 | 60 `/context` pour le lot E1 (relevé de 50 le 2026-11-09) |
 | Payante (E2) | 38 (séries 1 à 5 : 17, 6, 4, 3 et 8) | 33 | 40 appels au modèle et 40 `/context` pour le lot E2 |
 | H14 (E3) | 1, tapé à la main | 1 | — |
 
-Les deux compteurs sont dans `brut/` (`compteur-context.json` et `compteur-modele.json`). Ils sont incrémentés **avant** chaque lancement ; un lancement interrompu compte. Les appels au modèle passent par le quota de l'abonnement. Un appel des séries 1 à 4 fait un seul tour d'API ; un appel de déclencheur (série 5) en fait 2 ou 3.
+Les deux compteurs sont dans `brut/` (`compteur-context.json` et `compteur-modele.json`). Ils sont incrémentés **avant** chaque lancement ; un lancement interrompu compte. L'option `--plafond` ne peut qu'abaisser la limite d'une exécution. Un plafond ne se relève que par une décision inscrite dans le code (`RELEVEMENTS_PLAFOND`, une par lot au plus) : au lancement suivant, le compteur du lot passe au nouveau plafond en gardant ses utilisés, avec la trace du changement dans `historique_plafond`, et le lanceur l'annonce en console. Les appels au modèle passent par le quota de l'abonnement. Un appel des séries 1 à 4 fait un seul tour d'API ; un appel de déclencheur (série 5) en fait 2 ou 3.
 
 ## Lire les résultats
 

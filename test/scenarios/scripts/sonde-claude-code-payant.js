@@ -29,8 +29,29 @@ const MAX_SERIES_REJETEES = 2;
 
 /** Les deux compteurs, distincts : un fichier et des plafonds par lot chacun. */
 const COMPTEURS = {
-  context: { fichier: 'compteur-context.json', plafonds: { E1: 50, E2: 40 }, unite: '/context' },
+  context: { fichier: 'compteur-context.json', plafonds: { E1: 60, E2: 40 }, unite: '/context' },
   modele: { fichier: 'compteur-modele.json', plafonds: { E2: PLAFOND_MODELE }, unite: 'appel(s) au modèle' },
+};
+
+/**
+ * Les relèvements de plafond, décidés explicitement, un au plus par compteur et par lot. Un compteur
+ * existant du lot, au plafond « ancien », passe au plafond « nouveau » (égal au plafond du lot) en
+ * gardant ses utilisés, avec cette trace. Aucune option ne relève un plafond : --plafond ne fait
+ * qu'abaisser la limite d'une exécution.
+ */
+const RELEVEMENTS_PLAFOND = {
+  context: {
+    E1: { ancien: 50, nouveau: 60, date: '2026-11-09', motif: 'série E1 du 2026-11-09 rejetée pour des écarts de synchronisation du profil : relance décidée explicitement' },
+  },
+};
+for (const [type, lots] of Object.entries(RELEVEMENTS_PLAFOND)) {
+  for (const [lot, r] of Object.entries(lots)) {
+    if (COMPTEURS[type].plafonds[lot] !== r.nouveau || !(r.nouveau > r.ancien)) throw new Error(`relèvement incohérent : ${type} ${lot}`);
+  }
+}
+const traceRelevement = (type, lot) => {
+  const r = (RELEVEMENTS_PLAFOND[type] || {})[lot];
+  return r ? [{ ancien: r.ancien, nouveau: r.nouveau, date: r.date, motif: r.motif }] : undefined;
 };
 const nomArchive = (type, lot) => `compteur-${type}-${lot}.json`;
 
@@ -66,7 +87,8 @@ function lireCompteur(dossier, type, lot) {
   }
   const c = lireJsonCompteur(f, type);
   const valide = c && c.lot === lot && c.plafond === d.plafonds[lot] && Number.isInteger(c.utilises) && c.utilises >= 0
-    && (type !== 'modele' || (Number.isInteger(c.series_rejetees) && c.series_rejetees >= 0));
+    && (type !== 'modele' || (Number.isInteger(c.series_rejetees) && c.series_rejetees >= 0))
+    && (c.historique_plafond === undefined || JSON.stringify(c.historique_plafond) === JSON.stringify(traceRelevement(type, lot)));
   if (!valide) {
     throw new Arret(`compteur ${type} d'un autre lot ou invalide : arrêt (un changement de lot passe par l'archivage, jamais par une remise à zéro)`);
   }
@@ -101,6 +123,25 @@ function ouvrirLot(dossier, type, lot) {
   if (fs.existsSync(path.join(dossier, archive))) throw new Arret(`l'archive ${archive} existe déjà : rien n'est écrasé`);
   fs.renameSync(f, path.join(dossier, archive));
   return { ancien: c, archive };
+}
+
+/**
+ * Applique le relèvement déclaré du lot (RELEVEMENTS_PLAFOND) au compteur présent, une seule fois :
+ * seulement si le compteur est de ce lot, au plafond « ancien », sans trace, avec des utilisés valides.
+ * Les utilisés sont gardés tels quels. Renvoie le compteur relevé, sinon null (rien n'est écrit).
+ */
+function releverPlafond(dossier, type, lot) {
+  const d = definitionCompteur(type, lot);
+  const r = (RELEVEMENTS_PLAFOND[type] || {})[lot];
+  const f = path.join(dossier, d.fichier);
+  if (!r || !fs.existsSync(f)) return null;
+  const c = lireJsonCompteur(f, type);
+  const relevable = c && c.lot === lot && c.plafond === r.ancien && c.historique_plafond === undefined
+    && Number.isInteger(c.utilises) && c.utilises >= 0 && c.utilises <= r.ancien;
+  if (!relevable) return null;
+  const suivant = { ...c, plafond: r.nouveau, historique_plafond: traceRelevement(type, lot) };
+  ecrireCompteur(dossier, type, suivant);
+  return suivant;
 }
 
 /** Refuse une exécution qui dépasserait le plafond (celui du lot, ou un plafond demandé plus bas). */
@@ -790,7 +831,7 @@ function gestesH14({ configDir, projet, invite, dossierBrut = 'test/scenarios/cl
 module.exports = {
   LOT_PAYANT, PLAFOND_MODELE, MAX_SERIES_REJETEES, COMPTEURS, EMPREINTES_INVITES, INVITES_MANUELLES,
   SERIES, D_TOUS, OUTILS_DECLENCHEURS, AUTORISATIONS, REGLAGES_DECLENCHEURS, CHEMIN_REGLAGES, JEUX_H14,
-  nomArchive, lireCompteur, ouvrirLot, verifierBudget, reserver, noterSerieRejetee,
+  RELEVEMENTS_PLAFOND, nomArchive, lireCompteur, ouvrirLot, releverPlafond, verifierBudget, reserver, noterSerieRejetee,
   sha256, lireSonde, verifierInvites, invitesEnvoyables,
   planPayant, compterPlan, lireOptionsPayant,
   lireFluxPayant, entreeUsage, lireUsage, creerGardeFlux, controlerAppelPayant, extraireJson, lireReponse, outilsAppeles,

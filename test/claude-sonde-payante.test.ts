@@ -151,6 +151,66 @@ describe('Suite de Tests : Partie payante de la sonde Claude Code (lot I3, sans 
     }
   });
 
+  test('4b. Relèvement du plafond E1 de 50 à 60 : utilisés gardés, trace écrite, une seule fois, aucun autre lot', () => {
+    const brut = tmp('releve');
+    const f = path.join(brut, 'compteur-context.json');
+    const lire = () => JSON.parse(fs.readFileSync(f, 'utf8'));
+    const trace = [{ ancien: 50, nouveau: 60, date: '2026-11-09', motif: P.RELEVEMENTS_PLAFOND.context.E1.motif }];
+    const journal: string[] = [];
+    const log = console.log;
+    try {
+      assert.deepStrictEqual(Object.keys(P.RELEVEMENTS_PLAFOND), ['context']);
+      assert.deepStrictEqual(Object.keys(P.RELEVEMENTS_PLAFOND.context), ['E1'], 'un seul relèvement déclaré');
+      assert.deepStrictEqual([P.COMPTEURS.context.plafonds.E1, P.COMPTEURS.context.plafonds.E2], [60, 40]);
+
+      // Le compteur E1 figé à 50 est refusé tel quel, puis relevé à l'ouverture du lot
+      fs.writeFileSync(f, JSON.stringify({ lot: 'E1', plafond: 50, utilises: 26 }));
+      assert.throws(() => P.lireCompteur(brut, 'context', 'E1'), S.Arret);
+      console.log = (m: string) => journal.push(m);
+      assert.strictEqual(S.ouvrirLotAnnonce(brut, 'context', 'E1'), null, 'même lot : rien n\'est archivé');
+      console.log = log;
+      assert.deepStrictEqual(lire(), { lot: 'E1', plafond: 60, utilises: 26, historique_plafond: trace });
+      assert.ok(journal.some((m) => /relevé de 50 à 60 .*26 utilisé\(s\) conservé\(s\)/.test(m)), journal.join('\n'));
+      assert.deepStrictEqual(P.lireCompteur(brut, 'context', 'E1'), lire());
+      assert.strictEqual(P.reserver(brut, 'context', 'E1'), 27);
+      assert.deepStrictEqual(lire().historique_plafond, trace, 'la trace survit à une réservation');
+      // Une seule fois : le compteur relevé n'est plus relevable
+      assert.strictEqual(P.releverPlafond(brut, 'context', 'E1'), null);
+      assert.strictEqual(lire().utilises, 27);
+      // --plafond n'abaisse que la limite de l'exécution
+      assert.throws(() => P.verifierBudget(brut, 'context', 'E1', 4, 30), /limite de 30/);
+      assert.strictEqual(P.verifierBudget(brut, 'context', 'E1', 33, 100).plafond, 60);
+      assert.throws(() => P.verifierBudget(brut, 'context', 'E1', 34, 100), /limite de 60/);
+      // Une trace forgée ou un autre plafond de départ sont refusés, sans réécriture
+      fs.writeFileSync(f, JSON.stringify({ lot: 'E1', plafond: 60, utilises: 26, historique_plafond: [{ ...trace[0], motif: 'autre' }] }));
+      assert.throws(() => P.lireCompteur(brut, 'context', 'E1'), S.Arret);
+      for (const c of [{ lot: 'E1', plafond: 45, utilises: 3 }, { lot: 'E1', plafond: 50, utilises: 3, historique_plafond: trace }, { lot: 'E1', plafond: 50, utilises: 51 }]) {
+        fs.writeFileSync(f, JSON.stringify(c));
+        assert.strictEqual(P.releverPlafond(brut, 'context', 'E1'), null, JSON.stringify(c));
+        assert.deepStrictEqual(lire(), c);
+      }
+
+      // Aucun autre lot ne peut être relevé de la même façon
+      for (const c of [{ lot: 'E2', plafond: 30, utilises: 5 }, { lot: 'E2', plafond: 50, utilises: 5 }]) {
+        fs.writeFileSync(f, JSON.stringify(c));
+        assert.strictEqual(P.releverPlafond(brut, 'context', 'E2'), null);
+        assert.throws(() => P.lireCompteur(brut, 'context', 'E2'), S.Arret);
+        assert.deepStrictEqual(lire(), c);
+      }
+      fs.writeFileSync(f, JSON.stringify({ lot: 'I2', plafond: 50, utilises: 26 }));
+      assert.strictEqual(P.releverPlafond(brut, 'context', 'E1'), null, 'un compteur d\'un autre lot n\'est pas relevé');
+      assert.deepStrictEqual(lire(), { lot: 'I2', plafond: 50, utilises: 26 });
+      assert.throws(() => P.releverPlafond(brut, 'context', 'I2'), S.Refus);
+      const m = path.join(brut, 'compteur-modele.json');
+      fs.writeFileSync(m, JSON.stringify({ lot: 'E2', plafond: 30, utilises: 1, series_rejetees: 0 }));
+      assert.strictEqual(P.releverPlafond(brut, 'modele', 'E2'), null);
+      assert.throws(() => P.lireCompteur(brut, 'modele', 'E2'), S.Arret);
+    } finally {
+      console.log = log;
+      supprimer(brut);
+    }
+  });
+
   test('5. SONDE.md : douze invites, une section et un bloc chacune, empreintes égales à EMPREINTES_INVITES', () => {
     assert.deepStrictEqual([...INVITES.keys()].sort(), Object.keys(P.EMPREINTES_INVITES).sort());
     assert.strictEqual(INVITES.size, 12);

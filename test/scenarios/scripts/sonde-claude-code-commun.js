@@ -149,9 +149,25 @@ function racinesCibles({ configDir, espace }, p = path) {
 }
 
 /**
+ * Les chemins du profil isolé que la synchronisation du compte modifie pendant une série (mesuré le
+ * 2026-11-09). Renvoie le motif du chemin (relatif au profil, séparateur « / »), sinon null. La
+ * correspondance est exacte : skills/syncedX, skills/canari-* ou policy-limits.json.bak ne sont pas des
+ * chemins synchronisés.
+ */
+const MOTIF_SKILLS_SYNCHRONISES = 'skills/synced/**';
+const MOTIF_LIMITES = 'policy-limits.json';
+function cheminSynchronise(rel) {
+  const r = String(rel).toLowerCase();
+  if (r === 'skills/synced' || r.startsWith('skills/synced/')) return MOTIF_SKILLS_SYNCHRONISES;
+  if (r === 'policy-limits.json') return MOTIF_LIMITES;
+  return null;
+}
+
+/**
  * Plan de déploiement : une entrée par fixture des jeux demandés, avec sa source, sa destination
  * absolue et son chemin normalisé (<global>/…, <memoire> pour le dossier de mémoire). Lève une
- * erreur pour un jeu inconnu, une cible inconnue, un segment « .. » ou une collision.
+ * erreur pour un jeu inconnu, une cible inconnue, un segment « .. », une collision ou une cible
+ * réservée à la synchronisation du compte (skills/synced/, policy-limits.json du profil).
  */
 function planDeploiement(rels, jeux, { configDir, espace, fixturesDir }, p = path) {
   if (!Array.isArray(jeux) || jeux.length === 0) throw new Error('aucun jeu demandé');
@@ -170,6 +186,7 @@ function planDeploiement(rels, jeux, { configDir, espace, fixturesDir }, p = pat
     if (!CIBLES.includes(cible)) throw new Error(`${rel} : cible inconnue`);
     const segments = chemin.split('/');
     if (segments.some((s) => s === '' || s === '.' || s === '..')) throw new Error(`${rel} : segment de chemin refusé`);
+    if (cible === 'global' && cheminSynchronise(chemin)) throw new Error(`${rel} : cible réservée à la synchronisation du compte`);
     const sousRacine = cible === 'mcp' ? [jeu, ...segments] : segments;
     const normalise = `<${cible}>/${cible === 'mcp' ? `${jeu}/` : ''}${convertir(rel, '<memoire>').chemin}`;
     plan.push({
@@ -307,6 +324,9 @@ module.exports = {
   cleDeploiement,
   collisions,
   racinesCibles,
+  MOTIF_SKILLS_SYNCHRONISES,
+  MOTIF_LIMITES,
+  cheminSynchronise,
   planDeploiement,
   lirePoste,
   variantesHome,

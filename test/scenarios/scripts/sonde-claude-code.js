@@ -31,7 +31,7 @@
  *     au modèle : apiKeySource=none (aussi dès l'initialisation, avant la première requête) ; sinon le
  *     fichier brut/ARRET.txt est écrit et bloque tout lancement suivant de claude ;
  *   - deux compteurs persistants et distincts, liés au lot, incrémentés avant chaque lancement :
- *     /context (50 en E1, 40 en E2) et appels au modèle (40 en E2, ou moins avec --plafond) ;
+ *     /context (60 en E1, relevé de 50 le 2026-11-09 ; 40 en E2) et appels au modèle (40 en E2, ou moins avec --plafond) ;
  *   - garde de flux pendant chaque appel au modèle : tours, outils, chemins et commande Bash ;
  *   - empreintes SHA-256 (en LF) de chaque fixture comparées à inventaire.json avant tout déploiement :
  *     un écart refuse le déploiement et nomme le fichier ;
@@ -489,6 +489,11 @@ const reserverContext = (dossier, lot) => payant.reserver(dossier, 'context', lo
 function ouvrirLotAnnonce(dossier, type, lot) {
   const r = payant.ouvrirLot(dossier, type, lot);
   if (r) console.log(`[sonde-claude] Compteur ${type} du lot ${r.ancien.lot} (${r.ancien.utilises} sur ${r.ancien.plafond}) archivé sous brut/${r.archive} ; lot ${lot} ouvert, sans remise à zéro de l'ancien.`);
+  const releve = payant.releverPlafond(dossier, type, lot);
+  if (releve) {
+    const t = releve.historique_plafond[releve.historique_plafond.length - 1];
+    console.log(`[sonde-claude] Plafond du compteur ${type} du lot ${lot} relevé de ${t.ancien} à ${t.nouveau} (décision du ${t.date}) ; ${releve.utilises} utilisé(s) conservé(s).`);
+  }
   return r;
 }
 
@@ -664,16 +669,32 @@ function motifConnu(rel, nature, type, nomMemoire) {
   if (r === 'policy-limits.json.signature.json' && nature === 'modifié') return 'policy-limits.json.signature.json';
   if (type === 'd' && nature === 'ajouté' && (r === 'projects' || r === `projects/${m}` || r === `projects/${m}/memory`)) return 'projects/<memoire>/memory/ (vide)';
   if (type === 'd' && nature === 'ajouté' && (r === 'session-env' || /^session-env\/[^/]+$/.test(r))) return 'session-env/<id>/ (vide)';
+  // La synchronisation du compte pendant une série (mesuré le 2026-11-09) : skills/synced/ dans tous
+  // les sens, policy-limits.json ajouté ou modifié seulement.
+  const synchronise = commun.cheminSynchronise(rel);
+  if (synchronise === commun.MOTIF_SKILLS_SYNCHRONISES) return synchronise;
+  if (synchronise === commun.MOTIF_LIMITES && type === 'f' && nature !== 'retiré') return synchronise;
   return null;
 }
 
+/**
+ * Les écarts du profil entre deux listes. Les écarts connus ne sont donnés que par motif, avec leur
+ * nombre par nature, jamais par nom de fichier ; les inconnus sont nommés (ils restent dans brut/).
+ */
 function ecartsProfil(avant, apres, nomMemoire) {
   const connus = new Map();
   const inconnus = [];
+  const champ = { 'ajouté': 'ajoutes', 'modifié': 'modifies', 'retiré': 'retires' };
   const noter = (rel, nature, type) => {
     const motif = motifConnu(rel, nature, type, nomMemoire);
-    if (motif) connus.set(motif, (connus.get(motif) || 0) + 1);
-    else inconnus.push({ chemin: rel, nature });
+    if (!motif) {
+      inconnus.push({ chemin: rel, nature });
+      return;
+    }
+    const c = connus.get(motif) || { motif, nombre: 0, ajoutes: 0, modifies: 0, retires: 0 };
+    c.nombre += 1;
+    c[champ[nature]] += 1;
+    connus.set(motif, c);
   };
   for (const [rel, e] of apres) {
     const a = avant.get(rel);
@@ -681,7 +702,7 @@ function ecartsProfil(avant, apres, nomMemoire) {
     else if (a.type !== e.type || a.taille !== e.taille) noter(rel, 'modifié', e.type);
   }
   for (const [rel, e] of avant) if (!apres.has(rel)) noter(rel, 'retiré', e.type);
-  return { connus: [...connus].map(([motif, nombre]) => ({ motif, nombre })), inconnus };
+  return { connus: [...connus.values()], inconnus };
 }
 
 // --- Déploiement et retrait ---------------------------------------------------------------------------------

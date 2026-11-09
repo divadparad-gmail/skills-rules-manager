@@ -354,13 +354,13 @@ describe('Suite de Tests : Lanceur de la sonde Claude Code (lot I2, sans lancer 
   test('10. Fichier ARRET et compteur persistant : refus au plafond, série trop longue refusée avant tout appel', () => {
     const brut = tmp('brut');
     try {
-      assert.deepStrictEqual(S.lireCompteur(brut, 'context', 'E1'), { lot: 'E1', plafond: 50, utilises: 0 });
-      S.verifierBudget(brut, 50, 'E1');
-      assert.throws(() => S.verifierBudget(brut, 51, 'E1'), S.Refus);
+      assert.deepStrictEqual(S.lireCompteur(brut, 'context', 'E1'), { lot: 'E1', plafond: 60, utilises: 0 });
+      S.verifierBudget(brut, 60, 'E1');
+      assert.throws(() => S.verifierBudget(brut, 61, 'E1'), S.Refus);
       assert.strictEqual(S.reserverContext(brut, 'E1'), 1);
-      assert.deepStrictEqual(JSON.parse(fs.readFileSync(path.join(brut, S.FICHIER_COMPTEUR), 'utf8')), { lot: 'E1', plafond: 50, utilises: 1 });
-      fs.writeFileSync(path.join(brut, S.FICHIER_COMPTEUR), JSON.stringify({ lot: 'E1', plafond: 50, utilises: 49 }));
-      assert.strictEqual(S.reserverContext(brut, 'E1'), 50);
+      assert.deepStrictEqual(JSON.parse(fs.readFileSync(path.join(brut, S.FICHIER_COMPTEUR), 'utf8')), { lot: 'E1', plafond: 60, utilises: 1 });
+      fs.writeFileSync(path.join(brut, S.FICHIER_COMPTEUR), JSON.stringify({ lot: 'E1', plafond: 60, utilises: 59 }));
+      assert.strictEqual(S.reserverContext(brut, 'E1'), 60);
       assert.throws(() => S.reserverContext(brut, 'E1'), S.Arret);
       assert.throws(() => S.verifierBudget(brut, 1, 'E1'), S.Refus);
       fs.writeFileSync(path.join(brut, S.FICHIER_COMPTEUR), JSON.stringify({ lot: 'I2', plafond: 50, utilises: 0 }));
@@ -368,7 +368,7 @@ describe('Suite de Tests : Lanceur de la sonde Claude Code (lot I2, sans lancer 
       fs.writeFileSync(path.join(brut, S.FICHIER_COMPTEUR), JSON.stringify({ lot: 'E1', plafond: 500, utilises: 0 }));
       assert.throws(() => S.lireCompteur(brut, 'context', 'E1'), S.Arret, 'plafond modifié');
       assert.throws(() => S.lireCompteur(brut, 'context', 'I2'), S.Refus, 'lot inconnu');
-      fs.writeFileSync(path.join(brut, S.FICHIER_COMPTEUR), JSON.stringify({ lot: 'E1', plafond: 50, utilises: 3 }));
+      fs.writeFileSync(path.join(brut, S.FICHIER_COMPTEUR), JSON.stringify({ lot: 'E1', plafond: 60, utilises: 3 }));
 
       // lancerClaude refuse avant tout lancement, sans toucher au compteur
       const env = S.environnementNettoye({ PATH: 'p' }, CONFIG_W);
@@ -513,16 +513,68 @@ describe('Suite de Tests : Lanceur de la sonde Claude Code (lot I2, sans lancer 
     apres.delete('skills');
     const ecarts = S.ecartsProfil(avant, apres, m);
     assert.deepStrictEqual(ecarts.connus, [
-      { motif: '.claude.json', nombre: 1 },
-      { motif: 'policy-limits.json.signature.json', nombre: 1 },
-      { motif: 'backups/.claude.json.backup.*', nombre: 2 },
-      { motif: 'projects/<memoire>/memory/ (vide)', nombre: 3 },
-      { motif: 'session-env/<id>/ (vide)', nombre: 2 },
+      { motif: '.claude.json', nombre: 1, ajoutes: 0, modifies: 1, retires: 0 },
+      { motif: 'policy-limits.json.signature.json', nombre: 1, ajoutes: 0, modifies: 1, retires: 0 },
+      { motif: 'backups/.claude.json.backup.*', nombre: 2, ajoutes: 1, modifies: 0, retires: 1 },
+      { motif: 'projects/<memoire>/memory/ (vide)', nombre: 3, ajoutes: 3, modifies: 0, retires: 0 },
+      { motif: 'session-env/<id>/ (vide)', nombre: 2, ajoutes: 2, modifies: 0, retires: 0 },
     ]);
     assert.deepStrictEqual(ecarts.inconnus.map((e: any) => `${e.nature} ${e.chemin}`).sort(), [
       'ajouté projects/C--exemple-projet/memory/MEMORY.md', 'ajouté statsig', 'ajouté statsig/x', 'modifié .credentials.json', 'retiré skills',
     ]);
     assert.deepStrictEqual(S.ecartsProfil(avant, new Map(avant), m), { connus: [], inconnus: [] });
+  });
+
+  test('13b. Synchronisation du compte : skills/synced/ et policy-limits.json tolérés et comptés sans nom, voisins inconnus, cibles refusées', () => {
+    const m = 'C--exemple-projet';
+    const avant = new Map<string, { type: string; taille: number }>([
+      ['skills', { type: 'd', taille: 0 }], ['skills/synced', { type: 'd', taille: 0 }],
+      ['skills/synced/skill-a', { type: 'd', taille: 0 }], ['skills/synced/skill-a/SKILL.md', { type: 'f', taille: 10 }],
+      ['skills/synced/skill-b', { type: 'd', taille: 0 }], ['skills/synced/skill-b/SKILL.md', { type: 'f', taille: 20 }],
+      ['policy-limits.json', { type: 'f', taille: 50 }], ['policy-limits.json.bak', { type: 'f', taille: 50 }],
+    ]);
+    const apres = new Map(avant);
+    apres.set('skills/synced/skill-a/SKILL.md', { type: 'f', taille: 11 });
+    apres.delete('skills/synced/skill-b/SKILL.md');
+    apres.delete('skills/synced/skill-b');
+    apres.set('skills/synced/skill-c', { type: 'd', taille: 0 });
+    apres.set('skills/synced/skill-c/SKILL.md', { type: 'f', taille: 30 });
+    apres.set('policy-limits.json', { type: 'f', taille: 60 });
+    // Les voisins restent des écarts inconnus
+    apres.set('skills/syncedX', { type: 'f', taille: 1 });
+    apres.set('skills/canari-x', { type: 'd', taille: 0 });
+    apres.set('skills/canari-x/SKILL.md', { type: 'f', taille: 1 });
+    apres.set('policy-limits.json.bak', { type: 'f', taille: 51 });
+    apres.set('synced/policy-limits.json', { type: 'f', taille: 1 });
+    const ecarts = S.ecartsProfil(avant, apres, m);
+    assert.deepStrictEqual(ecarts.connus, [
+      { motif: 'skills/synced/**', nombre: 5, ajoutes: 2, modifies: 1, retires: 2 },
+      { motif: 'policy-limits.json', nombre: 1, ajoutes: 0, modifies: 1, retires: 0 },
+    ]);
+    assert.ok(!JSON.stringify(ecarts.connus).includes('skill-'), 'aucun nom de fichier dans les écarts connus');
+    assert.deepStrictEqual(ecarts.inconnus.map((e: any) => `${e.nature} ${e.chemin}`).sort(), [
+      'ajouté skills/canari-x', 'ajouté skills/canari-x/SKILL.md', 'ajouté skills/syncedX', 'ajouté synced/policy-limits.json', 'modifié policy-limits.json.bak',
+    ]);
+    // policy-limits.json : ajout toléré, retrait inconnu ; skills/synced créé pendant la série : toléré
+    assert.deepStrictEqual(S.ecartsProfil(new Map(), new Map([['policy-limits.json', { type: 'f', taille: 1 }], ['skills/synced', { type: 'd', taille: 0 }]]), m).connus, [
+      { motif: 'policy-limits.json', nombre: 1, ajoutes: 1, modifies: 0, retires: 0 },
+      { motif: 'skills/synced/**', nombre: 1, ajoutes: 1, modifies: 0, retires: 0 },
+    ]);
+    assert.deepStrictEqual(S.ecartsProfil(new Map([['policy-limits.json', { type: 'f', taille: 1 }]]), new Map(), m).inconnus, [{ chemin: 'policy-limits.json', nature: 'retiré' }]);
+
+    // Le plan de déploiement refuse toute cible du profil sous skills/synced/ ou égale à policy-limits.json
+    for (const rel of ['j/global/skills/synced/canari-s/SKILL.md.fixture', 'j/global/skills/Synced/x.md.fixture', 'j/global/policy-limits.json.fixture']) {
+      assert.throws(() => planW([rel], ['j']), /réservée à la synchronisation du compte/, rel);
+    }
+    for (const rel of ['j/global/skills/syncedX/a.md.fixture', 'j/global/policy-limits.json.bak.fixture', 'j/projet/policy-limits.json.fixture']) {
+      assert.strictEqual(planW([rel], ['j']).length, 1, rel);
+    }
+    // Aucune fixture, ni de l'inventaire ni du dossier, ne vise ces chemins
+    const inventaire = C.lireInventaire(fs.readFileSync(path.join(ROOT, 'test', 'scenarios', 'claude-code-injection-contexte', 'inventaire.json'), 'utf8'));
+    const rels = [...new Set([...inventaire.keys(), ...S.listerFixtures()])] as string[];
+    assert.ok(rels.length > 0);
+    const visees = rels.map((rel) => C.convertir(rel)).filter((c: any) => c.cible === 'global' && C.cheminSynchronise(c.chemin));
+    assert.deepStrictEqual(visees, []);
   });
 
   test('14. Bases : identiques au début et à la fin, sinon la série est rejetée', () => {
