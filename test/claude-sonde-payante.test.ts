@@ -141,12 +141,84 @@ describe('Suite de Tests : Partie payante de la sonde Claude Code (lot I3, sans 
       assert.throws(() => P.ouvrirLot(brut, 'modele', 'E2'), /existe déjà/);
       assert.strictEqual(fs.readFileSync(path.join(brut, 'compteur-modele-E1.json'), 'utf8'), 'archive');
       // La commande context exige --lot ; --preparer-h14 n'en prend pas
-      assert.throws(() => S.lireOptions([]), /--lot <E1\|E2> est obligatoire/);
+      assert.throws(() => S.lireOptions([]), /--lot <E1\|E2\|V1> est obligatoire/);
       assert.throws(() => S.lireOptions(['--lot', 'I2']), S.Refus);
       assert.strictEqual(S.lireOptions(['--lot', 'E1']).lot, 'E1');
       assert.throws(() => S.lireOptions(['--preparer-h14', '--lot', 'E1']), /--preparer-h14/);
       assert.strictEqual(S.lireOptions(['--preparer-h14']).preparerH14, true);
     } finally {
+      supprimer(brut);
+    }
+  });
+
+  test('4c. Lot V1 (vérification de version) : accepté, plafonné à 30, compteur propre, E1 archivé sans réouverture, payant refusé', async () => {
+    const brut = tmp('v1');
+    const f = path.join(brut, 'compteur-context.json');
+    const journal: string[] = [];
+    const log = console.log;
+    const erreurs = console.error;
+    try {
+      // Accepté par --lot, plafond de 30, aucun compteur du modèle ni relèvement
+      assert.deepStrictEqual(S.LOTS_CONTEXT, ['E1', 'E2', 'V1']);
+      assert.strictEqual(S.lireOptions(['--lot', 'V1', '--resultats']).lot, 'V1');
+      assert.strictEqual(P.COMPTEURS.context.plafonds.V1, 30);
+      assert.deepStrictEqual(P.LOTS_CONTEXT_SEUL, ['V1']);
+      assert.ok(!Object.prototype.hasOwnProperty.call(P.COMPTEURS.modele.plafonds, 'V1'));
+      assert.ok(!Object.prototype.hasOwnProperty.call(P.RELEVEMENTS_PLAFOND.context, 'V1'), 'aucun relèvement déclaré pour V1');
+
+      // Le compteur E1 (52 sur 60, relevé) est archivé à l'ouverture de V1, annoncé, sans remise à zéro
+      const e1 = { lot: 'E1', plafond: 60, utilises: 52, historique_plafond: [{ ancien: 50, nouveau: 60, date: '2026-11-09', motif: P.RELEVEMENTS_PLAFOND.context.E1.motif }] };
+      fs.writeFileSync(f, JSON.stringify(e1));
+      console.log = (m: string) => journal.push(m);
+      const r = S.ouvrirLotAnnonce(brut, 'context', 'V1');
+      console.log = log;
+      assert.deepStrictEqual([r.archive, r.ancien.utilises], ['compteur-context-E1.json', 52]);
+      assert.deepStrictEqual(JSON.parse(fs.readFileSync(path.join(brut, 'compteur-context-E1.json'), 'utf8')), e1, 'archive identique au compteur E1');
+      assert.ok(journal.some((m) => /Compteur context du lot E1 \(52 sur 60\) archivé sous brut\/compteur-context-E1\.json ; lot V1 ouvert/.test(m)), journal.join('\n'));
+      assert.ok(!fs.existsSync(f), 'aucun compteur V1 avant le premier lancement');
+      assert.throws(() => P.ouvrirLot(brut, 'context', 'E1'), /archivé/, 'E1 ne se rouvre pas');
+      assert.throws(() => P.lireCompteur(brut, 'context', 'E1'), /ne peut pas être rouvert/);
+      assert.strictEqual(S.ouvrirLotAnnonce(brut, 'context', 'V1'), null, 'même lot : rien n\'est archivé');
+
+      // Compteur propre, plafonné à 30 : une série complète (26) passe, une seconde est refusée avant tout appel
+      assert.deepStrictEqual(P.lireCompteur(brut, 'context', 'V1'), { lot: 'V1', plafond: 30, utilises: 0 });
+      const serie = S.BASES.length * 2 + S.COMBINAISONS.length;
+      assert.strictEqual(serie, 26);
+      S.verifierBudget(brut, serie, 'V1');
+      assert.throws(() => S.verifierBudget(brut, 31, 'V1'), /limite de 30 pour le lot V1/);
+      for (let i = 1; i <= serie; i++) assert.strictEqual(S.reserverContext(brut, 'V1'), i);
+      assert.throws(() => S.verifierBudget(brut, serie, 'V1'), /26 \/context déjà utilisé\(s\), 26 prévu\(s\), limite de 30 pour le lot V1/);
+      S.verifierBudget(brut, 4, 'V1');
+      fs.writeFileSync(f, JSON.stringify({ lot: 'V1', plafond: 30, utilises: 29 }));
+      assert.strictEqual(S.reserverContext(brut, 'V1'), 30);
+      assert.throws(() => S.reserverContext(brut, 'V1'), (e: Error) => e instanceof S.Arret && /plafond de 30/.test(e.message));
+      fs.writeFileSync(f, JSON.stringify({ lot: 'V1', plafond: 60, utilises: 0 }));
+      assert.throws(() => P.lireCompteur(brut, 'context', 'V1'), S.Arret, 'un plafond V1 modifié à la main est refusé');
+      assert.strictEqual(P.releverPlafond(brut, 'context', 'V1'), null);
+
+      // Partie payante refusée sous V1 : options, compteur du modèle et lancement
+      fs.writeFileSync(f, JSON.stringify({ lot: 'V1', plafond: 30, utilises: 3 }));
+      for (const args of [['--confirmer', '--plafond', '38', '--lot', 'V1'], ['--a-sec', '--lot', 'V1'], ['--lot', 'V1']]) {
+        assert.throws(() => P.lireOptionsPayant(args), (e: Error) => e instanceof S.Refus && /le lot V1 \(vérification de version\) n'accepte que \/context : toute commande payante y est refusée/.test(e.message), args.join(' '));
+      }
+      assert.throws(() => P.lireOptionsPayant(['--confirmer', '--plafond', '38', '--lot', 'E2']), /tourne toujours sous le lot E2/);
+      for (const geste of [() => P.lireCompteur(brut, 'modele', 'V1'), () => P.verifierBudget(brut, 'modele', 'V1', 1), () => P.reserver(brut, 'modele', 'V1')]) {
+        assert.throws(geste, (e: Error) => e instanceof S.Refus && /n'accepte que \/context/.test(e.message));
+      }
+      assert.ok(!fs.existsSync(path.join(brut, 'compteur-modele.json')), 'aucun compteur du modèle écrit');
+      const env = S.environnementNettoye({ PATH: 'p' }, CONFIG_W);
+      const argv = argvDe(etape('U1'));
+      assert.throws(
+        () => S.lancerClaude({ exe: path.join(brut, 'inexistant.exe'), argv, env, cwd: brut, espace: ESPACE_W, configDir: CONFIG_W, dossierBrut: brut, plateforme: 'win32', lot: 'V1', invites: ENVOYABLES, garde: () => null }),
+        (e: Error) => e instanceof S.Refus && /lot V1 .*appel au modèle refusé/.test(e.message),
+      );
+      assert.strictEqual(P.lireCompteur(brut, 'context', 'V1').utilises, 3, 'aucun lancement compté');
+      // Par la commande : code 2, avant tout geste
+      console.error = () => undefined;
+      assert.strictEqual(await S.principal(['payant', '--confirmer', '--plafond', '38', '--lot', 'V1']), 2);
+    } finally {
+      console.log = log;
+      console.error = erreurs;
       supprimer(brut);
     }
   });

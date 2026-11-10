@@ -4,16 +4,21 @@
  *
  * Usage (depuis la racine du dépôt) :
  *   npm run sonde:claude-etat                       version, auth status et préconditions ; aucun /context
- *   npm run sonde:claude-context -- --lot <E1|E2>   déploiement, /context par combinaison, retrait, rapport
+ *   npm run sonde:claude-context -- --lot <E1|E2|V1>   déploiement, /context par combinaison, retrait, rapport
  *   npm run sonde:claude-context -- --preparer-h14  déploie le jeu de H14 et affiche les gestes (aucun /context)
  *   npm run sonde:claude -- --a-sec                 affiche les 38 appels prévus, sans rien lancer ni écrire
  *   npm run sonde:claude -- --confirmer --plafond <n> [--series 1,3] [--resultats]   partie payante
  *   node test/scenarios/scripts/sonde-claude-code.js retirer   retrait d'un déploiement (interrompu, ou H14)
  *   npm run sonde:claude-baseline -- --depuis <context-…json>   écrit attendu/baseline-<date>.json d'après un
  *                           rapport valide de resultats/, après la garde ; aucun lancement de claude
+ *   npm run sonde:claude-compatible -- --rapport <context-…json> --baseline <version|date|fichier>
+ *                           ajoute la version du rapport à versions_compatibles de la baseline désignée,
+ *                           seulement si la série est valide, toutes les entrées couvertes et 0 écart ;
+ *                           rien d'autre n'est changé ; aucun lancement de claude
  * Options de « context » :
- *   --lot <E1|E2>           lot du compteur de /context (obligatoire) ; au changement de lot, l'ancien
- *                           compteur est archivé dans brut/, et un lot archivé ne peut pas être rouvert
+ *   --lot <E1|E2|V1>        lot du compteur de /context (obligatoire) ; au changement de lot, l'ancien
+ *                           compteur est archivé dans brut/, et un lot archivé ne peut pas être rouvert ;
+ *                           V1 est le lot des vérifications de version (/context seulement, plafond 30)
  *   --combinaisons <id,id>  ne mesure que ces combinaisons (les quatre bases sont toujours mesurées)
  *   --resultats             écrit le rapport normalisé dans resultats/ au lieu de brut/
  *
@@ -33,7 +38,8 @@
  *     au modèle : apiKeySource=none (aussi dès l'initialisation, avant la première requête) ; sinon le
  *     fichier brut/ARRET.txt est écrit et bloque tout lancement suivant de claude ;
  *   - deux compteurs persistants et distincts, liés au lot, incrémentés avant chaque lancement :
- *     /context (60 en E1, relevé de 50 le 2026-11-09 ; 40 en E2) et appels au modèle (40 en E2, ou moins avec --plafond) ;
+ *     /context (60 en E1, relevé de 50 le 2026-11-09 ; 40 en E2 ; 30 en V1) et appels au modèle (40 en E2,
+ *     ou moins avec --plafond ; aucun en V1, où tout appel au modèle est refusé) ;
  *   - garde de flux pendant chaque appel au modèle : tours, outils, chemins et commande Bash ;
  *   - empreintes SHA-256 (en LF) de chaque fixture comparées à inventaire.json avant tout déploiement :
  *     un écart refuse le déploiement et nomme le fichier ;
@@ -52,6 +58,7 @@ const { spawn, spawnSync } = require('child_process');
 const commun = require('./sonde-claude-code-commun');
 const payant = require('./sonde-claude-code-payant');
 const constructionBaseline = require('./sonde-claude-code-baseline');
+const comparateur = require('./compare-injection-claude');
 
 const RACINE_DEPOT = path.resolve(__dirname, '..', '..', '..');
 const SUITE = path.join(RACINE_DEPOT, 'test', 'scenarios', 'claude-code-injection-contexte');
@@ -872,6 +879,7 @@ function lancerClaude({ exe, argv, env, cwd, espace, configDir, dossierBrut, pla
   if (pb.length > 0) throw new Refus(`environnement non conforme : ${pb.join(' ; ')}`);
   if (forme === 'modele' && typeof garde !== 'function') throw new Refus('appel au modèle sans garde de flux');
   if ((forme === 'context' || forme === 'modele') && !lot) throw new Refus('lot du compteur absent');
+  if (forme === 'modele' && payant.LOTS_CONTEXT_SEUL.includes(lot)) throw new Refus(`le lot ${lot} (vérification de version) n'accepte que /context : appel au modèle refusé`);
   let numero = null;
   if (forme === 'context') numero = reserverContext(dossierBrut, lot);
   else if (forme === 'modele') numero = payant.reserver(dossierBrut, 'modele', lot);
@@ -1597,15 +1605,65 @@ function commandeBaseline(reste, { resultats = RESULTATS, attendu = ATTENDU, pos
   return 0;
 }
 
+/**
+ * Ajoute la version d'un rapport « context » de resultats/ à versions_compatibles de la baseline
+ * désignée (décision du 2026-11-10). Refuse au moindre écart, à la moindre entrée non couverte ou si la
+ * série n'est pas valide. Seul ce champ change : le reste du fichier est vérifié identique avant
+ * l'écriture. Ne lance jamais claude.
+ */
+function commandeCompatible(reste, { resultats = RESULTATS, attendu = ATTENDU, poste = commun.lirePoste() } = {}) {
+  const usage = 'Usage : sonde-claude-code.js compatible --rapport <context-AAAA-MM-JJ-HHMM.json> --baseline <version|date|fichier>';
+  const o = {};
+  for (let i = 0; i < reste.length; i += 2) {
+    const [cle, valeur] = [reste[i], reste[i + 1]];
+    if (!['--rapport', '--baseline'].includes(cle) || typeof valeur !== 'string' || o[cle] !== undefined) throw new Refus(usage);
+    o[cle] = valeur;
+  }
+  if (!o['--rapport'] || !o['--baseline']) throw new Refus(usage);
+  const nom = o['--rapport'];
+  if (!constructionBaseline.NOM_RAPPORT_CONTEXT.test(nom)) throw new Refus('rapport refusé : un nom context-AAAA-MM-JJ-HHMM.json de resultats/ est attendu');
+  const fichierRapport = path.join(resultats, nom);
+  if (!fs.existsSync(fichierRapport)) throw new Refus(`rapport introuvable dans resultats/ : ${nom}`);
+  let rapport;
+  try {
+    rapport = JSON.parse(fs.readFileSync(fichierRapport, 'utf8'));
+  } catch {
+    throw new Refus(`rapport illisible : ${nom}`);
+  }
+  const choix = comparateur.choisirBaseline(rapport, comparateur.listerBaselines(attendu), o['--baseline']);
+  if (!choix.baseline) throw new Refus(choix.erreur.replace('SONDE_BASELINE_CLAUDE', '--baseline'));
+  const cible = path.join(attendu, choix.baseline.fichier);
+  const texte = fs.readFileSync(cible, 'utf8');
+  if (`${JSON.stringify(JSON.parse(texte), null, 2)}\n` !== texte) throw new Refus(`${choix.baseline.fichier} n'est pas au format écrit par la sonde : il ne serait pas modifié sur la seule ligne voulue`);
+  let ajout;
+  try {
+    ajout = constructionBaseline.ajoutVersionCompatible(JSON.parse(texte), rapport);
+  } catch (err) {
+    throw new Refus(`ajout refusé : ${err.message}`);
+  }
+  // Contrôle indépendant : hors de versions_compatibles, la baseline doit rester identique.
+  const sansCompatibles = (c) => JSON.stringify({ ...c, environnement: { ...c.environnement, versions_compatibles: null } });
+  if (sansCompatibles(ajout.contenu) !== sansCompatibles(JSON.parse(texte))) throw new Refus('ajout refusé : un autre champ que versions_compatibles changerait');
+  const nouveau = `${JSON.stringify(ajout.contenu, null, 2)}\n`;
+  const problemes = [...commun.problemesTexte(nouveau, poste, [process.env.LOCALAPPDATA].filter(Boolean)), ...commun.problemesJson(nouveau)];
+  if (problemes.length > 0) throw new Refus(`garde de confidentialité : baseline non modifiée (${problemes.join(' ; ')})`);
+  fs.writeFileSync(`${cible}.tmp`, nouveau, { encoding: 'utf8', flag: 'wx' });
+  fs.renameSync(`${cible}.tmp`, cible);
+  console.log(`[sonde-claude] ${comparateur.enteteComparaison(nom, choix).replace('SONDE_BASELINE_CLAUDE', '--baseline')} : ${ajout.lignes.length} entrées couvertes, 0 écart.`);
+  console.log(`[sonde-claude] Version ${ajout.version} ajoutée à versions_compatibles de ${choix.baseline.fichier} (désormais : ${ajout.contenu.environnement.versions_compatibles.join(', ')}) ; rien d'autre n'a changé.`);
+  return 0;
+}
+
 async function principal(argv) {
   const [commande, ...reste] = argv;
   try {
     if (commande === 'etat' && reste.length === 0) return await commandeEtat();
     if (commande === 'baseline') return commandeBaseline(reste);
+    if (commande === 'compatible') return commandeCompatible(reste);
     if (commande === 'context') return await commandeContext(reste);
     if (commande === 'payant') return await commandePayant(reste);
     if (commande === 'retirer' && reste.length === 0) return await commandeRetirer();
-    throw new Refus('Usage : node test/scenarios/scripts/sonde-claude-code.js <etat|context|payant|retirer|baseline> (voir l\'en-tête du fichier)');
+    throw new Refus('Usage : node test/scenarios/scripts/sonde-claude-code.js <etat|context|payant|retirer|baseline|compatible> (voir l\'en-tête du fichier)');
   } catch (err) {
     const message = masquer(err && err.message ? err.message : String(err));
     if (err instanceof Arret) {
@@ -1634,7 +1692,7 @@ module.exports = {
   controlerAppel, verifierArret, ecrireArret, lireCompteur, verifierBudget, reserverContext, ouvrirLotAnnonce,
   racinesNormalisation, reecrireChemin, fixturesAttendues, o200kDuPlan, normaliserCombinaison, comparerBases,
   listerProfil, ecartsProfil, listerFixtures, fichiersADeployer, deployer, retirer, lancerClaude, ecrireRapport,
-  lireOptions, nettoyerRaison, preparerEtape, comparerBornesSerie, commandeBaseline, principal,
+  lireOptions, nettoyerRaison, preparerEtape, comparerBornesSerie, commandeBaseline, commandeCompatible, principal,
 };
 
 if (require.main === module) {

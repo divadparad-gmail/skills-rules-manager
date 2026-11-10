@@ -3,7 +3,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { test, describe } from 'node:test';
 
-// Comparateur de la suite d'injection Claude Code (lots I3 et E1). Les tests 1 à 4, 6 et 7 portent sur des
+// Comparateur de la suite d'injection Claude Code (lots I3, E1 et V1). Les tests 1 à 4 et 6 à 9 portent sur des
 // données synthétiques. Le test 5 compare le dernier rapport local de resultats/ à sa baseline : il n'est
 // joué que par npm run test:injection-claude (INJECTION_CLAUDE_COMPARE=1), et ignoré dans npm test.
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -264,6 +264,113 @@ describe('Suite de Tests : Comparateur de la suite d\'injection Claude Code (lot
     assert.deepStrictEqual(K.problemesBaseline({ ...baseline, entrees: [{ id: 'm', instrument: 'context', combinaison: 'mcp-long', outil_mcp: 'x', attendu: { present: true, tokens: 1 } }] }), ['m : outil MCP comparé en présence seulement (A2)']);
   });
 
+  test('8. Comparaison inter-versions : une baseline imposée d\'une autre version est acceptée et annoncée comme telle', () => {
+    const b: any = baselineConnue(B.baselineDepuisRapport(rapportContext(), { source: 'context-2026-11-09-0856.json' }), 'baseline-2026-11-09.json');
+    const r322: any = rapportContext();
+    r322.lot = 'V1';
+    r322.environnement.version_avant = r322.environnement.version_apres = '2.1.322';
+    // Sans baseline imposée : refus, jamais devinée
+    assert.match(K.choisirBaseline(r322, [b]).erreur, /Aucune baseline pour Claude Code 2\.1\.322/);
+    // Imposée par date, version ou nom de fichier : acceptée, marquée inter-versions
+    for (const forcee of ['2026-11-09', '2.1.318', 'baseline-2026-11-09.json']) {
+      const c = K.choisirBaseline(r322, [b], forcee);
+      assert.strictEqual(c.baseline.fichier, 'baseline-2026-11-09.json', forcee);
+      assert.deepStrictEqual(c.interVersions, { rapport: '2.1.322', baseline: '2.1.318' }, forcee);
+    }
+    const choix = K.choisirBaseline(r322, [b], '2026-11-09');
+    assert.strictEqual(
+      K.enteteComparaison('context-2026-11-10-1000.json', choix),
+      'comparaison inter-versions : rapport 2.1.322 contre baseline 2.1.318 (context-2026-11-10-1000.json contre baseline-2026-11-09.json, baseline imposée par SONDE_BASELINE_CLAUDE)',
+    );
+    assert.deepStrictEqual(K.comparer(choix.baseline.contenu, r322).filter((l: any) => l.ecart || !l.couverte), [], 'la comparaison elle-même est inchangée');
+    // Même version, ou version déjà compatible : pas d'inter-versions
+    const meme = K.choisirBaseline(rapportContext(), [b], '2026-11-09');
+    assert.strictEqual(meme.interVersions, undefined);
+    assert.strictEqual(K.enteteComparaison('context-2026-11-09-0856.json', meme), 'context-2026-11-09-0856.json contre baseline-2026-11-09.json');
+    const compatible = baselineConnue({ ...b.contenu, environnement: { ...b.contenu.environnement, versions_compatibles: ['2.1.318', '2.1.322'] } }, 'baseline-2026-11-09.json');
+    assert.strictEqual(K.choisirBaseline(r322, [compatible], '2026-11-09').interVersions, undefined);
+    assert.strictEqual(K.choisirBaseline(r322, [compatible]).baseline.fichier, 'baseline-2026-11-09.json');
+    // Rapport sans version et baseline imposée : inter-versions, version inconnue
+    assert.match(K.enteteComparaison('context-x.json', K.choisirBaseline({ environnement: {} }, [b], '2026-11-09')), /^comparaison inter-versions : rapport \(version inconnue\) contre baseline 2\.1\.318 /);
+  });
+
+  test('9. Ajout à versions_compatibles : refusé en cas d\'écart, d\'entrée non couverte ou de série non valide ; accepté avec 0 écart, rien d\'autre ne change', () => {
+    const baseline = B.baselineDepuisRapport(rapportContext(), { source: 'context-2026-11-09-0856.json' });
+    const r322 = (modifier: (r: any) => void = () => undefined) => {
+      const r: any = rapportContext();
+      r.lot = 'V1';
+      r.environnement.version_avant = r.environnement.version_apres = '2.1.322';
+      r.environnement.date_mesure = '2026-11-10';
+      modifier(r);
+      return r;
+    };
+    // La fonction pure
+    const ajout = B.ajoutVersionCompatible(baseline, r322());
+    assert.deepStrictEqual(ajout.contenu.environnement.versions_compatibles, ['2.1.318', '2.1.322']);
+    assert.deepStrictEqual(baseline.environnement.versions_compatibles, ['2.1.318'], 'la baseline reçue n\'est pas modifiée');
+    const refus = (r: any, motif: RegExp, b: any = baseline) => assert.throws(() => B.ajoutVersionCompatible(b, r), motif);
+    refus(r322((r) => (r.combinaisons[0].memory_files[0].tokens = 39)), /1 écart\(s\) avec la baseline/);
+    refus(r322((r) => (r.combinaisons[0].delta_base = 683)), /1 écart\(s\)/);
+    refus(r322((r) => (r.serie.valide = false)), /série non valide/);
+    refus(r322((r) => (r.combinaisons = r.combinaisons.slice(0, 2))), /2 entrée\(s\) non couverte\(s\)/);
+    refus(r322((r) => (r.environnement.version_apres = '2.1.323')), /différente avant et après/);
+    refus(r322((r) => (r.environnement.version_avant = r.environnement.version_apres = '2.1.322-beta')), /mal formée/);
+    refus(r322((r) => (r.rapport = 'claude-code-payant')), /claude-code-context/);
+    refus(rapportContext(), /déjà couverte/);
+    refus(r322(), /baseline mal formée/, { ...baseline, entrees: [{ id: 't', instrument: 'context', combinaison: 'niveaux', mesure: 'total', attendu: 1 }] });
+
+    // La commande, sur des dossiers temporaires : baseline désignée, rien d'écrit en cas de refus
+    const d = tmp('compatible');
+    const log = console.log;
+    const journal: string[] = [];
+    try {
+      const resultats = path.join(d, 'resultats');
+      const attendu = path.join(d, 'attendu');
+      fs.mkdirSync(resultats);
+      fs.mkdirSync(attendu);
+      const cible = path.join(attendu, 'baseline-2026-11-09.json');
+      const texte = `${JSON.stringify(baseline, null, 2)}\n`;
+      fs.writeFileSync(cible, texte);
+      const ecrire = (nom: string, r: any) => fs.writeFileSync(path.join(resultats, nom), JSON.stringify(r));
+      ecrire('context-2026-11-10-1000.json', r322());
+      ecrire('context-2026-11-10-1001.json', r322((r) => (r.combinaisons[1].skills[0].tokens = 30)));
+      ecrire('context-2026-11-10-1002.json', r322((r) => (r.serie.valide = false)));
+      const poste = { home: 'C:\\Users\\exemple-compte', compte: 'exemple-compte', hote: 'POSTE-EXEMPLE' };
+      const lancer = (reste: string[], p = poste) => S.commandeCompatible(reste, { resultats, attendu, poste: p });
+      const valide = ['--rapport', 'context-2026-11-10-1000.json', '--baseline', '2026-11-09'];
+      console.log = (m: string) => journal.push(m);
+      assert.throws(() => lancer(['--rapport', 'context-2026-11-10-1000.json']), /Usage/);
+      assert.throws(() => lancer([...valide, '--force', 'x']), /Usage/);
+      assert.throws(() => lancer(['--rapport', '../context-2026-11-10-1000.json', '--baseline', '2026-11-09']), /rapport refusé/);
+      assert.throws(() => lancer(['--rapport', 'context-2026-11-10-1000.json', '--baseline', '2026-12-01']), /--baseline=2026-12-01 ne désigne aucune baseline/);
+      assert.throws(() => lancer(['--rapport', 'context-2026-11-10-1001.json', '--baseline', '2026-11-09']), (e: Error) => e instanceof S.Refus && /ajout refusé : 1 écart\(s\)/.test(e.message));
+      assert.throws(() => lancer(['--rapport', 'context-2026-11-10-1002.json', '--baseline', '2026-11-09']), (e: Error) => e instanceof S.Refus && /ajout refusé : série non valide/.test(e.message));
+      assert.throws(() => lancer(valide, { ...poste, compte: 'Windows' }), /garde de confidentialité/);
+      assert.strictEqual(fs.readFileSync(cible, 'utf8'), texte, 'baseline intacte après les refus');
+      assert.deepStrictEqual(journal, [], 'aucun message de succès');
+
+      // Accepté avec 0 écart : seul le tableau versions_compatibles change, d'une version
+      assert.strictEqual(lancer(valide), 0);
+      const apres = fs.readFileSync(cible, 'utf8');
+      assert.strictEqual(apres, texte.replace('      "2.1.318"\n    ],', '      "2.1.318",\n      "2.1.322"\n    ],'));
+      assert.notStrictEqual(apres, texte);
+      assert.ok(journal.some((m) => /comparaison inter-versions : rapport 2\.1\.322 contre baseline 2\.1\.318 .*baseline imposée par --baseline\) : 8 entrées couvertes, 0 écart/.test(m)), journal.join('\n'));
+      assert.ok(journal.some((m) => /Version 2\.1\.322 ajoutée à versions_compatibles de baseline-2026-11-09\.json \(désormais : 2\.1\.318, 2\.1\.322\)/.test(m)), journal.join('\n'));
+      assert.deepStrictEqual(fs.readdirSync(attendu), ['baseline-2026-11-09.json'], 'aucun fichier temporaire laissé');
+      // Une seconde fois : déjà couverte, rien ne change ; le comparateur la choisit désormais sans variable
+      assert.throws(() => lancer(valide), /déjà couverte/);
+      assert.strictEqual(fs.readFileSync(cible, 'utf8'), apres);
+      assert.strictEqual(K.choisirBaseline(r322(), K.listerBaselines(attendu)).baseline.fichier, 'baseline-2026-11-09.json');
+      // Un fichier qui n'est pas au format écrit par la sonde n'est jamais réécrit
+      fs.writeFileSync(cible, JSON.stringify(baseline));
+      assert.throws(() => lancer(valide), /pas au format écrit par la sonde/);
+      assert.strictEqual(fs.readFileSync(cible, 'utf8'), JSON.stringify(baseline));
+    } finally {
+      console.log = log;
+      supprimer(d);
+    }
+  });
+
   test('5. Comparaison réelle : le dernier rapport de resultats/ et sa baseline (npm run test:injection-claude)', (t) => {
     if (!COMPARE) {
       t.skip('Ignoré par défaut : lancer npm run test:injection-claude après une sonde (README de la suite).');
@@ -275,7 +382,7 @@ describe('Suite de Tests : Comparateur de la suite d\'injection Claude Code (lot
     assert.ok('baseline' in choix, choix.erreur);
     const lignes = K.comparer(choix.baseline.contenu, rapport.contenu);
     const ecarts = lignes.filter((l: any) => l.ecart);
-    console.log(`[Comparaison Claude Code] ${rapport.fichier} contre ${choix.baseline.fichier} : ${lignes.filter((l: any) => l.couverte).length} entrées couvertes, ${lignes.filter((l: any) => !l.couverte).length} non couvertes, ${ecarts.length} écart(s).`);
+    console.log(`[Comparaison Claude Code] ${K.enteteComparaison(rapport.fichier, choix)} : ${lignes.filter((l: any) => l.couverte).length} entrées couvertes, ${lignes.filter((l: any) => !l.couverte).length} non couvertes, ${ecarts.length} écart(s).`);
     for (const l of ecarts) console.log(`  ÉCART ${l.id} : attendu ${JSON.stringify(l.attendu)}, observé ${JSON.stringify(l.observe)}`);
     assert.deepStrictEqual(ecarts.map((l: any) => l.id), [], 'Écarts avec la baseline : voir SCENARIOS-CLAUDE-CODE.md, colonne « Si ça change ».');
   });

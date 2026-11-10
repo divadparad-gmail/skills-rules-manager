@@ -10,7 +10,8 @@
  * Variables :
  *   SONDE_RAPPORT_CLAUDE   un rapport précis de resultats/ (nom de fichier), au lieu du dernier ;
  *   SONDE_BASELINE_CLAUDE  impose une baseline (version, date ou nom de fichier), au lieu de celle de
- *                          la version du rapport (environnement.version, ou versions_compatibles).
+ *                          la version du rapport (environnement.version, ou versions_compatibles) ; si
+ *                          leurs versions diffèrent, la comparaison est annoncée « inter-versions ».
  */
 'use strict';
 
@@ -55,21 +56,28 @@ function dernierRapport(dossier = RESULTATS, demande = '') {
 const versionRapport = (r) => (r && r.environnement && typeof r.environnement.version_avant === 'string' ? r.environnement.version_avant.trim() : null);
 const versionBaseline = (b) => (b.contenu.environnement && b.contenu.environnement.version) || null;
 
+/** Vrai si la version du rapport est celle de la baseline ou l'une de ses versions compatibles. */
+const versionCouverte = (v, b) => Boolean(v) && (versionBaseline(b) === v || ((b.contenu.environnement || {}).versions_compatibles || []).includes(v));
+
 /**
  * La baseline à comparer : celle que désigne SONDE_BASELINE_CLAUDE (version, date ou nom de fichier),
  * sinon la plus récente dont la version, ou une version compatible, est celle du rapport. Jamais devinée.
+ * Une baseline imposée est acceptée même si sa version diffère de celle du rapport (vérification d'une
+ * nouvelle version, lot V1) : le choix porte alors interVersions, que l'affichage doit annoncer.
  */
 function choisirBaseline(rapport, baselines, forcee) {
   const connues = baselines.length > 0 ? baselines.map((b) => `${versionBaseline(b)} (${b.fichier})`).join(', ') : 'aucune';
   const voulue = typeof forcee === 'string' ? forcee.trim() : '';
   if (voulue) {
     const b = baselines.find((x) => [x.fichier, x.date, versionBaseline(x)].includes(voulue));
-    return b ? { baseline: b } : { erreur: `SONDE_BASELINE_CLAUDE=${voulue} ne désigne aucune baseline connue (${connues}).` };
+    if (!b) return { erreur: `SONDE_BASELINE_CLAUDE=${voulue} ne désigne aucune baseline connue (${connues}).` };
+    const v = versionRapport(rapport);
+    return versionCouverte(v, b) ? { baseline: b } : { baseline: b, interVersions: { rapport: v, baseline: versionBaseline(b) } };
   }
   if (baselines.length === 0) return { erreur: `Aucune baseline dans attendu/ : la première est créée au lot E1 (${README_HINT}).` };
   const v = versionRapport(rapport);
   if (!v) return { erreur: `Le rapport ne porte pas de version (environnement.version_avant). Pour comparer quand même, utilise SONDE_BASELINE_CLAUDE (${README_HINT}).` };
-  const candidates = baselines.filter((b) => versionBaseline(b) === v || ((b.contenu.environnement || {}).versions_compatibles || []).includes(v));
+  const candidates = baselines.filter((b) => versionCouverte(v, b));
   if (candidates.length === 0) {
     return { erreur: `Aucune baseline pour Claude Code ${v} (connues : ${connues}). Pour comparer quand même, désigne-en une avec SONDE_BASELINE_CLAUDE ; pour figer cette version, suis la règle de création d'une baseline (${README_HINT}).` };
   }
@@ -166,9 +174,21 @@ function comparer(baseline, rapport) {
   });
 }
 
+/**
+ * L'en-tête affiché avant le bilan : une comparaison inter-versions est toujours annoncée comme telle,
+ * avec les deux versions, pour qu'aucun bilan « 0 écart » ne passe pour celui de la même version.
+ */
+function enteteComparaison(fichierRapport, choix) {
+  const fichiers = `${fichierRapport} contre ${choix.baseline.fichier}`;
+  if (!choix.interVersions) return fichiers;
+  const { rapport, baseline } = choix.interVersions;
+  return `comparaison inter-versions : rapport ${rapport || '(version inconnue)'} contre baseline ${baseline} (${fichiers}, baseline imposée par SONDE_BASELINE_CLAUDE)`;
+}
+
 module.exports = {
   ATTENDU, RESULTATS, NOM_BASELINE, NOM_RAPPORT,
-  listerBaselines, dernierRapport, versionRapport, choisirBaseline, problemesBaseline, observer, conforme, comparer,
+  listerBaselines, dernierRapport, versionRapport, versionCouverte, choisirBaseline, problemesBaseline, observer, conforme, comparer,
+  enteteComparaison,
 };
 
 if (require.main === module) {

@@ -9,6 +9,8 @@
  * changent avec la synchronisation du compte et d'un poste à l'autre.
  * Anomalie A2 : les tokens des outils MCP ne sont comparés qu'en présence, et l'écart d'une combinaison
  * avec MCP est pris sans la catégorie « MCP tools ».
+ * Décision du 2026-11-10 : une baseline existante ne change jamais, sauf par ajoutVersionCompatible(),
+ * qui ne touche qu'à versions_compatibles, et seulement après une comparaison complète sans écart.
  */
 'use strict';
 
@@ -168,7 +170,39 @@ function baselineDepuisRapport(rapport, { source }) {
   };
 }
 
+const VERSION_CLAUDE = /^\d+\.\d+\.\d+$/;
+
+/**
+ * Décision du 2026-11-10 : ajoute la version d'un rapport « context » à versions_compatibles d'une
+ * baseline existante, sans rien changer d'autre. Refuse (erreur) une série non valide, une version
+ * absente, mal formée, différente avant et après ou déjà couverte, une baseline mal formée, une entrée
+ * non couverte (une série partielle ne prouve rien) et au moins un écart. Renvoie la baseline complétée
+ * et les lignes de la comparaison.
+ */
+function ajoutVersionCompatible(contenu, rapport) {
+  // eslint-disable-next-line global-require
+  const comparateur = require('./compare-injection-claude');
+  if (!rapport || rapport.rapport !== 'claude-code-context') throw new Error('rapport « claude-code-context » attendu');
+  if (!rapport.serie || rapport.serie.valide !== true) throw new Error('série non valide : aucune version ne peut être déclarée compatible');
+  const env = rapport.environnement || {};
+  const v = env.version_avant;
+  if (typeof v !== 'string' || v !== env.version_apres) throw new Error('version absente, ou différente avant et après la série');
+  if (!VERSION_CLAUDE.test(v)) throw new Error(`version mal formée : ${v}`);
+  const problemes = comparateur.problemesBaseline(contenu);
+  if (problemes.length > 0) throw new Error(`baseline mal formée : ${problemes.join(' ; ')}`);
+  if (!Array.isArray(contenu.environnement.versions_compatibles)) throw new Error('versions_compatibles absent de la baseline');
+  if (comparateur.versionCouverte(v, { contenu })) throw new Error(`la version ${v} est déjà couverte par cette baseline : rien à ajouter`);
+  const lignes = comparateur.comparer(contenu, rapport);
+  const nonCouvertes = lignes.filter((l) => !l.couverte).length;
+  const ecarts = lignes.filter((l) => l.ecart).length;
+  if (ecarts > 0) throw new Error(`${ecarts} écart(s) avec la baseline : la version ${v} n'est pas compatible`);
+  if (nonCouvertes > 0) throw new Error(`${nonCouvertes} entrée(s) non couverte(s) par le rapport : une série partielle ne prouve pas la compatibilité`);
+  const suivant = JSON.parse(JSON.stringify(contenu));
+  suivant.environnement.versions_compatibles.push(v);
+  return { contenu: suivant, version: v, lignes };
+}
+
 module.exports = {
   SCENARIO_COMBINAISON, SCENARIO_DELTA, SCENARIO_ELEMENT, OBSERVATIONS_MANUELLES, REMARQUES_FIXES, NOM_RAPPORT_CONTEXT,
-  scenarioDe, baselineDepuisRapport,
+  VERSION_CLAUDE, scenarioDe, baselineDepuisRapport, ajoutVersionCompatible,
 };

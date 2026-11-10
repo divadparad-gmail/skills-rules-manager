@@ -16,7 +16,7 @@ La suite a deux parties :
 | `mcp/serveur-fixture.js` | Le serveur MCP de fixture : stdio, modules intégrés de Node seulement, aucune action. |
 | `SONDE.md` | Les invites exactes des appels au modèle. C'est la seule source d'invites que le lanceur accepte, et chacune est vérifiée par son empreinte. |
 | `SCENARIOS-CLAUDE-CODE.md` | La grille des scénarios CC01 à CC37, avec une colonne par baseline. |
-| `attendu/baseline-AAAA-MM-JJ.json` | Les baselines, une par version de Claude Code mesurée, commitées. Elles ne comparent que ce qui ne dépend pas du compte (voir « Ce que compare la baseline »). Une baseline existante n'est jamais modifiée. |
+| `attendu/baseline-AAAA-MM-JJ.json` | Les baselines, une par version de Claude Code mesurée, commitées. Elles ne comparent que ce qui ne dépend pas du compte (voir « Ce que compare la baseline »). Une baseline existante n'est jamais modifiée, sauf par l'ajout d'une version à `versions_compatibles` (`sonde:claude-compatible`, après une comparaison complète sans écart). |
 | `resultats/` | Les rapports normalisés (`context-…` et `payant-…`), écrits après la garde de confidentialité. **Ils restent locaux** : depuis le 2026-11-09, Git les ignore (sauf `.gitkeep`), car ils contiennent des totaux qui dépendent du compte. |
 | `brut/` | Les sorties brutes, les compteurs, le journal de déploiement et le fichier `ARRET.txt`. **Ce dossier est ignoré par Git** : il contient des données locales. |
 
@@ -30,11 +30,13 @@ Toutes les commandes se lancent depuis la racine du dépôt, dans un **terminal 
 |---|---|---|
 | `npm run sonde:claude-etat` | La version, l'état de connexion, les préconditions et les compteurs | Nul |
 | `npm run sonde:claude-context -- --lot E1` | La partie gratuite : 22 combinaisons et 4 bases, soit 26 `/context` | Nul (usage 0, contrôlé après chaque lancement) |
+| `npm run sonde:claude-context -- --lot V1 --resultats` | La même partie gratuite, pour vérifier une nouvelle version de Claude Code (lot V1, `/context` seulement) | Nul |
 | `npm run sonde:claude -- --a-sec` | Affiche les 38 appels prévus (argv, noms des variables, fichiers déployés), **sans rien lancer ni écrire** | Nul |
 | `npm run sonde:claude -- --confirmer --plafond 38` | La partie payante, séries 1 à 5 | 38 appels au modèle, sur le quota de l'abonnement |
 | `npm run sonde:claude-context -- --preparer-h14` | Déploie le jeu de H14 et affiche les gestes à faire dans VS Code | Nul ici ; 1 appel manuel dans le panneau |
 | `node test/scenarios/scripts/sonde-claude-code.js retirer` | Retire un déploiement laissé en place (interruption, ou H14) | Nul |
 | `npm run sonde:claude-baseline -- --depuis context-AAAA-MM-JJ-HHMM.json` | Écrit `attendu/baseline-<date>.json` d'après un rapport **valide** de `resultats/`, après la garde ; refuse d'écraser une baseline existante | Nul (aucun lancement de `claude`) |
+| `npm run sonde:claude-compatible -- --rapport context-AAAA-MM-JJ-HHMM.json --baseline 2026-11-09` | Ajoute la version du rapport à `versions_compatibles` de la baseline désignée, et rien d'autre ; refuse si la série n'est pas valide, si une entrée n'est pas couverte ou s'il y a au moins un écart | Nul (aucun lancement de `claude`) |
 | `npm run test:injection-claude` | Compare le dernier rapport de `resultats/` à sa baseline | Nul |
 
 Options utiles :
@@ -81,6 +83,24 @@ Remove-Item Env:CLAUDE_CONFIG_DIR
 
 Au premier lancement d'un lot, le lanceur archive le compteur du lot précédent dans `brut/` (par exemple `compteur-context-I2.json`) et l'annonce en console. Il ne remet jamais un compteur à zéro, et un lot archivé ne peut pas être rouvert.
 
+### 1 bis. La vérification d'une nouvelle version (lot V1)
+
+Le lot V1 (décision du 2026-11-10) sert aux vérifications de version : il n'accepte que `/context`, avec un plafond de 30 et son propre compteur. Toute commande payante y est refusée (`--lot V1` sur `sonde:claude`, appel au modèle, compteur du modèle).
+
+1. `npm run sonde:claude-etat` : noter la version, et vérifier les préconditions.
+2. `npm run sonde:claude-context -- --lot V1 --resultats` (26 `/context`). Au premier lancement, le compteur E1 est archivé sous `brut/compteur-context-E1.json`, et le lot E1 ne peut plus être rouvert.
+3. Comparer à la baseline de la version précédente, désignée explicitement :
+
+   ```powershell
+   # PowerShell
+   $env:SONDE_BASELINE_CLAUDE = "2026-11-09"; npm run test:injection-claude; Remove-Item Env:SONDE_BASELINE_CLAUDE
+   ```
+
+   La console annonce alors « comparaison inter-versions : rapport X contre baseline Y ».
+4. Avec 0 écart et toutes les entrées couvertes : `npm run sonde:claude-compatible -- --rapport <rapport V1> --baseline 2026-11-09`, puis commiter la baseline. Avec au moins un écart : suivre la colonne « Si ça change » de la grille et décider d'une nouvelle baseline datée.
+
+Le lot E2 archivera à son tour le compteur V1 : une vérification de version ultérieure demandera un nouveau lot, sur décision.
+
 ### 2. La partie payante (lot E2)
 
 1. **D'abord à sec** : `npm run sonde:claude -- --a-sec`. Vérifier le total annoncé (38 appels au modèle et 33 `/context`), l'argv de chaque série et la liste des fichiers déployés.
@@ -110,6 +130,7 @@ Le déroulement :
 | Partie | Appels au modèle | `/context` | Plafond |
 |---|---|---|---|
 | Gratuite (E1) | 0 | 26 | 60 `/context` pour le lot E1 (relevé de 50 le 2026-11-09) |
+| Vérification de version (V1) | 0 (refusés) | 26 | 30 `/context` pour le lot V1 |
 | Payante (E2) | 38 (séries 1 à 5 : 17, 6, 4, 3 et 8) | 33 | 40 appels au modèle et 40 `/context` pour le lot E2 |
 | H14 (E3) | 1, tapé à la main | 1 | — |
 
@@ -127,8 +148,10 @@ Les deux compteurs sont dans `brut/` (`compteur-context.json` et `compteur-model
   $env:SONDE_BASELINE_CLAUDE = "2026-11-05"; npm run test:injection-claude; Remove-Item Env:SONDE_BASELINE_CLAUDE
   ```
 
-  Une entrée « non couverte » est une entrée que le rapport ne mesure pas (autre partie, série rejetée) : ce n'est pas un écart.
-- **Un écart confirmé** : suivre la colonne « Si ça change » du scénario dans `SCENARIOS-CLAUDE-CODE.md`. On ne modifie jamais une baseline existante ; une nouvelle version de Claude Code qui change un résultat reçoit une nouvelle baseline datée, et une nouvelle colonne dans la grille.
+  Une baseline imposée est acceptée même si sa version diffère de celle du rapport ; la console l'annonce alors comme une « comparaison inter-versions : rapport X contre baseline Y ».
+
+  Une entrée « non couverte » est une entrée que le rapport ne mesure pas (autre partie, série rejetée) : ce n'est pas un écart. Elle empêche pourtant l'ajout à `versions_compatibles`, car une série partielle ne prouve pas la compatibilité.
+- **Un écart confirmé** : suivre la colonne « Si ça change » du scénario dans `SCENARIOS-CLAUDE-CODE.md`. On ne modifie jamais une baseline existante (sauf `versions_compatibles`, par la commande dédiée et sans aucun écart) ; une nouvelle version de Claude Code qui change un résultat reçoit une nouvelle baseline datée, et une nouvelle colonne dans la grille.
 
 ## Si une série est rejetée
 

@@ -4,7 +4,8 @@
  * Ce module ne lance jamais claude et n'importe pas child_process : le seul point de lancement reste
  * lancerClaude() dans sonde-claude-code.js. On y trouve :
  *   - les compteurs persistants par lot (/context et appels au modèle), avec l'archivage au changement
- *     de lot, sans remise à zéro et sans réouverture d'un lot archivé ;
+ *     de lot, sans remise à zéro et sans réouverture d'un lot archivé ; le lot V1 (vérification de
+ *     version) n'accepte que /context ;
  *   - la lecture de SONDE.md et la vérification des invites par leur empreinte ;
  *   - le plan des séries 1 à 5 (38 appels au modèle, 33 /context) ;
  *   - la garde de flux (pendant l'appel) et les contrôles après l'appel ;
@@ -27,11 +28,21 @@ const MAX_SERIES_REJETEES = 2;
 
 // --- Compteurs par lot ----------------------------------------------------------------------------
 
-/** Les deux compteurs, distincts : un fichier et des plafonds par lot chacun. */
+/**
+ * Les deux compteurs, distincts : un fichier et des plafonds par lot chacun. V1 (décision du 2026-11-10)
+ * est le lot des vérifications de version : /context seulement, plafond de 30, sans compteur du modèle.
+ */
 const COMPTEURS = {
-  context: { fichier: 'compteur-context.json', plafonds: { E1: 60, E2: 40 }, unite: '/context' },
+  context: { fichier: 'compteur-context.json', plafonds: { E1: 60, E2: 40, V1: 30 }, unite: '/context' },
   modele: { fichier: 'compteur-modele.json', plafonds: { E2: PLAFOND_MODELE }, unite: 'appel(s) au modèle' },
 };
+
+/** Les lots qui n'acceptent que /context : tout appel au modèle et toute commande payante y sont refusés. */
+const LOTS_CONTEXT_SEUL = ['V1'];
+for (const lot of LOTS_CONTEXT_SEUL) {
+  if (Object.prototype.hasOwnProperty.call(COMPTEURS.modele.plafonds, lot)) throw new Error(`lot ${lot} « /context seulement » doté d'un compteur du modèle`);
+}
+const refusContextSeul = (lot) => new Refus(`le lot ${lot} (vérification de version) n'accepte que /context : toute commande payante y est refusée`);
 
 /**
  * Les relèvements de plafond, décidés explicitement, un au plus par compteur et par lot. Un compteur
@@ -58,6 +69,7 @@ const nomArchive = (type, lot) => `compteur-${type}-${lot}.json`;
 function definitionCompteur(type, lot) {
   const d = COMPTEURS[type];
   if (!d) throw new Refus(`compteur inconnu : ${type}`);
+  if (type === 'modele' && LOTS_CONTEXT_SEUL.includes(lot)) throw refusContextSeul(lot);
   if (!Object.prototype.hasOwnProperty.call(d.plafonds, lot)) {
     throw new Refus(`lot « ${String(lot)} » refusé pour le compteur ${type} (${Object.keys(d.plafonds).join(' ou ')} attendu)`);
   }
@@ -391,6 +403,11 @@ function lireOptionsPayant(args) {
       const v = args[++i];
       if (typeof v !== 'string' || !/^[1-5](,[1-5])*$/.test(v)) throw new Refus('--series attend une liste comme 1,3 (séries 1 à 5)');
       o.series = [...new Set(v.split(',').map(Number))].sort();
+    } else if (a === '--lot') {
+      // La partie payante tourne toujours sous LOT_PAYANT ; un lot « /context seulement » est refusé nommément.
+      const v = args[++i];
+      if (LOTS_CONTEXT_SEUL.includes(v)) throw refusContextSeul(v);
+      throw new Refus(`--lot refusé : la partie payante tourne toujours sous le lot ${LOT_PAYANT}, sans --lot`);
     } else throw new Refus(`option inconnue : ${a}`);
   }
   if (o.aSec && (o.confirmer || o.resultats)) throw new Refus('--a-sec ne lance rien : il refuse --confirmer et --resultats');
@@ -829,7 +846,7 @@ function gestesH14({ configDir, projet, invite, dossierBrut = 'test/scenarios/cl
 }
 
 module.exports = {
-  LOT_PAYANT, PLAFOND_MODELE, MAX_SERIES_REJETEES, COMPTEURS, EMPREINTES_INVITES, INVITES_MANUELLES,
+  LOT_PAYANT, PLAFOND_MODELE, MAX_SERIES_REJETEES, COMPTEURS, LOTS_CONTEXT_SEUL, EMPREINTES_INVITES, INVITES_MANUELLES,
   SERIES, D_TOUS, OUTILS_DECLENCHEURS, AUTORISATIONS, REGLAGES_DECLENCHEURS, CHEMIN_REGLAGES, JEUX_H14,
   RELEVEMENTS_PLAFOND, nomArchive, lireCompteur, ouvrirLot, releverPlafond, verifierBudget, reserver, noterSerieRejetee,
   sha256, lireSonde, verifierInvites, invitesEnvoyables,
