@@ -1,0 +1,1487 @@
+{
+  "baseline": "2026-11-09",
+  "environnement": {
+    "outil": "Claude Code",
+    "entree": "cli -p",
+    "os": "Windows",
+    "version": "2.1.318",
+    "versions_compatibles": [
+      "2.1.318"
+    ],
+    "modele": "claude-opus-5",
+    "effort": "high",
+    "sonde": "v1",
+    "date_mesure": "2026-11-09"
+  },
+  "source": {
+    "rapport": "context-2026-11-09-0856.json",
+    "local": true
+  },
+  "jeux_outils": {
+    "vide": [],
+    "avec_skill": [
+      "Skill"
+    ]
+  },
+  "decomposition": null,
+  "entrees": [
+    {
+      "id": "CC02:niveaux:<global>/CLAUDE.md",
+      "scenario": "CC02",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "niveaux",
+      "element": "<global>/CLAUDE.md",
+      "attendu": {
+        "present": true,
+        "type": "User",
+        "tokens": 55
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC15:niveaux:<global>/rules/g-perm.md",
+      "scenario": "CC15",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "niveaux",
+      "element": "<global>/rules/g-perm.md",
+      "attendu": {
+        "present": true,
+        "type": "User",
+        "tokens": 38
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC05:niveaux:<parent>/CLAUDE.md",
+      "scenario": "CC05",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "niveaux",
+      "element": "<parent>/CLAUDE.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 38
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC06:niveaux:<parent>/.claude/CLAUDE.md",
+      "scenario": "CC06",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "niveaux",
+      "element": "<parent>/.claude/CLAUDE.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 50
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC20:niveaux:<parent>/.claude/rules/par-regle.md",
+      "scenario": "CC20",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "niveaux",
+      "element": "<parent>/.claude/rules/par-regle.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 40
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC03:niveaux:<projet>/CLAUDE.md",
+      "scenario": "CC03",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "niveaux",
+      "element": "<projet>/CLAUDE.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 44
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC09:niveaux:<projet>/import-1.md",
+      "scenario": "CC09",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "niveaux",
+      "element": "<projet>/import-1.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 44
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC09:niveaux:<projet>/import-2.md",
+      "scenario": "CC09",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "niveaux",
+      "element": "<projet>/import-2.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 44
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC09:niveaux:<projet>/import-3.md",
+      "scenario": "CC09",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "niveaux",
+      "element": "<projet>/import-3.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 45
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC09:niveaux:<projet>/import-4.md",
+      "scenario": "CC09",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "niveaux",
+      "element": "<projet>/import-4.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 44
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC03:niveaux:<projet>/.claude/CLAUDE.md",
+      "scenario": "CC03",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "niveaux",
+      "element": "<projet>/.claude/CLAUDE.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 42
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC15:niveaux:<projet>/.claude/rules/p-perm.md",
+      "scenario": "CC15",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "niveaux",
+      "element": "<projet>/.claude/rules/p-perm.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 38
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC21:niveaux:<projet>/.claude/rules/p-yaml-invalide.md",
+      "scenario": "CC21",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "niveaux",
+      "element": "<projet>/.claude/rules/p-yaml-invalide.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 40
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC19:niveaux:<projet>/.claude/rules/sous/p-sous.md",
+      "scenario": "CC19",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "niveaux",
+      "element": "<projet>/.claude/rules/sous/p-sous.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 42
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC04:niveaux:<projet>/CLAUDE.local.md",
+      "scenario": "CC04",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "niveaux",
+      "element": "<projet>/CLAUDE.local.md",
+      "attendu": {
+        "present": true,
+        "type": "Local",
+        "tokens": 36
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC23:niveaux:<global>/projects/<memoire>/memory/MEMORY.md",
+      "scenario": "CC23",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "niveaux",
+      "element": "<global>/projects/<memoire>/memory/MEMORY.md",
+      "attendu": {
+        "present": true,
+        "type": "AutoMem",
+        "tokens": 42
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC17:niveaux:<global>/rules/g-paths.md",
+      "scenario": "CC17",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "niveaux",
+      "element": "<global>/rules/g-paths.md",
+      "attendu": {
+        "present": false
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC17:niveaux:<projet>/.claude/rules/p-paths.md",
+      "scenario": "CC17",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "niveaux",
+      "element": "<projet>/.claude/rules/p-paths.md",
+      "attendu": {
+        "present": false
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC09:niveaux:<projet>/import-5.md",
+      "scenario": "CC09",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "niveaux",
+      "element": "<projet>/import-5.md",
+      "attendu": {
+        "present": false
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC12:niveaux:delta",
+      "scenario": "CC12",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "niveaux",
+      "mesure": "delta",
+      "jeu_outils": "vide",
+      "attendu": {
+        "delta": 682,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC22:agents-seul:<projet>/AGENTS.md",
+      "scenario": "CC22",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "agents-seul",
+      "element": "<projet>/AGENTS.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 45
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC22:agents-seul:delta",
+      "scenario": "CC22",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "agents-seul",
+      "mesure": "delta",
+      "jeu_outils": "vide",
+      "attendu": {
+        "delta": 45,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC22:agents-avec-claude:<projet>/CLAUDE.md",
+      "scenario": "CC22",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "agents-avec-claude",
+      "element": "<projet>/CLAUDE.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 59
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC22:agents-avec-claude:<projet>/AGENTS.md",
+      "scenario": "CC22",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "agents-avec-claude",
+      "element": "<projet>/AGENTS.md",
+      "attendu": {
+        "present": false
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC22:agents-avec-claude:delta",
+      "scenario": "CC22",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "agents-avec-claude",
+      "mesure": "delta",
+      "jeu_outils": "vide",
+      "attendu": {
+        "delta": 59,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC24:skills:skill canari-g1",
+      "scenario": "CC24",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "skills",
+      "skill": "canari-g1",
+      "attendu": {
+        "present": true,
+        "source": "userSettings",
+        "tokens": 29
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC25:skills:skill canari-homo",
+      "scenario": "CC25",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "skills",
+      "skill": "canari-homo",
+      "attendu": {
+        "present": true,
+        "source": "userSettings",
+        "tokens": 31
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC27:skills:skill canari-long",
+      "scenario": "CC27",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "skills",
+      "skill": "canari-long",
+      "attendu": {
+        "present": true,
+        "source": "projectSettings",
+        "tokens": 517
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC24:skills:skill canari-p1",
+      "scenario": "CC24",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "skills",
+      "skill": "canari-p1",
+      "attendu": {
+        "present": true,
+        "source": "projectSettings",
+        "tokens": 29
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC24:skills:skill canari-parent",
+      "scenario": "CC24",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "skills",
+      "skill": "canari-parent",
+      "attendu": {
+        "present": true,
+        "source": "projectSettings",
+        "tokens": 31
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC26:skills:skill canari-plugin:canari-plug",
+      "scenario": "CC26",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "skills",
+      "skill": "canari-plugin:canari-plug",
+      "attendu": {
+        "present": true,
+        "source": "plugin",
+        "tokens": 35
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC26:skills:skill canari-cache",
+      "scenario": "CC26",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "skills",
+      "skill": "canari-cache",
+      "attendu": {
+        "present": false
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC24:skills:delta",
+      "scenario": "CC24",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "skills",
+      "mesure": "delta",
+      "jeu_outils": "avec_skill",
+      "attendu": {
+        "delta": 672,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC29:skills-sans-outil:skill canari-g1",
+      "scenario": "CC29",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "skills-sans-outil",
+      "skill": "canari-g1",
+      "attendu": {
+        "present": false
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC29:skills-sans-outil:skill canari-homo",
+      "scenario": "CC29",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "skills-sans-outil",
+      "skill": "canari-homo",
+      "attendu": {
+        "present": false
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC29:skills-sans-outil:skill canari-parent",
+      "scenario": "CC29",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "skills-sans-outil",
+      "skill": "canari-parent",
+      "attendu": {
+        "present": false
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC29:skills-sans-outil:skill canari-plugin:canari-plug",
+      "scenario": "CC29",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "skills-sans-outil",
+      "skill": "canari-plugin:canari-plug",
+      "attendu": {
+        "present": false
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC29:skills-sans-outil:skill canari-cache",
+      "scenario": "CC29",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "skills-sans-outil",
+      "skill": "canari-cache",
+      "attendu": {
+        "present": false
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC29:skills-sans-outil:skill canari-long",
+      "scenario": "CC29",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "skills-sans-outil",
+      "skill": "canari-long",
+      "attendu": {
+        "present": false
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC29:skills-sans-outil:skill canari-p1",
+      "scenario": "CC29",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "skills-sans-outil",
+      "skill": "canari-p1",
+      "attendu": {
+        "present": false
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC29:skills-sans-outil:delta",
+      "scenario": "CC29",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "skills-sans-outil",
+      "mesure": "delta",
+      "jeu_outils": "vide",
+      "attendu": {
+        "delta": 0,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC27:skill-long-1500:skill canari-long",
+      "scenario": "CC27",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "skill-long-1500",
+      "skill": "canari-long",
+      "attendu": {
+        "present": true,
+        "source": "projectSettings",
+        "tokens": 505
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC27:skill-long-1500:delta",
+      "scenario": "CC27",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "skill-long-1500",
+      "mesure": "delta",
+      "jeu_outils": "avec_skill",
+      "attendu": {
+        "delta": 505,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC18:declencheurs:<projet>/.claude/rules/d-paths.md",
+      "scenario": "CC18",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "declencheurs",
+      "element": "<projet>/.claude/rules/d-paths.md",
+      "attendu": {
+        "present": false
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC08:declencheurs:<projet>/sous/CLAUDE.md",
+      "scenario": "CC08",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "declencheurs",
+      "element": "<projet>/sous/CLAUDE.md",
+      "attendu": {
+        "present": false
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC28:declencheurs:skill canari-paths",
+      "scenario": "CC28",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "declencheurs",
+      "skill": "canari-paths",
+      "attendu": {
+        "present": false
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC28:declencheurs:delta",
+      "scenario": "CC28",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "declencheurs",
+      "mesure": "delta",
+      "jeu_outils": "avec_skill",
+      "attendu": {
+        "delta": 0,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC33:hook-sortie:delta",
+      "scenario": "CC33",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "hook-sortie",
+      "mesure": "delta",
+      "jeu_outils": "vide",
+      "attendu": {
+        "delta": 43,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC34:hook-muet:delta",
+      "scenario": "CC34",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "hook-muet",
+      "mesure": "delta",
+      "jeu_outils": "vide",
+      "attendu": {
+        "delta": 0,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC30:mcp-canari:mcp mcp__canari-mcp__canari_outil",
+      "scenario": "CC30",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "mcp-canari",
+      "outil_mcp": "mcp__canari-mcp__canari_outil",
+      "attendu": {
+        "present": true
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC30:mcp-canari:delta",
+      "scenario": "CC30",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "mcp-canari",
+      "mesure": "delta",
+      "jeu_outils": "vide",
+      "sans_outils_mcp": true,
+      "attendu": {
+        "delta": 51,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC32:mcp-long:mcp mcp__canari-mcp-long__canari_outil_long",
+      "scenario": "CC32",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "mcp-long",
+      "outil_mcp": "mcp__canari-mcp-long__canari_outil_long",
+      "attendu": {
+        "present": true
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC32:mcp-long:delta",
+      "scenario": "CC32",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "mcp-long",
+      "mesure": "delta",
+      "jeu_outils": "vide",
+      "sans_outils_mcp": true,
+      "attendu": {
+        "delta": 1573,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC13:cout-f-quatre-chemins:<global>/CLAUDE.md",
+      "scenario": "CC13",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "cout-f-quatre-chemins",
+      "element": "<global>/CLAUDE.md",
+      "attendu": {
+        "present": true,
+        "type": "User",
+        "tokens": 69
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC13:cout-f-quatre-chemins:<parent>/CLAUDE.md",
+      "scenario": "CC13",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "cout-f-quatre-chemins",
+      "element": "<parent>/CLAUDE.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 69
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC13:cout-f-quatre-chemins:<projet>/CLAUDE.md",
+      "scenario": "CC13",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "cout-f-quatre-chemins",
+      "element": "<projet>/CLAUDE.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 69
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC13:cout-f-quatre-chemins:<projet>/.claude/CLAUDE.md",
+      "scenario": "CC13",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "cout-f-quatre-chemins",
+      "element": "<projet>/.claude/CLAUDE.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 69
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC13:cout-f-quatre-chemins:delta",
+      "scenario": "CC13",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "cout-f-quatre-chemins",
+      "mesure": "delta",
+      "jeu_outils": "vide",
+      "attendu": {
+        "delta": 276,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC37:cout-f2-projet:<projet>/CLAUDE.md",
+      "scenario": "CC37",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "cout-f2-projet",
+      "element": "<projet>/CLAUDE.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 133
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC37:cout-f2-projet:delta",
+      "scenario": "CC37",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "cout-f2-projet",
+      "mesure": "delta",
+      "jeu_outils": "vide",
+      "attendu": {
+        "delta": 133,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC37:cout-h15-anglais:<projet>/CLAUDE.md",
+      "scenario": "CC37",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "cout-h15-anglais",
+      "element": "<projet>/CLAUDE.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 71
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC37:cout-h15-anglais:delta",
+      "scenario": "CC37",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "cout-h15-anglais",
+      "mesure": "delta",
+      "jeu_outils": "vide",
+      "attendu": {
+        "delta": 71,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC37:cout-h15-code:<projet>/CLAUDE.md",
+      "scenario": "CC37",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "cout-h15-code",
+      "element": "<projet>/CLAUDE.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 72
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC37:cout-h15-code:delta",
+      "scenario": "CC37",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "cout-h15-code",
+      "mesure": "delta",
+      "jeu_outils": "vide",
+      "attendu": {
+        "delta": 72,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC15:cout-regles:<projet>/.claude/rules/r.md",
+      "scenario": "CC15",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "cout-regles",
+      "element": "<projet>/.claude/rules/r.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 61
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC15:cout-regles:<projet>/.claude/rules/regle-au-nom-volontairement-tres-long-pour-mesurer-le-cout-du-chemin.md",
+      "scenario": "CC15",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "cout-regles",
+      "element": "<projet>/.claude/rules/regle-au-nom-volontairement-tres-long-pour-mesurer-le-cout-du-chemin.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 61
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC17:cout-regles:<projet>/.claude/rules/r-paths.md",
+      "scenario": "CC17",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "cout-regles",
+      "element": "<projet>/.claude/rules/r-paths.md",
+      "attendu": {
+        "present": false
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC15:cout-regles:delta",
+      "scenario": "CC15",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "cout-regles",
+      "mesure": "delta",
+      "jeu_outils": "vide",
+      "attendu": {
+        "delta": 122,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC24:cout-skills:skill canari-s2",
+      "scenario": "CC24",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "cout-skills",
+      "skill": "canari-s2",
+      "attendu": {
+        "present": true,
+        "source": "userSettings",
+        "tokens": 39
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC24:cout-skills:skill canari-s1",
+      "scenario": "CC24",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "cout-skills",
+      "skill": "canari-s1",
+      "attendu": {
+        "present": true,
+        "source": "projectSettings",
+        "tokens": 39
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC24:cout-skills:delta",
+      "scenario": "CC24",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "cout-skills",
+      "mesure": "delta",
+      "jeu_outils": "avec_skill",
+      "attendu": {
+        "delta": 78,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC24:cout-skill-x2:skill canari-s1",
+      "scenario": "CC24",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "cout-skill-x2",
+      "skill": "canari-s1",
+      "attendu": {
+        "present": true,
+        "source": "projectSettings",
+        "tokens": 73
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC24:cout-skill-x2:delta",
+      "scenario": "CC24",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "cout-skill-x2",
+      "mesure": "delta",
+      "jeu_outils": "avec_skill",
+      "attendu": {
+        "delta": 73,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC31:cout-mcp-a1:mcp mcp__canari-mcp-a1__canari_outil",
+      "scenario": "CC31",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "cout-mcp-a1",
+      "outil_mcp": "mcp__canari-mcp-a1__canari_outil",
+      "attendu": {
+        "present": true
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC31:cout-mcp-a1:delta",
+      "scenario": "CC31",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "cout-mcp-a1",
+      "mesure": "delta",
+      "jeu_outils": "vide",
+      "sans_outils_mcp": true,
+      "attendu": {
+        "delta": 53,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC30:cout-mcp-a2:mcp mcp__canari-mcp-a2__canari_outil",
+      "scenario": "CC30",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "cout-mcp-a2",
+      "outil_mcp": "mcp__canari-mcp-a2__canari_outil",
+      "attendu": {
+        "present": true
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC30:cout-mcp-a2:delta",
+      "scenario": "CC30",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "cout-mcp-a2",
+      "mesure": "delta",
+      "jeu_outils": "vide",
+      "sans_outils_mcp": true,
+      "attendu": {
+        "delta": 89,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC30:cout-mcp-b1:mcp mcp__canari-mcp-b1__canari_outil",
+      "scenario": "CC30",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "cout-mcp-b1",
+      "outil_mcp": "mcp__canari-mcp-b1__canari_outil",
+      "attendu": {
+        "present": true
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC30:cout-mcp-b1:delta",
+      "scenario": "CC30",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "cout-mcp-b1",
+      "mesure": "delta",
+      "jeu_outils": "vide",
+      "sans_outils_mcp": true,
+      "attendu": {
+        "delta": 0,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC02:jeu-complet:<global>/CLAUDE.md",
+      "scenario": "CC02",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "jeu-complet",
+      "element": "<global>/CLAUDE.md",
+      "attendu": {
+        "present": true,
+        "type": "User",
+        "tokens": 55
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC15:jeu-complet:<global>/rules/g-perm.md",
+      "scenario": "CC15",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "jeu-complet",
+      "element": "<global>/rules/g-perm.md",
+      "attendu": {
+        "present": true,
+        "type": "User",
+        "tokens": 38
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC05:jeu-complet:<parent>/CLAUDE.md",
+      "scenario": "CC05",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "jeu-complet",
+      "element": "<parent>/CLAUDE.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 38
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC06:jeu-complet:<parent>/.claude/CLAUDE.md",
+      "scenario": "CC06",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "jeu-complet",
+      "element": "<parent>/.claude/CLAUDE.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 50
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC20:jeu-complet:<parent>/.claude/rules/par-regle.md",
+      "scenario": "CC20",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "jeu-complet",
+      "element": "<parent>/.claude/rules/par-regle.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 40
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC03:jeu-complet:<projet>/CLAUDE.md",
+      "scenario": "CC03",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "jeu-complet",
+      "element": "<projet>/CLAUDE.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 44
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC09:jeu-complet:<projet>/import-1.md",
+      "scenario": "CC09",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "jeu-complet",
+      "element": "<projet>/import-1.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 44
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC09:jeu-complet:<projet>/import-2.md",
+      "scenario": "CC09",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "jeu-complet",
+      "element": "<projet>/import-2.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 44
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC09:jeu-complet:<projet>/import-3.md",
+      "scenario": "CC09",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "jeu-complet",
+      "element": "<projet>/import-3.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 45
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC09:jeu-complet:<projet>/import-4.md",
+      "scenario": "CC09",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "jeu-complet",
+      "element": "<projet>/import-4.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 44
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC03:jeu-complet:<projet>/.claude/CLAUDE.md",
+      "scenario": "CC03",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "jeu-complet",
+      "element": "<projet>/.claude/CLAUDE.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 42
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC15:jeu-complet:<projet>/.claude/rules/p-perm.md",
+      "scenario": "CC15",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "jeu-complet",
+      "element": "<projet>/.claude/rules/p-perm.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 38
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC21:jeu-complet:<projet>/.claude/rules/p-yaml-invalide.md",
+      "scenario": "CC21",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "jeu-complet",
+      "element": "<projet>/.claude/rules/p-yaml-invalide.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 40
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC19:jeu-complet:<projet>/.claude/rules/sous/p-sous.md",
+      "scenario": "CC19",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "jeu-complet",
+      "element": "<projet>/.claude/rules/sous/p-sous.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 42
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC04:jeu-complet:<projet>/CLAUDE.local.md",
+      "scenario": "CC04",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "jeu-complet",
+      "element": "<projet>/CLAUDE.local.md",
+      "attendu": {
+        "present": true,
+        "type": "Local",
+        "tokens": 36
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC23:jeu-complet:<global>/projects/<memoire>/memory/MEMORY.md",
+      "scenario": "CC23",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "jeu-complet",
+      "element": "<global>/projects/<memoire>/memory/MEMORY.md",
+      "attendu": {
+        "present": true,
+        "type": "AutoMem",
+        "tokens": 42
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC24:jeu-complet:skill canari-g1",
+      "scenario": "CC24",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "jeu-complet",
+      "skill": "canari-g1",
+      "attendu": {
+        "present": true,
+        "source": "userSettings",
+        "tokens": 29
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC25:jeu-complet:skill canari-homo",
+      "scenario": "CC25",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "jeu-complet",
+      "skill": "canari-homo",
+      "attendu": {
+        "present": true,
+        "source": "userSettings",
+        "tokens": 31
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC27:jeu-complet:skill canari-long",
+      "scenario": "CC27",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "jeu-complet",
+      "skill": "canari-long",
+      "attendu": {
+        "present": true,
+        "source": "projectSettings",
+        "tokens": 517
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC24:jeu-complet:skill canari-p1",
+      "scenario": "CC24",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "jeu-complet",
+      "skill": "canari-p1",
+      "attendu": {
+        "present": true,
+        "source": "projectSettings",
+        "tokens": 29
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC24:jeu-complet:skill canari-parent",
+      "scenario": "CC24",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "jeu-complet",
+      "skill": "canari-parent",
+      "attendu": {
+        "present": true,
+        "source": "projectSettings",
+        "tokens": 31
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC26:jeu-complet:skill canari-plugin:canari-plug",
+      "scenario": "CC26",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "jeu-complet",
+      "skill": "canari-plugin:canari-plug",
+      "attendu": {
+        "present": true,
+        "source": "plugin",
+        "tokens": 35
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC30:jeu-complet:mcp mcp__canari-mcp__canari_outil",
+      "scenario": "CC30",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "jeu-complet",
+      "outil_mcp": "mcp__canari-mcp__canari_outil",
+      "attendu": {
+        "present": true
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC17:jeu-complet:<global>/rules/g-paths.md",
+      "scenario": "CC17",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "jeu-complet",
+      "element": "<global>/rules/g-paths.md",
+      "attendu": {
+        "present": false
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC17:jeu-complet:<projet>/.claude/rules/p-paths.md",
+      "scenario": "CC17",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "jeu-complet",
+      "element": "<projet>/.claude/rules/p-paths.md",
+      "attendu": {
+        "present": false
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC09:jeu-complet:<projet>/import-5.md",
+      "scenario": "CC09",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "jeu-complet",
+      "element": "<projet>/import-5.md",
+      "attendu": {
+        "present": false
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC26:jeu-complet:skill canari-cache",
+      "scenario": "CC26",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "jeu-complet",
+      "skill": "canari-cache",
+      "attendu": {
+        "present": false
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC35:jeu-complet:delta",
+      "scenario": "CC35",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "jeu-complet",
+      "mesure": "delta",
+      "jeu_outils": "avec_skill",
+      "sans_outils_mcp": true,
+      "attendu": {
+        "delta": 1448,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    }
+  ],
+  "remarques": [
+    "Entrées « context » seulement (lot E1) : les entrées « usage » et « canari » viendront au lot E2.",
+    "Ne sont comparés que la présence, le type (ou la source) et les tokens de chaque fixture, et l'écart de chaque combinaison à la base de même jeu d'outils de la même série (delta_base). Les totaux absolus et les éléments hors fixtures (skills, plugins et outils du compte) ne sont jamais comparés : ils changent avec la synchronisation du compte et d'un poste à l'autre.",
+    "Anomalie A2 : les tokens des outils MCP sont instables et non additifs. Ils ne sont comparés qu'en présence, et l'écart des combinaisons avec MCP est pris sans la catégorie « MCP tools » (sans_outils_mcp).",
+    "CC07 (H16b), observation manuelle du 2026-11-09 en 2.1.318, dans une session interactive (/context, aucun appel au modèle) : le CLAUDE.md global est chargé une seule fois pour un projet situé sous le dossier personnel. Aucune entrée : le comparateur ne peut pas le vérifier."
+  ]
+}
