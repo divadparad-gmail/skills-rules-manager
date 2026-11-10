@@ -837,7 +837,7 @@ const JEUX_H14 = ['niveaux', 'skills', 'hook-sortie'];
  * Le geste qui précède la préparation (décision Q1) : le lanceur refuse de préparer tant qu'il ne le
  * voit pas fait. Les gestes de fin sont dans sonde-claude-code-h14.js (gestesFinH14).
  */
-const GESTE_DEBUT_H14 = 'Avant la préparation : dans la VS Code principale, règle extensions.autoUpdate sur false (paramètres utilisateur : Extensions › Auto Update › None). Il le reste pendant tout E3 ; la clôture rappelle de le rétablir.';
+const GESTE_DEBUT_H14 = 'Avant la préparation : dans la VS Code principale, coupe la mise à jour automatique des extensions (palette de commandes, « Extensions: Disable Auto Update for Extensions », qui écrit extensions.autoUpdate sur "off" ; false est aussi accepté). Elle le reste pendant tout E3 ; la clôture rappelle de la rétablir.';
 
 /**
  * Les gestes de H14 dans le panneau, affichés par --preparer-h14 (PowerShell ordinaire). Les chemins

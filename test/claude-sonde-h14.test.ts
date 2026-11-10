@@ -143,31 +143,52 @@ describe('Suite de Tests : H14, le panneau VS Code (lot E3, sans rien lancer)', 
     }
   });
 
-  test('4. VS Code (Q1, D-b, précision 3) : autoUpdate coupé exigé ; instance séparée avec ses réglages ; dossier non vide refusé sans suppression', () => {
-    assert.strictEqual(H.autoUpdateCoupe('{\n  "extensions.autoUpdate": false,\n  "editor.fontSize": 14\n}'), true);
-    assert.strictEqual(H.autoUpdateCoupe('{ "extensions.autoUpdate": true }'), false);
-    assert.strictEqual(H.autoUpdateCoupe('{ "extensions.autoUpdate": "onlyEnabledExtensions" }'), false);
-    assert.strictEqual(H.autoUpdateCoupe('{\n  // "extensions.autoUpdate": false,\n}'), false, 'une ligne commentée ne compte pas');
-    assert.strictEqual(H.autoUpdateCoupe('{ "editor.fontSize": 14 }'), false, 'absent : la valeur par défaut est active');
+  test('4. VS Code (Q1, D-b, précision 3) : autoUpdate coupé exigé ("off" ou false) et recopié dans l\'instance séparée ; dossier non vide refusé sans suppression', () => {
+    // "off" (écrit par « Extensions: Disable Auto Update for Extensions ») et false sont acceptés
+    assert.strictEqual(H.valeurAutoUpdateCoupee('{\n  "extensions.autoUpdate": "off",\n  "editor.fontSize": 14\n}'), 'off');
+    assert.strictEqual(H.valeurAutoUpdateCoupee('{\n  "extensions.autoUpdate": false,\n  "editor.fontSize": 14\n}'), false);
+    // Toute autre valeur, l'absence, une ligne commentée ou deux valeurs contradictoires sont refusées
+    for (const [texte, motif] of [
+      ['{ "extensions.autoUpdate": true }', 'true'],
+      ['{ "extensions.autoUpdate": "onlyEnabledExtensions" }', 'onlyEnabledExtensions'],
+      ['{ "extensions.autoUpdate": "onlySelectedExtensions" }', 'onlySelectedExtensions, refusé à dessein'],
+      ['{ "extensions.autoUpdate": "Off" }', 'casse différente'],
+      ['{ "extensions.autoUpdate": "off", "extensions.autoUpdate": false }', 'valeurs contradictoires'],
+      ['{\n  // "extensions.autoUpdate": "off",\n}', 'ligne commentée'],
+      ['{ "editor.fontSize": 14 }', 'absent : la valeur par défaut est active'],
+    ]) {
+      assert.strictEqual(H.valeurAutoUpdateCoupee(texte), null, motif);
+      assert.strictEqual(H.autoUpdateCoupe(texte), false, motif);
+    }
+    assert.deepStrictEqual(H.VALEURS_AUTO_UPDATE_COUPE, [false, 'off']);
     assert.strictEqual(H.cheminReglagesPrincipaux({ env: { APPDATA: 'C:\\Users\\x\\AppData\\Roaming' }, plateforme: 'win32', home: 'C:\\Users\\x' }), 'C:\\Users\\x\\AppData\\Roaming\\Code\\User\\settings.json');
-    assert.deepStrictEqual(H.REGLAGES_INSTANCE, { 'extensions.autoUpdate': false, 'extensions.autoCheckUpdates': false, 'update.mode': 'none', 'claudeCode.attachOpenFile': false, 'claudeCode.attachSelection': false });
+    assert.deepStrictEqual(H.REGLAGES_INSTANCE_FIXES, { 'extensions.autoCheckUpdates': false, 'update.mode': 'none', 'claudeCode.attachOpenFile': false, 'claudeCode.attachSelection': false });
+    assert.throws(() => H.reglagesInstance(true), S.Refus);
+    assert.throws(() => H.reglagesInstance('on'), S.Refus);
     const racine = tmp('instance');
     try {
-      const dossier = path.join(racine, H.DOSSIER_INSTANCE);
-      H.verifierInstanceLibre(dossier);
-      fs.mkdirSync(dossier);
-      H.verifierInstanceLibre(dossier);
-      const f = H.ecrireInstance(dossier);
-      assert.deepStrictEqual(JSON.parse(fs.readFileSync(f, 'utf8')), H.REGLAGES_INSTANCE);
-      assert.throws(() => H.verifierInstanceLibre(dossier), (e: Error) => e instanceof S.Refus && /existe et n'est pas vide/.test(e.message) && /Remove-Item -Recurse -Force "\$env:TEMP\\vscode-canari"/.test(e.message));
-      assert.throws(() => H.ecrireInstance(dossier), S.Refus);
-      assert.ok(fs.existsSync(f), 'le lanceur ne supprime jamais le dossier');
+      for (const valeur of ['off', false]) {
+        const dossier = path.join(racine, `${H.DOSSIER_INSTANCE}-${String(valeur)}`);
+        H.verifierInstanceLibre(dossier);
+        fs.mkdirSync(dossier);
+        H.verifierInstanceLibre(dossier);
+        const f = H.ecrireInstance(dossier, valeur);
+        const ecrit = JSON.parse(fs.readFileSync(f, 'utf8'));
+        assert.deepStrictEqual(ecrit, { 'extensions.autoUpdate': valeur, ...H.REGLAGES_INSTANCE_FIXES }, 'même valeur que la VS Code principale');
+        assert.throws(() => H.verifierInstanceLibre(dossier), (e: Error) => e instanceof S.Refus && /existe et n'est pas vide/.test(e.message) && /Remove-Item -Recurse -Force "\$env:TEMP\\vscode-canari"/.test(e.message));
+        assert.throws(() => H.ecrireInstance(dossier, valeur), S.Refus);
+        assert.ok(fs.existsSync(f), 'le lanceur ne supprime jamais le dossier');
+      }
+      const refuse = path.join(racine, 'refuse');
+      assert.throws(() => H.ecrireInstance(refuse, 'on'), S.Refus);
+      assert.ok(!fs.existsSync(refuse), 'une valeur refusée n\'écrit rien');
     } finally {
       supprimer(racine);
     }
     const fin: string[] = H.gestesFinH14({ dossierInstance: 'X:\\tmp\\vscode-canari' });
-    assert.match(fin[0], /Rétablis extensions\.autoUpdate/);
+    assert.match(fin[0], /Rétablis la mise à jour automatique des extensions .*« Extensions: Enable Auto Update for Extensions »/);
     assert.ok(fin.some((l) => l.includes('X:\\tmp\\vscode-canari')));
+    assert.match(P.GESTE_DEBUT_H14, /« Extensions: Disable Auto Update for Extensions », qui écrit extensions\.autoUpdate sur "off" ; false est aussi accepté/);
   });
 
   test('5. Attendus de H14 (Q2) : déduits de l\'appel 4a de la baseline, sans MCP ni plugin, marqués « deduit »', () => {

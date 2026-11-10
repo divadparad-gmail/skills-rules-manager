@@ -149,7 +149,7 @@ Le déroulement :
 
 L'essai se fait en trois commandes sous le lot E3 (plafond de 12 `/context`, 10 prévus), voir le tableau ci-dessus. L'essentiel :
 
-- avant la préparation, `extensions.autoUpdate` doit valoir `false` dans la VS Code principale, et il le reste pendant tout E3 ; la préparation le vérifie, et la clôture rappelle de le rétablir ;
+- avant la préparation, la mise à jour automatique des extensions est coupée dans la VS Code principale (« Extensions: Disable Auto Update for Extensions », qui écrit `extensions.autoUpdate` sur `"off"` ; `false` est aussi accepté, toute autre valeur ou l'absence du réglage est refusée), et elle le reste pendant tout E3 ; la préparation le vérifie et recopie la même valeur dans l'instance séparée ; la clôture rappelle de la rétablir (« Extensions: Enable Auto Update for Extensions ») ;
 - les références `-p` sont mesurées sur le même déploiement que le panneau, avec le `claude` du poste et avec la copie embarquée dans l'extension (trouvée à chaque exécution, ou désignée par `CANARI_CLAUDE_EMBARQUEE`) ; chaque mesure est contrôlée contre la version de sa copie ;
 - une instance séparée de VS Code est lancée avec un `--user-data-dir` distinct, depuis un terminal où le profil isolé est posé ; **il n'est pas nécessaire de fermer les autres fenêtres**. La préparation crée ce dossier temporaire avec ses réglages (ni mise à jour des extensions ni de VS Code, ni fichier ouvert ni sélection joints) et refuse un dossier existant et non vide, sans jamais le supprimer ;
 - le `/status` du panneau tranche : profil isolé, connexion claude.ai sur un abonnement, aucune clé d'API ; sinon, on ne tape rien d'autre ;

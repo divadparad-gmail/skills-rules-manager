@@ -36,16 +36,30 @@ const FICHIER_PROFIL_AVANT = 'profil-avant.txt';
 /** Le dossier utilisateur temporaire de l'instance séparée de VS Code, sous le dossier temporaire. */
 const DOSSIER_INSTANCE = 'vscode-canari';
 /**
- * Les réglages de l'instance séparée (décision D-b) : ni mise à jour des extensions ni de VS Code, et
- * ni fichier ouvert ni sélection joints au message du panneau.
+ * Les valeurs de extensions.autoUpdate acceptées comme « coupé » (décision du 2026-11-10) : false, et
+ * "off", que la commande « Extensions: Disable Auto Update for Extensions » écrit. Source : le code de
+ * VS Code 1.145.2 installé (workbench.desktop.main.js : getAutoUpdateValue() traite "off", false et
+ * "onlySelectedExtensions" comme coupé ; les commandes Disable et Enable ont pour précondition
+ * config.extensions.autoUpdate != "off" et == "off"). "onlySelectedExtensions" reste refusé à dessein.
  */
-const REGLAGES_INSTANCE = Object.freeze({
-  'extensions.autoUpdate': false,
+const VALEURS_AUTO_UPDATE_COUPE = Object.freeze([false, 'off']);
+/**
+ * Les autres réglages de l'instance séparée (décision D-b), aux valeurs reconnues : ni vérification des
+ * mises à jour des extensions (booléen, lu dans le code de VS Code 1.145.2), ni mise à jour de VS Code
+ * (update.mode, énumération none, manual, start, default, même source), ni fichier ouvert ni sélection
+ * joints au message (booléens, lus dans le package.json de l'extension Claude Code 2.1.322).
+ */
+const REGLAGES_INSTANCE_FIXES = Object.freeze({
   'extensions.autoCheckUpdates': false,
   'update.mode': 'none',
   'claudeCode.attachOpenFile': false,
   'claudeCode.attachSelection': false,
 });
+/** Les réglages de l'instance séparée, avec la valeur de extensions.autoUpdate lue dans la principale. */
+function reglagesInstance(valeurAutoUpdate) {
+  if (!VALEURS_AUTO_UPDATE_COUPE.includes(valeurAutoUpdate)) throw new Refus('valeur de extensions.autoUpdate refusée pour l\'instance séparée (false ou "off" attendu)');
+  return { 'extensions.autoUpdate': valeurAutoUpdate, ...REGLAGES_INSTANCE_FIXES };
+}
 const ID_EXTENSION = 'anthropic.claude-code';
 const NOM_DOSSIER_EXTENSION = /^anthropic\.claude-code-(\d+\.\d+\.\d+)(?:-[a-z0-9-]+)?$/i;
 const UUID_NOM = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -127,16 +141,20 @@ function cheminReglagesPrincipaux({ env = process.env, plateforme = process.plat
 }
 
 /**
- * Vrai si extensions.autoUpdate vaut false dans le texte des paramètres (JSON avec commentaires) :
- * au moins une occurrence, et toutes à false. Une ligne commentée ne compte pas.
+ * La valeur « coupé » de extensions.autoUpdate dans le texte des paramètres (JSON avec commentaires) :
+ * false ou "off", à condition que toutes les occurrences non commentées portent la même ; sinon null
+ * (réglage absent, autre valeur, ou valeurs contradictoires).
  */
-function autoUpdateCoupe(texte) {
+function valeurAutoUpdateCoupee(texte) {
   const lignes = String(texte).split(/\r?\n/).filter((l) => !/^\s*\/\//.test(l));
-  const valeurs = [...lignes.join('\n').matchAll(/"extensions\.autoUpdate"\s*:\s*([^,}\s]+)/g)].map((m) => m[1]);
-  return valeurs.length > 0 && valeurs.every((v) => v === 'false');
+  const brutes = [...lignes.join('\n').matchAll(/"extensions\.autoUpdate"\s*:\s*([^,}\s]+)/g)].map((m) => m[1]);
+  if (brutes.length === 0 || brutes.some((v) => v !== brutes[0])) return null;
+  const valeur = brutes[0] === 'false' ? false : brutes[0] === '"off"' ? 'off' : undefined;
+  return VALEURS_AUTO_UPDATE_COUPE.includes(valeur) ? valeur : null;
 }
+const autoUpdateCoupe = (texte) => valeurAutoUpdateCoupee(texte) !== null;
 
-const texteReglagesInstance = () => `${JSON.stringify(REGLAGES_INSTANCE, null, 2)}\n`;
+const texteReglagesInstance = (valeurAutoUpdate) => `${JSON.stringify(reglagesInstance(valeurAutoUpdate), null, 2)}\n`;
 
 /**
  * Refuse un dossier utilisateur temporaire existant et non vide (précision 3 du 2026-11-10) : il
@@ -149,12 +167,16 @@ function verifierInstanceLibre(dossierInstance, { existe = fs.existsSync, lister
   }
 }
 
-/** Écrit User/settings.json du dossier utilisateur temporaire (jamais d'écrasement). */
-function ecrireInstance(dossierInstance, { ecrire = (f, t) => fs.writeFileSync(f, t, { encoding: 'utf8', flag: 'wx' }), creer = (d) => fs.mkdirSync(d, { recursive: true }) } = {}) {
+/**
+ * Écrit User/settings.json du dossier utilisateur temporaire (jamais d'écrasement), avec la valeur de
+ * extensions.autoUpdate lue dans la VS Code principale (false ou "off").
+ */
+function ecrireInstance(dossierInstance, valeurAutoUpdate, { ecrire = (f, t) => fs.writeFileSync(f, t, { encoding: 'utf8', flag: 'wx' }), creer = (d) => fs.mkdirSync(d, { recursive: true }) } = {}) {
+  const texte = texteReglagesInstance(valeurAutoUpdate);
   verifierInstanceLibre(dossierInstance);
   const fichier = path.join(dossierInstance, 'User', 'settings.json');
   creer(path.dirname(fichier));
-  ecrire(fichier, texteReglagesInstance());
+  ecrire(fichier, texte);
   return fichier;
 }
 
@@ -475,7 +497,7 @@ function ecartVersion(versionsPanneau, versionEmbarquee) {
 /** Les gestes affichés par --cloturer-h14. */
 function gestesFinH14({ dossierInstance }) {
   return [
-    '1. Rétablis extensions.autoUpdate dans les paramètres utilisateur de la VS Code principale (coupé pendant tout E3, décision Q1).',
+    '1. Rétablis la mise à jour automatique des extensions dans la VS Code principale (coupée pendant tout E3, décision Q1) : palette de commandes, « Extensions: Enable Auto Update for Extensions ».',
     `2. Le dossier utilisateur temporaire de l'instance séparée reste en place (${dossierInstance}) : il ne contient que l'état de cette instance ; supprime-le quand tu veux.`,
     '3. Ne recopie rien de brut/ (relevé manuel, transcription, sorties brutes) dans un fichier suivi par Git.',
   ];
@@ -483,8 +505,8 @@ function gestesFinH14({ dossierInstance }) {
 
 module.exports = {
   LOT_H14, PREVUS_PREPARATION, PREVUS_CLOTURE, PREVUS_TOTAL, FICHIER_ETAT, SOUS_DOSSIER_TRANSCRIPTION, FICHIER_PROFIL_AVANT,
-  DOSSIER_INSTANCE, REGLAGES_INSTANCE, UUID_NOM,
-  trouverCopieEmbarquee, cheminReglagesPrincipaux, autoUpdateCoupe, texteReglagesInstance, verifierInstanceLibre, ecrireInstance,
+  DOSSIER_INSTANCE, VALEURS_AUTO_UPDATE_COUPE, REGLAGES_INSTANCE_FIXES, UUID_NOM,
+  trouverCopieEmbarquee, cheminReglagesPrincipaux, valeurAutoUpdateCoupee, autoUpdateCoupe, reglagesInstance, texteReglagesInstance, verifierInstanceLibre, ecrireInstance,
   estTranscription, lireTranscription, canarisDeLInventaire, attendusH14, comparerCanaris, verifierTranscriptions,
   texteProfil, lireProfilTexte, classerEcartsH14, deployesDuJournal, dossierMemoireProjet,
   uuidDe, sessionsDans, sessionsDuProfil, nouvellesSessions, deplacerTranscriptions, lireTextesSession, ecartVersion, gestesFinH14,

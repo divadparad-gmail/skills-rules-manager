@@ -667,7 +667,7 @@ describe('Suite de Tests : Partie payante de la sonde Claude Code (lot I3, sans 
     assert.match(texte, /appel d'outil, note-le : le relevé des canaris est alors invalide, sans relance/);
     assert.ok(texte.indexOf('--verifier-h14') > texte.indexOf(INVITES.get('h14-panneau') as string), 'la vérification suit l\'appel');
     assert.match(lignes[lignes.length - 1], /npm run sonde:claude-context -- --lot E3 --cloturer-h14$/);
-    assert.match(P.GESTE_DEBUT_H14, /extensions\.autoUpdate sur false/);
+    assert.match(P.GESTE_DEBUT_H14, /Disable Auto Update for Extensions/);
     assert.ok(texte.indexOf('/status') < texte.indexOf('/context') && texte.indexOf('/context') < texte.indexOf(INVITES.get('h14-panneau') as string));
   });
 

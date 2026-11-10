@@ -1251,8 +1251,9 @@ async function commandePreparerH14() {
   if (lireEtatH14()) throw new Refus(`un essai H14 est en cours (brut/${h14.FICHIER_ETAT}) : le clore par --lot E3 --cloturer-h14`);
   const home = os.homedir();
   const reglages = h14.cheminReglagesPrincipaux({ plateforme: ctx.plateforme, home });
-  if (!fs.existsSync(reglages) || !h14.autoUpdateCoupe(fs.readFileSync(reglages, 'utf8'))) {
-    throw new Refus(`extensions.autoUpdate ne vaut pas false dans les paramètres utilisateur de la VS Code principale. ${payant.GESTE_DEBUT_H14}`);
+  const valeurAutoUpdate = fs.existsSync(reglages) ? h14.valeurAutoUpdateCoupee(fs.readFileSync(reglages, 'utf8')) : null;
+  if (valeurAutoUpdate === null) {
+    throw new Refus(`extensions.autoUpdate ne vaut ni "off" ni false dans les paramètres utilisateur de la VS Code principale (absent ou autre valeur). ${payant.GESTE_DEBUT_H14}`);
   }
   const dossierInstance = path.join(os.tmpdir(), h14.DOSSIER_INSTANCE);
   h14.verifierInstanceLibre(dossierInstance);
@@ -1312,7 +1313,7 @@ async function commandePreparerH14() {
   const sessions = h14.sessionsDuProfil(ctx.configDir, nomMemoire);
   fs.writeFileSync(path.join(dossierEssai, FICHIER_SESSIONS_NOTEES), sessions.length > 0 ? `${sessions.join('\n')}\n` : '', 'utf8');
   const creeesParMesures = sessions.filter((s) => !sessionsAvant.includes(s)).length;
-  h14.ecrireInstance(dossierInstance);
+  h14.ecrireInstance(dossierInstance, valeurAutoUpdate);
   const etat = {
     format: 1,
     lot: h14.LOT_H14,
