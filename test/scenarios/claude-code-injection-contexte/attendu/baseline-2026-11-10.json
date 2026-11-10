@@ -1,0 +1,3610 @@
+{
+  "baseline": "2026-11-10",
+  "environnement": {
+    "outil": "Claude Code",
+    "entree": "cli -p",
+    "os": "Windows",
+    "version": "2.1.319",
+    "versions_compatibles": [
+      "2.1.319"
+    ],
+    "modele": "claude-opus-5",
+    "effort": "high",
+    "sonde": "v1",
+    "date_mesure": "2026-11-10"
+  },
+  "source": {
+    "context": "context-2026-11-10-0711.json",
+    "payant": [
+      "payant-2026-11-10-0742.json",
+      "payant-2026-11-10-0754.json",
+      "payant-2026-11-10-0759.json",
+      "payant-2026-11-10-0805.json",
+      "payant-2026-11-10-0815.json"
+    ],
+    "local": true
+  },
+  "jeux_outils": {
+    "vide": [],
+    "avec_skill": [
+      "Skill"
+    ],
+    "toolsearch": [
+      "ToolSearch"
+    ],
+    "declencheurs": [
+      "Read",
+      "Write",
+      "Edit",
+      "Glob",
+      "Grep",
+      "Bash"
+    ]
+  },
+  "decomposition": {
+    "comparee": false,
+    "memoire": {
+      "contenu_F": 64,
+      "element_projet": 189,
+      "element_parent": 105,
+      "element_projet_claude": 112,
+      "element_global": 196,
+      "entete_parent": 41,
+      "entete_projet_claude": 48,
+      "entete_par_caractere_de_chemin": 0.4667,
+      "entete_fixe_project": 23.27,
+      "entete_projet": 44.27,
+      "preambule": 80.73,
+      "entete_global_user": 51.27,
+      "entete_fixe_user": 21.4,
+      "constante_context": 5,
+      "contenu_context": 64,
+      "ecart_contenu_usage_context": 0,
+      "enveloppe_hors_context": {
+        "U1": 120,
+        "U4": 120,
+        "parent": 36,
+        "projet_claude": 43
+      },
+      "context_valide": true
+    },
+    "regles": {
+      "element_court": 102,
+      "element_long": 137,
+      "enveloppe_hors_context_court": 41,
+      "entete_par_caractere_de_chemin": 0.5224,
+      "regle_paths": 0,
+      "regle_paths_nulle": true
+    },
+    "skills": {
+      "ligne": 49,
+      "ligne_global": 49,
+      "chemin_compte": false,
+      "contenu_description": 41,
+      "contenu_context": 34,
+      "constante_context": 5,
+      "constante_usage": 8,
+      "enveloppe_hors_context": {
+        "S1": 10,
+        "S3": 17,
+        "long": 89
+      },
+      "description_longue": 594,
+      "context_valide": false
+    },
+    "mcp": {
+      "serveur_a": 559,
+      "serveur_a2": 595,
+      "serveur_b_sans_instructions": 475,
+      "instructions": 84,
+      "instructions_doubles": 120,
+      "constante_instructions": 48,
+      "differe_serveur_a": 1102,
+      "differe_textes_longs": 2623
+    },
+    "hooks": {
+      "sortie": 30,
+      "muet": 0,
+      "muet_nul": true
+    },
+    "h15": {
+      "r_usage": {
+        "francais": 1.9394,
+        "anglais": 1.4348,
+        "code": 1.2407
+      },
+      "r_context": {
+        "francais": 2.0909,
+        "anglais": 1.5435,
+        "code": 1.3333,
+        "skill": 1.3
+      }
+    },
+    "o200k": {
+      "F": 33,
+      "F2": 66,
+      "anglais": 46,
+      "code": 54,
+      "skill_s1": 30,
+      "skill_x2": 54,
+      "instructions_a1": 16,
+      "instructions_a2": 32
+    },
+    "enveloppes_4a": {
+      "nombre": 25
+    },
+    "declencheurs_delta_tour": {
+      "ER": 209,
+      "EW": 272,
+      "EE": 296,
+      "EG": 91,
+      "EGr": 157,
+      "EB": 226,
+      "ER-sous": 210,
+      "temoin": 125
+    }
+  },
+  "entrees": [
+    {
+      "id": "CC02:niveaux:<global>/CLAUDE.md",
+      "scenario": "CC02",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "niveaux",
+      "element": "<global>/CLAUDE.md",
+      "attendu": {
+        "present": true,
+        "type": "User",
+        "tokens": 55
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC15:niveaux:<global>/rules/g-perm.md",
+      "scenario": "CC15",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "niveaux",
+      "element": "<global>/rules/g-perm.md",
+      "attendu": {
+        "present": true,
+        "type": "User",
+        "tokens": 38
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC05:niveaux:<parent>/CLAUDE.md",
+      "scenario": "CC05",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "niveaux",
+      "element": "<parent>/CLAUDE.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 38
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC06:niveaux:<parent>/.claude/CLAUDE.md",
+      "scenario": "CC06",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "niveaux",
+      "element": "<parent>/.claude/CLAUDE.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 50
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC20:niveaux:<parent>/.claude/rules/par-regle.md",
+      "scenario": "CC20",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "niveaux",
+      "element": "<parent>/.claude/rules/par-regle.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 40
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC03:niveaux:<projet>/CLAUDE.md",
+      "scenario": "CC03",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "niveaux",
+      "element": "<projet>/CLAUDE.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 44
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC09:niveaux:<projet>/import-1.md",
+      "scenario": "CC09",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "niveaux",
+      "element": "<projet>/import-1.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 44
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC09:niveaux:<projet>/import-2.md",
+      "scenario": "CC09",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "niveaux",
+      "element": "<projet>/import-2.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 44
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC09:niveaux:<projet>/import-3.md",
+      "scenario": "CC09",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "niveaux",
+      "element": "<projet>/import-3.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 45
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC09:niveaux:<projet>/import-4.md",
+      "scenario": "CC09",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "niveaux",
+      "element": "<projet>/import-4.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 44
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC03:niveaux:<projet>/.claude/CLAUDE.md",
+      "scenario": "CC03",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "niveaux",
+      "element": "<projet>/.claude/CLAUDE.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 42
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC15:niveaux:<projet>/.claude/rules/p-perm.md",
+      "scenario": "CC15",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "niveaux",
+      "element": "<projet>/.claude/rules/p-perm.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 38
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC21:niveaux:<projet>/.claude/rules/p-yaml-invalide.md",
+      "scenario": "CC21",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "niveaux",
+      "element": "<projet>/.claude/rules/p-yaml-invalide.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 40
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC19:niveaux:<projet>/.claude/rules/sous/p-sous.md",
+      "scenario": "CC19",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "niveaux",
+      "element": "<projet>/.claude/rules/sous/p-sous.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 42
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC04:niveaux:<projet>/CLAUDE.local.md",
+      "scenario": "CC04",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "niveaux",
+      "element": "<projet>/CLAUDE.local.md",
+      "attendu": {
+        "present": true,
+        "type": "Local",
+        "tokens": 36
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC23:niveaux:<global>/projects/<memoire>/memory/MEMORY.md",
+      "scenario": "CC23",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "niveaux",
+      "element": "<global>/projects/<memoire>/memory/MEMORY.md",
+      "attendu": {
+        "present": true,
+        "type": "AutoMem",
+        "tokens": 42
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC17:niveaux:<global>/rules/g-paths.md",
+      "scenario": "CC17",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "niveaux",
+      "element": "<global>/rules/g-paths.md",
+      "attendu": {
+        "present": false
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC17:niveaux:<projet>/.claude/rules/p-paths.md",
+      "scenario": "CC17",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "niveaux",
+      "element": "<projet>/.claude/rules/p-paths.md",
+      "attendu": {
+        "present": false
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC09:niveaux:<projet>/import-5.md",
+      "scenario": "CC09",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "niveaux",
+      "element": "<projet>/import-5.md",
+      "attendu": {
+        "present": false
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC12:niveaux:delta",
+      "scenario": "CC12",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "niveaux",
+      "mesure": "delta",
+      "jeu_outils": "vide",
+      "attendu": {
+        "delta": 682,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC22:agents-seul:<projet>/AGENTS.md",
+      "scenario": "CC22",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "agents-seul",
+      "element": "<projet>/AGENTS.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 45
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC22:agents-seul:delta",
+      "scenario": "CC22",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "agents-seul",
+      "mesure": "delta",
+      "jeu_outils": "vide",
+      "attendu": {
+        "delta": 45,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC22:agents-avec-claude:<projet>/CLAUDE.md",
+      "scenario": "CC22",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "agents-avec-claude",
+      "element": "<projet>/CLAUDE.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 59
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC22:agents-avec-claude:<projet>/AGENTS.md",
+      "scenario": "CC22",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "agents-avec-claude",
+      "element": "<projet>/AGENTS.md",
+      "attendu": {
+        "present": false
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC22:agents-avec-claude:delta",
+      "scenario": "CC22",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "agents-avec-claude",
+      "mesure": "delta",
+      "jeu_outils": "vide",
+      "attendu": {
+        "delta": 59,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC24:skills:skill canari-g1",
+      "scenario": "CC24",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "skills",
+      "skill": "canari-g1",
+      "attendu": {
+        "present": true,
+        "source": "userSettings",
+        "tokens": 29
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC25:skills:skill canari-homo",
+      "scenario": "CC25",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "skills",
+      "skill": "canari-homo",
+      "attendu": {
+        "present": true,
+        "source": "userSettings",
+        "tokens": 31
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC27:skills:skill canari-long",
+      "scenario": "CC27",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "skills",
+      "skill": "canari-long",
+      "attendu": {
+        "present": true,
+        "source": "projectSettings",
+        "tokens": 517
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC24:skills:skill canari-p1",
+      "scenario": "CC24",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "skills",
+      "skill": "canari-p1",
+      "attendu": {
+        "present": true,
+        "source": "projectSettings",
+        "tokens": 29
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC24:skills:skill canari-parent",
+      "scenario": "CC24",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "skills",
+      "skill": "canari-parent",
+      "attendu": {
+        "present": true,
+        "source": "projectSettings",
+        "tokens": 31
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC26:skills:skill canari-plugin:canari-plug",
+      "scenario": "CC26",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "skills",
+      "skill": "canari-plugin:canari-plug",
+      "attendu": {
+        "present": true,
+        "source": "plugin",
+        "tokens": 35
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC26:skills:skill canari-cache",
+      "scenario": "CC26",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "skills",
+      "skill": "canari-cache",
+      "attendu": {
+        "present": false
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC24:skills:delta",
+      "scenario": "CC24",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "skills",
+      "mesure": "delta",
+      "jeu_outils": "avec_skill",
+      "attendu": {
+        "delta": 672,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC29:skills-sans-outil:skill canari-g1",
+      "scenario": "CC29",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "skills-sans-outil",
+      "skill": "canari-g1",
+      "attendu": {
+        "present": false
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC29:skills-sans-outil:skill canari-homo",
+      "scenario": "CC29",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "skills-sans-outil",
+      "skill": "canari-homo",
+      "attendu": {
+        "present": false
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC29:skills-sans-outil:skill canari-parent",
+      "scenario": "CC29",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "skills-sans-outil",
+      "skill": "canari-parent",
+      "attendu": {
+        "present": false
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC29:skills-sans-outil:skill canari-plugin:canari-plug",
+      "scenario": "CC29",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "skills-sans-outil",
+      "skill": "canari-plugin:canari-plug",
+      "attendu": {
+        "present": false
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC29:skills-sans-outil:skill canari-cache",
+      "scenario": "CC29",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "skills-sans-outil",
+      "skill": "canari-cache",
+      "attendu": {
+        "present": false
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC29:skills-sans-outil:skill canari-long",
+      "scenario": "CC29",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "skills-sans-outil",
+      "skill": "canari-long",
+      "attendu": {
+        "present": false
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC29:skills-sans-outil:skill canari-p1",
+      "scenario": "CC29",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "skills-sans-outil",
+      "skill": "canari-p1",
+      "attendu": {
+        "present": false
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC29:skills-sans-outil:delta",
+      "scenario": "CC29",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "skills-sans-outil",
+      "mesure": "delta",
+      "jeu_outils": "vide",
+      "attendu": {
+        "delta": 0,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC27:skill-long-1500:skill canari-long",
+      "scenario": "CC27",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "skill-long-1500",
+      "skill": "canari-long",
+      "attendu": {
+        "present": true,
+        "source": "projectSettings",
+        "tokens": 505
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC27:skill-long-1500:delta",
+      "scenario": "CC27",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "skill-long-1500",
+      "mesure": "delta",
+      "jeu_outils": "avec_skill",
+      "attendu": {
+        "delta": 505,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC18:declencheurs:<projet>/.claude/rules/d-paths.md",
+      "scenario": "CC18",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "declencheurs",
+      "element": "<projet>/.claude/rules/d-paths.md",
+      "attendu": {
+        "present": false
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC08:declencheurs:<projet>/sous/CLAUDE.md",
+      "scenario": "CC08",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "declencheurs",
+      "element": "<projet>/sous/CLAUDE.md",
+      "attendu": {
+        "present": false
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC28:declencheurs:skill canari-paths",
+      "scenario": "CC28",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "declencheurs",
+      "skill": "canari-paths",
+      "attendu": {
+        "present": false
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC28:declencheurs:delta",
+      "scenario": "CC28",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "declencheurs",
+      "mesure": "delta",
+      "jeu_outils": "avec_skill",
+      "attendu": {
+        "delta": 0,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC33:hook-sortie:delta",
+      "scenario": "CC33",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "hook-sortie",
+      "mesure": "delta",
+      "jeu_outils": "vide",
+      "attendu": {
+        "delta": 43,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC34:hook-muet:delta",
+      "scenario": "CC34",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "hook-muet",
+      "mesure": "delta",
+      "jeu_outils": "vide",
+      "attendu": {
+        "delta": 0,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC30:mcp-canari:mcp mcp__canari-mcp__canari_outil",
+      "scenario": "CC30",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "mcp-canari",
+      "outil_mcp": "mcp__canari-mcp__canari_outil",
+      "attendu": {
+        "present": true
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC30:mcp-canari:delta",
+      "scenario": "CC30",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "mcp-canari",
+      "mesure": "delta",
+      "jeu_outils": "vide",
+      "sans_outils_mcp": true,
+      "attendu": {
+        "delta": 51,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC32:mcp-long:mcp mcp__canari-mcp-long__canari_outil_long",
+      "scenario": "CC32",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "mcp-long",
+      "outil_mcp": "mcp__canari-mcp-long__canari_outil_long",
+      "attendu": {
+        "present": true
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC32:mcp-long:delta",
+      "scenario": "CC32",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "mcp-long",
+      "mesure": "delta",
+      "jeu_outils": "vide",
+      "sans_outils_mcp": true,
+      "attendu": {
+        "delta": 1573,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC13:cout-f-quatre-chemins:<global>/CLAUDE.md",
+      "scenario": "CC13",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "cout-f-quatre-chemins",
+      "element": "<global>/CLAUDE.md",
+      "attendu": {
+        "present": true,
+        "type": "User",
+        "tokens": 69
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC13:cout-f-quatre-chemins:<parent>/CLAUDE.md",
+      "scenario": "CC13",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "cout-f-quatre-chemins",
+      "element": "<parent>/CLAUDE.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 69
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC13:cout-f-quatre-chemins:<projet>/CLAUDE.md",
+      "scenario": "CC13",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "cout-f-quatre-chemins",
+      "element": "<projet>/CLAUDE.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 69
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC13:cout-f-quatre-chemins:<projet>/.claude/CLAUDE.md",
+      "scenario": "CC13",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "cout-f-quatre-chemins",
+      "element": "<projet>/.claude/CLAUDE.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 69
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC13:cout-f-quatre-chemins:delta",
+      "scenario": "CC13",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "cout-f-quatre-chemins",
+      "mesure": "delta",
+      "jeu_outils": "vide",
+      "attendu": {
+        "delta": 276,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC37:cout-f2-projet:<projet>/CLAUDE.md",
+      "scenario": "CC37",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "cout-f2-projet",
+      "element": "<projet>/CLAUDE.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 133
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC37:cout-f2-projet:delta",
+      "scenario": "CC37",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "cout-f2-projet",
+      "mesure": "delta",
+      "jeu_outils": "vide",
+      "attendu": {
+        "delta": 133,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC37:cout-h15-anglais:<projet>/CLAUDE.md",
+      "scenario": "CC37",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "cout-h15-anglais",
+      "element": "<projet>/CLAUDE.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 71
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC37:cout-h15-anglais:delta",
+      "scenario": "CC37",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "cout-h15-anglais",
+      "mesure": "delta",
+      "jeu_outils": "vide",
+      "attendu": {
+        "delta": 71,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC37:cout-h15-code:<projet>/CLAUDE.md",
+      "scenario": "CC37",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "cout-h15-code",
+      "element": "<projet>/CLAUDE.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 72
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC37:cout-h15-code:delta",
+      "scenario": "CC37",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "cout-h15-code",
+      "mesure": "delta",
+      "jeu_outils": "vide",
+      "attendu": {
+        "delta": 72,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC15:cout-regles:<projet>/.claude/rules/r.md",
+      "scenario": "CC15",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "cout-regles",
+      "element": "<projet>/.claude/rules/r.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 61
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC15:cout-regles:<projet>/.claude/rules/regle-au-nom-volontairement-tres-long-pour-mesurer-le-cout-du-chemin.md",
+      "scenario": "CC15",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "cout-regles",
+      "element": "<projet>/.claude/rules/regle-au-nom-volontairement-tres-long-pour-mesurer-le-cout-du-chemin.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 61
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC17:cout-regles:<projet>/.claude/rules/r-paths.md",
+      "scenario": "CC17",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "cout-regles",
+      "element": "<projet>/.claude/rules/r-paths.md",
+      "attendu": {
+        "present": false
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC15:cout-regles:delta",
+      "scenario": "CC15",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "cout-regles",
+      "mesure": "delta",
+      "jeu_outils": "vide",
+      "attendu": {
+        "delta": 122,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC24:cout-skills:skill canari-s2",
+      "scenario": "CC24",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "cout-skills",
+      "skill": "canari-s2",
+      "attendu": {
+        "present": true,
+        "source": "userSettings",
+        "tokens": 39
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC24:cout-skills:skill canari-s1",
+      "scenario": "CC24",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "cout-skills",
+      "skill": "canari-s1",
+      "attendu": {
+        "present": true,
+        "source": "projectSettings",
+        "tokens": 39
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC24:cout-skills:delta",
+      "scenario": "CC24",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "cout-skills",
+      "mesure": "delta",
+      "jeu_outils": "avec_skill",
+      "attendu": {
+        "delta": 78,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC24:cout-skill-x2:skill canari-s1",
+      "scenario": "CC24",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "cout-skill-x2",
+      "skill": "canari-s1",
+      "attendu": {
+        "present": true,
+        "source": "projectSettings",
+        "tokens": 73
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC24:cout-skill-x2:delta",
+      "scenario": "CC24",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "cout-skill-x2",
+      "mesure": "delta",
+      "jeu_outils": "avec_skill",
+      "attendu": {
+        "delta": 73,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC31:cout-mcp-a1:mcp mcp__canari-mcp-a1__canari_outil",
+      "scenario": "CC31",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "cout-mcp-a1",
+      "outil_mcp": "mcp__canari-mcp-a1__canari_outil",
+      "attendu": {
+        "present": true
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC31:cout-mcp-a1:delta",
+      "scenario": "CC31",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "cout-mcp-a1",
+      "mesure": "delta",
+      "jeu_outils": "vide",
+      "sans_outils_mcp": true,
+      "attendu": {
+        "delta": 53,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC30:cout-mcp-a2:mcp mcp__canari-mcp-a2__canari_outil",
+      "scenario": "CC30",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "cout-mcp-a2",
+      "outil_mcp": "mcp__canari-mcp-a2__canari_outil",
+      "attendu": {
+        "present": true
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC30:cout-mcp-a2:delta",
+      "scenario": "CC30",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "cout-mcp-a2",
+      "mesure": "delta",
+      "jeu_outils": "vide",
+      "sans_outils_mcp": true,
+      "attendu": {
+        "delta": 89,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC30:cout-mcp-b1:mcp mcp__canari-mcp-b1__canari_outil",
+      "scenario": "CC30",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "cout-mcp-b1",
+      "outil_mcp": "mcp__canari-mcp-b1__canari_outil",
+      "attendu": {
+        "present": true
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC30:cout-mcp-b1:delta",
+      "scenario": "CC30",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "cout-mcp-b1",
+      "mesure": "delta",
+      "jeu_outils": "vide",
+      "sans_outils_mcp": true,
+      "attendu": {
+        "delta": 0,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC02:jeu-complet:<global>/CLAUDE.md",
+      "scenario": "CC02",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "jeu-complet",
+      "element": "<global>/CLAUDE.md",
+      "attendu": {
+        "present": true,
+        "type": "User",
+        "tokens": 55
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC15:jeu-complet:<global>/rules/g-perm.md",
+      "scenario": "CC15",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "jeu-complet",
+      "element": "<global>/rules/g-perm.md",
+      "attendu": {
+        "present": true,
+        "type": "User",
+        "tokens": 38
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC05:jeu-complet:<parent>/CLAUDE.md",
+      "scenario": "CC05",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "jeu-complet",
+      "element": "<parent>/CLAUDE.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 38
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC06:jeu-complet:<parent>/.claude/CLAUDE.md",
+      "scenario": "CC06",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "jeu-complet",
+      "element": "<parent>/.claude/CLAUDE.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 50
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC20:jeu-complet:<parent>/.claude/rules/par-regle.md",
+      "scenario": "CC20",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "jeu-complet",
+      "element": "<parent>/.claude/rules/par-regle.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 40
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC03:jeu-complet:<projet>/CLAUDE.md",
+      "scenario": "CC03",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "jeu-complet",
+      "element": "<projet>/CLAUDE.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 44
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC09:jeu-complet:<projet>/import-1.md",
+      "scenario": "CC09",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "jeu-complet",
+      "element": "<projet>/import-1.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 44
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC09:jeu-complet:<projet>/import-2.md",
+      "scenario": "CC09",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "jeu-complet",
+      "element": "<projet>/import-2.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 44
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC09:jeu-complet:<projet>/import-3.md",
+      "scenario": "CC09",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "jeu-complet",
+      "element": "<projet>/import-3.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 45
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC09:jeu-complet:<projet>/import-4.md",
+      "scenario": "CC09",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "jeu-complet",
+      "element": "<projet>/import-4.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 44
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC03:jeu-complet:<projet>/.claude/CLAUDE.md",
+      "scenario": "CC03",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "jeu-complet",
+      "element": "<projet>/.claude/CLAUDE.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 42
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC15:jeu-complet:<projet>/.claude/rules/p-perm.md",
+      "scenario": "CC15",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "jeu-complet",
+      "element": "<projet>/.claude/rules/p-perm.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 38
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC21:jeu-complet:<projet>/.claude/rules/p-yaml-invalide.md",
+      "scenario": "CC21",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "jeu-complet",
+      "element": "<projet>/.claude/rules/p-yaml-invalide.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 40
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC19:jeu-complet:<projet>/.claude/rules/sous/p-sous.md",
+      "scenario": "CC19",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "jeu-complet",
+      "element": "<projet>/.claude/rules/sous/p-sous.md",
+      "attendu": {
+        "present": true,
+        "type": "Project",
+        "tokens": 42
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC04:jeu-complet:<projet>/CLAUDE.local.md",
+      "scenario": "CC04",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "jeu-complet",
+      "element": "<projet>/CLAUDE.local.md",
+      "attendu": {
+        "present": true,
+        "type": "Local",
+        "tokens": 36
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC23:jeu-complet:<global>/projects/<memoire>/memory/MEMORY.md",
+      "scenario": "CC23",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "jeu-complet",
+      "element": "<global>/projects/<memoire>/memory/MEMORY.md",
+      "attendu": {
+        "present": true,
+        "type": "AutoMem",
+        "tokens": 42
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC24:jeu-complet:skill canari-g1",
+      "scenario": "CC24",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "jeu-complet",
+      "skill": "canari-g1",
+      "attendu": {
+        "present": true,
+        "source": "userSettings",
+        "tokens": 29
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC25:jeu-complet:skill canari-homo",
+      "scenario": "CC25",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "jeu-complet",
+      "skill": "canari-homo",
+      "attendu": {
+        "present": true,
+        "source": "userSettings",
+        "tokens": 31
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC27:jeu-complet:skill canari-long",
+      "scenario": "CC27",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "jeu-complet",
+      "skill": "canari-long",
+      "attendu": {
+        "present": true,
+        "source": "projectSettings",
+        "tokens": 517
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC24:jeu-complet:skill canari-p1",
+      "scenario": "CC24",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "jeu-complet",
+      "skill": "canari-p1",
+      "attendu": {
+        "present": true,
+        "source": "projectSettings",
+        "tokens": 29
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC24:jeu-complet:skill canari-parent",
+      "scenario": "CC24",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "jeu-complet",
+      "skill": "canari-parent",
+      "attendu": {
+        "present": true,
+        "source": "projectSettings",
+        "tokens": 31
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC26:jeu-complet:skill canari-plugin:canari-plug",
+      "scenario": "CC26",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "jeu-complet",
+      "skill": "canari-plugin:canari-plug",
+      "attendu": {
+        "present": true,
+        "source": "plugin",
+        "tokens": 35
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC30:jeu-complet:mcp mcp__canari-mcp__canari_outil",
+      "scenario": "CC30",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "jeu-complet",
+      "outil_mcp": "mcp__canari-mcp__canari_outil",
+      "attendu": {
+        "present": true
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC17:jeu-complet:<global>/rules/g-paths.md",
+      "scenario": "CC17",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "jeu-complet",
+      "element": "<global>/rules/g-paths.md",
+      "attendu": {
+        "present": false
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC17:jeu-complet:<projet>/.claude/rules/p-paths.md",
+      "scenario": "CC17",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "jeu-complet",
+      "element": "<projet>/.claude/rules/p-paths.md",
+      "attendu": {
+        "present": false
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC09:jeu-complet:<projet>/import-5.md",
+      "scenario": "CC09",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "jeu-complet",
+      "element": "<projet>/import-5.md",
+      "attendu": {
+        "present": false
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC26:jeu-complet:skill canari-cache",
+      "scenario": "CC26",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "jeu-complet",
+      "skill": "canari-cache",
+      "attendu": {
+        "present": false
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC35:jeu-complet:delta",
+      "scenario": "CC35",
+      "instrument": "context",
+      "etape": "E0",
+      "combinaison": "jeu-complet",
+      "mesure": "delta",
+      "jeu_outils": "avec_skill",
+      "sans_outils_mcp": true,
+      "attendu": {
+        "delta": 1448,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC12:U1:usage",
+      "scenario": "CC12",
+      "instrument": "usage",
+      "etape": "E0",
+      "serie": 1,
+      "appel": "U1",
+      "reference": "U0a",
+      "jeu_outils": "vide",
+      "attendu": {
+        "delta": 189,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC05:U2:usage",
+      "scenario": "CC05",
+      "instrument": "usage",
+      "etape": "E0",
+      "serie": 1,
+      "appel": "U2",
+      "reference": "U0a",
+      "jeu_outils": "vide",
+      "attendu": {
+        "delta": 294,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC13:U3:usage",
+      "scenario": "CC13",
+      "instrument": "usage",
+      "etape": "E0",
+      "serie": 1,
+      "appel": "U3",
+      "reference": "U0a",
+      "jeu_outils": "vide",
+      "attendu": {
+        "delta": 406,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC02:U-global:usage",
+      "scenario": "CC02",
+      "instrument": "usage",
+      "etape": "E0",
+      "serie": 1,
+      "appel": "U-global",
+      "reference": "U0a",
+      "jeu_outils": "vide",
+      "attendu": {
+        "delta": 196,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC14:U4:usage",
+      "scenario": "CC14",
+      "instrument": "usage",
+      "etape": "E0",
+      "serie": 1,
+      "appel": "U4",
+      "reference": "U0a",
+      "jeu_outils": "vide",
+      "attendu": {
+        "delta": 253,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC15:U5:usage",
+      "scenario": "CC15",
+      "instrument": "usage",
+      "etape": "E0",
+      "serie": 1,
+      "appel": "U5",
+      "reference": "U0a",
+      "jeu_outils": "vide",
+      "attendu": {
+        "delta": 291,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC15:U6:usage",
+      "scenario": "CC15",
+      "instrument": "usage",
+      "etape": "E0",
+      "serie": 1,
+      "appel": "U6",
+      "reference": "U0a",
+      "jeu_outils": "vide",
+      "attendu": {
+        "delta": 428,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC17:U7:usage",
+      "scenario": "CC17",
+      "instrument": "usage",
+      "etape": "E0",
+      "serie": 1,
+      "appel": "U7",
+      "reference": "U0a",
+      "jeu_outils": "vide",
+      "attendu": {
+        "delta": 189,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC33:H1:usage",
+      "scenario": "CC33",
+      "instrument": "usage",
+      "etape": "E0",
+      "serie": 1,
+      "appel": "H1",
+      "reference": "U0a",
+      "jeu_outils": "vide",
+      "attendu": {
+        "delta": 30,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC34:H2:usage",
+      "scenario": "CC34",
+      "instrument": "usage",
+      "etape": "E0",
+      "serie": 1,
+      "appel": "H2",
+      "reference": "U0a",
+      "jeu_outils": "vide",
+      "attendu": {
+        "delta": 0,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC31:M1:usage",
+      "scenario": "CC31",
+      "instrument": "usage",
+      "etape": "E0",
+      "serie": 1,
+      "appel": "M1",
+      "reference": "U0a",
+      "jeu_outils": "vide",
+      "attendu": {
+        "delta": 559,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC30:M2:usage",
+      "scenario": "CC30",
+      "instrument": "usage",
+      "etape": "E0",
+      "serie": 1,
+      "appel": "M2",
+      "reference": "U0a",
+      "jeu_outils": "vide",
+      "attendu": {
+        "delta": 595,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC30:M3:usage",
+      "scenario": "CC30",
+      "instrument": "usage",
+      "etape": "E0",
+      "serie": 1,
+      "appel": "M3",
+      "reference": "U0a",
+      "jeu_outils": "vide",
+      "attendu": {
+        "delta": 475,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC37:H15-en:usage",
+      "scenario": "CC37",
+      "instrument": "usage",
+      "etape": "E0",
+      "serie": 1,
+      "appel": "H15-en",
+      "reference": "U0a",
+      "jeu_outils": "vide",
+      "attendu": {
+        "delta": 191,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC37:H15-code:usage",
+      "scenario": "CC37",
+      "instrument": "usage",
+      "etape": "E0",
+      "serie": 1,
+      "appel": "H15-code",
+      "reference": "U0a",
+      "jeu_outils": "vide",
+      "attendu": {
+        "delta": 192,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC01:U0b:usage",
+      "scenario": "CC01",
+      "instrument": "usage",
+      "etape": "E0",
+      "serie": 1,
+      "appel": "U0b",
+      "reference": "U0a",
+      "jeu_outils": "vide",
+      "attendu": {
+        "delta": 0,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC24:S1:usage",
+      "scenario": "CC24",
+      "instrument": "usage",
+      "etape": "E0",
+      "serie": 2,
+      "appel": "S1",
+      "reference": "S0a",
+      "jeu_outils": "avec_skill",
+      "attendu": {
+        "delta": 49,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC24:S2:usage",
+      "scenario": "CC24",
+      "instrument": "usage",
+      "etape": "E0",
+      "serie": 2,
+      "appel": "S2",
+      "reference": "S0a",
+      "jeu_outils": "avec_skill",
+      "attendu": {
+        "delta": 98,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC24:S3:usage",
+      "scenario": "CC24",
+      "instrument": "usage",
+      "etape": "E0",
+      "serie": 2,
+      "appel": "S3",
+      "reference": "S0a",
+      "jeu_outils": "avec_skill",
+      "attendu": {
+        "delta": 90,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC27:S-long:usage",
+      "scenario": "CC27",
+      "instrument": "usage",
+      "etape": "E0",
+      "serie": 2,
+      "appel": "S-long",
+      "reference": "S0a",
+      "jeu_outils": "avec_skill",
+      "attendu": {
+        "delta": 594,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC01:S0b:usage",
+      "scenario": "CC01",
+      "instrument": "usage",
+      "etape": "E0",
+      "serie": 2,
+      "appel": "S0b",
+      "reference": "S0a",
+      "jeu_outils": "avec_skill",
+      "attendu": {
+        "delta": 0,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC31:T1:usage",
+      "scenario": "CC31",
+      "instrument": "usage",
+      "etape": "E0",
+      "serie": 3,
+      "appel": "T1",
+      "reference": "T0a",
+      "jeu_outils": "toolsearch",
+      "attendu": {
+        "delta": 1102,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC32:T-long:usage",
+      "scenario": "CC32",
+      "instrument": "usage",
+      "etape": "E0",
+      "serie": 3,
+      "appel": "T-long",
+      "reference": "T0a",
+      "jeu_outils": "toolsearch",
+      "attendu": {
+        "delta": 2623,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC01:T0b:usage",
+      "scenario": "CC01",
+      "instrument": "usage",
+      "etape": "E0",
+      "serie": 3,
+      "appel": "T0b",
+      "reference": "T0a",
+      "jeu_outils": "toolsearch",
+      "attendu": {
+        "delta": 0,
+        "tolerance": 0
+      },
+      "confiance": "observe"
+    },
+    {
+      "id": "CC35:4a:CANARI-CC-GLOB-XJ6U",
+      "scenario": "CC35",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4a",
+      "canari": "CANARI-CC-GLOB-XJ6U",
+      "attendu": true,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC35:4a:CANARI-CC-MEMORY-93KS",
+      "scenario": "CC35",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4a",
+      "canari": "CANARI-CC-MEMORY-93KS",
+      "attendu": true,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC35:4a:CANARI-CC-GPATHS-DE25",
+      "scenario": "CC35",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4a",
+      "canari": "CANARI-CC-GPATHS-DE25",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC35:4a:CANARI-CC-GRULE-BFJK",
+      "scenario": "CC35",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4a",
+      "canari": "CANARI-CC-GRULE-BFJK",
+      "attendu": true,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC35:4a:CANARI-CC-PAR-7A67",
+      "scenario": "CC35",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4a",
+      "canari": "CANARI-CC-PAR-7A67",
+      "attendu": true,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC35:4a:CANARI-CC-PARDOT-3AQ4",
+      "scenario": "CC35",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4a",
+      "canari": "CANARI-CC-PARDOT-3AQ4",
+      "attendu": true,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC35:4a:CANARI-CC-PARRULE-8WLE",
+      "scenario": "CC35",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4a",
+      "canari": "CANARI-CC-PARRULE-8WLE",
+      "attendu": true,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC35:4a:CANARI-CC-LOCAL-T44S",
+      "scenario": "CC35",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4a",
+      "canari": "CANARI-CC-LOCAL-T44S",
+      "attendu": true,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC35:4a:CANARI-CC-PROJFM-XHPP",
+      "scenario": "CC35",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4a",
+      "canari": "CANARI-CC-PROJFM-XHPP",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC35:4a:CANARI-CC-PROJ-QQV9",
+      "scenario": "CC35",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4a",
+      "canari": "CANARI-CC-PROJ-QQV9",
+      "attendu": true,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC35:4a:CANARI-CC-COMM-5ZDP",
+      "scenario": "CC35",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4a",
+      "canari": "CANARI-CC-COMM-5ZDP",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC35:4a:CANARI-CC-PROJDOT-CKZL",
+      "scenario": "CC35",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4a",
+      "canari": "CANARI-CC-PROJDOT-CKZL",
+      "attendu": true,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC35:4a:CANARI-CC-RPATHS-2PL9",
+      "scenario": "CC35",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4a",
+      "canari": "CANARI-CC-RPATHS-2PL9",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC35:4a:CANARI-CC-RFM-MCUC",
+      "scenario": "CC35",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4a",
+      "canari": "CANARI-CC-RFM-MCUC",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC35:4a:CANARI-CC-RULE-PNK5",
+      "scenario": "CC35",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4a",
+      "canari": "CANARI-CC-RULE-PNK5",
+      "attendu": true,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC35:4a:CANARI-CC-RYAML-4GQU",
+      "scenario": "CC35",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4a",
+      "canari": "CANARI-CC-RYAML-4GQU",
+      "attendu": true,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC35:4a:CANARI-CC-RSOUS-UDFQ",
+      "scenario": "CC35",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4a",
+      "canari": "CANARI-CC-RSOUS-UDFQ",
+      "attendu": true,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC35:4a:CANARI-CC-IMP1-JK6J",
+      "scenario": "CC35",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4a",
+      "canari": "CANARI-CC-IMP1-JK6J",
+      "attendu": true,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC35:4a:CANARI-CC-IMP2-PZWT",
+      "scenario": "CC35",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4a",
+      "canari": "CANARI-CC-IMP2-PZWT",
+      "attendu": true,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC35:4a:CANARI-CC-IMP3-WJ9W",
+      "scenario": "CC35",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4a",
+      "canari": "CANARI-CC-IMP3-WJ9W",
+      "attendu": true,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC35:4a:CANARI-CC-IMP4-BKHE",
+      "scenario": "CC35",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4a",
+      "canari": "CANARI-CC-IMP4-BKHE",
+      "attendu": true,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC35:4a:CANARI-CC-IMP5-569U",
+      "scenario": "CC35",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4a",
+      "canari": "CANARI-CC-IMP5-569U",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC35:4a:CANARI-CC-SKG1-FJS4",
+      "scenario": "CC35",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4a",
+      "canari": "CANARI-CC-SKG1-FJS4",
+      "attendu": true,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC35:4a:CANARI-CC-SKCORPSG1-A7AT",
+      "scenario": "CC35",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4a",
+      "canari": "CANARI-CC-SKCORPSG1-A7AT",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC35:4a:CANARI-CC-HOMOGL-LMBV",
+      "scenario": "CC35",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4a",
+      "canari": "CANARI-CC-HOMOGL-LMBV",
+      "attendu": true,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC35:4a:CANARI-CC-SKPAR-C34N",
+      "scenario": "CC35",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4a",
+      "canari": "CANARI-CC-SKPAR-C34N",
+      "attendu": true,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC35:4a:CANARI-CC-PLUGDESC-FTXJ",
+      "scenario": "CC35",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4a",
+      "canari": "CANARI-CC-PLUGDESC-FTXJ",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC35:4a:CANARI-CC-SKPLUG-5KME",
+      "scenario": "CC35",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4a",
+      "canari": "CANARI-CC-SKPLUG-5KME",
+      "attendu": true,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC35:4a:CANARI-CC-SKCORPSPLUG-EG37",
+      "scenario": "CC35",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4a",
+      "canari": "CANARI-CC-SKCORPSPLUG-EG37",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC35:4a:CANARI-CC-SKCACHE-9Q9U",
+      "scenario": "CC35",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4a",
+      "canari": "CANARI-CC-SKCACHE-9Q9U",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC35:4a:CANARI-CC-HOMOPR-6VX3",
+      "scenario": "CC35",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4a",
+      "canari": "CANARI-CC-HOMOPR-6VX3",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC35:4a:CANARI-CC-SKLONGDEBUT-EG4Q",
+      "scenario": "CC35",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4a",
+      "canari": "CANARI-CC-SKLONGDEBUT-EG4Q",
+      "attendu": true,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC35:4a:CANARI-CC-SKLONGFIN-ACDU",
+      "scenario": "CC35",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4a",
+      "canari": "CANARI-CC-SKLONGFIN-ACDU",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC35:4a:CANARI-CC-SKP1-PDW6",
+      "scenario": "CC35",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4a",
+      "canari": "CANARI-CC-SKP1-PDW6",
+      "attendu": true,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC35:4a:CANARI-CC-SKCORPSP1-KUQQ",
+      "scenario": "CC35",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4a",
+      "canari": "CANARI-CC-SKCORPSP1-KUQQ",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC35:4a:CANARI-CC-HOOK-C2QM",
+      "scenario": "CC35",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4a",
+      "canari": "CANARI-CC-HOOK-C2QM",
+      "attendu": true,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC35:4a:CANARI-CC-MCPINSTR-76MH",
+      "scenario": "CC35",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4a",
+      "canari": "CANARI-CC-MCPINSTR-76MH",
+      "attendu": true,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC35:4a:CANARI-CC-MCPOUTIL-S65X",
+      "scenario": "CC35",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4a",
+      "canari": "CANARI-CC-MCPOUTIL-S65X",
+      "attendu": true,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC35:4a:CANARI-CC-MCPENV-KGUZ",
+      "scenario": "CC35",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4a",
+      "canari": "CANARI-CC-MCPENV-KGUZ",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC02:4b:CANARI-CC-GLOB-XJ6U",
+      "scenario": "CC02",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4b",
+      "canari": "CANARI-CC-GLOB-XJ6U",
+      "attendu": true,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC23:4b:CANARI-CC-MEMORY-93KS",
+      "scenario": "CC23",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4b",
+      "canari": "CANARI-CC-MEMORY-93KS",
+      "attendu": true,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC17:4b:CANARI-CC-GPATHS-DE25",
+      "scenario": "CC17",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4b",
+      "canari": "CANARI-CC-GPATHS-DE25",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC15:4b:CANARI-CC-GRULE-BFJK",
+      "scenario": "CC15",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4b",
+      "canari": "CANARI-CC-GRULE-BFJK",
+      "attendu": true,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC05:4b:CANARI-CC-PAR-7A67",
+      "scenario": "CC05",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4b",
+      "canari": "CANARI-CC-PAR-7A67",
+      "attendu": true,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC06:4b:CANARI-CC-PARDOT-3AQ4",
+      "scenario": "CC06",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4b",
+      "canari": "CANARI-CC-PARDOT-3AQ4",
+      "attendu": true,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC20:4b:CANARI-CC-PARRULE-8WLE",
+      "scenario": "CC20",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4b",
+      "canari": "CANARI-CC-PARRULE-8WLE",
+      "attendu": true,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC04:4b:CANARI-CC-LOCAL-T44S",
+      "scenario": "CC04",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4b",
+      "canari": "CANARI-CC-LOCAL-T44S",
+      "attendu": true,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC11:4b:CANARI-CC-PROJFM-XHPP",
+      "scenario": "CC11",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4b",
+      "canari": "CANARI-CC-PROJFM-XHPP",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC03:4b:CANARI-CC-PROJ-QQV9",
+      "scenario": "CC03",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4b",
+      "canari": "CANARI-CC-PROJ-QQV9",
+      "attendu": true,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC10:4b:CANARI-CC-COMM-5ZDP",
+      "scenario": "CC10",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4b",
+      "canari": "CANARI-CC-COMM-5ZDP",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC03:4b:CANARI-CC-PROJDOT-CKZL",
+      "scenario": "CC03",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4b",
+      "canari": "CANARI-CC-PROJDOT-CKZL",
+      "attendu": true,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC17:4b:CANARI-CC-RPATHS-2PL9",
+      "scenario": "CC17",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4b",
+      "canari": "CANARI-CC-RPATHS-2PL9",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC16:4b:CANARI-CC-RFM-MCUC",
+      "scenario": "CC16",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4b",
+      "canari": "CANARI-CC-RFM-MCUC",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC15:4b:CANARI-CC-RULE-PNK5",
+      "scenario": "CC15",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4b",
+      "canari": "CANARI-CC-RULE-PNK5",
+      "attendu": true,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC21:4b:CANARI-CC-RYAML-4GQU",
+      "scenario": "CC21",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4b",
+      "canari": "CANARI-CC-RYAML-4GQU",
+      "attendu": true,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC19:4b:CANARI-CC-RSOUS-UDFQ",
+      "scenario": "CC19",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4b",
+      "canari": "CANARI-CC-RSOUS-UDFQ",
+      "attendu": true,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC09:4b:CANARI-CC-IMP1-JK6J",
+      "scenario": "CC09",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4b",
+      "canari": "CANARI-CC-IMP1-JK6J",
+      "attendu": true,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC09:4b:CANARI-CC-IMP2-PZWT",
+      "scenario": "CC09",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4b",
+      "canari": "CANARI-CC-IMP2-PZWT",
+      "attendu": true,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC09:4b:CANARI-CC-IMP3-WJ9W",
+      "scenario": "CC09",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4b",
+      "canari": "CANARI-CC-IMP3-WJ9W",
+      "attendu": true,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC09:4b:CANARI-CC-IMP4-BKHE",
+      "scenario": "CC09",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4b",
+      "canari": "CANARI-CC-IMP4-BKHE",
+      "attendu": true,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC09:4b:CANARI-CC-IMP5-569U",
+      "scenario": "CC09",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4b",
+      "canari": "CANARI-CC-IMP5-569U",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC30:4b:CANARI-CC-MCPINSTR-76MH",
+      "scenario": "CC30",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4b",
+      "canari": "CANARI-CC-MCPINSTR-76MH",
+      "attendu": true,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC30:4b:CANARI-CC-MCPOUTIL-S65X",
+      "scenario": "CC30",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4b",
+      "canari": "CANARI-CC-MCPOUTIL-S65X",
+      "attendu": true,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC30:4b:CANARI-CC-MCPENV-KGUZ",
+      "scenario": "CC30",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4b",
+      "canari": "CANARI-CC-MCPENV-KGUZ",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC32:4b:CANARI-CC-MCPLONGDEBUT-9MAD",
+      "scenario": "CC32",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4b",
+      "canari": "CANARI-CC-MCPLONGDEBUT-9MAD",
+      "attendu": true,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC32:4b:CANARI-CC-MCPLONGFIN-8J26",
+      "scenario": "CC32",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4b",
+      "canari": "CANARI-CC-MCPLONGFIN-8J26",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC32:4b:CANARI-CC-MCPOUTLONGDEBUT-FGAX",
+      "scenario": "CC32",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4b",
+      "canari": "CANARI-CC-MCPOUTLONGDEBUT-FGAX",
+      "attendu": true,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC32:4b:CANARI-CC-MCPOUTLONGFIN-HK5X",
+      "scenario": "CC32",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4b",
+      "canari": "CANARI-CC-MCPOUTLONGFIN-HK5X",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC24:4c:CANARI-CC-SKG1-FJS4",
+      "scenario": "CC24",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4c",
+      "canari": "CANARI-CC-SKG1-FJS4",
+      "attendu": true,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC24:4c:CANARI-CC-SKCORPSG1-A7AT",
+      "scenario": "CC24",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4c",
+      "canari": "CANARI-CC-SKCORPSG1-A7AT",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC25:4c:CANARI-CC-HOMOGL-LMBV",
+      "scenario": "CC25",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4c",
+      "canari": "CANARI-CC-HOMOGL-LMBV",
+      "attendu": true,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC24:4c:CANARI-CC-SKPAR-C34N",
+      "scenario": "CC24",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4c",
+      "canari": "CANARI-CC-SKPAR-C34N",
+      "attendu": true,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC26:4c:CANARI-CC-PLUGDESC-FTXJ",
+      "scenario": "CC26",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4c",
+      "canari": "CANARI-CC-PLUGDESC-FTXJ",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC26:4c:CANARI-CC-SKPLUG-5KME",
+      "scenario": "CC26",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4c",
+      "canari": "CANARI-CC-SKPLUG-5KME",
+      "attendu": true,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC26:4c:CANARI-CC-SKCORPSPLUG-EG37",
+      "scenario": "CC26",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4c",
+      "canari": "CANARI-CC-SKCORPSPLUG-EG37",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC26:4c:CANARI-CC-SKCACHE-9Q9U",
+      "scenario": "CC26",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4c",
+      "canari": "CANARI-CC-SKCACHE-9Q9U",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC25:4c:CANARI-CC-HOMOPR-6VX3",
+      "scenario": "CC25",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4c",
+      "canari": "CANARI-CC-HOMOPR-6VX3",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC27:4c:CANARI-CC-SKLONGDEBUT-EG4Q",
+      "scenario": "CC27",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4c",
+      "canari": "CANARI-CC-SKLONGDEBUT-EG4Q",
+      "attendu": true,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC27:4c:CANARI-CC-SKLONGFIN-ACDU",
+      "scenario": "CC27",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4c",
+      "canari": "CANARI-CC-SKLONGFIN-ACDU",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC24:4c:CANARI-CC-SKP1-PDW6",
+      "scenario": "CC24",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4c",
+      "canari": "CANARI-CC-SKP1-PDW6",
+      "attendu": true,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC24:4c:CANARI-CC-SKCORPSP1-KUQQ",
+      "scenario": "CC24",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4c",
+      "canari": "CANARI-CC-SKCORPSP1-KUQQ",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC18:4c:CANARI-CC-DPATHS-9C2L",
+      "scenario": "CC18",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4c",
+      "canari": "CANARI-CC-DPATHS-9C2L",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC28:4c:CANARI-CC-DSKPATHS-Q9PG",
+      "scenario": "CC28",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4c",
+      "canari": "CANARI-CC-DSKPATHS-Q9PG",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC28:4c:CANARI-CC-DSKCORPS-ZLKX",
+      "scenario": "CC28",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4c",
+      "canari": "CANARI-CC-DSKCORPS-ZLKX",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC08:4c:CANARI-CC-DSOUS-7VJB",
+      "scenario": "CC08",
+      "instrument": "canari",
+      "etape": "E0",
+      "serie": 4,
+      "appel": "4c",
+      "canari": "CANARI-CC-DSOUS-7VJB",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC18:ER:avant:CANARI-CC-DPATHS-9C2L",
+      "scenario": "CC18",
+      "instrument": "canari",
+      "etape": "avant",
+      "serie": 5,
+      "appel": "ER",
+      "canari": "CANARI-CC-DPATHS-9C2L",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC28:ER:avant:CANARI-CC-DSKPATHS-Q9PG",
+      "scenario": "CC28",
+      "instrument": "canari",
+      "etape": "avant",
+      "serie": 5,
+      "appel": "ER",
+      "canari": "CANARI-CC-DSKPATHS-Q9PG",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC28:ER:avant:CANARI-CC-DSKCORPS-ZLKX",
+      "scenario": "CC28",
+      "instrument": "canari",
+      "etape": "avant",
+      "serie": 5,
+      "appel": "ER",
+      "canari": "CANARI-CC-DSKCORPS-ZLKX",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC08:ER:avant:CANARI-CC-DSOUS-7VJB",
+      "scenario": "CC08",
+      "instrument": "canari",
+      "etape": "avant",
+      "serie": 5,
+      "appel": "ER",
+      "canari": "CANARI-CC-DSOUS-7VJB",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC18:ER:apres:CANARI-CC-DPATHS-9C2L",
+      "scenario": "CC18",
+      "instrument": "canari",
+      "etape": "apres",
+      "serie": 5,
+      "appel": "ER",
+      "canari": "CANARI-CC-DPATHS-9C2L",
+      "attendu": true,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC28:ER:apres:CANARI-CC-DSKPATHS-Q9PG",
+      "scenario": "CC28",
+      "instrument": "canari",
+      "etape": "apres",
+      "serie": 5,
+      "appel": "ER",
+      "canari": "CANARI-CC-DSKPATHS-Q9PG",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC28:ER:apres:CANARI-CC-DSKCORPS-ZLKX",
+      "scenario": "CC28",
+      "instrument": "canari",
+      "etape": "apres",
+      "serie": 5,
+      "appel": "ER",
+      "canari": "CANARI-CC-DSKCORPS-ZLKX",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC08:ER:apres:CANARI-CC-DSOUS-7VJB",
+      "scenario": "CC08",
+      "instrument": "canari",
+      "etape": "apres",
+      "serie": 5,
+      "appel": "ER",
+      "canari": "CANARI-CC-DSOUS-7VJB",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC18:EW:avant:CANARI-CC-DPATHS-9C2L",
+      "scenario": "CC18",
+      "instrument": "canari",
+      "etape": "avant",
+      "serie": 5,
+      "appel": "EW",
+      "canari": "CANARI-CC-DPATHS-9C2L",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC28:EW:avant:CANARI-CC-DSKPATHS-Q9PG",
+      "scenario": "CC28",
+      "instrument": "canari",
+      "etape": "avant",
+      "serie": 5,
+      "appel": "EW",
+      "canari": "CANARI-CC-DSKPATHS-Q9PG",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC28:EW:avant:CANARI-CC-DSKCORPS-ZLKX",
+      "scenario": "CC28",
+      "instrument": "canari",
+      "etape": "avant",
+      "serie": 5,
+      "appel": "EW",
+      "canari": "CANARI-CC-DSKCORPS-ZLKX",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC08:EW:avant:CANARI-CC-DSOUS-7VJB",
+      "scenario": "CC08",
+      "instrument": "canari",
+      "etape": "avant",
+      "serie": 5,
+      "appel": "EW",
+      "canari": "CANARI-CC-DSOUS-7VJB",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC18:EW:apres:CANARI-CC-DPATHS-9C2L",
+      "scenario": "CC18",
+      "instrument": "canari",
+      "etape": "apres",
+      "serie": 5,
+      "appel": "EW",
+      "canari": "CANARI-CC-DPATHS-9C2L",
+      "attendu": true,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC28:EW:apres:CANARI-CC-DSKPATHS-Q9PG",
+      "scenario": "CC28",
+      "instrument": "canari",
+      "etape": "apres",
+      "serie": 5,
+      "appel": "EW",
+      "canari": "CANARI-CC-DSKPATHS-Q9PG",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC28:EW:apres:CANARI-CC-DSKCORPS-ZLKX",
+      "scenario": "CC28",
+      "instrument": "canari",
+      "etape": "apres",
+      "serie": 5,
+      "appel": "EW",
+      "canari": "CANARI-CC-DSKCORPS-ZLKX",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC08:EW:apres:CANARI-CC-DSOUS-7VJB",
+      "scenario": "CC08",
+      "instrument": "canari",
+      "etape": "apres",
+      "serie": 5,
+      "appel": "EW",
+      "canari": "CANARI-CC-DSOUS-7VJB",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC18:EE:avant:CANARI-CC-DPATHS-9C2L",
+      "scenario": "CC18",
+      "instrument": "canari",
+      "etape": "avant",
+      "serie": 5,
+      "appel": "EE",
+      "canari": "CANARI-CC-DPATHS-9C2L",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC28:EE:avant:CANARI-CC-DSKPATHS-Q9PG",
+      "scenario": "CC28",
+      "instrument": "canari",
+      "etape": "avant",
+      "serie": 5,
+      "appel": "EE",
+      "canari": "CANARI-CC-DSKPATHS-Q9PG",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC28:EE:avant:CANARI-CC-DSKCORPS-ZLKX",
+      "scenario": "CC28",
+      "instrument": "canari",
+      "etape": "avant",
+      "serie": 5,
+      "appel": "EE",
+      "canari": "CANARI-CC-DSKCORPS-ZLKX",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC08:EE:avant:CANARI-CC-DSOUS-7VJB",
+      "scenario": "CC08",
+      "instrument": "canari",
+      "etape": "avant",
+      "serie": 5,
+      "appel": "EE",
+      "canari": "CANARI-CC-DSOUS-7VJB",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC18:EE:apres:CANARI-CC-DPATHS-9C2L",
+      "scenario": "CC18",
+      "instrument": "canari",
+      "etape": "apres",
+      "serie": 5,
+      "appel": "EE",
+      "canari": "CANARI-CC-DPATHS-9C2L",
+      "attendu": true,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC28:EE:apres:CANARI-CC-DSKPATHS-Q9PG",
+      "scenario": "CC28",
+      "instrument": "canari",
+      "etape": "apres",
+      "serie": 5,
+      "appel": "EE",
+      "canari": "CANARI-CC-DSKPATHS-Q9PG",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC28:EE:apres:CANARI-CC-DSKCORPS-ZLKX",
+      "scenario": "CC28",
+      "instrument": "canari",
+      "etape": "apres",
+      "serie": 5,
+      "appel": "EE",
+      "canari": "CANARI-CC-DSKCORPS-ZLKX",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC08:EE:apres:CANARI-CC-DSOUS-7VJB",
+      "scenario": "CC08",
+      "instrument": "canari",
+      "etape": "apres",
+      "serie": 5,
+      "appel": "EE",
+      "canari": "CANARI-CC-DSOUS-7VJB",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC18:EG:avant:CANARI-CC-DPATHS-9C2L",
+      "scenario": "CC18",
+      "instrument": "canari",
+      "etape": "avant",
+      "serie": 5,
+      "appel": "EG",
+      "canari": "CANARI-CC-DPATHS-9C2L",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC28:EG:avant:CANARI-CC-DSKPATHS-Q9PG",
+      "scenario": "CC28",
+      "instrument": "canari",
+      "etape": "avant",
+      "serie": 5,
+      "appel": "EG",
+      "canari": "CANARI-CC-DSKPATHS-Q9PG",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC28:EG:avant:CANARI-CC-DSKCORPS-ZLKX",
+      "scenario": "CC28",
+      "instrument": "canari",
+      "etape": "avant",
+      "serie": 5,
+      "appel": "EG",
+      "canari": "CANARI-CC-DSKCORPS-ZLKX",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC08:EG:avant:CANARI-CC-DSOUS-7VJB",
+      "scenario": "CC08",
+      "instrument": "canari",
+      "etape": "avant",
+      "serie": 5,
+      "appel": "EG",
+      "canari": "CANARI-CC-DSOUS-7VJB",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC18:EG:apres:CANARI-CC-DPATHS-9C2L",
+      "scenario": "CC18",
+      "instrument": "canari",
+      "etape": "apres",
+      "serie": 5,
+      "appel": "EG",
+      "canari": "CANARI-CC-DPATHS-9C2L",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC28:EG:apres:CANARI-CC-DSKPATHS-Q9PG",
+      "scenario": "CC28",
+      "instrument": "canari",
+      "etape": "apres",
+      "serie": 5,
+      "appel": "EG",
+      "canari": "CANARI-CC-DSKPATHS-Q9PG",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC28:EG:apres:CANARI-CC-DSKCORPS-ZLKX",
+      "scenario": "CC28",
+      "instrument": "canari",
+      "etape": "apres",
+      "serie": 5,
+      "appel": "EG",
+      "canari": "CANARI-CC-DSKCORPS-ZLKX",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC08:EG:apres:CANARI-CC-DSOUS-7VJB",
+      "scenario": "CC08",
+      "instrument": "canari",
+      "etape": "apres",
+      "serie": 5,
+      "appel": "EG",
+      "canari": "CANARI-CC-DSOUS-7VJB",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC18:EGr:avant:CANARI-CC-DPATHS-9C2L",
+      "scenario": "CC18",
+      "instrument": "canari",
+      "etape": "avant",
+      "serie": 5,
+      "appel": "EGr",
+      "canari": "CANARI-CC-DPATHS-9C2L",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC28:EGr:avant:CANARI-CC-DSKPATHS-Q9PG",
+      "scenario": "CC28",
+      "instrument": "canari",
+      "etape": "avant",
+      "serie": 5,
+      "appel": "EGr",
+      "canari": "CANARI-CC-DSKPATHS-Q9PG",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC28:EGr:avant:CANARI-CC-DSKCORPS-ZLKX",
+      "scenario": "CC28",
+      "instrument": "canari",
+      "etape": "avant",
+      "serie": 5,
+      "appel": "EGr",
+      "canari": "CANARI-CC-DSKCORPS-ZLKX",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC08:EGr:avant:CANARI-CC-DSOUS-7VJB",
+      "scenario": "CC08",
+      "instrument": "canari",
+      "etape": "avant",
+      "serie": 5,
+      "appel": "EGr",
+      "canari": "CANARI-CC-DSOUS-7VJB",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC18:EGr:apres:CANARI-CC-DPATHS-9C2L",
+      "scenario": "CC18",
+      "instrument": "canari",
+      "etape": "apres",
+      "serie": 5,
+      "appel": "EGr",
+      "canari": "CANARI-CC-DPATHS-9C2L",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC28:EGr:apres:CANARI-CC-DSKPATHS-Q9PG",
+      "scenario": "CC28",
+      "instrument": "canari",
+      "etape": "apres",
+      "serie": 5,
+      "appel": "EGr",
+      "canari": "CANARI-CC-DSKPATHS-Q9PG",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC28:EGr:apres:CANARI-CC-DSKCORPS-ZLKX",
+      "scenario": "CC28",
+      "instrument": "canari",
+      "etape": "apres",
+      "serie": 5,
+      "appel": "EGr",
+      "canari": "CANARI-CC-DSKCORPS-ZLKX",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC08:EGr:apres:CANARI-CC-DSOUS-7VJB",
+      "scenario": "CC08",
+      "instrument": "canari",
+      "etape": "apres",
+      "serie": 5,
+      "appel": "EGr",
+      "canari": "CANARI-CC-DSOUS-7VJB",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC18:EB:avant:CANARI-CC-DPATHS-9C2L",
+      "scenario": "CC18",
+      "instrument": "canari",
+      "etape": "avant",
+      "serie": 5,
+      "appel": "EB",
+      "canari": "CANARI-CC-DPATHS-9C2L",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC28:EB:avant:CANARI-CC-DSKPATHS-Q9PG",
+      "scenario": "CC28",
+      "instrument": "canari",
+      "etape": "avant",
+      "serie": 5,
+      "appel": "EB",
+      "canari": "CANARI-CC-DSKPATHS-Q9PG",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC28:EB:avant:CANARI-CC-DSKCORPS-ZLKX",
+      "scenario": "CC28",
+      "instrument": "canari",
+      "etape": "avant",
+      "serie": 5,
+      "appel": "EB",
+      "canari": "CANARI-CC-DSKCORPS-ZLKX",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC08:EB:avant:CANARI-CC-DSOUS-7VJB",
+      "scenario": "CC08",
+      "instrument": "canari",
+      "etape": "avant",
+      "serie": 5,
+      "appel": "EB",
+      "canari": "CANARI-CC-DSOUS-7VJB",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC18:EB:apres:CANARI-CC-DPATHS-9C2L",
+      "scenario": "CC18",
+      "instrument": "canari",
+      "etape": "apres",
+      "serie": 5,
+      "appel": "EB",
+      "canari": "CANARI-CC-DPATHS-9C2L",
+      "attendu": true,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC28:EB:apres:CANARI-CC-DSKPATHS-Q9PG",
+      "scenario": "CC28",
+      "instrument": "canari",
+      "etape": "apres",
+      "serie": 5,
+      "appel": "EB",
+      "canari": "CANARI-CC-DSKPATHS-Q9PG",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC28:EB:apres:CANARI-CC-DSKCORPS-ZLKX",
+      "scenario": "CC28",
+      "instrument": "canari",
+      "etape": "apres",
+      "serie": 5,
+      "appel": "EB",
+      "canari": "CANARI-CC-DSKCORPS-ZLKX",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC08:EB:apres:CANARI-CC-DSOUS-7VJB",
+      "scenario": "CC08",
+      "instrument": "canari",
+      "etape": "apres",
+      "serie": 5,
+      "appel": "EB",
+      "canari": "CANARI-CC-DSOUS-7VJB",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC18:ER-sous:avant:CANARI-CC-DPATHS-9C2L",
+      "scenario": "CC18",
+      "instrument": "canari",
+      "etape": "avant",
+      "serie": 5,
+      "appel": "ER-sous",
+      "canari": "CANARI-CC-DPATHS-9C2L",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC28:ER-sous:avant:CANARI-CC-DSKPATHS-Q9PG",
+      "scenario": "CC28",
+      "instrument": "canari",
+      "etape": "avant",
+      "serie": 5,
+      "appel": "ER-sous",
+      "canari": "CANARI-CC-DSKPATHS-Q9PG",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC28:ER-sous:avant:CANARI-CC-DSKCORPS-ZLKX",
+      "scenario": "CC28",
+      "instrument": "canari",
+      "etape": "avant",
+      "serie": 5,
+      "appel": "ER-sous",
+      "canari": "CANARI-CC-DSKCORPS-ZLKX",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC08:ER-sous:avant:CANARI-CC-DSOUS-7VJB",
+      "scenario": "CC08",
+      "instrument": "canari",
+      "etape": "avant",
+      "serie": 5,
+      "appel": "ER-sous",
+      "canari": "CANARI-CC-DSOUS-7VJB",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC18:ER-sous:apres:CANARI-CC-DPATHS-9C2L",
+      "scenario": "CC18",
+      "instrument": "canari",
+      "etape": "apres",
+      "serie": 5,
+      "appel": "ER-sous",
+      "canari": "CANARI-CC-DPATHS-9C2L",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC28:ER-sous:apres:CANARI-CC-DSKPATHS-Q9PG",
+      "scenario": "CC28",
+      "instrument": "canari",
+      "etape": "apres",
+      "serie": 5,
+      "appel": "ER-sous",
+      "canari": "CANARI-CC-DSKPATHS-Q9PG",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC28:ER-sous:apres:CANARI-CC-DSKCORPS-ZLKX",
+      "scenario": "CC28",
+      "instrument": "canari",
+      "etape": "apres",
+      "serie": 5,
+      "appel": "ER-sous",
+      "canari": "CANARI-CC-DSKCORPS-ZLKX",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC08:ER-sous:apres:CANARI-CC-DSOUS-7VJB",
+      "scenario": "CC08",
+      "instrument": "canari",
+      "etape": "apres",
+      "serie": 5,
+      "appel": "ER-sous",
+      "canari": "CANARI-CC-DSOUS-7VJB",
+      "attendu": true,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC18:temoin:avant:CANARI-CC-DPATHS-9C2L",
+      "scenario": "CC18",
+      "instrument": "canari",
+      "etape": "avant",
+      "serie": 5,
+      "appel": "temoin",
+      "canari": "CANARI-CC-DPATHS-9C2L",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC28:temoin:avant:CANARI-CC-DSKPATHS-Q9PG",
+      "scenario": "CC28",
+      "instrument": "canari",
+      "etape": "avant",
+      "serie": 5,
+      "appel": "temoin",
+      "canari": "CANARI-CC-DSKPATHS-Q9PG",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC28:temoin:avant:CANARI-CC-DSKCORPS-ZLKX",
+      "scenario": "CC28",
+      "instrument": "canari",
+      "etape": "avant",
+      "serie": 5,
+      "appel": "temoin",
+      "canari": "CANARI-CC-DSKCORPS-ZLKX",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC08:temoin:avant:CANARI-CC-DSOUS-7VJB",
+      "scenario": "CC08",
+      "instrument": "canari",
+      "etape": "avant",
+      "serie": 5,
+      "appel": "temoin",
+      "canari": "CANARI-CC-DSOUS-7VJB",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC18:temoin:apres:CANARI-CC-DPATHS-9C2L",
+      "scenario": "CC18",
+      "instrument": "canari",
+      "etape": "apres",
+      "serie": 5,
+      "appel": "temoin",
+      "canari": "CANARI-CC-DPATHS-9C2L",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC28:temoin:apres:CANARI-CC-DSKPATHS-Q9PG",
+      "scenario": "CC28",
+      "instrument": "canari",
+      "etape": "apres",
+      "serie": 5,
+      "appel": "temoin",
+      "canari": "CANARI-CC-DSKPATHS-Q9PG",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC28:temoin:apres:CANARI-CC-DSKCORPS-ZLKX",
+      "scenario": "CC28",
+      "instrument": "canari",
+      "etape": "apres",
+      "serie": 5,
+      "appel": "temoin",
+      "canari": "CANARI-CC-DSKCORPS-ZLKX",
+      "attendu": false,
+      "confiance": "observe"
+    },
+    {
+      "id": "CC08:temoin:apres:CANARI-CC-DSOUS-7VJB",
+      "scenario": "CC08",
+      "instrument": "canari",
+      "etape": "apres",
+      "serie": 5,
+      "appel": "temoin",
+      "canari": "CANARI-CC-DSOUS-7VJB",
+      "attendu": false,
+      "confiance": "observe"
+    }
+  ],
+  "remarques": [
+    "Sources : les entrées « context » viennent du rapport local context-2026-11-10-0711.json (lot V1) ; les entrées « usage » et « canari » viennent des rapports locaux payant-2026-11-10-0742.json, payant-2026-11-10-0754.json, payant-2026-11-10-0759.json, payant-2026-11-10-0805.json, payant-2026-11-10-0815.json (lot E2, séries 1 à 5, 38 appels au modèle). Ces rapports ne sont pas commités.",
+    "Ne sont comparés que la présence, le type (ou la source) et les tokens de chaque fixture, et l'écart de chaque combinaison à la base de même jeu d'outils de la même série (delta_base). Les totaux absolus et les éléments hors fixtures (skills, plugins et outils du compte) ne sont jamais comparés : ils changent avec la synchronisation du compte et d'un poste à l'autre.",
+    "Anomalie A2 : les tokens des outils MCP sont instables et non additifs. Ils ne sont comparés qu'en présence, et l'écart des combinaisons avec MCP est pris sans la catégorie « MCP tools » (sans_outils_mcp).",
+    "Les entrées « usage » sont des différences d'entrée entre un appel et la base de sa série (U0a, S0a ou T0a), jamais des valeurs absolues : celles-ci dépendent du compte (adresse, date, skills de l'organisation). La série 4 n'a pas de base d'usage : elle n'a que des entrées « canari ».",
+    "L'usage n'a été mesuré qu'en 2.1.319, une seule fois par appel : la tolérance de 0 n'a pas encore été éprouvée par une seconde mesure.",
+    "Les différences d'usage des skills (série 2) pourraient dépendre du nombre de skills du compte, si leur liste a un budget limité (non vérifié) : un poste avec beaucoup de skills pourrait observer d'autres valeurs.",
+    "Les entrées « canari » reposent sur ce que rapporte le modèle. Elles sont comparées strictement : un canari vu doit rester vu, un canari non vu doit rester non vu. Un échec du comparateur sur ces entrées est un signal d'enquête, pas une conclusion.",
+    "La section « decomposition » est une information, non comparée (comparee: false) : préambule, en-têtes par type, pente par caractère de chemin, constantes, rapports H15, enveloppes, nombre d'enveloppes de 4a, et différences d'entrée d'un tour à l'autre des déclencheurs (série 5), qui contiennent le texte écrit par le modèle au tour 1 et varient avec sa formulation. Elle ne contient ni les décalages entre l'usage et /context des bases ni l'empreinte des enveloppes de 4a, qui dépendent du compte."
+  ]
+}
