@@ -35,9 +35,10 @@ Toutes les commandes se lancent depuis la racine du dépôt, dans un **terminal 
 | `npm run sonde:claude -- --confirmer --plafond 38` | La partie payante, séries 1 à 5 | 38 appels au modèle, sur le quota de l'abonnement |
 | `npm run sonde:claude-context -- --preparer-h14` | Déploie le jeu de H14 et affiche les gestes à faire dans VS Code | Nul ici ; 1 appel manuel dans le panneau |
 | `node test/scenarios/scripts/sonde-claude-code.js retirer` | Retire un déploiement laissé en place (interruption, ou H14) | Nul |
-| `npm run sonde:claude-baseline -- --depuis context-AAAA-MM-JJ-HHMM.json` | Écrit `attendu/baseline-<date>.json` d'après un rapport **valide** de `resultats/`, après la garde ; refuse d'écraser une baseline existante | Nul (aucun lancement de `claude`) |
+| `npm run sonde:claude-baseline -- --depuis context-AAAA-MM-JJ-HHMM.json` | Écrit `attendu/baseline-<date>.json` d'après un rapport « context » **valide** de `resultats/` (entrées « context » seulement), après la garde ; refuse d'écraser une baseline existante | Nul (aucun lancement de `claude`) |
+| `npm run sonde:claude-baseline -- --depuis context-….json --payant payant-….json,payant-….json,…` | Écrit `attendu/baseline-<date>.json` d'après un rapport « context » et les rapports « payant » d'un même lot (entrées « context », « usage » et « canari », et une section de décomposition non comparée), après la garde ; refuse d'écraser une baseline existante (voir « Construire une baseline à partir de plusieurs rapports ») | Nul (aucun lancement de `claude`) |
 | `npm run sonde:claude-compatible -- --rapport context-AAAA-MM-JJ-HHMM.json --baseline 2026-11-09` | Ajoute la version du rapport à `versions_compatibles` de la baseline désignée, et rien d'autre ; refuse si la série n'est pas valide, si une entrée n'est pas couverte ou s'il y a au moins un écart | Nul (aucun lancement de `claude`) |
-| `npm run test:injection-claude` | Compare le dernier rapport de `resultats/` à sa baseline | Nul |
+| `npm run test:injection-claude` | Compare l'ensemble de rapports de `resultats/` (le dernier « context » et les « payant » de sa version) à sa baseline | Nul |
 
 Options utiles :
 
@@ -116,6 +117,22 @@ Le lot E2 archivera à son tour le compteur V1 : une vérification de version ul
 1. **D'abord à sec** : `npm run sonde:claude -- --a-sec`. Vérifier le total annoncé (38 appels au modèle et 33 `/context`), l'argv de chaque série et la liste des fichiers déployés.
 2. **Puis pour de vrai** : `npm run sonde:claude -- --confirmer --plafond 38 --resultats`.
 3. `npm run test:injection-claude`.
+4. Pour une version sans baseline payante, et seulement sur décision : construire la baseline à partir du rapport « context » de la même version et des rapports « payant » du lot (voir ci-dessous), puis la colonne de la version dans `SCENARIOS-CLAUDE-CODE.md`.
+
+#### Construire une baseline à partir de plusieurs rapports
+
+Décisions du 2026-11-10 (première application : `baseline-2026-11-10.json`, Claude Code 2.1.319) :
+
+```powershell
+# PowerShell
+npm run sonde:claude-baseline -- --depuis context-2026-11-10-0711.json --payant payant-2026-11-10-0742.json,payant-2026-11-10-0754.json,payant-2026-11-10-0759.json,payant-2026-11-10-0805.json,payant-2026-11-10-0815.json
+```
+
+- **Les sources** : les entrées « context » viennent du rapport « context » ; les entrées « usage » et « canari » viennent des rapports « payant ».
+- **Les refus** : un rapport non valide (série rejetée, exécution arrêtée, réponse illisible), des versions différentes (un mélange est refusé, de même qu'un autre modèle ou un autre effort), des rapports « payant » de lots différents, une série manquante ou en double, un appel en double, manquant ou hors du plan, une valeur absolue (base de série absente, clé de décomposition hors de la liste blanche) et un élément hors fixtures (jeu ou canari absent de l'inventaire, canari sans scénario). Rien n'est écrit après un refus, ni si la garde de confidentialité échoue.
+- **L'usage** : seulement des différences, jamais de valeur absolue. Chaque appel est comparé à la base de sa série (U0a, S0a ou T0a). La série 4 n'a pas de base d'usage : elle ne donne que des canaris.
+- **Les canaris** : pour chaque appel des séries 4 et 5, chaque canari des jeux de l'appel (d'après `inventaire.json`) devient une entrée « vu » ou « non vu », comparée strictement. Ces entrées reposent sur ce que rapporte le modèle : un écart est un signal d'enquête, pas une conclusion.
+- **La décomposition** (`decomposition`, `comparee: false`) : les valeurs des cinq rapports, fusionnées (une valeur contradictoire est refusée), le nombre d'enveloppes de 4a et les différences d'entrée d'un tour à l'autre des déclencheurs. Ces dernières contiennent le texte écrit par le modèle au tour 1 et varient avec sa formulation : elles ne sont jamais comparées. Les décalages entre l'usage et `/context` des bases et l'empreinte des enveloppes de 4a dépendent du compte : ils n'y figurent pas.
 
 Le déroulement :
 
@@ -150,17 +167,22 @@ Les deux compteurs sont dans `brut/` (`compteur-context.json` et `compteur-model
 
 - **Le rapport** (`resultats/payant-AAAA-MM-JJ-HHMM.json`) donne, pour chaque appel, l'entrée (trois compteurs), la sortie, la somme des quatre compteurs, l'usage par tour, les canaris rapportés et les outils appelés. Le texte des enveloppes de l'appel 4a reste dans `brut/` : le rapport n'en garde que le nombre et l'empreinte.
 - **La décomposition** (`decomposition` du rapport) est calculée sur l'entrée des seules séries valides : préambule, en-têtes de type Project et User, pente par caractère de chemin, constante par élément, enveloppe que `/context` ne voit pas, validité de `/context` comme instrument (protocole 4) et rapport au compte o200k (H15). Une valeur dont une mesure manque vaut `null`.
-- **Ce que compare la baseline** (décision du 2026-11-09) : la présence, le type (ou la source) et les tokens de chaque fixture, et l'écart de chaque combinaison à la base de même jeu d'outils, dans la même série (`delta_base`). Jamais les totaux absolus ni les éléments hors fixtures (skills, plugins et outils du compte), qui changent avec la synchronisation du compte et d'un poste à l'autre. Les outils MCP ne sont comparés qu'en présence (anomalie A2), et l'écart d'une combinaison avec MCP est pris sans la catégorie « MCP tools ». Les observations manuelles (CC07) sont dans les remarques de la baseline.
-- **La comparaison** (`npm run test:injection-claude`) choisit la baseline d'après la version du rapport ou ses `versions_compatibles`. La variable `SONDE_BASELINE_CLAUDE` en impose une (version, date ou nom de fichier), et `SONDE_RAPPORT_CLAUDE` désigne un autre rapport :
+- **Ce que compare la baseline** (décisions du 2026-11-09 et du 2026-11-10) : la présence, le type (ou la source) et les tokens de chaque fixture, et l'écart de chaque combinaison à la base de même jeu d'outils, dans la même série (`delta_base`) ; depuis la baseline 2.1.319, la différence d'entrée de chaque appel à la base de sa série, et chaque canari vu ou non vu. Jamais les totaux absolus, ni l'entrée absolue d'un appel, ni les éléments hors fixtures (skills, plugins et outils du compte), qui changent avec la synchronisation du compte et d'un poste à l'autre. Les outils MCP ne sont comparés qu'en présence (anomalie A2), et l'écart d'une combinaison avec MCP est pris sans la catégorie « MCP tools ». La section `decomposition` n'est jamais comparée. Les observations manuelles (CC07) sont dans les remarques de la baseline.
+- **La comparaison** (`npm run test:injection-claude`) porte sur un **ensemble** de rapports :
+  - **par défaut**, le rapport « context » le plus récent fixe la version ; s'y ajoutent, pour chaque série, le rapport « payant » de cette version le plus récent qui la contient. Les rapports « payant » d'une autre version sont écartés, et la console en donne le nombre. Sans rapport « payant » de cette version (par exemple après un lot V1 sur une nouvelle version), seules les entrées « context » sont couvertes ;
+  - **désigné**, par `SONDE_RAPPORT_CLAUDE` : un nom de fichier de `resultats/`, ou plusieurs séparés par des virgules. Le comparateur refuse un nom inconnu ou répété, deux rapports « context », un mélange de versions et une série en double.
+
+  La console nomme tous les fichiers comparés, puis donne les entrées couvertes par instrument. Le comparateur choisit la baseline d'après la version de l'ensemble ou ses `versions_compatibles` (la plus récente si plusieurs conviennent). La variable `SONDE_BASELINE_CLAUDE` en impose une (version, date ou nom de fichier) :
 
   ```powershell
   # PowerShell
   $env:SONDE_BASELINE_CLAUDE = "2026-11-05"; npm run test:injection-claude; Remove-Item Env:SONDE_BASELINE_CLAUDE
+  $env:SONDE_RAPPORT_CLAUDE = "context-2026-11-10-0711.json,payant-2026-11-10-0742.json"; npm run test:injection-claude; Remove-Item Env:SONDE_RAPPORT_CLAUDE
   ```
 
   Une baseline imposée est acceptée même si sa version diffère de celle du rapport ; la console l'annonce alors comme une « comparaison inter-versions : rapport X contre baseline Y ».
 
-  Une entrée « non couverte » est une entrée que le rapport ne mesure pas (autre partie, série rejetée) : ce n'est pas un écart. Elle empêche pourtant l'ajout à `versions_compatibles`, car une série partielle ne prouve pas la compatibilité.
+  Une entrée « non couverte » est une entrée que le rapport ne mesure pas (autre partie, série rejetée) : ce n'est pas un écart. Elle empêche pourtant l'ajout à `versions_compatibles`, car une série partielle ne prouve pas la compatibilité. Conséquence pour `baseline-2026-11-10.json` : un lot V1 seul (`/context`) laisse ses entrées « usage » et « canari » non couvertes, et `sonde:claude-compatible` refuse donc d'y ajouter une nouvelle version sans partie payante (point ouvert, à décider).
 - **Un écart confirmé** : suivre la colonne « Si ça change » du scénario dans `SCENARIOS-CLAUDE-CODE.md`. On ne modifie jamais une baseline existante (sauf `versions_compatibles`, par la commande dédiée et sans aucun écart) ; une nouvelle version de Claude Code qui change un résultat reçoit une nouvelle baseline datée, et une nouvelle colonne dans la grille.
 
 ## Si une série est rejetée

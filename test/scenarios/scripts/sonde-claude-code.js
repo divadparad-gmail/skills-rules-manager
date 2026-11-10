@@ -9,8 +9,10 @@
  *   npm run sonde:claude -- --a-sec                 affiche les 38 appels prévus, sans rien lancer ni écrire
  *   npm run sonde:claude -- --confirmer --plafond <n> [--series 1,3] [--resultats]   partie payante
  *   node test/scenarios/scripts/sonde-claude-code.js retirer   retrait d'un déploiement (interrompu, ou H14)
- *   npm run sonde:claude-baseline -- --depuis <context-…json>   écrit attendu/baseline-<date>.json d'après un
- *                           rapport valide de resultats/, après la garde ; aucun lancement de claude
+ *   npm run sonde:claude-baseline -- --depuis <context-…json> [--payant <payant-…json,…>]   écrit
+ *                           attendu/baseline-<date>.json d'après un rapport « context » valide de resultats/
+ *                           et, avec --payant, les rapports « payant » d'un même lot (entrées usage et
+ *                           canari), après la garde ; n'écrase jamais ; aucun lancement de claude
  *   npm run sonde:claude-compatible -- --rapport <context-…json> --baseline <version|date|fichier>
  *                           ajoute la version du rapport à versions_compatibles de la baseline désignée,
  *                           seulement si la série est valide, toutes les entrées couvertes et 0 écart ;
@@ -1597,24 +1599,42 @@ async function commandePayant(args) {
 }
 
 /**
- * Écrit attendu/baseline-<date>.json d'après un rapport « context » de resultats/, après la garde de
- * confidentialité. Ne lance jamais claude, et n'écrase jamais une baseline existante.
+ * Écrit attendu/baseline-<date>.json d'après un rapport « context » de resultats/ et, avec --payant, les
+ * rapports « payant » d'un même lot (décisions du 2026-11-10), après la garde de confidentialité. Ne lance
+ * jamais claude, et n'écrase jamais une baseline existante.
  */
-function commandeBaseline(reste, { resultats = RESULTATS, attendu = ATTENDU, poste = commun.lirePoste() } = {}) {
-  if (reste.length !== 2 || reste[0] !== '--depuis') throw new Refus('Usage : sonde-claude-code.js baseline --depuis <context-AAAA-MM-JJ-HHMM.json>');
-  const nom = reste[1];
-  if (!constructionBaseline.NOM_RAPPORT_CONTEXT.test(nom)) throw new Refus('rapport refusé : un nom context-AAAA-MM-JJ-HHMM.json de resultats/ est attendu');
-  const fichier = path.join(resultats, nom);
-  if (!fs.existsSync(fichier)) throw new Refus(`rapport introuvable dans resultats/ : ${nom}`);
-  let rapport;
-  try {
-    rapport = JSON.parse(fs.readFileSync(fichier, 'utf8'));
-  } catch {
-    throw new Refus(`rapport illisible : ${nom}`);
+function commandeBaseline(reste, { resultats = RESULTATS, attendu = ATTENDU, poste = commun.lirePoste(), inventaire = INVENTAIRE } = {}) {
+  const usage = 'Usage : sonde-claude-code.js baseline --depuis <context-AAAA-MM-JJ-HHMM.json> [--payant <payant-…json,payant-…json,…>]';
+  const o = {};
+  for (let i = 0; i < reste.length; i += 2) {
+    const [cle, valeur] = [reste[i], reste[i + 1]];
+    if (!['--depuis', '--payant'].includes(cle) || typeof valeur !== 'string' || o[cle] !== undefined) throw new Refus(usage);
+    o[cle] = valeur;
+  }
+  if (!o['--depuis']) throw new Refus(usage);
+  const lire = (nom, motif, attendu) => {
+    if (!motif.test(nom)) throw new Refus(`rapport refusé : un nom ${attendu} de resultats/ est attendu`);
+    const fichier = path.join(resultats, nom);
+    if (!fs.existsSync(fichier)) throw new Refus(`rapport introuvable dans resultats/ : ${nom}`);
+    try {
+      return JSON.parse(fs.readFileSync(fichier, 'utf8'));
+    } catch {
+      throw new Refus(`rapport illisible : ${nom}`);
+    }
+  };
+  const nom = o['--depuis'];
+  const rapport = lire(nom, constructionBaseline.NOM_RAPPORT_CONTEXT, 'context-AAAA-MM-JJ-HHMM.json');
+  let payants = null;
+  if (o['--payant'] !== undefined) {
+    const noms = o['--payant'].split(',').map((x) => x.trim());
+    if (new Set(noms).size !== noms.length) throw new Refus('--payant : un rapport figure deux fois');
+    payants = noms.map((n) => ({ nom: n, contenu: lire(n, constructionBaseline.NOM_RAPPORT_PAYANT, 'payant-AAAA-MM-JJ-HHMM.json') }));
   }
   let baseline;
   try {
-    baseline = constructionBaseline.baselineDepuisRapport(rapport, { source: nom });
+    baseline = payants
+      ? constructionBaseline.baselineDepuisRapports({ context: { nom, contenu: rapport }, payants }, { inventaire: JSON.parse(fs.readFileSync(inventaire, 'utf8')) })
+      : constructionBaseline.baselineDepuisRapport(rapport, { source: nom });
   } catch (err) {
     throw new Refus(`baseline refusée : ${err.message}`);
   }

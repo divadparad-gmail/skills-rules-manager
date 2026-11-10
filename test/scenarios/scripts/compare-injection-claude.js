@@ -8,7 +8,9 @@
  * variable, la comparaison réelle est ignorée dans npm test.
  *
  * Variables :
- *   SONDE_RAPPORT_CLAUDE   un rapport précis de resultats/ (nom de fichier), au lieu du dernier ;
+ *   SONDE_RAPPORT_CLAUDE   l'ensemble de rapports à comparer, au lieu de l'ensemble par défaut : un nom de
+ *                          fichier de resultats/, ou plusieurs séparés par des virgules (au plus un
+ *                          « context » et des « payant » de la même version, sans série en double) ;
  *   SONDE_BASELINE_CLAUDE  impose une baseline (version, date ou nom de fichier), au lieu de celle de
  *                          la version du rapport (environnement.version, ou versions_compatibles) ; si
  *                          leurs versions diffèrent, la comparaison est annoncée « inter-versions ».
@@ -106,9 +108,12 @@ function problemesBaseline(contenu) {
       else if (e.mesure === 'delta' && (!e.attendu || typeof e.attendu.delta !== 'number')) out.push(`${e.id} : attendu.delta attendu`);
       else if (e.outil_mcp && e.attendu && e.attendu.tokens !== undefined) out.push(`${e.id} : outil MCP comparé en présence seulement (A2)`);
     }
-    if (e.instrument === 'usage' && (typeof e.appel !== 'string' || typeof e.reference !== 'string' || !e.attendu || typeof e.attendu.delta !== 'number')) out.push(`${e.id} : appel, reference et attendu.delta attendus`);
+    if (e.instrument === 'usage' && e.mesure === 'delta_tour') out.push(`${e.id} : différence d'un tour à l'autre refusée (elle contient le texte du modèle : décomposition seulement)`);
+    else if (e.instrument === 'usage' && (typeof e.appel !== 'string' || typeof e.reference !== 'string' || !e.attendu || typeof e.attendu.delta !== 'number')) out.push(`${e.id} : appel, reference et attendu.delta attendus`);
     if (e.instrument === 'canari' && (typeof e.appel !== 'string' || typeof e.canari !== 'string' || typeof e.attendu !== 'boolean')) out.push(`${e.id} : appel, canari et attendu booléen attendus`);
   }
+  // Décision du 2026-11-10 : la décomposition est une information, jamais comparée.
+  if (contenu.decomposition !== undefined && contenu.decomposition !== null && (typeof contenu.decomposition !== 'object' || contenu.decomposition.comparee !== false)) out.push('decomposition : comparee: false attendu (section non comparée)');
   return out;
 }
 
@@ -174,6 +179,75 @@ function comparer(baseline, rapport) {
   });
 }
 
+const NOM_PAYANT = /^payant-/;
+const horodatage = (f) => NOM_RAPPORT.exec(f)[2];
+
+/**
+ * Fusionne un ensemble de rapports ({ fichier, contenu }) en un rapport virtuel que comparer() sait lire :
+ * les combinaisons du rapport « context » (si sa série est valide), les séries et les appels des rapports
+ * « payant ». Refuse deux rapports « context », un mélange de versions, une série ou un appel en double.
+ */
+function fusionnerRapports(rapports) {
+  if (!Array.isArray(rapports) || rapports.length === 0) throw new Error('ensemble de rapports vide');
+  const contexts = rapports.filter((r) => !NOM_PAYANT.test(r.fichier));
+  if (contexts.length > 1) throw new Error(`un seul rapport « context » par ensemble (${contexts.map((r) => r.fichier).join(', ')})`);
+  const versions = [...new Set(rapports.map((r) => versionRapport(r.contenu)))];
+  if (versions.length !== 1 || !versions[0]) throw new Error(`mélange de versions refusé (${rapports.map((r) => `${r.fichier} : ${versionRapport(r.contenu) || 'version inconnue'}`).join(', ')})`);
+  const series = [];
+  const appels = [];
+  for (const r of rapports.filter((x) => NOM_PAYANT.test(x.fichier))) {
+    for (const s of r.contenu.series || []) {
+      if (series.some((x) => x.numero === s.numero)) throw new Error(`série ${s.numero} en double dans l'ensemble`);
+      series.push(s);
+    }
+    for (const a of r.contenu.appels || []) {
+      if (appels.some((x) => x.id === a.id)) throw new Error(`appel ${a.id} en double dans l'ensemble`);
+      appels.push(a);
+    }
+  }
+  const ctx = contexts[0] && contexts[0].contenu;
+  const combinaisons = ctx && (!ctx.serie || ctx.serie.valide !== false) ? ctx.combinaisons || [] : [];
+  return { rapport: 'ensemble', environnement: { version_avant: versions[0] }, combinaisons, series, appels };
+}
+
+/**
+ * L'ensemble à comparer. Désigné (SONDE_RAPPORT_CLAUDE) : un ou plusieurs noms séparés par des virgules,
+ * pris tels quels. Par défaut : le rapport « context » le plus récent (sinon le « payant » le plus récent)
+ * fixe la version ; s'y ajoutent, pour chaque série, le rapport « payant » de cette version le plus récent
+ * qui la contient. Les rapports d'une autre version sont écartés et comptés. Renvoie null si resultats/
+ * n'a aucun rapport.
+ */
+function choisirEnsemble(dossier = RESULTATS, demande = '') {
+  if (!fs.existsSync(dossier)) return null;
+  const noms = fs.readdirSync(dossier).filter((f) => NOM_RAPPORT.test(f)).sort((a, b) => (horodatage(a) < horodatage(b) ? -1 : horodatage(a) > horodatage(b) ? 1 : 0));
+  const lire = (nom) => ({ fichier: nom, contenu: JSON.parse(fs.readFileSync(path.join(dossier, nom), 'utf8')) });
+  const voulu = typeof demande === 'string' ? demande.trim() : '';
+  if (voulu) {
+    const liste = voulu.split(',').map((x) => x.trim());
+    for (const n of liste) {
+      if (!noms.includes(n)) throw new Error(`SONDE_RAPPORT_CLAUDE : ${n || '(nom vide)'} ne désigne aucun rapport de resultats/`);
+    }
+    if (new Set(liste).size !== liste.length) throw new Error('SONDE_RAPPORT_CLAUDE : un rapport figure deux fois');
+    const rapports = liste.map(lire);
+    return { fichiers: liste, ecartes: 0, rapports, contenu: fusionnerRapports(rapports) };
+  }
+  if (noms.length === 0) return null;
+  const contexts = noms.filter((n) => !NOM_PAYANT.test(n));
+  const reference = lire(contexts.length > 0 ? contexts[contexts.length - 1] : noms[noms.length - 1]);
+  const version = versionRapport(reference.contenu);
+  const payants = noms.filter((n) => NOM_PAYANT.test(n)).map(lire);
+  const memes = payants.filter((p) => versionRapport(p.contenu) === version);
+  // Pour chaque série, le rapport le plus récent qui la contient ; un rapport plus ancien ne garde que ses autres séries.
+  const retenues = new Map();
+  for (const p of memes) for (const s of p.contenu.series || []) retenues.set(s.numero, p.fichier);
+  const choisis = memes.filter((p) => [...retenues.values()].includes(p.fichier)).map((p) => {
+    const garder = new Set([...retenues].filter(([, f]) => f === p.fichier).map(([n]) => n));
+    return { fichier: p.fichier, contenu: { ...p.contenu, series: (p.contenu.series || []).filter((s) => garder.has(s.numero)), appels: (p.contenu.appels || []).filter((a) => garder.has(a.serie)) } };
+  });
+  const rapports = NOM_PAYANT.test(reference.fichier) ? choisis : [reference, ...choisis];
+  return { fichiers: rapports.map((r) => r.fichier), ecartes: payants.length - memes.length, rapports, contenu: fusionnerRapports(rapports) };
+}
+
 /**
  * L'en-tête affiché avant le bilan : une comparaison inter-versions est toujours annoncée comme telle,
  * avec les deux versions, pour qu'aucun bilan « 0 écart » ne passe pour celui de la même version.
@@ -187,7 +261,7 @@ function enteteComparaison(fichierRapport, choix) {
 
 module.exports = {
   ATTENDU, RESULTATS, NOM_BASELINE, NOM_RAPPORT,
-  listerBaselines, dernierRapport, versionRapport, versionCouverte, choisirBaseline, problemesBaseline, observer, conforme, comparer,
+  listerBaselines, dernierRapport, fusionnerRapports, choisirEnsemble, versionRapport, versionCouverte, choisirBaseline, problemesBaseline, observer, conforme, comparer,
   enteteComparaison,
 };
 
