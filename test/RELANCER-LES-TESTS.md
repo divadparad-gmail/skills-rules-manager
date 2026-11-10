@@ -43,7 +43,7 @@ La jauge Claude Code de l'extension s'appuie sur la suite `scenarios/claude-code
 3. La partie payante (appels au modèle sur le quota de l'abonnement) ne se relance que sur décision, toujours précédée de son mode à sec : même README, point 2.
 4. Lis le résultat et, en cas d'écart, suis la colonne « Si ça change » de [SCENARIOS-CLAUDE-CODE.md](scenarios/claude-code-injection-contexte/SCENARIOS-CLAUDE-CODE.md) : ne modifie jamais une baseline existante.
 
-`npm run test:injection-claude` compare le dernier rapport à sa baseline ; comme `test:injection`, cette comparaison est ignorée dans `npm test`.
+`npm run test:injection-claude` compare le dernier rapport à sa baseline ; comme `test:injection`, cette comparaison est ignorée dans `npm test`. Les rapports de `resultats/` restent locaux (ignorés par Git) ; seule la baseline est commitée, et elle ne compare que ce qui ne dépend pas du compte.
 
 ## 3. Le test manuel
 

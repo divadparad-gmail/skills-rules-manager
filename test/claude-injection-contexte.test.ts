@@ -226,7 +226,8 @@ describe('Suite de Tests : Injection de contexte Claude Code (fixtures inertes, 
       'resultats/.gitkeep',
       ...DOCUMENTS,
     ]);
-    // Les rapports normalisés et les baselines (lots E1 et E2) passent par la garde du test 11.
+    // Les rapports normalisés (locaux, ignorés par Git depuis le 2026-11-09) et les baselines (commitées)
+    // passent par la garde du test 11 : un rapport local doit toujours la passer.
     const rapportOuBaseline = (rel: string) => RAPPORT_PERMIS.test(rel) || BASELINE_PERMISE.test(rel);
     const parasites = listFiles(SUITE).filter((rel) => !rel.startsWith('brut/') && !permis.has(rel) && !rapportOuBaseline(rel));
     assert.deepStrictEqual(parasites, []);
@@ -553,17 +554,19 @@ describe('Suite de Tests : Injection de contexte Claude Code (fixtures inertes, 
     }
   });
 
-  test('13. .gitignore : brut/ est ignoré, le reste de la suite est suivi', (t) => {
+  test('13. .gitignore : brut/ et les rapports de resultats/ sont ignorés (sauf .gitkeep), le reste de la suite est suivi', (t) => {
     const depot = spawnSync('git', ['rev-parse', '--show-toplevel'], { cwd: ROOT });
     if (depot.error || depot.status !== 0) {
       t.skip('Hors d\'un dépôt Git, ou git introuvable.');
       return;
     }
-    const temoin = `${SUITE_REL}/brut/exemple.jsonl`;
-    const suivis = listFiles(SUITE).filter((rel) => !rel.startsWith('brut/')).map((rel) => `${SUITE_REL}/${rel}`);
-    const result = spawnSync('git', ['check-ignore', '--no-index', '--stdin'], { cwd: ROOT, input: [temoin, ...suivis].join('\n') + '\n' });
+    // Décision du 2026-11-09 : les rapports restent locaux, seule la baseline est commitée.
+    const local = (rel: string) => rel.startsWith('brut/') || (rel.startsWith('resultats/') && rel !== 'resultats/.gitkeep');
+    const temoins = [`${SUITE_REL}/brut/exemple.jsonl`, `${SUITE_REL}/resultats/context-2026-11-05-0930.json`, `${SUITE_REL}/resultats/payant-2026-11-05-1012.json`];
+    const suivis = [...new Set([...listFiles(SUITE).filter((rel) => !local(rel)), 'resultats/.gitkeep', 'attendu/baseline-2026-11-05.json'])].map((rel) => `${SUITE_REL}/${rel}`);
+    const result = spawnSync('git', ['check-ignore', '--no-index', '--stdin'], { cwd: ROOT, input: [...temoins, ...suivis].join('\n') + '\n' });
     assert.ok(result.status === 0 || result.status === 1, result.stderr.toString('utf8'));
     const ignores = result.stdout.toString('utf8').split(/\r?\n/).filter(Boolean);
-    assert.deepStrictEqual(ignores, [temoin], 'Seul brut/ doit être ignoré : ajouter la ligne « /test/scenarios/claude-code-injection-contexte/brut/ »');
+    assert.deepStrictEqual(ignores, temoins, 'Seuls brut/ et les rapports de resultats/ doivent être ignorés (resultats/.gitkeep et attendu/ restent suivis)');
   });
 });

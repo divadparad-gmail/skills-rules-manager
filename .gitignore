@@ -71,3 +71,6 @@ scripts/hooks/*.log
 
 # Suite d'injection Claude Code : sorties brutes de la sonde (chemins et données locales).
 /test/scenarios/claude-code-injection-contexte/brut/
+# Suite d'injection Claude Code : rapports normalisés, locaux depuis le 2026-11-09 (seule la baseline est commitée).
+/test/scenarios/claude-code-injection-contexte/resultats/*
+!/test/scenarios/claude-code-injection-contexte/resultats/.gitkeep

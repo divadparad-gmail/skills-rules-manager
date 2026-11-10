@@ -16,8 +16,8 @@ La suite a deux parties :
 | `mcp/serveur-fixture.js` | Le serveur MCP de fixture : stdio, modules intégrés de Node seulement, aucune action. |
 | `SONDE.md` | Les invites exactes des appels au modèle. C'est la seule source d'invites que le lanceur accepte, et chacune est vérifiée par son empreinte. |
 | `SCENARIOS-CLAUDE-CODE.md` | La grille des scénarios CC01 à CC37, avec une colonne par baseline. |
-| `attendu/baseline-AAAA-MM-JJ.json` | Les baselines, une par version de Claude Code mesurée. Une baseline existante n'est jamais modifiée. |
-| `resultats/` | Les rapports normalisés (`context-…` et `payant-…`), commités après la garde de confidentialité. |
+| `attendu/baseline-AAAA-MM-JJ.json` | Les baselines, une par version de Claude Code mesurée, commitées. Elles ne comparent que ce qui ne dépend pas du compte (voir « Ce que compare la baseline »). Une baseline existante n'est jamais modifiée. |
+| `resultats/` | Les rapports normalisés (`context-…` et `payant-…`), écrits après la garde de confidentialité. **Ils restent locaux** : depuis le 2026-11-09, Git les ignore (sauf `.gitkeep`), car ils contiennent des totaux qui dépendent du compte. |
 | `brut/` | Les sorties brutes, les compteurs, le journal de déploiement et le fichier `ARRET.txt`. **Ce dossier est ignoré par Git** : il contient des données locales. |
 
 Les scripts sont dans `../scripts/` : `sonde-claude-code.js` (le lanceur, le seul point de lancement de `claude`), `sonde-claude-code-payant.js` (la partie payante, sans aucun lancement), `sonde-claude-code-commun.js` (le contrat partagé) et `compare-injection-claude.js` (le comparateur).
@@ -34,11 +34,12 @@ Toutes les commandes se lancent depuis la racine du dépôt, dans un **terminal 
 | `npm run sonde:claude -- --confirmer --plafond 38` | La partie payante, séries 1 à 5 | 38 appels au modèle, sur le quota de l'abonnement |
 | `npm run sonde:claude-context -- --preparer-h14` | Déploie le jeu de H14 et affiche les gestes à faire dans VS Code | Nul ici ; 1 appel manuel dans le panneau |
 | `node test/scenarios/scripts/sonde-claude-code.js retirer` | Retire un déploiement laissé en place (interruption, ou H14) | Nul |
+| `npm run sonde:claude-baseline -- --depuis context-AAAA-MM-JJ-HHMM.json` | Écrit `attendu/baseline-<date>.json` d'après un rapport **valide** de `resultats/`, après la garde ; refuse d'écraser une baseline existante | Nul (aucun lancement de `claude`) |
 | `npm run test:injection-claude` | Compare le dernier rapport de `resultats/` à sa baseline | Nul |
 
 Options utiles :
 
-- `--resultats` écrit le rapport normalisé dans `resultats/` au lieu de `brut/` ; c'est ce rapport que l'on commite ;
+- `--resultats` écrit le rapport normalisé dans `resultats/` au lieu de `brut/` ; c'est ce rapport que lisent le comparateur et la commande de baseline (il reste local) ;
 - `--combinaisons a,b` (partie gratuite) et `--series 1,3` (partie payante) relancent une partie seulement ;
 - `--plafond <n>` abaisse le plafond de l'exécution ; il ne peut jamais dépasser 40.
 
@@ -76,6 +77,7 @@ Remove-Item Env:CLAUDE_CONFIG_DIR
 1. `npm run sonde:claude-etat` : les préconditions doivent être remplies.
 2. `npm run sonde:claude-context -- --lot E1 --resultats`.
 3. `npm run test:injection-claude`.
+4. Pour une version sans baseline, et seulement sur décision : `npm run sonde:claude-baseline -- --depuis <rapport valide>`, puis la colonne de la version dans `SCENARIOS-CLAUDE-CODE.md`. On ne commite que la baseline.
 
 Au premier lancement d'un lot, le lanceur archive le compteur du lot précédent dans `brut/` (par exemple `compteur-context-I2.json`) et l'annonce en console. Il ne remet jamais un compteur à zéro, et un lot archivé ne peut pas être rouvert.
 
@@ -117,6 +119,7 @@ Les deux compteurs sont dans `brut/` (`compteur-context.json` et `compteur-model
 
 - **Le rapport** (`resultats/payant-AAAA-MM-JJ-HHMM.json`) donne, pour chaque appel, l'entrée (trois compteurs), la sortie, la somme des quatre compteurs, l'usage par tour, les canaris rapportés et les outils appelés. Le texte des enveloppes de l'appel 4a reste dans `brut/` : le rapport n'en garde que le nombre et l'empreinte.
 - **La décomposition** (`decomposition` du rapport) est calculée sur l'entrée des seules séries valides : préambule, en-têtes de type Project et User, pente par caractère de chemin, constante par élément, enveloppe que `/context` ne voit pas, validité de `/context` comme instrument (protocole 4) et rapport au compte o200k (H15). Une valeur dont une mesure manque vaut `null`.
+- **Ce que compare la baseline** (décision du 2026-11-09) : la présence, le type (ou la source) et les tokens de chaque fixture, et l'écart de chaque combinaison à la base de même jeu d'outils, dans la même série (`delta_base`). Jamais les totaux absolus ni les éléments hors fixtures (skills, plugins et outils du compte), qui changent avec la synchronisation du compte et d'un poste à l'autre. Les outils MCP ne sont comparés qu'en présence (anomalie A2), et l'écart d'une combinaison avec MCP est pris sans la catégorie « MCP tools ». Les observations manuelles (CC07) sont dans les remarques de la baseline.
 - **La comparaison** (`npm run test:injection-claude`) choisit la baseline d'après la version du rapport ou ses `versions_compatibles`. La variable `SONDE_BASELINE_CLAUDE` en impose une (version, date ou nom de fichier), et `SONDE_RAPPORT_CLAUDE` désigne un autre rapport :
 
   ```powershell
@@ -144,4 +147,4 @@ Le fichier bloque tout lancement de `claude`, `--version` compris. Il donne la d
 
 ## La confidentialité
 
-Les rapports de `resultats/` et les baselines de `attendu/` passent par une garde avant toute écriture : aucun chemin absolu (ils sont réécrits en `<global>`, `<parent>`, `<projet>`, `<plugin>`, `<mcp>` et `<memoire>`), aucune adresse, aucun identifiant de session ni d'organisation, et aucun nom de skill, de plugin ou de serveur hors des fixtures (liste blanche `canari*`). Les éléments du compte n'apparaissent qu'en totaux. Le test `claude-injection-contexte` refait ce contrôle sur les fichiers suivis.
+Les rapports de `resultats/` et les baselines de `attendu/` passent par une garde avant toute écriture : aucun chemin absolu (ils sont réécrits en `<global>`, `<parent>`, `<projet>`, `<plugin>`, `<mcp>` et `<memoire>`), aucune adresse, aucun identifiant de session ni d'organisation, et aucun nom de skill, de plugin ou de serveur hors des fixtures (liste blanche `canari*`). Dans les rapports locaux, les éléments du compte n'apparaissent qu'en totaux ; la baseline n'en contient aucun, ni aucun total absolu. Le test `claude-injection-contexte` refait ce contrôle sur les baselines, les documents et les rapports locaux présents dans `resultats/`.

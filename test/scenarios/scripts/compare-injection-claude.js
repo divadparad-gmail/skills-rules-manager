@@ -91,7 +91,13 @@ function problemesBaseline(contenu) {
     if (ids.has(e.id)) out.push(`${e.id} : id en double`);
     ids.add(e.id);
     if (!INSTRUMENTS.has(e.instrument)) out.push(`${e.id} : instrument inconnu`);
-    if (e.instrument === 'context' && (typeof e.combinaison !== 'string' || (!e.element && !e.skill && e.mesure !== 'total'))) out.push(`${e.id} : combinaison et élément attendus`);
+    if (e.instrument === 'context') {
+      // Décision du 2026-11-09 : jamais de total absolu, seulement des fixtures et des écarts à la base.
+      if (e.mesure === 'total') out.push(`${e.id} : total absolu refusé (il dépend du compte)`);
+      else if (typeof e.combinaison !== 'string' || (!e.element && !e.skill && !e.outil_mcp && e.mesure !== 'delta')) out.push(`${e.id} : combinaison et élément attendus`);
+      else if (e.mesure === 'delta' && (!e.attendu || typeof e.attendu.delta !== 'number')) out.push(`${e.id} : attendu.delta attendu`);
+      else if (e.outil_mcp && e.attendu && e.attendu.tokens !== undefined) out.push(`${e.id} : outil MCP comparé en présence seulement (A2)`);
+    }
     if (e.instrument === 'usage' && (typeof e.appel !== 'string' || typeof e.reference !== 'string' || !e.attendu || typeof e.attendu.delta !== 'number')) out.push(`${e.id} : appel, reference et attendu.delta attendus`);
     if (e.instrument === 'canari' && (typeof e.appel !== 'string' || typeof e.canari !== 'string' || typeof e.attendu !== 'boolean')) out.push(`${e.id} : appel, canari et attendu booléen attendus`);
   }
@@ -105,7 +111,15 @@ function observer(entree, rapport) {
   if (entree.instrument === 'context') {
     const combo = (rapport.combinaisons || []).find((c) => c.id === entree.combinaison);
     if (!valide(combo)) return { couverte: false };
-    if (entree.mesure === 'total') return { couverte: true, valeur: combo.total };
+    if (entree.mesure === 'delta') {
+      if (typeof combo.delta_base !== 'number') return { couverte: false };
+      const outilsMcp = entree.sans_outils_mcp ? ((combo.categories || []).find((c) => c.nom === 'MCP tools') || {}).tokens || 0 : 0;
+      return { couverte: true, valeur: combo.delta_base - outilsMcp };
+    }
+    if (entree.outil_mcp) {
+      const t = (combo.mcp_tools || []).find((x) => x.name === entree.outil_mcp);
+      return { couverte: true, valeur: { present: Boolean(t) } };
+    }
     if (entree.element) {
       const m = (combo.memory_files || []).find((f) => f.chemin.toLowerCase() === entree.element.toLowerCase());
       return { couverte: true, valeur: { present: Boolean(m), type: m ? m.type : null, tokens: m ? m.tokens : null } };
@@ -130,7 +144,7 @@ function observer(entree, rapport) {
 function conforme(entree, valeur) {
   if (entree.instrument === 'usage') return Math.abs(valeur - entree.attendu.delta) <= (entree.attendu.tolerance ?? 0);
   if (entree.instrument === 'canari') return valeur === entree.attendu;
-  if (entree.mesure === 'total') return valeur === entree.attendu;
+  if (entree.mesure === 'delta') return Math.abs(valeur - entree.attendu.delta) <= (entree.attendu.tolerance ?? 0);
   const tolerance = entree.attendu.tolerance ?? 0;
   return Object.entries(entree.attendu).every(([k, v]) => {
     if (k === 'tolerance') return true;
@@ -139,7 +153,11 @@ function conforme(entree, valeur) {
   });
 }
 
-/** Une ligne par entrée de la baseline : couverte ou non par le rapport, et écart éventuel. */
+/**
+ * Une ligne par entrée de la baseline : couverte ou non par le rapport, et écart éventuel. Seules les
+ * entrées de la baseline sont comparées : les totaux absolus et les éléments hors fixtures du rapport
+ * ne le sont jamais.
+ */
 function comparer(baseline, rapport) {
   return baseline.entrees.map((entree) => {
     const o = observer(entree, rapport);

@@ -9,6 +9,8 @@
  *   npm run sonde:claude -- --a-sec                 affiche les 38 appels prévus, sans rien lancer ni écrire
  *   npm run sonde:claude -- --confirmer --plafond <n> [--series 1,3] [--resultats]   partie payante
  *   node test/scenarios/scripts/sonde-claude-code.js retirer   retrait d'un déploiement (interrompu, ou H14)
+ *   npm run sonde:claude-baseline -- --depuis <context-…json>   écrit attendu/baseline-<date>.json d'après un
+ *                           rapport valide de resultats/, après la garde ; aucun lancement de claude
  * Options de « context » :
  *   --lot <E1|E2>           lot du compteur de /context (obligatoire) ; au changement de lot, l'ancien
  *                           compteur est archivé dans brut/, et un lot archivé ne peut pas être rouvert
@@ -49,6 +51,7 @@ const path = require('path');
 const { spawn, spawnSync } = require('child_process');
 const commun = require('./sonde-claude-code-commun');
 const payant = require('./sonde-claude-code-payant');
+const constructionBaseline = require('./sonde-claude-code-baseline');
 
 const RACINE_DEPOT = path.resolve(__dirname, '..', '..', '..');
 const SUITE = path.join(RACINE_DEPOT, 'test', 'scenarios', 'claude-code-injection-contexte');
@@ -58,6 +61,7 @@ const INVENTAIRE = path.join(SUITE, 'inventaire.json');
 const SONDE = path.join(SUITE, 'SONDE.md');
 const BRUT = path.join(SUITE, 'brut');
 const RESULTATS = path.join(SUITE, 'resultats');
+const ATTENDU = path.join(SUITE, 'attendu');
 
 const LOTS_CONTEXT = Object.keys(payant.COMPTEURS.context.plafonds);
 const MODELE = 'claude-opus-5';
@@ -1560,14 +1564,48 @@ async function commandePayant(args) {
   return 0;
 }
 
+/**
+ * Écrit attendu/baseline-<date>.json d'après un rapport « context » de resultats/, après la garde de
+ * confidentialité. Ne lance jamais claude, et n'écrase jamais une baseline existante.
+ */
+function commandeBaseline(reste, { resultats = RESULTATS, attendu = ATTENDU, poste = commun.lirePoste() } = {}) {
+  if (reste.length !== 2 || reste[0] !== '--depuis') throw new Refus('Usage : sonde-claude-code.js baseline --depuis <context-AAAA-MM-JJ-HHMM.json>');
+  const nom = reste[1];
+  if (!constructionBaseline.NOM_RAPPORT_CONTEXT.test(nom)) throw new Refus('rapport refusé : un nom context-AAAA-MM-JJ-HHMM.json de resultats/ est attendu');
+  const fichier = path.join(resultats, nom);
+  if (!fs.existsSync(fichier)) throw new Refus(`rapport introuvable dans resultats/ : ${nom}`);
+  let rapport;
+  try {
+    rapport = JSON.parse(fs.readFileSync(fichier, 'utf8'));
+  } catch {
+    throw new Refus(`rapport illisible : ${nom}`);
+  }
+  let baseline;
+  try {
+    baseline = constructionBaseline.baselineDepuisRapport(rapport, { source: nom });
+  } catch (err) {
+    throw new Refus(`baseline refusée : ${err.message}`);
+  }
+  const texte = `${JSON.stringify(baseline, null, 2)}\n`;
+  const problemes = [...commun.problemesTexte(texte, poste, [process.env.LOCALAPPDATA].filter(Boolean)), ...commun.problemesJson(texte)];
+  if (problemes.length > 0) throw new Refus(`garde de confidentialité : baseline non écrite (${problemes.join(' ; ')})`);
+  const cible = path.join(attendu, `baseline-${baseline.baseline}.json`);
+  if (fs.existsSync(cible)) throw new Refus(`une baseline existe déjà pour cette date (${path.basename(cible)}) : une baseline existante n'est jamais modifiée`);
+  fs.mkdirSync(attendu, { recursive: true });
+  fs.writeFileSync(cible, texte, { encoding: 'utf8', flag: 'wx' });
+  console.log(`[sonde-claude] Baseline écrite : ${path.relative(RACINE_DEPOT, cible).replace(/\\/g, '/')} (${baseline.entrees.length} entrées, version ${baseline.environnement.version}).`);
+  return 0;
+}
+
 async function principal(argv) {
   const [commande, ...reste] = argv;
   try {
     if (commande === 'etat' && reste.length === 0) return await commandeEtat();
+    if (commande === 'baseline') return commandeBaseline(reste);
     if (commande === 'context') return await commandeContext(reste);
     if (commande === 'payant') return await commandePayant(reste);
     if (commande === 'retirer' && reste.length === 0) return await commandeRetirer();
-    throw new Refus('Usage : node test/scenarios/scripts/sonde-claude-code.js <etat|context|payant|retirer> (voir l\'en-tête du fichier)');
+    throw new Refus('Usage : node test/scenarios/scripts/sonde-claude-code.js <etat|context|payant|retirer|baseline> (voir l\'en-tête du fichier)');
   } catch (err) {
     const message = masquer(err && err.message ? err.message : String(err));
     if (err instanceof Arret) {
@@ -1596,7 +1634,7 @@ module.exports = {
   controlerAppel, verifierArret, ecrireArret, lireCompteur, verifierBudget, reserverContext, ouvrirLotAnnonce,
   racinesNormalisation, reecrireChemin, fixturesAttendues, o200kDuPlan, normaliserCombinaison, comparerBases,
   listerProfil, ecartsProfil, listerFixtures, fichiersADeployer, deployer, retirer, lancerClaude, ecrireRapport,
-  lireOptions, nettoyerRaison, preparerEtape, comparerBornesSerie, principal,
+  lireOptions, nettoyerRaison, preparerEtape, comparerBornesSerie, commandeBaseline, principal,
 };
 
 if (require.main === module) {
