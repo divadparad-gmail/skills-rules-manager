@@ -438,7 +438,7 @@ describe('Suite de Tests : Lanceur de la sonde Claude Code (lot I2, sans lancer 
         serie: { valide: true, raisons_rejet: [] },
         bases: { vide: { debut: entree, fin: entree, identiques: true } },
         combinaisons: [{ id: 'jeu', jeux: ['jeu'], outils: 'vide', ...entree }],
-        profil: { ecarts_connus: [{ motif: '.claude.json', nombre: 1 }], ecarts_inconnus: 0 },
+        profil: { zones_sonde: { ecarts: 1, en_cause: [{ zone: 'segment « canari »', nombre: 1, ajoutes: 1, modifies: 0, retires: 0, chemins: ['skills/canari-x/SKILL.md'] }] }, hors_zones: [{ groupe: 'cache', nombre: 1, ajoutes: 0, modifies: 1, retires: 0 }] },
       };
       const ecrit = S.ecrireRapport(rapport, { destination: 'brut', nom: 'context-2026-01-01-0000.json', poste: POSTE, interdits, dossiers });
       assert.strictEqual(path.dirname(ecrit), brut);
@@ -471,7 +471,7 @@ describe('Suite de Tests : Lanceur de la sonde Claude Code (lot I2, sans lancer 
     }
   });
 
-  test('13. Profil isolé : liste sans jamais ouvrir .credentials.json, écarts connus nommés, écarts inconnus signalés', () => {
+  test('13. Profil isolé : liste sans jamais ouvrir .credentials.json ; hors des zones de la sonde, écarts comptés par premier segment, sans nom ni rejet', () => {
     const profil = tmp('profil');
     const ouverts: string[] = [];
     const originaux = { readFileSync: fs.readFileSync, openSync: fs.openSync, readFile: fs.readFile, createReadStream: fs.createReadStream };
@@ -495,86 +495,157 @@ describe('Suite de Tests : Lanceur de la sonde Claude Code (lot I2, sans lancer 
       supprimer(profil);
     }
 
+    // Le contrôle par zones (décision du 2026-11-10) : un écart hors zones est compté sans nom ni rejet
     const m = 'C--exemple-projet';
+    const zones = C.zonesSonde([...C.lireInventaire(fs.readFileSync(path.join(ROOT, 'test', 'scenarios', 'claude-code-injection-contexte', 'inventaire.json'), 'utf8')).keys()]);
     const avant = new Map<string, { type: string; taille: number }>([
       ['.claude.json', { type: 'f', taille: 100 }], ['.credentials.json', { type: 'f', taille: 400 }], ['backups', { type: 'd', taille: 0 }],
-      ['backups/.claude.json.backup.1', { type: 'f', taille: 90 }], ['policy-limits.json.signature.json', { type: 'f', taille: 3005 }],
-      ['skills', { type: 'd', taille: 0 }],
+      ['backups/.claude.json.backup.1', { type: 'f', taille: 90 }], ['policy-limits.json', { type: 'f', taille: 50 }],
+      ['cache', { type: 'd', taille: 0 }], ['cache/model-catalog', { type: 'd', taille: 0 }], ['cache/model-catalog/x', { type: 'f', taille: 10 }],
+      ['skills', { type: 'd', taille: 0 }], ['skills/synced', { type: 'd', taille: 0 }], ['skills/synced/x', { type: 'f', taille: 5 }],
     ]);
     const apres = new Map(avant);
     apres.set('.claude.json', { type: 'f', taille: 120 });
     apres.delete('backups/.claude.json.backup.1');
     apres.set('backups/.claude.json.backup.2', { type: 'f', taille: 100 });
-    apres.set('policy-limits.json.signature.json', { type: 'f', taille: 3000 });
-    for (const d of ['projects', `projects/${m}`, `projects/${m}/memory`, 'session-env', 'session-env/id-exemple', 'statsig']) apres.set(d, { type: 'd', taille: 0 });
-    apres.set(`projects/${m}/memory/MEMORY.md`, { type: 'f', taille: 10 });
-    apres.set('statsig/x', { type: 'f', taille: 1 });
+    apres.set('cache/model-catalog/x', { type: 'f', taille: 11 });
+    apres.set('policy-limits.json', { type: 'f', taille: 60 });
+    apres.set('skills/synced/x', { type: 'f', taille: 6 });
+    apres.set('session-env', { type: 'd', taille: 0 });
+    apres.set('session-env/id-exemple', { type: 'd', taille: 0 });
     apres.set('.credentials.json', { type: 'f', taille: 410 });
-    apres.delete('skills');
-    const ecarts = S.ecartsProfil(avant, apres, m);
-    assert.deepStrictEqual(ecarts.connus, [
-      { motif: '.claude.json', nombre: 1, ajoutes: 0, modifies: 1, retires: 0 },
-      { motif: 'policy-limits.json.signature.json', nombre: 1, ajoutes: 0, modifies: 1, retires: 0 },
-      { motif: 'backups/.claude.json.backup.*', nombre: 2, ajoutes: 1, modifies: 0, retires: 1 },
-      { motif: 'projects/<memoire>/memory/ (vide)', nombre: 3, ajoutes: 3, modifies: 0, retires: 0 },
-      { motif: 'session-env/<id>/ (vide)', nombre: 2, ajoutes: 2, modifies: 0, retires: 0 },
+    const ecarts = S.ecartsProfil(avant, apres, m, zones);
+    assert.deepStrictEqual(ecarts.zones, [], 'aucun écart hors zones ne rejette');
+    assert.deepStrictEqual(ecarts.hors_zones, [
+      { groupe: '.claude.json', nombre: 1, ajoutes: 0, modifies: 1, retires: 0 },
+      { groupe: '.credentials.json', nombre: 1, ajoutes: 0, modifies: 1, retires: 0 },
+      { groupe: 'backups', nombre: 2, ajoutes: 1, modifies: 0, retires: 1 },
+      { groupe: 'cache', nombre: 1, ajoutes: 0, modifies: 1, retires: 0 },
+      { groupe: 'policy-limits.json', nombre: 1, ajoutes: 0, modifies: 1, retires: 0 },
+      { groupe: 'session-env', nombre: 2, ajoutes: 2, modifies: 0, retires: 0 },
+      { groupe: 'skills/synced', nombre: 1, ajoutes: 0, modifies: 1, retires: 0 },
     ]);
-    assert.deepStrictEqual(ecarts.inconnus.map((e: any) => `${e.nature} ${e.chemin}`).sort(), [
-      'ajouté projects/C--exemple-projet/memory/MEMORY.md', 'ajouté statsig', 'ajouté statsig/x', 'modifié .credentials.json', 'retiré skills',
+    const resume = S.resumeProfil(ecarts, m);
+    assert.deepStrictEqual(resume.zones_sonde, { ecarts: 0, en_cause: [] });
+    const texte = JSON.stringify(resume);
+    for (const nom of ['model-catalog', 'backup.2', 'id-exemple', '/x']) assert.ok(!texte.includes(nom), `aucun nom de fichier hors zones (${nom})`);
+    assert.deepStrictEqual(S.lignesProfil(resume), [
+      'zones de la sonde : 0 écart(s)',
+      'hors zones (sans rejet) : .claude.json : 0 ajouté(s), 1 modifié(s), 0 retiré(s) ; .credentials.json : 0 ajouté(s), 1 modifié(s), 0 retiré(s) ; backups : 1 ajouté(s), 0 modifié(s), 1 retiré(s) ; cache : 0 ajouté(s), 1 modifié(s), 0 retiré(s) ; policy-limits.json : 0 ajouté(s), 1 modifié(s), 0 retiré(s) ; session-env : 2 ajouté(s), 0 modifié(s), 0 retiré(s) ; skills/synced : 0 ajouté(s), 1 modifié(s), 0 retiré(s)',
     ]);
-    assert.deepStrictEqual(S.ecartsProfil(avant, new Map(avant), m), { connus: [], inconnus: [] });
+    assert.deepStrictEqual(S.ecartsProfil(avant, new Map(avant), m, zones), { zones: [], hors_zones: [] });
+    // Sans liste explicite, les zones sont celles de l'inventaire du dépôt
+    assert.deepStrictEqual(S.ecartsProfil(avant, apres, m), ecarts);
   });
 
-  test('13b. Synchronisation du compte : skills/synced/ et policy-limits.json tolérés et comptés sans nom, voisins inconnus, cibles refusées', () => {
+  test('13b. Zones de la sonde : dérivées des cibles « global » de l\'inventaire ; un écart dans chaque zone rejette, nommé seulement dans brut/', () => {
     const m = 'C--exemple-projet';
-    const avant = new Map<string, { type: string; taille: number }>([
-      ['skills', { type: 'd', taille: 0 }], ['skills/synced', { type: 'd', taille: 0 }],
-      ['skills/synced/skill-a', { type: 'd', taille: 0 }], ['skills/synced/skill-a/SKILL.md', { type: 'f', taille: 10 }],
-      ['skills/synced/skill-b', { type: 'd', taille: 0 }], ['skills/synced/skill-b/SKILL.md', { type: 'f', taille: 20 }],
-      ['policy-limits.json', { type: 'f', taille: 50 }], ['policy-limits.json.bak', { type: 'f', taille: 50 }],
+    const inventaire = C.lireInventaire(fs.readFileSync(path.join(ROOT, 'test', 'scenarios', 'claude-code-injection-contexte', 'inventaire.json'), 'utf8'));
+    const rels = [...new Set([...inventaire.keys(), ...S.listerFixtures()])] as string[];
+    const zones = C.zonesSonde([...inventaire.keys()]);
+    // La dérivation donne exactement les zones décidées le 2026-11-10
+    assert.deepStrictEqual(zones, [
+      { type: 'fichier', chemin: 'CLAUDE.md' },
+      { type: 'dossier', chemin: 'projects/<memoire>' },
+      { type: 'dossier', chemin: 'rules' },
+      { type: 'dossier', chemin: 'skills' },
     ]);
-    const apres = new Map(avant);
-    apres.set('skills/synced/skill-a/SKILL.md', { type: 'f', taille: 11 });
-    apres.delete('skills/synced/skill-b/SKILL.md');
-    apres.delete('skills/synced/skill-b');
-    apres.set('skills/synced/skill-c', { type: 'd', taille: 0 });
-    apres.set('skills/synced/skill-c/SKILL.md', { type: 'f', taille: 30 });
-    apres.set('policy-limits.json', { type: 'f', taille: 60 });
-    // Les voisins restent des écarts inconnus
-    apres.set('skills/syncedX', { type: 'f', taille: 1 });
-    apres.set('skills/canari-x', { type: 'd', taille: 0 });
-    apres.set('skills/canari-x/SKILL.md', { type: 'f', taille: 1 });
-    apres.set('policy-limits.json.bak', { type: 'f', taille: 51 });
-    apres.set('synced/policy-limits.json', { type: 'f', taille: 1 });
-    const ecarts = S.ecartsProfil(avant, apres, m);
-    assert.deepStrictEqual(ecarts.connus, [
-      { motif: 'skills/synced/**', nombre: 5, ajoutes: 2, modifies: 1, retires: 2 },
-      { motif: 'policy-limits.json', nombre: 1, ajoutes: 0, modifies: 1, retires: 0 },
+    // Chaque cible « global » de l'inventaire et du dossier des fixtures tombe dans une zone
+    const globales = rels.map((rel) => C.convertir(rel, m)).filter((c: any) => c.cible === 'global');
+    assert.ok(globales.length >= 5);
+    for (const c of globales) assert.ok(C.zoneDe(c.chemin, zones, m), `cible hors zones : ${c.chemin}`);
+    // Une règle de dérivation par forme de cible (fixtures synthétiques)
+    assert.deepStrictEqual(C.zonesSonde(['j/global/AGENTS.md.fixture', 'j/global/_claude/agents/a.md.fixture', 'j/global/projects/__projet__/x.md.fixture', 'j/projet/CLAUDE.md.fixture']), [
+      { type: 'dossier', chemin: '.claude' }, { type: 'fichier', chemin: 'AGENTS.md' }, { type: 'dossier', chemin: 'projects/<memoire>' },
     ]);
-    assert.ok(!JSON.stringify(ecarts.connus).includes('skill-'), 'aucun nom de fichier dans les écarts connus');
-    assert.deepStrictEqual(ecarts.inconnus.map((e: any) => `${e.nature} ${e.chemin}`).sort(), [
-      'ajouté skills/canari-x', 'ajouté skills/canari-x/SKILL.md', 'ajouté skills/syncedX', 'ajouté synced/policy-limits.json', 'modifié policy-limits.json.bak',
-    ]);
-    // policy-limits.json : ajout toléré, retrait inconnu ; skills/synced créé pendant la série : toléré
-    assert.deepStrictEqual(S.ecartsProfil(new Map(), new Map([['policy-limits.json', { type: 'f', taille: 1 }], ['skills/synced', { type: 'd', taille: 0 }]]), m).connus, [
-      { motif: 'policy-limits.json', nombre: 1, ajoutes: 1, modifies: 0, retires: 0 },
-      { motif: 'skills/synced/**', nombre: 1, ajoutes: 1, modifies: 0, retires: 0 },
-    ]);
-    assert.deepStrictEqual(S.ecartsProfil(new Map([['policy-limits.json', { type: 'f', taille: 1 }]]), new Map(), m).inconnus, [{ chemin: 'policy-limits.json', nature: 'retiré' }]);
 
-    // Le plan de déploiement refuse toute cible du profil sous skills/synced/ ou égale à policy-limits.json
+    // Un écart de fichier dans chaque zone rejette (ajout, modification, retrait)
+    const base = new Map<string, { type: string; taille: number }>([
+      ['CLAUDE.md', { type: 'f', taille: 10 }], ['rules', { type: 'd', taille: 0 }], ['rules/x.md', { type: 'f', taille: 5 }],
+      ['skills', { type: 'd', taille: 0 }], ['projects', { type: 'd', taille: 0 }], [`projects/${m}`, { type: 'd', taille: 0 }],
+      [`projects/${m}/memory`, { type: 'd', taille: 0 }], [`projects/${m}/memory/MEMORY.md`, { type: 'f', taille: 4 }], ['cache', { type: 'd', taille: 0 }],
+    ]);
+    const cas: [string, (a: Map<string, any>) => void, string, string][] = [
+      ['CLAUDE.md modifié', (a) => a.set('CLAUDE.md', { type: 'f', taille: 11 }), 'CLAUDE.md', 'modifié'],
+      ['claude.md (casse)', (a) => a.set('claude.md', { type: 'f', taille: 1 }), 'CLAUDE.md', 'ajouté'],
+      ['rules/x retiré', (a) => a.delete('rules/x.md'), 'rules/', 'retiré'],
+      ['skills/autre ajouté', (a) => a.set('skills/autre.md', { type: 'f', taille: 1 }), 'skills/', 'ajouté'],
+      ['skills/canari-x ajouté', (a) => a.set('skills/canari-x', { type: 'f', taille: 1 }), C.ZONE_CANARI, 'ajouté'],
+      ['mémoire ajoutée', (a) => a.set(`projects/${m}/memory/x.md`, { type: 'f', taille: 3 }), 'projects/<memoire>/', 'ajouté'],
+      ['MEMORY.md retiré', (a) => a.delete(`projects/${m}/memory/MEMORY.md`), 'projects/<memoire>/', 'retiré'],
+      ['fichier canari ailleurs', (a) => a.set('cache/Mon-CANARI.txt', { type: 'f', taille: 1 }), C.ZONE_CANARI, 'ajouté'],
+      ['canari sous skills/synced', (a) => a.set('skills/synced/canari-s', { type: 'f', taille: 1 }), C.ZONE_CANARI, 'ajouté'],
+      ['lien dans une zone', (a) => a.set('rules/lien', { type: 'l', taille: 0 }), 'rules/', 'ajouté'],
+    ];
+    for (const [nom, modifier, zone, nature] of cas) {
+      const apresCas = new Map(base);
+      modifier(apresCas);
+      const e: any = S.ecartsProfil(base, apresCas, m, zones);
+      assert.deepStrictEqual(e.zones.map((z: any) => [z.zone, z.nature]), [[zone, nature]], nom);
+      assert.deepStrictEqual(e.hors_zones, [], nom);
+    }
+    // Dans une zone, un dossier seul ne rejette pas : il est compté hors rejet, par premier segment
+    const dossiers = new Map(base);
+    dossiers.set('skills/canari-vide', { type: 'd', taille: 0 });
+    dossiers.set('rules/sous', { type: 'd', taille: 0 });
+    dossiers.delete('cache');
+    const ed: any = S.ecartsProfil(base, dossiers, m, zones);
+    assert.deepStrictEqual(ed.zones, []);
+    assert.deepStrictEqual(ed.hors_zones.map((g: any) => [g.groupe, g.ajoutes, g.retires]), [['cache', 0, 1], ['rules', 1, 0], ['skills', 1, 0]]);
+    // Hors zones : un autre dossier de projets, des voisins de rules et de CLAUDE.md, un cache
+    const voisins = new Map(base);
+    for (const [rel, type] of [['projects/autre-projet', 'd'], ['projects/autre-projet/memory', 'd'], ['rules-bak', 'f'], ['CLAUDE.md.bak', 'f'], ['statsig', 'd'], ['statsig/x', 'f']]) voisins.set(rel, { type, taille: 1 });
+    const ev = S.ecartsProfil(base, voisins, m, zones);
+    assert.deepStrictEqual(ev.zones, []);
+    assert.deepStrictEqual(ev.hors_zones.map((g: any) => [g.groupe, g.nombre]), [['CLAUDE.md.bak', 1], ['projects', 2], ['rules-bak', 1], ['statsig', 2]]);
+    // Le résumé du rapport : la zone en cause, comptée par nature ; seul un chemin canari est cité, mémoire masquée
+    const apres = new Map(base);
+    apres.set('rules/secret-reel.md', { type: 'f', taille: 1 });
+    apres.set(`projects/${m}/memory/canari-m.md`, { type: 'f', taille: 1 });
+    apres.set('cache/model-catalog', { type: 'd', taille: 0 });
+    const e: any = S.ecartsProfil(base, apres, m, zones);
+    const resume = S.resumeProfil(e, m);
+    assert.deepStrictEqual(resume.zones_sonde, {
+      ecarts: 2,
+      en_cause: [
+        { zone: 'rules/', nombre: 1, ajoutes: 1, modifies: 0, retires: 0 },
+        { zone: C.ZONE_CANARI, nombre: 1, ajoutes: 1, modifies: 0, retires: 0, chemins: ['projects/<memoire>/memory/canari-m.md'] },
+      ],
+    });
+    assert.deepStrictEqual(resume.hors_zones, [{ groupe: 'cache', nombre: 1, ajoutes: 1, modifies: 0, retires: 0 }]);
+    assert.ok(!JSON.stringify(resume).includes('secret-reel') && !JSON.stringify(resume).includes(m), 'aucun nom réel hors canari, dossier de mémoire masqué');
+    assert.match(S.lignesProfil(resume)[0], /^zones de la sonde : 2 écart\(s\) ; rules\/ : 1 ajouté/);
+    assert.ok(e.zones.some((z: any) => z.chemin === 'rules/secret-reel.md'), 'le détail nommé reste dans ecarts-profil.json (brut/)');
+
+    // Le plan de déploiement refuse toujours toute cible du profil sous skills/synced/ ou égale à policy-limits.json
     for (const rel of ['j/global/skills/synced/canari-s/SKILL.md.fixture', 'j/global/skills/Synced/x.md.fixture', 'j/global/policy-limits.json.fixture']) {
       assert.throws(() => planW([rel], ['j']), /réservée à la synchronisation du compte/, rel);
     }
-    for (const rel of ['j/global/skills/syncedX/a.md.fixture', 'j/global/policy-limits.json.bak.fixture', 'j/projet/policy-limits.json.fixture']) {
-      assert.strictEqual(planW([rel], ['j']).length, 1, rel);
-    }
-    // Aucune fixture, ni de l'inventaire ni du dossier, ne vise ces chemins
-    const inventaire = C.lireInventaire(fs.readFileSync(path.join(ROOT, 'test', 'scenarios', 'claude-code-injection-contexte', 'inventaire.json'), 'utf8'));
-    const rels = [...new Set([...inventaire.keys(), ...S.listerFixtures()])] as string[];
-    assert.ok(rels.length > 0);
     const visees = rels.map((rel) => C.convertir(rel)).filter((c: any) => c.cible === 'global' && C.cheminSynchronise(c.chemin));
     assert.deepStrictEqual(visees, []);
+  });
+
+  test('13c. Profil neuf (portabilité) : projects/<memoire>/memory/ créé vide par Claude Code → série non rejetée ; un fichier ajouté dedans → série rejetée', () => {
+    const profil = tmp('profil-neuf');
+    const m = 'C--exemple-projet';
+    const zones = C.zonesSonde([...C.lireInventaire(fs.readFileSync(path.join(ROOT, 'test', 'scenarios', 'claude-code-injection-contexte', 'inventaire.json'), 'utf8')).keys()]);
+    try {
+      fs.writeFileSync(path.join(profil, '.claude.json'), '{}');
+      const avant = S.listerProfil(profil);
+      // Claude Code crée le dossier de mémoire, vide, pendant la série
+      fs.mkdirSync(path.join(profil, 'projects', m, 'memory'), { recursive: true });
+      const vide: any = S.ecartsProfil(avant, S.listerProfil(profil), m, zones);
+      assert.deepStrictEqual(vide.zones, [], 'aucun écart dans les zones : la série n\'est pas rejetée');
+      assert.deepStrictEqual(vide.hors_zones, [{ groupe: 'projects', nombre: 3, ajoutes: 3, modifies: 0, retires: 0 }]);
+      assert.deepStrictEqual(S.resumeProfil(vide, m).zones_sonde, { ecarts: 0, en_cause: [] });
+      // Un fichier ajouté dans ce dossier rejette la série
+      fs.writeFileSync(path.join(profil, 'projects', m, 'memory', 'notes.md'), 'x');
+      const fichier: any = S.ecartsProfil(avant, S.listerProfil(profil), m, zones);
+      assert.deepStrictEqual(fichier.zones, [{ zone: 'projects/<memoire>/', chemin: `projects/${m}/memory/notes.md`, nature: 'ajouté' }]);
+      assert.deepStrictEqual(S.resumeProfil(fichier, m).zones_sonde, { ecarts: 1, en_cause: [{ zone: 'projects/<memoire>/', nombre: 1, ajoutes: 1, modifies: 0, retires: 0 }] });
+    } finally {
+      supprimer(profil);
+    }
   });
 
   test('14. Bases : identiques au début et à la fin, sinon la série est rejetée', () => {

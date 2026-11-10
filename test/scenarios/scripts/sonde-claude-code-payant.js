@@ -30,10 +30,11 @@ const MAX_SERIES_REJETEES = 2;
 
 /**
  * Les deux compteurs, distincts : un fichier et des plafonds par lot chacun. V1 (décision du 2026-11-10)
- * est le lot des vérifications de version : /context seulement, plafond de 30, sans compteur du modèle.
+ * est le lot des vérifications de version : /context seulement, plafond de 60 (relevé de 30 le même jour),
+ * sans compteur du modèle.
  */
 const COMPTEURS = {
-  context: { fichier: 'compteur-context.json', plafonds: { E1: 60, E2: 40, V1: 30 }, unite: '/context' },
+  context: { fichier: 'compteur-context.json', plafonds: { E1: 60, E2: 40, V1: 60 }, unite: '/context' },
   modele: { fichier: 'compteur-modele.json', plafonds: { E2: PLAFOND_MODELE }, unite: 'appel(s) au modèle' },
 };
 
@@ -53,6 +54,7 @@ const refusContextSeul = (lot) => new Refus(`le lot ${lot} (vérification de ver
 const RELEVEMENTS_PLAFOND = {
   context: {
     E1: { ancien: 50, nouveau: 60, date: '2026-11-09', motif: 'série E1 du 2026-11-09 rejetée pour des écarts de synchronisation du profil : relance décidée explicitement' },
+    V1: { ancien: 30, nouveau: 60, date: '2026-11-10', motif: 'série V1 rejetée pour un cache de Claude Code hors des zones de la sonde ; relance décidée explicitement' },
   },
 };
 for (const [type, lots] of Object.entries(RELEVEMENTS_PLAFOND)) {

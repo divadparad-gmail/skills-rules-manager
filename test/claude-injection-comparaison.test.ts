@@ -58,7 +58,7 @@ const rapportContext = (): any => {
       { id: 'skills', jeux: ['skills'], outils: 'Skill', mcp: [], total: 9393, delta_base: 672, categories: [{ nom: 'System prompt', tokens: 3150 }, { nom: 'Skills', tokens: 6235 }], memory_files: [], skills: [{ name: 'canari-p1', source: 'projectSettings', tokens: 29 }], mcp_tools: [], hors_fixtures: hors(), init: { nombre_skills: 41 }, fixtures_absentes: ['skill canari-cache'] },
       { id: 'mcp-long', jeux: ['mcp-long'], outils: 'vide', mcp: ['mcp-long'], total: 6078, delta_base: 2984, categories: [{ nom: 'System prompt', tokens: 3086 }, { nom: 'MCP tools', tokens: 1411 }, { nom: 'MCP server instructions', tokens: 1573 }], memory_files: [], skills: [], mcp_tools: [{ name: 'mcp__canari-mcp-long__canari_outil_long', server: 'canari-mcp-long', tokens: 1411 }], hors_fixtures: hors(), init: { nombre_skills: 41 }, fixtures_absentes: [] },
     ],
-    profil: { ecarts_connus: [], ecarts_inconnus: 0 },
+    profil: { zones_sonde: { ecarts: 0, en_cause: [] }, hors_zones: [] },
   };
 };
 const baselineConnue =(contenu: object, fichier = 'baseline-2026-11-05.json') => ({ fichier, date: fichier.slice(9, 19), contenu });

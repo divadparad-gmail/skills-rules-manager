@@ -56,7 +56,17 @@ Le lanceur les vérifie et refuse de partir si l'une manque.
 
 Les chemins par défaut sont calculés : le profil est `%LOCALAPPDATA%\canari-claude-code\config`, l'espace `<lecteur système>\canari-claude-code\espace`, et l'exécutable est cherché dans le `PATH` (jamais un `.cmd`). Les variables `CANARI_CLAUDE_CONFIG_DIR`, `CANARI_CLAUDE_ESPACE` et `CANARI_CLAUDE_EXE` les remplacent.
 
-Après chaque série, le profil isolé est comparé à son état du début. Un écart inconnu rejette la série. Les écarts connus sont tolérés et comptés par motif et par nature (ajoutés, modifiés, retirés), sans nom de fichier : ce sont les caches de Claude Code et, depuis le 2026-11-09, la synchronisation du compte, qui modifie `skills/synced/` et `policy-limits.json` pendant une série. Aucune fixture ne peut viser ces deux chemins.
+Après chaque série, le profil isolé est comparé à son état du début. Depuis la décision du 2026-11-10, qui précise D5 (« tout écart dans les zones de la sonde rejette la série »), seul un écart de **fichier** dans **les zones où la sonde écrit elle-même** rejette la série. Un dossier vide créé ou retiré par Claude Code dans une zone (par exemple `projects/<memoire>/memory/` sur un profil neuf) est compté sans rejet, comme les écarts hors zones. Les zones sont :
+
+- `CLAUDE.md` à la racine du profil ;
+- `rules/` et tout ce qu'il contient ;
+- `skills/` et tout ce qu'il contient, sauf `skills/synced/` (synchronisation du compte) ;
+- `projects/<dossier de mémoire de l'espace>/` et tout ce qu'il contient ;
+- tout chemin dont un segment contient « canari », sans tenir compte de la casse.
+
+Ces zones sont dérivées des cibles « global » de `inventaire.json` (`zonesSonde` dans `sonde-claude-code-commun.js`), et un test vérifie que chaque cible « global » tombe dans une zone. Le rapport donne « zones de la sonde : n écart(s) », avec la zone en cause, sans nom de fichier réel hors canari ; le détail nommé reste dans `brut/`.
+
+Ailleurs, les changements faits par Claude Code lui-même (caches, sauvegardes, `session-env`, synchronisation du compte, `.claude.json`…) sont comptés **sans rejet**, par premier segment de chemin (`skills/synced` à part), avec les nombres d'ajoutés, de modifiés et de retirés, jamais les noms de fichiers. `.credentials.json` n'est jamais lu : seul un changement de taille peut y être compté. La garantie de validité d'une série reste la comparaison des bases au début et à la fin. Aucune fixture ne peut viser `skills/synced/` ni `policy-limits.json`.
 
 ## Connecter le profil isolé (une seule fois)
 
@@ -85,7 +95,7 @@ Au premier lancement d'un lot, le lanceur archive le compteur du lot précédent
 
 ### 1 bis. La vérification d'une nouvelle version (lot V1)
 
-Le lot V1 (décision du 2026-11-10) sert aux vérifications de version : il n'accepte que `/context`, avec un plafond de 30 et son propre compteur. Toute commande payante y est refusée (`--lot V1` sur `sonde:claude`, appel au modèle, compteur du modèle).
+Le lot V1 (décision du 2026-11-10) sert aux vérifications de version : il n'accepte que `/context`, avec un plafond de 60 et son propre compteur. Le plafond, d'abord de 30, a été relevé à 60 le 2026-11-10 par `RELEVEMENTS_PLAFOND`, en gardant les 26 utilisés, après une série V1 rejetée pour un cache de Claude Code hors des zones de la sonde. Toute commande payante y est refusée (`--lot V1` sur `sonde:claude`, appel au modèle, compteur du modèle).
 
 1. `npm run sonde:claude-etat` : noter la version, et vérifier les préconditions.
 2. `npm run sonde:claude-context -- --lot V1 --resultats` (26 `/context`). Au premier lancement, le compteur E1 est archivé sous `brut/compteur-context-E1.json`, et le lot E1 ne peut plus être rouvert.
@@ -130,7 +140,7 @@ Le déroulement :
 | Partie | Appels au modèle | `/context` | Plafond |
 |---|---|---|---|
 | Gratuite (E1) | 0 | 26 | 60 `/context` pour le lot E1 (relevé de 50 le 2026-11-09) |
-| Vérification de version (V1) | 0 (refusés) | 26 | 30 `/context` pour le lot V1 |
+| Vérification de version (V1) | 0 (refusés) | 26 | 60 `/context` pour le lot V1 (relevé de 30 le 2026-11-10) |
 | Payante (E2) | 38 (séries 1 à 5 : 17, 6, 4, 3 et 8) | 33 | 40 appels au modèle et 40 `/context` pour le lot E2 |
 | H14 (E3) | 1, tapé à la main | 1 | — |
 

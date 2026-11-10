@@ -151,20 +151,19 @@ describe('Suite de Tests : Partie payante de la sonde Claude Code (lot I3, sans 
     }
   });
 
-  test('4c. Lot V1 (vérification de version) : accepté, plafonné à 30, compteur propre, E1 archivé sans réouverture, payant refusé', async () => {
+  test('4c. Lot V1 (vérification de version) : accepté, plafond de 60, compteur propre, E1 archivé sans réouverture, payant refusé', async () => {
     const brut = tmp('v1');
     const f = path.join(brut, 'compteur-context.json');
     const journal: string[] = [];
     const log = console.log;
     const erreurs = console.error;
     try {
-      // Accepté par --lot, plafond de 30, aucun compteur du modèle ni relèvement
+      // Accepté par --lot, plafond de 60 (relevé de 30 le 2026-11-10), aucun compteur du modèle
       assert.deepStrictEqual(S.LOTS_CONTEXT, ['E1', 'E2', 'V1']);
       assert.strictEqual(S.lireOptions(['--lot', 'V1', '--resultats']).lot, 'V1');
-      assert.strictEqual(P.COMPTEURS.context.plafonds.V1, 30);
+      assert.strictEqual(P.COMPTEURS.context.plafonds.V1, 60);
       assert.deepStrictEqual(P.LOTS_CONTEXT_SEUL, ['V1']);
       assert.ok(!Object.prototype.hasOwnProperty.call(P.COMPTEURS.modele.plafonds, 'V1'));
-      assert.ok(!Object.prototype.hasOwnProperty.call(P.RELEVEMENTS_PLAFOND.context, 'V1'), 'aucun relèvement déclaré pour V1');
 
       // Le compteur E1 (52 sur 60, relevé) est archivé à l'ouverture de V1, annoncé, sans remise à zéro
       const e1 = { lot: 'E1', plafond: 60, utilises: 52, historique_plafond: [{ ancien: 50, nouveau: 60, date: '2026-11-09', motif: P.RELEVEMENTS_PLAFOND.context.E1.motif }] };
@@ -180,24 +179,42 @@ describe('Suite de Tests : Partie payante de la sonde Claude Code (lot I3, sans 
       assert.throws(() => P.lireCompteur(brut, 'context', 'E1'), /ne peut pas être rouvert/);
       assert.strictEqual(S.ouvrirLotAnnonce(brut, 'context', 'V1'), null, 'même lot : rien n\'est archivé');
 
-      // Compteur propre, plafonné à 30 : une série complète (26) passe, une seconde est refusée avant tout appel
-      assert.deepStrictEqual(P.lireCompteur(brut, 'context', 'V1'), { lot: 'V1', plafond: 30, utilises: 0 });
+      // Compteur propre, plafond de 60 : deux séries complètes (26) passent, une troisième est refusée avant tout appel
+      assert.deepStrictEqual(P.lireCompteur(brut, 'context', 'V1'), { lot: 'V1', plafond: 60, utilises: 0 });
       const serie = S.BASES.length * 2 + S.COMBINAISONS.length;
       assert.strictEqual(serie, 26);
       S.verifierBudget(brut, serie, 'V1');
-      assert.throws(() => S.verifierBudget(brut, 31, 'V1'), /limite de 30 pour le lot V1/);
-      for (let i = 1; i <= serie; i++) assert.strictEqual(S.reserverContext(brut, 'V1'), i);
-      assert.throws(() => S.verifierBudget(brut, serie, 'V1'), /26 \/context déjà utilisé\(s\), 26 prévu\(s\), limite de 30 pour le lot V1/);
-      S.verifierBudget(brut, 4, 'V1');
-      fs.writeFileSync(f, JSON.stringify({ lot: 'V1', plafond: 30, utilises: 29 }));
-      assert.strictEqual(S.reserverContext(brut, 'V1'), 30);
-      assert.throws(() => S.reserverContext(brut, 'V1'), (e: Error) => e instanceof S.Arret && /plafond de 30/.test(e.message));
-      fs.writeFileSync(f, JSON.stringify({ lot: 'V1', plafond: 60, utilises: 0 }));
+      assert.throws(() => S.verifierBudget(brut, 61, 'V1'), /limite de 60 pour le lot V1/);
+      for (let i = 1; i <= 2 * serie; i++) assert.strictEqual(S.reserverContext(brut, 'V1'), i);
+      assert.throws(() => S.verifierBudget(brut, serie, 'V1'), /52 \/context déjà utilisé\(s\), 26 prévu\(s\), limite de 60 pour le lot V1/);
+      S.verifierBudget(brut, 8, 'V1');
+      fs.writeFileSync(f, JSON.stringify({ lot: 'V1', plafond: 60, utilises: 59 }));
+      assert.strictEqual(S.reserverContext(brut, 'V1'), 60);
+      assert.throws(() => S.reserverContext(brut, 'V1'), (e: Error) => e instanceof S.Arret && /plafond de 60/.test(e.message));
+      fs.writeFileSync(f, JSON.stringify({ lot: 'V1', plafond: 90, utilises: 0 }));
       assert.throws(() => P.lireCompteur(brut, 'context', 'V1'), S.Arret, 'un plafond V1 modifié à la main est refusé');
       assert.strictEqual(P.releverPlafond(brut, 'context', 'V1'), null);
 
+      // Relèvement de V1 de 30 à 60 (décision du 2026-11-10) : les 26 utilisés sont conservés, une seule fois
+      const traceV1 = [{ ancien: 30, nouveau: 60, date: '2026-11-10', motif: P.RELEVEMENTS_PLAFOND.context.V1.motif }];
+      assert.match(traceV1[0].motif, /cache de Claude Code hors des zones de la sonde/);
+      fs.writeFileSync(f, JSON.stringify({ lot: 'V1', plafond: 30, utilises: 26 }));
+      assert.throws(() => P.lireCompteur(brut, 'context', 'V1'), S.Arret, 'le compteur à 30 est refusé tel quel');
+      journal.length = 0;
+      console.log = (m: string) => journal.push(m);
+      assert.strictEqual(S.ouvrirLotAnnonce(brut, 'context', 'V1'), null, 'même lot : rien n\'est archivé');
+      console.log = log;
+      assert.deepStrictEqual(JSON.parse(fs.readFileSync(f, 'utf8')), { lot: 'V1', plafond: 60, utilises: 26, historique_plafond: traceV1 });
+      assert.ok(journal.some((m) => /lot V1 relevé de 30 à 60 \(décision du 2026-11-10\) ; 26 utilisé\(s\) conservé\(s\)/.test(m)), journal.join('\n'));
+      assert.strictEqual(P.releverPlafond(brut, 'context', 'V1'), null, 'une seule fois');
+      S.verifierBudget(brut, serie, 'V1');
+      assert.throws(() => S.verifierBudget(brut, 35, 'V1'), /26 \/context déjà utilisé\(s\), 35 prévu\(s\), limite de 60/);
+      assert.strictEqual(S.reserverContext(brut, 'V1'), 27);
+      assert.deepStrictEqual(JSON.parse(fs.readFileSync(f, 'utf8')).historique_plafond, traceV1, 'la trace survit à une réservation');
+      assert.strictEqual(P.releverPlafond(brut, 'context', 'V1'), null);
+
       // Partie payante refusée sous V1 : options, compteur du modèle et lancement
-      fs.writeFileSync(f, JSON.stringify({ lot: 'V1', plafond: 30, utilises: 3 }));
+      fs.writeFileSync(f, JSON.stringify({ lot: 'V1', plafond: 60, utilises: 3 }));
       for (const args of [['--confirmer', '--plafond', '38', '--lot', 'V1'], ['--a-sec', '--lot', 'V1'], ['--lot', 'V1']]) {
         assert.throws(() => P.lireOptionsPayant(args), (e: Error) => e instanceof S.Refus && /le lot V1 \(vérification de version\) n'accepte que \/context : toute commande payante y est refusée/.test(e.message), args.join(' '));
       }
@@ -232,7 +249,7 @@ describe('Suite de Tests : Partie payante de la sonde Claude Code (lot I3, sans 
     const log = console.log;
     try {
       assert.deepStrictEqual(Object.keys(P.RELEVEMENTS_PLAFOND), ['context']);
-      assert.deepStrictEqual(Object.keys(P.RELEVEMENTS_PLAFOND.context), ['E1'], 'un seul relèvement déclaré');
+      assert.deepStrictEqual(Object.keys(P.RELEVEMENTS_PLAFOND.context), ['E1', 'V1'], 'un relèvement par lot au plus : E1, puis V1 (2026-11-10)');
       assert.deepStrictEqual([P.COMPTEURS.context.plafonds.E1, P.COMPTEURS.context.plafonds.E2], [60, 40]);
 
       // Le compteur E1 figé à 50 est refusé tel quel, puis relevé à l'ouverture du lot

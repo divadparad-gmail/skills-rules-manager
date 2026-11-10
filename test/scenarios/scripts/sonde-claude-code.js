@@ -18,7 +18,7 @@
  * Options de « context » :
  *   --lot <E1|E2|V1>        lot du compteur de /context (obligatoire) ; au changement de lot, l'ancien
  *                           compteur est archivé dans brut/, et un lot archivé ne peut pas être rouvert ;
- *                           V1 est le lot des vérifications de version (/context seulement, plafond 30)
+ *                           V1 est le lot des vérifications de version (/context seulement, plafond 60)
  *   --combinaisons <id,id>  ne mesure que ces combinaisons (les quatre bases sont toujours mesurées)
  *   --resultats             écrit le rapport normalisé dans resultats/ au lieu de brut/
  *
@@ -34,11 +34,14 @@
  *     CLAUDE_CONFIG_DIR et DISABLE_AUTOUPDATER=1 sont posées ; tout autre nom est refusé avant chaque
  *     lancement ;
  *   - profil connecté par claude.ai, sur un abonnement, avec le bon configDirectory, avant chaque série ;
+ *   - profil isolé comparé au début et à la fin de chaque série : un écart dans les zones où la sonde
+ *     écrit (commun.zonesSonde, dérivées de l'inventaire) rejette la série ; ailleurs, les changements
+ *     de Claude Code sont comptés par premier segment, sans rejet (décision du 2026-11-10) ;
  *   - après chaque /context : apiKeySource=none, usage nul, num_turns=0, coût nul ; après chaque appel
  *     au modèle : apiKeySource=none (aussi dès l'initialisation, avant la première requête) ; sinon le
  *     fichier brut/ARRET.txt est écrit et bloque tout lancement suivant de claude ;
  *   - deux compteurs persistants et distincts, liés au lot, incrémentés avant chaque lancement :
- *     /context (60 en E1, relevé de 50 le 2026-11-09 ; 40 en E2 ; 30 en V1) et appels au modèle (40 en E2,
+ *     /context (60 en E1, relevé de 50 le 2026-11-09 ; 40 en E2 ; 60 en V1, relevé de 30 le 2026-11-10) et appels au modèle (40 en E2,
  *     ou moins avec --plafond ; aucun en V1, où tout appel au modèle est refusé) ;
  *   - garde de flux pendant chaque appel au modèle : tours, outils, chemins et commande Bash ;
  *   - empreintes SHA-256 (en LF) de chaque fixture comparées à inventaire.json avant tout déploiement :
@@ -670,50 +673,67 @@ function listerProfil(configDir) {
   return out;
 }
 
-/** Les écarts de cache créés par Claude Code lui-même (point 0 de la phase 2), nommés. */
-function motifConnu(rel, nature, type, nomMemoire) {
-  const m = String(nomMemoire).toLowerCase();
-  const r = rel.toLowerCase();
-  if (r === '.claude.json' && nature === 'modifié') return '.claude.json';
-  if (/^backups\/\.claude\.json\.backup\.[^/]+$/.test(r) && nature !== 'modifié') return 'backups/.claude.json.backup.*';
-  if (r === 'backups' && type === 'd' && nature === 'ajouté') return 'backups/';
-  if (r === 'policy-limits.json.signature.json' && nature === 'modifié') return 'policy-limits.json.signature.json';
-  if (type === 'd' && nature === 'ajouté' && (r === 'projects' || r === `projects/${m}` || r === `projects/${m}/memory`)) return 'projects/<memoire>/memory/ (vide)';
-  if (type === 'd' && nature === 'ajouté' && (r === 'session-env' || /^session-env\/[^/]+$/.test(r))) return 'session-env/<id>/ (vide)';
-  // La synchronisation du compte pendant une série (mesuré le 2026-11-09) : skills/synced/ dans tous
-  // les sens, policy-limits.json ajouté ou modifié seulement.
-  const synchronise = commun.cheminSynchronise(rel);
-  if (synchronise === commun.MOTIF_SKILLS_SYNCHRONISES) return synchronise;
-  if (synchronise === commun.MOTIF_LIMITES && type === 'f' && nature !== 'retiré') return synchronise;
-  return null;
-}
+/** Les zones de la sonde dérivées de l'inventaire du dépôt (commun.zonesSonde). */
+const zonesParDefaut = () => commun.zonesSonde([...commun.lireInventaire(fs.readFileSync(INVENTAIRE, 'utf8')).keys()]);
+const CHAMP_NATURE = { 'ajouté': 'ajoutes', 'modifié': 'modifies', 'retiré': 'retires' };
+const compter = (groupes, cle, champs, nature) => {
+  const c = groupes.get(cle) || { ...champs, nombre: 0, ajoutes: 0, modifies: 0, retires: 0 };
+  c.nombre += 1;
+  c[CHAMP_NATURE[nature]] += 1;
+  groupes.set(cle, c);
+};
 
 /**
- * Les écarts du profil entre deux listes. Les écarts connus ne sont donnés que par motif, avec leur
- * nombre par nature, jamais par nom de fichier ; les inconnus sont nommés (ils restent dans brut/).
+ * Les écarts du profil entre deux listes (décision du 2026-11-10, précision de D5). Seuls les écarts
+ * de fichiers dans les zones de la sonde rejettent une série : ils sont nommés ici (ils restent dans
+ * brut/). Les autres (dossiers des zones, et tout écart hors zones) sont comptés par premier segment (skills/synced à part), avec leur
+ * nombre par nature, jamais par nom de fichier. La liste ne vient que de listerProfil, qui n'ouvre
+ * aucun fichier : .credentials.json n'y apparaît que par un changement de taille.
  */
-function ecartsProfil(avant, apres, nomMemoire) {
-  const connus = new Map();
-  const inconnus = [];
-  const champ = { 'ajouté': 'ajoutes', 'modifié': 'modifies', 'retiré': 'retires' };
-  const noter = (rel, nature, type) => {
-    const motif = motifConnu(rel, nature, type, nomMemoire);
-    if (!motif) {
-      inconnus.push({ chemin: rel, nature });
-      return;
-    }
-    const c = connus.get(motif) || { motif, nombre: 0, ajoutes: 0, modifies: 0, retires: 0 };
-    c.nombre += 1;
-    c[champ[nature]] += 1;
-    connus.set(motif, c);
+function ecartsProfil(avant, apres, nomMemoire, zones = zonesParDefaut()) {
+  const dansZones = [];
+  const horsZones = new Map();
+  // Dans une zone, seuls les fichiers (et liens) rejettent : un dossier créé ou retiré par Claude Code
+  // (projects/<memoire>/memory/ sur un profil neuf) est compté hors rejet, comme les écarts hors zones.
+  const noter = (rel, nature, dossier) => {
+    const zone = commun.zoneDe(rel, zones, nomMemoire);
+    if (zone && !dossier) dansZones.push({ zone, chemin: rel, nature });
+    else compter(horsZones, commun.groupeHorsZones(rel), { groupe: commun.groupeHorsZones(rel) }, nature);
   };
   for (const [rel, e] of apres) {
     const a = avant.get(rel);
-    if (!a) noter(rel, 'ajouté', e.type);
-    else if (a.type !== e.type || a.taille !== e.taille) noter(rel, 'modifié', e.type);
+    if (!a) noter(rel, 'ajouté', e.type === 'd');
+    else if (a.type !== e.type || a.taille !== e.taille) noter(rel, 'modifié', a.type === 'd' && e.type === 'd');
   }
-  for (const [rel, e] of avant) if (!apres.has(rel)) noter(rel, 'retiré', e.type);
-  return { connus: [...connus.values()], inconnus };
+  for (const [rel, e] of avant) if (!apres.has(rel)) noter(rel, 'retiré', e.type === 'd');
+  const tri = (a, b) => (a.groupe < b.groupe ? -1 : a.groupe > b.groupe ? 1 : 0);
+  return { zones: dansZones, hors_zones: [...horsZones.values()].sort(tri) };
+}
+
+/**
+ * Le résumé du profil pour le rapport : le nombre d'écarts dans les zones de la sonde, la zone en
+ * cause (comptée par nature ; seuls les chemins « canari » sont cités, le dossier de mémoire masqué),
+ * puis les comptes hors zones.
+ */
+function resumeProfil(ecarts, nomMemoire) {
+  const enCause = new Map();
+  const m = String(nomMemoire);
+  for (const e of ecarts.zones) {
+    compter(enCause, e.zone, { zone: e.zone }, e.nature);
+    if (e.zone === commun.ZONE_CANARI) {
+      const c = enCause.get(e.zone);
+      c.chemins = [...(c.chemins || []), e.chemin.split('/').map((s) => (s.toLowerCase() === m.toLowerCase() ? '<memoire>' : s)).join('/')];
+    }
+  }
+  return { zones_sonde: { ecarts: ecarts.zones.length, en_cause: [...enCause.values()] }, hors_zones: ecarts.hors_zones };
+}
+
+/** Les lignes de console du contrôle du profil. */
+function lignesProfil(resume) {
+  const nature = (c) => `${c.ajoutes} ajouté(s), ${c.modifies} modifié(s), ${c.retires} retiré(s)`;
+  const out = [`zones de la sonde : ${resume.zones_sonde.ecarts} écart(s)${resume.zones_sonde.en_cause.map((c) => ` ; ${c.zone} : ${nature(c)}${c.chemins ? ` (${c.chemins.join(', ')})` : ''}`).join('')}`];
+  out.push(`hors zones (sans rejet) : ${resume.hors_zones.length === 0 ? 'aucun écart' : resume.hors_zones.map((c) => `${c.groupe} : ${nature(c)}`).join(' ; ')}`);
+  return out;
 }
 
 // --- Déploiement et retrait ---------------------------------------------------------------------------------
@@ -1216,9 +1236,11 @@ async function commandeContext(args) {
   if (apres.problemes.length > 0) raisonsRejet.push(`connexion non conforme après la série : ${apres.problemes.join(' ; ')}`);
   const profilApres = listerProfil(ctx.configDir);
   fs.writeFileSync(path.join(dossierSerie, 'profil-apres.txt'), [...profilApres].map(([r, e]) => `${e.type} ${e.taille} ${r}`).join('\n') + '\n');
-  const ecarts = ecartsProfil(profilAvant, profilApres, nomMemoire);
+  const ecarts = ecartsProfil(profilAvant, profilApres, nomMemoire, commun.zonesSonde([...inventaire.keys()]));
   fs.writeFileSync(path.join(dossierSerie, 'ecarts-profil.json'), `${JSON.stringify(ecarts, null, 2)}\n`);
-  if (ecarts.inconnus.length > 0) raisonsRejet.push(`${ecarts.inconnus.length} écart(s) inconnu(s) du profil (détail dans brut/)`);
+  const resume = resumeProfil(ecarts, nomMemoire);
+  for (const l of lignesProfil(resume)) console.log(`[sonde-claude] Profil isolé, ${l}`);
+  if (ecarts.zones.length > 0) raisonsRejet.push(`zones de la sonde : ${ecarts.zones.length} écart(s) dans ${resume.zones_sonde.en_cause.map((c) => c.zone).join(', ')} (détail dans brut/)`);
 
   const compteur = lireCompteur(BRUT, 'context', opts.lot);
   const rapport = {
@@ -1234,7 +1256,7 @@ async function commandeContext(args) {
     serie: { valide: raisonsRejet.length === 0, raisons_rejet: raisonsRejet, context_utilises: numero, compteur_lot: compteur.utilises, plafond: compteur.plafond },
     bases,
     combinaisons: resultats,
-    profil: { ecarts_connus: ecarts.connus, ecarts_inconnus: ecarts.inconnus.length },
+    profil: resume,
   };
   const poste = commun.lirePoste();
   const interdits = [...new Set([...avant.sensibles, ...apres.sensibles, ctx.espace, ctx.configDir, ctx.exe, nomMemoire, process.env.LOCALAPPDATA].filter(Boolean))];
@@ -1523,8 +1545,10 @@ async function commandePayant(args) {
   if (fs.existsSync(ctx.projet) && fs.readdirSync(ctx.projet).length === 0) fs.rmdirSync(ctx.projet);
   const profilApres = listerProfil(ctx.configDir);
   fs.writeFileSync(path.join(dossierSerie, 'profil-apres.txt'), [...profilApres].map(([r, e]) => `${e.type} ${e.taille} ${r}`).join('\n') + '\n');
-  const ecartsP = ecartsProfil(profilAvant, profilApres, x.nomMemoire);
+  const ecartsP = ecartsProfil(profilAvant, profilApres, x.nomMemoire, commun.zonesSonde([...x.inventaire.keys()]));
   fs.writeFileSync(path.join(dossierSerie, 'ecarts-profil.json'), `${JSON.stringify(ecartsP, null, 2)}\n`);
+  const resumeP = resumeProfil(ecartsP, x.nomMemoire);
+  for (const l of lignesProfil(resumeP)) console.log(`[sonde-claude] Profil isolé, ${l}`);
 
   const valides = new Set(series.filter((s) => s.valide).map((s) => s.numero));
   const appelsValides = appels.filter((a) => valides.has(a.serie));
@@ -1556,7 +1580,7 @@ async function commandePayant(args) {
     appels,
     combinaisons,
     decomposition,
-    profil: { ecarts_connus: ecartsP.connus, ecarts_inconnus: ecartsP.inconnus.length },
+    profil: resumeP,
   };
   const poste = commun.lirePoste();
   const interdits = [...new Set([...sensibles, ctx.espace, ctx.configDir, ctx.exe, x.nomMemoire, process.env.LOCALAPPDATA].filter(Boolean))];
@@ -1564,8 +1588,8 @@ async function commandePayant(args) {
   console.log(`[sonde-claude] Rapport normalisé : ${path.relative(RACINE_DEPOT, fichier).replace(/\\/g, '/')}`);
   console.log(`[sonde-claude] Appels au modèle : ${appels.length} ; /context : ${combinaisons.length} ; compteur modèle : ${resumeCompteur(BRUT, 'modele')}.`);
   if (arret) return 4;
-  if (series.some((s) => !s.valide) || ecartsP.inconnus.length > 0) {
-    if (ecartsP.inconnus.length > 0) console.error(`[sonde-claude] ${ecartsP.inconnus.length} écart(s) inconnu(s) du profil (détail dans brut/).`);
+  if (series.some((s) => !s.valide) || ecartsP.zones.length > 0) {
+    if (ecartsP.zones.length > 0) console.error(`[sonde-claude] Zones de la sonde : ${ecartsP.zones.length} écart(s) dans le profil isolé (détail dans brut/).`);
     return 3;
   }
   console.log('[sonde-claude] Toutes les séries sont valides.');
@@ -1691,7 +1715,7 @@ module.exports = {
   problemesEspace, problemesAuth, verifierPrompt, argumentsContext, argumentsAppel, verifierArgv, lireFlux, sommeUsage,
   controlerAppel, verifierArret, ecrireArret, lireCompteur, verifierBudget, reserverContext, ouvrirLotAnnonce,
   racinesNormalisation, reecrireChemin, fixturesAttendues, o200kDuPlan, normaliserCombinaison, comparerBases,
-  listerProfil, ecartsProfil, listerFixtures, fichiersADeployer, deployer, retirer, lancerClaude, ecrireRapport,
+  listerProfil, ecartsProfil, resumeProfil, lignesProfil, listerFixtures, fichiersADeployer, deployer, retirer, lancerClaude, ecrireRapport,
   lireOptions, nettoyerRaison, preparerEtape, comparerBornesSerie, commandeBaseline, commandeCompatible, principal,
 };
 

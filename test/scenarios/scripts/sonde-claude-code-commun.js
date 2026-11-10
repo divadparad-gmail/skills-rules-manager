@@ -164,6 +164,54 @@ function cheminSynchronise(rel) {
 }
 
 /**
+ * Les zones de la sonde dans le profil isolé (décision du 2026-11-10, précision de D5) : les seuls
+ * endroits où la sonde écrit elle-même. Un écart dans une zone rejette la série ; ailleurs, les
+ * changements faits par Claude Code (caches, sauvegardes, synchronisation…) sont comptés sans rejet.
+ *
+ * Les zones sont dérivées des cibles « global » de l'inventaire :
+ *   - une cible à la racine du profil (CLAUDE.md) donne une zone « fichier » ;
+ *   - une cible sous le dossier de mémoire donne la zone projects/<memoire>/ ;
+ *   - toute autre cible donne la zone de son premier dossier (rules/, skills/).
+ * S'y ajoutent, fixes : tout chemin dont un segment contient « canari » (casse ignorée), et
+ * l'exclusion de skills/synced/ (synchronisation du compte), où aucune fixture ne peut aller.
+ */
+const MEMOIRE = '<memoire>';
+const ZONE_CANARI = 'segment « canari »';
+function zonesSonde(relsInventaire) {
+  const zones = new Map();
+  for (const rel of relsInventaire) {
+    const { cible, chemin } = convertir(rel, MEMOIRE);
+    if (cible !== 'global') continue;
+    const segments = chemin.split('/');
+    const iMemoire = segments.indexOf(MEMOIRE);
+    const zone = segments.length === 1 ? { type: 'fichier', chemin: segments[0] }
+      : iMemoire >= 0 ? { type: 'dossier', chemin: segments.slice(0, iMemoire + 1).join('/') }
+        : { type: 'dossier', chemin: segments[0] };
+    zones.set(`${zone.type}:${zone.chemin.toLowerCase()}`, zone);
+  }
+  return [...zones.values()].sort((a, b) => (a.chemin < b.chemin ? -1 : a.chemin > b.chemin ? 1 : 0));
+}
+
+/**
+ * La zone de la sonde d'un chemin du profil (relatif, séparateur « / »), ou null hors des zones. La
+ * comparaison ignore la casse ; <memoire> désigne le dossier de mémoire de l'espace.
+ */
+function zoneDe(rel, zones, nomMemoire) {
+  const r = String(rel).toLowerCase();
+  if (r.split('/').some((s) => s.includes('canari'))) return ZONE_CANARI;
+  if (cheminSynchronise(r) === MOTIF_SKILLS_SYNCHRONISES) return null;
+  const m = String(nomMemoire).toLowerCase();
+  for (const z of zones) {
+    const c = z.chemin.toLowerCase().split('/').map((s) => (s === MEMOIRE ? m : s)).join('/');
+    if (r === c || (z.type === 'dossier' && r.startsWith(`${c}/`))) return z.type === 'dossier' ? `${z.chemin}/` : z.chemin;
+  }
+  return null;
+}
+
+/** Le groupe d'un écart hors des zones : son premier segment, ou skills/synced compté à part. */
+const groupeHorsZones = (rel) => (cheminSynchronise(rel) === MOTIF_SKILLS_SYNCHRONISES ? 'skills/synced' : String(rel).split('/')[0]);
+
+/**
  * Plan de déploiement : une entrée par fixture des jeux demandés, avec sa source, sa destination
  * absolue et son chemin normalisé (<global>/…, <memoire> pour le dossier de mémoire). Lève une
  * erreur pour un jeu inconnu, une cible inconnue, un segment « .. », une collision ou une cible
@@ -327,6 +375,10 @@ module.exports = {
   MOTIF_SKILLS_SYNCHRONISES,
   MOTIF_LIMITES,
   cheminSynchronise,
+  ZONE_CANARI,
+  zonesSonde,
+  zoneDe,
+  groupeHorsZones,
   planDeploiement,
   lirePoste,
   variantesHome,
