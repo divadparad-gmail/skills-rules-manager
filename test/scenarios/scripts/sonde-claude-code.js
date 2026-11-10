@@ -5,10 +5,18 @@
  * Usage (depuis la racine du dépôt) :
  *   npm run sonde:claude-etat                       version, auth status et préconditions ; aucun /context
  *   npm run sonde:claude-context -- --lot <E1|E2|V1>   déploiement, /context par combinaison, retrait, rapport
- *   npm run sonde:claude-context -- --preparer-h14  déploie le jeu de H14 et affiche les gestes (aucun /context)
+ *   npm run sonde:claude-context -- --lot E3 --preparer-h14   H14 (lot E3), étape 1 : contrôles, 4 bases, un
+ *                           seul déploiement du jeu complet, /context de référence par le claude du poste
+ *                           (P5) et par la copie embarquée dans l'extension VS Code (P5b), puis les gestes
+ *   npm run sonde:claude-context -- --verifier-h14   H14, après le panneau : lit la transcription sans
+ *                           en afficher le texte (une seule nouvelle attendue), version, outils, canaris
+ *                           comparés aux attendus déduits de 4a, écarts du profil ; aucun /context
+ *   npm run sonde:claude-context -- --lot E3 --cloturer-h14   H14, fin : transcription déplacée dans brut/,
+ *                           retrait, 4 bases de fin comparées copie par copie, rapport brut/h14-….json
  *   npm run sonde:claude -- --a-sec                 affiche les 38 appels prévus, sans rien lancer ni écrire
  *   npm run sonde:claude -- --confirmer --plafond <n> [--series 1,3] [--resultats]   partie payante
- *   node test/scenarios/scripts/sonde-claude-code.js retirer   retrait d'un déploiement (interrompu, ou H14)
+ *   node test/scenarios/scripts/sonde-claude-code.js retirer   retrait d'un déploiement interrompu ; pendant
+ *                           un essai H14, déplace d'abord la transcription du panneau dans brut/
  *   npm run sonde:claude-baseline -- --depuis <context-…json> [--payant <payant-…json,…>]   écrit
  *                           attendu/baseline-<date>.json d'après un rapport « context » valide de resultats/
  *                           et, avec --payant, les rapports « payant » d'un même lot (entrées usage et
@@ -18,9 +26,10 @@
  *                           seulement si la série est valide, toutes les entrées couvertes et 0 écart ;
  *                           rien d'autre n'est changé ; aucun lancement de claude
  * Options de « context » :
- *   --lot <E1|E2|V1>        lot du compteur de /context (obligatoire) ; au changement de lot, l'ancien
+ *   --lot <E1|E2|V1|E3>     lot du compteur de /context (obligatoire) ; au changement de lot, l'ancien
  *                           compteur est archivé dans brut/, et un lot archivé ne peut pas être rouvert ;
- *                           V1 est le lot des vérifications de version (/context seulement, plafond 60)
+ *                           V1 est le lot des vérifications de version (/context seulement, plafond 60) ;
+ *                           E3 est réservé à H14 (/context seulement, plafond 12)
  *   --combinaisons <id,id>  ne mesure que ces combinaisons (les quatre bases sont toujours mesurées)
  *   --resultats             écrit le rapport normalisé dans resultats/ au lieu de brut/
  *
@@ -64,6 +73,7 @@ const commun = require('./sonde-claude-code-commun');
 const payant = require('./sonde-claude-code-payant');
 const constructionBaseline = require('./sonde-claude-code-baseline');
 const comparateur = require('./compare-injection-claude');
+const h14 = require('./sonde-claude-code-h14');
 
 const RACINE_DEPOT = path.resolve(__dirname, '..', '..', '..');
 const SUITE = path.join(RACINE_DEPOT, 'test', 'scenarios', 'claude-code-injection-contexte');
@@ -901,7 +911,7 @@ function lancerClaude({ exe, argv, env, cwd, espace, configDir, dossierBrut, pla
   if (pb.length > 0) throw new Refus(`environnement non conforme : ${pb.join(' ; ')}`);
   if (forme === 'modele' && typeof garde !== 'function') throw new Refus('appel au modèle sans garde de flux');
   if ((forme === 'context' || forme === 'modele') && !lot) throw new Refus('lot du compteur absent');
-  if (forme === 'modele' && payant.LOTS_CONTEXT_SEUL.includes(lot)) throw new Refus(`le lot ${lot} (vérification de version) n'accepte que /context : appel au modèle refusé`);
+  if (forme === 'modele' && payant.LOTS_CONTEXT_SEUL.includes(lot)) throw new Refus(`le lot ${lot} (${payant.ROLES_CONTEXT_SEUL[lot]}) n'accepte que /context : appel au modèle refusé`);
   let numero = null;
   if (forme === 'context') numero = reserverContext(dossierBrut, lot);
   else if (forme === 'modele') numero = payant.reserver(dossierBrut, 'modele', lot);
@@ -966,7 +976,8 @@ function processusFixtureRestants(espace, plateforme = process.platform) {
 /** Écrit le rapport normalisé après la garde ; rien n'est écrit au moindre problème. */
 function ecrireRapport(rapport, { destination, nom, poste, interdits, dossiers = { brut: BRUT, resultats: RESULTATS } }) {
   if (!['brut', 'resultats'].includes(destination)) throw new Refus('destination du rapport refusée (brut ou resultats seulement)');
-  if (!/^(context|payant)-\d{4}-\d{2}-\d{2}-\d{4}\.json$/.test(nom)) throw new Refus('nom de rapport refusé');
+  if (!/^(context|payant|h14)-\d{4}-\d{2}-\d{2}-\d{4}\.json$/.test(nom)) throw new Refus('nom de rapport refusé');
+  if (nom.startsWith('h14-') && destination !== 'brut') throw new Refus('le rapport H14 ne s\'écrit que dans brut/');
   const texte = `${JSON.stringify(rapport, null, 2)}\n`;
   const problemes = [...commun.problemesTexte(texte, poste, interdits), ...commun.problemesJson(texte)];
   if (problemes.length > 0) throw new Refus(`garde de confidentialité : rapport non écrit (${problemes.join(' ; ')})`);
@@ -1024,8 +1035,8 @@ function preparer({ aSec = false } = {}) {
 }
 
 /** Version et état de connexion, contrôlés ; renvoie aussi les valeurs sensibles (mémoire seulement). */
-async function lireEtat(ctx, cwd) {
-  const commun_ = { exe: ctx.exe, env: ctx.env, cwd, espace: ctx.espace, configDir: ctx.configDir, dossierBrut: BRUT, plateforme: ctx.plateforme };
+async function lireEtat(ctx, cwd, exe = ctx.exe) {
+  const commun_ = { exe, env: ctx.env, cwd, espace: ctx.espace, configDir: ctx.configDir, dossierBrut: BRUT, plateforme: ctx.plateforme };
   const v = await lancerClaude({ ...commun_, argv: ['--version'] });
   const version = (v.stdout.trim().match(/^(\S+)/) || [])[1];
   if (v.code !== 0 || !version) throw new Refus('claude --version a échoué');
@@ -1066,29 +1077,52 @@ async function commandeEtat() {
 
 async function commandeRetirer() {
   const journal = path.join(BRUT, FICHIER_JOURNAL);
+  // Pendant un essai H14, la transcription du panneau est d'abord déplacée dans brut/ (P4, décision Q3).
+  const etatH14 = lireEtatH14();
+  if (etatH14) {
+    const dep = deplacerTranscriptionH14(cheminsParDefaut(), etatH14);
+    console.log(`[sonde-claude] H14 : transcription du panneau déplacée dans brut/${etatH14.dossier}/${h14.SOUS_DOSSIER_TRANSCRIPTION}/ (${dep.fichiers} fichier(s), ${dep.dossiers} dossier(s), contenu non affiché).`);
+  }
   const { problemes } = retirer(journal);
   if (problemes.length > 0) {
     console.error(`[sonde-claude] Retrait incomplet :\n  - ${problemes.map(masquer).join('\n  - ')}`);
     return 2;
   }
   console.log('[sonde-claude] Aucun déploiement en attente.');
+  if (etatH14) console.log('[sonde-claude] Essai H14 toujours en cours : le clore par npm run sonde:claude-context -- --lot E3 --cloturer-h14 (bases de fin et rapport).');
   return 0;
 }
 
+const MODES_H14 = { preparerH14: '--preparer-h14', verifierH14: '--verifier-h14', cloturerH14: '--cloturer-h14' };
+
 function lireOptions(args) {
-  const opts = { combinaisons: null, resultats: false, lot: null, preparerH14: false };
+  const opts = { combinaisons: null, resultats: false, lot: null, preparerH14: false, verifierH14: false, cloturerH14: false };
+  const vus = new Set();
   for (let i = 0; i < args.length; i++) {
-    if (args[i] === '--resultats') opts.resultats = true;
-    else if (args[i] === '--preparer-h14') opts.preparerH14 = true;
-    else if (args[i] === '--combinaisons' && args[i + 1]) opts.combinaisons = args[++i].split(',').filter(Boolean);
-    else if (args[i] === '--lot' && args[i + 1]) opts.lot = args[++i];
-    else throw new Refus(`option inconnue : ${args[i]}`);
+    const a = args[i];
+    if (vus.has(a)) throw new Refus(`option répétée : ${a}`);
+    vus.add(a);
+    const mode = Object.keys(MODES_H14).find((k) => MODES_H14[k] === a);
+    if (mode) opts[mode] = true;
+    else if (a === '--resultats') opts.resultats = true;
+    else if (a === '--combinaisons' && args[i + 1]) opts.combinaisons = args[++i].split(',').filter(Boolean);
+    else if (a === '--lot' && args[i + 1]) opts.lot = args[++i];
+    else throw new Refus(`option inconnue : ${a}`);
   }
-  if (opts.preparerH14) {
-    if (opts.combinaisons || opts.resultats || opts.lot) throw new Refus('--preparer-h14 ne lance aucun /context : il refuse --lot, --combinaisons et --resultats');
+  const modes = Object.keys(MODES_H14).filter((k) => opts[k]);
+  if (modes.length > 1) throw new Refus(`${modes.map((k) => MODES_H14[k]).join(' et ')} : un seul mode H14 à la fois`);
+  if (modes.length === 1) {
+    const option = MODES_H14[modes[0]];
+    if (opts.combinaisons || opts.resultats) throw new Refus(`${option} refuse --combinaisons et --resultats`);
+    if (modes[0] === 'verifierH14') {
+      if (opts.lot) throw new Refus('--verifier-h14 ne lance aucun /context : il refuse --lot');
+    } else if (opts.lot !== h14.LOT_H14) {
+      throw new Refus(`${option} exige --lot ${h14.LOT_H14} (le lot des /context de H14)`);
+    }
     return opts;
   }
   if (!LOTS_CONTEXT.includes(opts.lot)) throw new Refus(`--lot <${LOTS_CONTEXT.join('|')}> est obligatoire`);
+  if (opts.lot === h14.LOT_H14) throw new Refus(`le lot ${h14.LOT_H14} est réservé à H14 (--preparer-h14 et --cloturer-h14)`);
   if (opts.combinaisons) {
     const inconnues = opts.combinaisons.filter((id) => !COMBINAISONS.some((c) => c.id === id));
     if (inconnues.length > 0) throw new Refus(`combinaison inconnue : ${inconnues.join(', ')}`);
@@ -1096,33 +1130,389 @@ function lireOptions(args) {
   return opts;
 }
 
+// --- H14 : le panneau Claude Code de VS Code (lot E3) ----------------------------------------------------
+
+/** La référence de H14 (P5, P5b) : le jeu complet, l'outil Skill, les évènements du hook, sans plugin. */
+const COMBINAISON_H14 = { id: 'h14', jeux: payant.JEUX_H14, outils: 'Skill', hookEvents: true };
+/** Les deux copies de Claude Code mesurées, dans l'ordre. */
+const COPIES_H14 = ['poste', 'embarquee'];
+const FICHIER_SESSIONS_NOTEES = 'sessions-notees.txt';
+const CANARI_FLUX = /CANARI-[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*/g;
+
+function lireEtatH14(dossier = BRUT) {
+  const f = path.join(dossier, h14.FICHIER_ETAT);
+  if (!fs.existsSync(f)) return null;
+  try {
+    return JSON.parse(fs.readFileSync(f, 'utf8'));
+  } catch {
+    throw new Arret(`${h14.FICHIER_ETAT} illisible : examiner le fichier dans brut/`);
+  }
+}
+
+/** Écrit un JSON de H14 dans brut/ après la garde de confidentialité ; rien n'est écrit au moindre problème. */
+function ecrireJsonGarde(fichier, objet, { poste, interdits }) {
+  const texte = `${JSON.stringify(objet, null, 2)}\n`;
+  const problemes = [...commun.problemesTexte(texte, poste, interdits), ...commun.problemesJson(texte)];
+  if (problemes.length > 0) throw new Refus(`garde de confidentialité : ${path.basename(fichier)} non écrit (${problemes.join(' ; ')})`);
+  fs.writeFileSync(`${fichier}.tmp`, texte, 'utf8');
+  fs.renameSync(`${fichier}.tmp`, fichier);
+}
+
+/** Les valeurs que la garde refuse pour H14 (chemins du poste, exécutables, dossier de mémoire). */
+const interditsH14 = (ctx, extra = []) => [...new Set([
+  ...extra, ctx.espace, ctx.configDir, ctx.exe, commun.nomDossierMemoire(path.join(ctx.espace, 'projet')), process.env.LOCALAPPDATA, os.homedir(), os.tmpdir(),
+].filter(Boolean))];
+
+/** Les sessions notées à la préparation (identifiants, dans brut/ seulement : la garde refuse les UUID). */
+function lireSessionsNotees(dossierEssai) {
+  const f = path.join(dossierEssai, FICHIER_SESSIONS_NOTEES);
+  if (!fs.existsSync(f)) throw new Arret(`brut/${path.basename(dossierEssai)}/${FICHIER_SESSIONS_NOTEES} absent : la liste des transcriptions notée à la préparation manque`);
+  return fs.readFileSync(f, 'utf8').split(/\r?\n/).filter(Boolean);
+}
+
+/** P4 : déplace la transcription du panneau dans brut/h14-<horodatage>/transcription/, sans l'afficher. */
+function deplacerTranscriptionH14({ configDir, espace }, etat, brut = BRUT) {
+  const dossierEssai = path.join(brut, etat.dossier);
+  return h14.deplacerTranscriptions({
+    configDir,
+    nomMemoire: commun.nomDossierMemoire(path.join(espace, 'projet')),
+    notees: lireSessionsNotees(dossierEssai),
+    destination: path.join(dossierEssai, h14.SOUS_DOSSIER_TRANSCRIPTION),
+  });
+}
+
+/** Les canaris attendus dans le panneau, déduits de l'appel 4a de la baseline la plus récente qui en a. */
+function attendusDeLaBaseline(inventaire, dossier = ATTENDU) {
+  const noms = fs.readdirSync(dossier).filter((n) => /^baseline-\d{4}-\d{2}-\d{2}\.json$/.test(n)).sort().reverse();
+  for (const nom of noms) {
+    const baseline = JSON.parse(fs.readFileSync(path.join(dossier, nom), 'utf8'));
+    if ((baseline.entrees || []).some((e) => e && e.instrument === 'canari' && e.appel === '4a')) {
+      return h14.attendusH14({ baseline, nomBaseline: nom, inventaire, jeux: payant.JEUX_H14 });
+    }
+  }
+  throw new Refus("aucune baseline n'a d'entrées « canari » de l'appel 4a : attendus de H14 introuvables");
+}
+
 /**
- * Préparation de H14 (conception, section 8) : auth status seulement, puis déploiement du jeu complet
- * sans MCP, laissé en place avec son journal ; les gestes sont affichés. Retrait par « retirer ».
+ * Un /context de H14 pour une copie (poste ou embarquée) : contrôlé contre la version de SA copie
+ * (précision 4), sortie brute dans le dossier de l'essai, entrée normalisée (fixtures du plan hors
+ * plugin, car le panneau n'a pas de --plugin-dir) et canaris de l'inventaire présents dans le flux.
+ */
+async function mesurerH14(ctx, { exe, copie, version, c, plan = [], rang, dossierEssai, racines, nomMemoire, canarisConnus }) {
+  const argv = argumentsContext({ outils: c.outils, hookEvents: c.hookEvents });
+  const r = await lancerClaude({ exe, argv, env: ctx.env, cwd: ctx.projet, espace: ctx.espace, configDir: ctx.configDir, dossierBrut: BRUT, plateforme: ctx.plateforme, lot: h14.LOT_H14 });
+  const base = path.join(dossierEssai, `${String(rang).padStart(2, '0')}-${copie}-${c.id}`);
+  fs.writeFileSync(`${base}.jsonl`, r.stdout, 'utf8');
+  if (r.stderr.trim()) fs.writeFileSync(`${base}.stderr.txt`, r.stderr, 'utf8');
+  const flux = lireFlux(r.stdout);
+  const controle = controlerAppel(flux, { versionAttendue: version });
+  if (controle.arret.length > 0) {
+    ecrireArret(BRUT, `H14 ${copie} ${c.id} : ${controle.arret.join(' ; ')}`);
+    throw new Arret(`H14 ${copie} ${c.id} : ${controle.arret.join(' ; ')}`);
+  }
+  if (r.expire) throw new SerieRejetee(`H14 ${copie} ${c.id} : délai dépassé`);
+  if (controle.autres.length > 0) throw new SerieRejetee(`H14 ${copie} ${c.id} : ${controle.autres.join(' ; ')}`);
+  if (c.cle === 'vide') {
+    const auto = flux.init && flux.init.memory_paths && flux.init.memory_paths.auto;
+    if (typeof auto !== 'string' || !memeChemin(auto, path.join(ctx.configDir, 'projects', nomMemoire, 'memory'), ctx.plateforme)) {
+      throw new SerieRejetee(`H14 ${copie} : le dossier de mémoire calculé ne correspond pas à memory_paths.auto`);
+    }
+  }
+  const sansPlugin = plan.filter((e) => e.cible !== 'plugin');
+  return {
+    id: c.id,
+    copie,
+    version: flux.init.claude_code_version,
+    outils: c.outils === '' ? 'vide' : c.outils,
+    hook_events: Boolean(c.hookEvents),
+    controle: { apiKeySource: flux.init.apiKeySource, usage: sommeUsage(flux.result.usage), num_turns: flux.result.num_turns },
+    ...normaliserCombinaison(flux, { racines, nomMemoire, plan: sansPlugin, plateforme: ctx.plateforme, o200k: o200kDuPlan(sansPlugin) }),
+    canaris_flux: [...new Set(r.stdout.match(CANARI_FLUX) || [])].filter((x) => canarisConnus.has(x)).sort(),
+  };
+}
+
+/** Les deux copies : le claude du poste (PATH ou CANARI_CLAUDE_EXE) et la copie embarquée (P5b). */
+function copiesH14(ctx) {
+  const embarquee = h14.trouverCopieEmbarquee({ plateforme: ctx.plateforme, home: os.homedir() });
+  return { poste: { exe: ctx.exe, version_dossier: null, source: 'poste' }, embarquee: { exe: embarquee.exe, version_dossier: embarquee.version, source: embarquee.source } };
+}
+
+/**
+ * H14, étape 1 (lot E3) : contrôles (autoUpdate coupé dans la VS Code principale, dossier utilisateur
+ * temporaire libre, copie embarquée, connexion de chaque copie), image du profil, 4 bases, un seul
+ * déploiement du jeu complet, /context H14 par chaque copie, liste des sessions notée, réglages de
+ * l'instance séparée, état, gestes. Le jeu reste en place pour le panneau.
  */
 async function commandePreparerH14() {
   const ctx = preparer();
   verifierArret(BRUT);
   if (ctx.pbEspace.length > 0) throw new Refus(ctx.pbEspace.join(' ; '));
   if (fs.existsSync(ctx.journal)) throw new Refus('un journal de déploiement existe : lancer « retirer »');
+  if (lireEtatH14()) throw new Refus(`un essai H14 est en cours (brut/${h14.FICHIER_ETAT}) : le clore par --lot E3 --cloturer-h14`);
+  const home = os.homedir();
+  const reglages = h14.cheminReglagesPrincipaux({ plateforme: ctx.plateforme, home });
+  if (!fs.existsSync(reglages) || !h14.autoUpdateCoupe(fs.readFileSync(reglages, 'utf8'))) {
+    throw new Refus(`extensions.autoUpdate ne vaut pas false dans les paramètres utilisateur de la VS Code principale. ${payant.GESTE_DEBUT_H14}`);
+  }
+  const dossierInstance = path.join(os.tmpdir(), h14.DOSSIER_INSTANCE);
+  h14.verifierInstanceLibre(dossierInstance);
+  const copies = copiesH14(ctx);
   const invites = payant.verifierInvites(fs.readFileSync(SONDE, 'utf8'));
   const rels = listerFixtures();
   const inventaire = commun.lireInventaire(fs.readFileSync(INVENTAIRE, 'utf8'));
+  attendusDeLaBaseline(inventaire);
+  const canarisConnus = new Set(h14.canarisDeLInventaire(inventaire).keys());
   const plan = commun.planDeploiement(rels, payant.JEUX_H14, { configDir: ctx.configDir, espace: ctx.espace, fixturesDir: FIXTURES });
   const { fichiers } = fichiersADeployer(plan, { espace: ctx.espace, inventaire, jeux: payant.JEUX_H14 });
   fs.mkdirSync(ctx.projet, { recursive: true });
-  const etat = await lireEtat(ctx, ctx.projet);
-  if (etat.problemes.length > 0) throw new Refus(`connexion non conforme : ${etat.problemes.join(' ; ')}`);
-  deployer(fichiers, ctx.journal, [ctx.espace, ctx.configDir]);
-  console.log(`[sonde-claude] H14 : ${fichiers.length} fichiers déployés (jeux ${payant.JEUX_H14.join(', ')}, sans MCP), laissés en place. CLI ${etat.version}.`);
+  const etats = {};
+  for (const copie of COPIES_H14) {
+    etats[copie] = await lireEtat(ctx, ctx.projet, copies[copie].exe);
+    if (etats[copie].problemes.length > 0) throw new Refus(`connexion non conforme (${copie}) : ${etats[copie].problemes.join(' ; ')}`);
+  }
+  const vd = copies.embarquee.version_dossier;
+  if (vd && etats.embarquee.version !== vd) throw new Refus(`la copie embarquée répond ${etats.embarquee.version}, alors que son dossier porte ${vd}`);
+  ouvrirLotAnnonce(BRUT, 'context', h14.LOT_H14);
+  verifierBudget(BRUT, h14.PREVUS_TOTAL, h14.LOT_H14);
+
+  const stamp = horodatage();
+  const dossierEssai = path.join(BRUT, `h14-${stamp}`);
+  fs.mkdirSync(dossierEssai);
+  const nomMemoire = commun.nomDossierMemoire(ctx.projet);
+  const racines = racinesNormalisation(ctx);
+  const profilAvant = listerProfil(ctx.configDir);
+  fs.writeFileSync(path.join(dossierEssai, h14.FICHIER_PROFIL_AVANT), h14.texteProfil(profilAvant), 'utf8');
+  const sessionsAvant = h14.sessionsDuProfil(ctx.configDir, nomMemoire);
+  console.log(`[sonde-claude] H14 ${stamp} : poste ${etats.poste.version}, copie embarquée ${etats.embarquee.version} (${copies.embarquee.source}), abonnement ${etats.poste.resume.subscriptionType}, ${h14.PREVUS_PREPARATION} /context maintenant et ${h14.PREVUS_CLOTURE} à la clôture.`);
+
+  const references = Object.fromEntries(COPIES_H14.map((c) => [c, { version: etats[c].version, bases: {} }]));
+  let rang = 0;
+  const x = { dossierEssai, racines, nomMemoire, canarisConnus };
+  try {
+    for (const copie of COPIES_H14) {
+      for (const b of BASES) {
+        references[copie].bases[b.cle] = { debut: await mesurerH14(ctx, { ...x, exe: copies[copie].exe, copie, version: etats[copie].version, c: b, rang: ++rang }) };
+      }
+    }
+    deployer(fichiers, ctx.journal, [ctx.espace, ctx.configDir]);
+    for (const copie of COPIES_H14) {
+      const e = await mesurerH14(ctx, { ...x, exe: copies[copie].exe, copie, version: etats[copie].version, c: COMBINAISON_H14, plan, rang: ++rang });
+      e.delta_base = e.total - references[copie].bases.avec_skill.debut.total;
+      references[copie].h14 = e;
+    }
+  } catch (err) {
+    if (fs.existsSync(ctx.journal)) {
+      const { problemes } = retirer(ctx.journal);
+      if (problemes.length > 0) console.error(`[sonde-claude] Retrait incomplet après l'échec :\n  - ${problemes.map(masquer).join('\n  - ')}`);
+      else console.log('[sonde-claude] Fixtures retirées après l\'échec.');
+    }
+    throw err;
+  }
+  // Précision 1 : la liste des sessions est notée APRÈS les mesures ; --verifier-h14 en exigera une seule nouvelle.
+  const sessions = h14.sessionsDuProfil(ctx.configDir, nomMemoire);
+  fs.writeFileSync(path.join(dossierEssai, FICHIER_SESSIONS_NOTEES), sessions.length > 0 ? `${sessions.join('\n')}\n` : '', 'utf8');
+  const creeesParMesures = sessions.filter((s) => !sessionsAvant.includes(s)).length;
+  h14.ecrireInstance(dossierInstance);
+  const etat = {
+    format: 1,
+    lot: h14.LOT_H14,
+    horodatage: stamp,
+    dossier: `h14-${stamp}`,
+    versions: { poste: etats.poste.version, embarquee: etats.embarquee.version },
+    source_copie_embarquee: copies.embarquee.source,
+    connexion: { methode: etats.poste.resume.authMethod, fournisseur: etats.poste.resume.apiProvider, abonnement: etats.poste.resume.subscriptionType },
+    sessions: { notees: sessions.length, creees_par_les_mesures: creeesParMesures },
+    references,
+  };
+  const interdits = interditsH14(ctx, [...etats.poste.sensibles, ...etats.embarquee.sensibles, copies.embarquee.exe, dossierInstance]);
+  ecrireJsonGarde(path.join(BRUT, h14.FICHIER_ETAT), etat, { poste: commun.lirePoste(), interdits });
+  console.log(`[sonde-claude] H14 : ${fichiers.length} fichiers déployés (jeux ${payant.JEUX_H14.join(', ')}, sans MCP), laissés en place.`);
+  for (const copie of COPIES_H14) {
+    const e = references[copie].h14;
+    console.log(`[sonde-claude] Référence ${copie} (${references[copie].version}) : total ${e.total} (${e.delta_base >= 0 ? '+' : ''}${e.delta_base} sur la base Skill), ${e.memory_files.length} mémoire(s), ${e.skills.length} skill(s) de fixture, ${e.fixtures_absentes.length} absente(s), canaris du flux : ${e.canaris_flux.join(', ') || 'aucun'}.`);
+  }
+  console.log(`[sonde-claude] Sessions du profil notées après les mesures : ${sessions.length} (dont ${creeesParMesures} créée(s) par les /context -p).`);
+  const compteur = lireCompteur(BRUT, 'context', h14.LOT_H14);
+  console.log(`[sonde-claude] /context du lot E3 : ${compteur.utilises} sur ${compteur.plafond}.`);
   console.log('[sonde-claude] Gestes à faire (les chemins ci-dessous sont ceux de ce poste ; ne les recopie dans aucun fichier du dépôt) :');
-  for (const l of payant.gestesH14({ configDir: ctx.configDir, projet: ctx.projet, invite: invites.get('h14-panneau') })) console.log(l);
+  for (const l of payant.gestesH14({ configDir: ctx.configDir, projet: ctx.projet, invite: invites.get('h14-panneau'), dossierInstance })) console.log(l);
+  return 0;
+}
+
+/**
+ * La vérification de H14 (P2, P3), sans aucun lancement : une seule nouvelle transcription exigée
+ * (sinon refus), lue sans jamais en afficher le texte ; version comparée à la copie embarquée mesurée ;
+ * canaris comparés aux attendus déduits de 4a ; écarts du profil classés depuis l'image d'avant.
+ */
+function verifierH14Interne(ctx, etat, { brut = BRUT, inventaireFichier = INVENTAIRE, attendu = ATTENDU } = {}) {
+  const dossierEssai = path.join(brut, etat.dossier);
+  const nomMemoire = commun.nomDossierMemoire(ctx.projet);
+  const notees = lireSessionsNotees(dossierEssai);
+  const dossierProfil = h14.dossierMemoireProjet(ctx.configDir, nomMemoire);
+  const dossierDeplace = path.join(dossierEssai, h14.SOUS_DOSSIER_TRANSCRIPTION);
+  const nouvelles = h14.nouvellesSessions({ profil: h14.sessionsDans(dossierProfil), notees, deplacees: h14.sessionsDans(dossierDeplace) });
+  if (nouvelles.length !== 1) {
+    throw new Refus(`${nouvelles.length} nouvelle(s) transcription(s) du panneau depuis la préparation (exactement une attendue) : vérification refusée, aucun texte affiché`);
+  }
+  const inventaire = commun.lireInventaire(fs.readFileSync(inventaireFichier, 'utf8'));
+  const attendus = attendusDeLaBaseline(inventaire, attendu);
+  const textes = h14.lireTextesSession(nouvelles[0], [dossierProfil, dossierDeplace]);
+  const v = h14.verifierTranscriptions(textes, { canarisConnus: new Set(h14.canarisDeLInventaire(inventaire).keys()), attendus });
+  const avant = h14.lireProfilTexte(fs.readFileSync(path.join(dossierEssai, h14.FICHIER_PROFIL_AVANT), 'utf8'));
+  const journal = fs.existsSync(ctx.journal) ? JSON.parse(fs.readFileSync(ctx.journal, 'utf8')) : null;
+  const classes = h14.classerEcartsH14({ avant, apres: listerProfil(ctx.configDir), nomMemoire, deployes: h14.deployesDuJournal(journal, ctx.configDir) });
+  const ecarts = ecartsProfil(avant, classes.apresFiltre, nomMemoire, commun.zonesSonde([...inventaire.keys()]));
+  fs.writeFileSync(path.join(dossierEssai, 'ecarts-profil-verification.json'), `${JSON.stringify(ecarts, null, 2)}\n`, 'utf8');
+  const { releve_canaris: releve, ...reste } = v;
+  return {
+    version: h14.ecartVersion(v.versions, etat.versions.embarquee),
+    releve_canaris: releve,
+    ...reste,
+    attendus,
+    profil: { deployes: classes.deployes, transcription_attendue: classes.transcription, ...resumeProfil(ecarts, nomMemoire) },
+  };
+}
+
+/** Les lignes de console d'une vérification (la version en tête, aucun texte de message). */
+function lignesVerification(v) {
+  const c = v.comparaison;
+  return [
+    v.version.message,
+    `transcription : ${v.transcriptions} fichier(s), ${v.lignes} ligne(s), ${v.appels_modele} appel(s) au modèle, ${v.invites} invite(s), modèle(s) ${v.modeles.join(', ') || 'aucun'}, outils ${v.outils.map((o) => `${o.nom} ×${o.nombre}`).join(', ') || 'aucun'}`,
+    `canaris (attendus ${v.attendus.confiance}, ${v.attendus.source}) : ${v.reponse.canaris.length} rapporté(s) ; ${c.conformes.length} vu(s) sur ${v.attendus.vus.length} attendu(s) ; manquants : ${c.manquants.join(', ') || 'aucun'} ; inattendus : ${c.inattendus.join(', ') || 'aucun'} ; hors jeu : ${c.hors_jeu.join(', ') || 'aucun'}`,
+    `profil : ${v.profil.deployes} entrée(s) déployée(s), transcription attendue (${v.profil.transcription_attendue.fichiers} fichier(s), ${v.profil.transcription_attendue.dossiers} dossier(s))`,
+    ...lignesProfil(v.profil),
+  ];
+}
+
+async function commandeVerifierH14() {
+  const ctx = preparer();
+  const etat = lireEtatH14();
+  if (!etat) throw new Refus('aucun essai H14 en cours : lancer d\'abord --lot E3 --preparer-h14');
+  const verification = verifierH14Interne(ctx, etat);
+  const garde = { poste: commun.lirePoste(), interdits: interditsH14(ctx) };
+  ecrireJsonGarde(path.join(BRUT, etat.dossier, 'verification.json'), verification, garde);
+  ecrireJsonGarde(path.join(BRUT, h14.FICHIER_ETAT), { ...etat, verification }, garde);
+  for (const l of lignesVerification(verification)) console.log(`[sonde-claude] H14, ${l}`);
+  let code = 0;
+  if (!verification.releve_canaris.valide) {
+    console.error(`[sonde-claude] RELEVÉ DES CANARIS INVALIDE : ${verification.releve_canaris.raisons.join(' ; ')}. Ne relance pas l'appel (décision D-c) : le /context du panneau reste le résultat.`);
+    code = 3;
+  }
+  if (verification.profil.zones_sonde.ecarts > 0) {
+    console.error(`[sonde-claude] ÉCART SIGNALÉ : ${verification.profil.zones_sonde.ecarts} écart(s) dans les zones de la sonde, hors fixtures et transcription (détail dans brut/${etat.dossier}/).`);
+    code = 3;
+  }
+  if (code === 0) console.log('[sonde-claude] Vérification H14 conforme.');
+  return code;
+}
+
+/**
+ * H14, fin (lot E3) : vérification si elle n'a pas été faite, transcription déplacée dans brut/ (P4),
+ * retrait, version de chaque copie relue, 4 bases de fin comparées à celles du début copie par copie
+ * (précision 4), profil comparé à l'image d'avant, rapport brut/h14-<horodatage>.json, gestes de fin.
+ */
+async function commandeCloturerH14() {
+  const ctx = preparer();
+  verifierArret(BRUT);
+  const etat = lireEtatH14();
+  if (!etat) throw new Refus('aucun essai H14 en cours');
+  const dossierEssai = path.join(BRUT, etat.dossier);
+  const garde = { poste: commun.lirePoste(), interdits: interditsH14(ctx) };
+  let verification = etat.verification || null;
+  let refusVerification = null;
+  if (!verification) {
+    try {
+      verification = verifierH14Interne(ctx, etat);
+      ecrireJsonGarde(path.join(dossierEssai, 'verification.json'), verification, garde);
+      ecrireJsonGarde(path.join(BRUT, h14.FICHIER_ETAT), { ...etat, verification }, garde);
+    } catch (err) {
+      if (!(err instanceof Refus)) throw err;
+      refusVerification = err.message;
+      console.error(`[sonde-claude] Vérification H14 refusée : ${masquer(err.message)}`);
+    }
+  }
+  const dep = deplacerTranscriptionH14(ctx, etat);
+  console.log(`[sonde-claude] Transcription du panneau déplacée dans brut/${etat.dossier}/${h14.SOUS_DOSSIER_TRANSCRIPTION}/ (${dep.fichiers} fichier(s), ${dep.dossiers} dossier(s), contenu non affiché).`);
+  const { problemes } = retirer(ctx.journal);
+  if (problemes.length > 0) throw new Refus(`retrait incomplet (${problemes.map(masquer).join(' ; ')}) : examiner, puis relancer --lot E3 --cloturer-h14`);
+  const contenu = fs.existsSync(ctx.espace) ? fs.readdirSync(ctx.espace) : [];
+  if (contenu.some((n) => n !== 'projet') || (fs.existsSync(ctx.projet) && fs.readdirSync(ctx.projet).length > 0)) {
+    throw new Refus("l'espace n'est pas revenu à son état initial après le retrait : examiner, puis relancer --lot E3 --cloturer-h14");
+  }
+  fs.mkdirSync(ctx.projet, { recursive: true });
+
+  const raisons = [];
+  const copies = copiesH14(ctx);
+  const etats = {};
+  for (const copie of COPIES_H14) {
+    etats[copie] = await lireEtat(ctx, ctx.projet, copies[copie].exe);
+    if (etats[copie].problemes.length > 0) raisons.push(`connexion non conforme (${copie}) à la clôture`);
+    if (etats[copie].version !== etat.versions[copie]) raisons.push(`copie ${copie} : version ${etat.versions[copie]} à la préparation, ${etats[copie].version} à la clôture (bases de fin non mesurées)`);
+  }
+  verifierBudget(BRUT, h14.PREVUS_CLOTURE, h14.LOT_H14);
+  const inventaire = commun.lireInventaire(fs.readFileSync(INVENTAIRE, 'utf8'));
+  const nomMemoire = commun.nomDossierMemoire(ctx.projet);
+  const x = { dossierEssai, racines: racinesNormalisation(ctx), nomMemoire, canarisConnus: new Set(h14.canarisDeLInventaire(inventaire).keys()) };
+  const references = etat.references;
+  let rang = 10;
+  for (const copie of COPIES_H14) {
+    if (etats[copie].version !== etat.versions[copie]) continue;
+    for (const b of BASES) {
+      const fin = await mesurerH14(ctx, { ...x, exe: copies[copie].exe, copie, version: etat.versions[copie], c: b, rang: ++rang });
+      const ecartsBase = comparerBases(references[copie].bases[b.cle].debut, fin);
+      references[copie].bases[b.cle].fin = fin;
+      references[copie].bases[b.cle].identiques = ecartsBase.length === 0;
+      if (ecartsBase.length > 0) raisons.push(`copie ${copie}, base ${b.cle} différente au début et à la fin : ${ecartsBase.join(', ')}`);
+    }
+  }
+  if (fs.existsSync(ctx.projet) && fs.readdirSync(ctx.projet).length === 0) fs.rmdirSync(ctx.projet);
+  if (fs.existsSync(ctx.espace) && fs.readdirSync(ctx.espace).length > 0) raisons.push("l'espace n'est pas vide à la fin");
+  const avant = h14.lireProfilTexte(fs.readFileSync(path.join(dossierEssai, h14.FICHIER_PROFIL_AVANT), 'utf8'));
+  const ecarts = ecartsProfil(avant, listerProfil(ctx.configDir), nomMemoire, commun.zonesSonde([...inventaire.keys()]));
+  fs.writeFileSync(path.join(dossierEssai, 'ecarts-profil-cloture.json'), `${JSON.stringify(ecarts, null, 2)}\n`, 'utf8');
+  const profil = resumeProfil(ecarts, nomMemoire);
+  if (ecarts.zones.length > 0) raisons.push(`zones de la sonde : ${ecarts.zones.length} écart(s) depuis l'image d'avant la préparation (détail dans brut/)`);
+
+  const compteur = lireCompteur(BRUT, 'context', h14.LOT_H14);
+  const rapport = {
+    rapport: 'claude-code-h14',
+    format: 1,
+    ecart_version: verification ? verification.version : { ecart: null, message: `vérification refusée : ${nettoyerRaison(refusVerification)}` },
+    lot: h14.LOT_H14,
+    environnement: {
+      outil: 'Claude Code', entree: 'panneau VS Code et cli -p', os: ctx.plateforme === 'win32' ? 'Windows' : ctx.plateforme,
+      versions: { ...etat.versions, panneau: verification ? verification.version.panneau : null }, modele: MODELE, effort: EFFORT,
+      ...etat.connexion, sonde: 'v1', date_mesure: etat.horodatage.slice(0, 10),
+    },
+    serie: { valide: raisons.length === 0, raisons_rejet: raisons.map(nettoyerRaison), compteur_lot: compteur.utilises, plafond: compteur.plafond },
+    references,
+    panneau: verification || { refus: nettoyerRaison(refusVerification) },
+    transcription_deplacee: dep,
+    profil,
+  };
+  const interdits = interditsH14(ctx, [...etats.poste.sensibles, ...etats.embarquee.sensibles, copies.embarquee.exe]);
+  const fichier = ecrireRapport(rapport, { destination: 'brut', nom: `h14-${etat.horodatage}.json`, poste: commun.lirePoste(), interdits });
+  fs.unlinkSync(path.join(BRUT, h14.FICHIER_ETAT));
+  console.log(`[sonde-claude] ${rapport.ecart_version.message}`);
+  for (const l of lignesProfil(profil)) console.log(`[sonde-claude] Profil isolé, ${l}`);
+  console.log(`[sonde-claude] Rapport H14 : ${path.relative(RACINE_DEPOT, fichier).replace(/\\/g, '/')} ; /context du lot E3 : ${compteur.utilises} sur ${compteur.plafond}.`);
+  if (verification && !verification.releve_canaris.valide) console.error(`[sonde-claude] Relevé des canaris du panneau invalide : ${verification.releve_canaris.raisons.join(' ; ')}. Le /context du panneau reste le résultat.`);
+  console.log('[sonde-claude] Gestes de fin :');
+  for (const l of h14.gestesFinH14({ dossierInstance: path.join(os.tmpdir(), h14.DOSSIER_INSTANCE) })) console.log(l);
+  if (raisons.length > 0) {
+    console.error(`[sonde-claude] RÉFÉRENCES H14 REJETÉES :\n  - ${raisons.map(masquer).join('\n  - ')}`);
+    return 3;
+  }
+  console.log('[sonde-claude] Références H14 valides.');
   return 0;
 }
 
 async function commandeContext(args) {
   const opts = lireOptions(args);
   if (opts.preparerH14) return commandePreparerH14();
+  if (opts.verifierH14) return commandeVerifierH14();
+  if (opts.cloturerH14) return commandeCloturerH14();
   const combinaisons = opts.combinaisons ? COMBINAISONS.filter((c) => opts.combinaisons.includes(c.id)) : COMBINAISONS;
   const ctx = preparer();
   verifierArret(BRUT);
@@ -1737,6 +2127,7 @@ module.exports = {
   racinesNormalisation, reecrireChemin, fixturesAttendues, o200kDuPlan, normaliserCombinaison, comparerBases,
   listerProfil, ecartsProfil, resumeProfil, lignesProfil, listerFixtures, fichiersADeployer, deployer, retirer, lancerClaude, ecrireRapport,
   lireOptions, nettoyerRaison, preparerEtape, comparerBornesSerie, commandeBaseline, commandeCompatible, principal,
+  COMBINAISON_H14, COPIES_H14, verifierH14Interne, ecrireJsonGarde, FICHIER_SESSIONS_NOTEES, lireEtatH14, attendusDeLaBaseline, deplacerTranscriptionH14, lignesVerification,
 };
 
 if (require.main === module) {

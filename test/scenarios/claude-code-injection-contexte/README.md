@@ -33,7 +33,9 @@ Toutes les commandes se lancent depuis la racine du dépôt, dans un **terminal 
 | `npm run sonde:claude-context -- --lot V1 --resultats` | La même partie gratuite, pour vérifier une nouvelle version de Claude Code (lot V1, `/context` seulement) | Nul |
 | `npm run sonde:claude -- --a-sec` | Affiche les 38 appels prévus (argv, noms des variables, fichiers déployés), **sans rien lancer ni écrire** | Nul |
 | `npm run sonde:claude -- --confirmer --plafond 38` | La partie payante, séries 1 à 5 | 38 appels au modèle, sur le quota de l'abonnement |
-| `npm run sonde:claude-context -- --preparer-h14` | Déploie le jeu de H14 et affiche les gestes à faire dans VS Code | Nul ici ; 1 appel manuel dans le panneau |
+| `npm run sonde:claude-context -- --lot E3 --preparer-h14` | H14 : 4 bases, déploiement unique du jeu complet, `/context` de référence par le `claude` du poste et par la copie embarquée dans l'extension, puis les gestes à faire dans VS Code | Nul ; 6 `/context` du lot E3 |
+| `npm run sonde:claude-context -- --verifier-h14` | H14 : lit la transcription du panneau sans en afficher le texte (une seule nouvelle session), version, outils, canaris, profil | Nul ; aucun `/context` |
+| `npm run sonde:claude-context -- --lot E3 --cloturer-h14` | H14 : transcription déplacée dans `brut/`, retrait, 4 bases de fin comparées copie par copie, rapport `brut/h14-….json` | Nul ; 4 `/context` du lot E3 |
 | `node test/scenarios/scripts/sonde-claude-code.js retirer` | Retire un déploiement laissé en place (interruption, ou H14) | Nul |
 | `npm run sonde:claude-baseline -- --depuis context-AAAA-MM-JJ-HHMM.json` | Écrit `attendu/baseline-<date>.json` d'après un rapport « context » **valide** de `resultats/` (entrées « context » seulement), après la garde ; refuse d'écraser une baseline existante | Nul (aucun lancement de `claude`) |
 | `npm run sonde:claude-baseline -- --depuis context-….json --payant payant-….json,payant-….json,…` | Écrit `attendu/baseline-<date>.json` d'après un rapport « context » et les rapports « payant » d'un même lot (entrées « context », « usage » et « canari », et une section de décomposition non comparée), après la garde ; refuse d'écraser une baseline existante (voir « Construire une baseline à partir de plusieurs rapports ») | Nul (aucun lancement de `claude`) |
@@ -145,12 +147,15 @@ Le déroulement :
 
 ### 3. H14 : le panneau Claude Code de VS Code (lot E3)
 
-`npm run sonde:claude-context -- --preparer-h14` déploie la mémoire, les règles, les skills et le hook (sans MCP), les laisse en place, puis affiche les gestes. L'essentiel :
+L'essai se fait en trois commandes sous le lot E3 (plafond de 12 `/context`, 10 prévus), voir le tableau ci-dessus. L'essentiel :
 
-- une instance séparée de VS Code est lancée avec un `--user-data-dir` distinct, depuis un terminal où le profil isolé est posé ; **il n'est pas nécessaire de fermer les autres fenêtres** ;
+- avant la préparation, `extensions.autoUpdate` doit valoir `false` dans la VS Code principale, et il le reste pendant tout E3 ; la préparation le vérifie, et la clôture rappelle de le rétablir ;
+- les références `-p` sont mesurées sur le même déploiement que le panneau, avec le `claude` du poste et avec la copie embarquée dans l'extension (trouvée à chaque exécution, ou désignée par `CANARI_CLAUDE_EMBARQUEE`) ; chaque mesure est contrôlée contre la version de sa copie ;
+- une instance séparée de VS Code est lancée avec un `--user-data-dir` distinct, depuis un terminal où le profil isolé est posé ; **il n'est pas nécessaire de fermer les autres fenêtres**. La préparation crée ce dossier temporaire avec ses réglages (ni mise à jour des extensions ni de VS Code, ni fichier ouvert ni sélection joints) et refuse un dossier existant et non vide, sans jamais le supprimer ;
 - le `/status` du panneau tranche : profil isolé, connexion claude.ai sur un abonnement, aucune clé d'API ; sinon, on ne tape rien d'autre ;
-- un seul appel au modèle : l'invite `h14-panneau` de `SONDE.md` ;
-- le retrait se fait par `node test/scenarios/scripts/sonde-claude-code.js retirer`.
+- un seul appel au modèle : l'invite `h14-panneau` de `SONDE.md`, jamais relancée ; un appel d'outil rend le relevé des canaris invalide, et le `/context` du panneau reste le résultat ;
+- la vérification exige exactement une nouvelle transcription (les `/context -p` n'en laissent pas : `--no-session-persistence`) ; elle compare les canaris aux attendus déduits de l'appel 4a de la baseline, marqués « deduit », et met l'écart de version en tête ;
+- la transcription est déplacée dans `brut/` (ignoré par Git et refusé par le hook `pre-commit`), jamais affichée ; `retirer` le fait aussi en secours.
 
 ## Le coût
 
@@ -159,7 +164,7 @@ Le déroulement :
 | Gratuite (E1) | 0 | 26 | 60 `/context` pour le lot E1 (relevé de 50 le 2026-11-09) |
 | Vérification de version (V1) | 0 (refusés) | 26 | 60 `/context` pour le lot V1 (relevé de 30 le 2026-11-10) |
 | Payante (E2) | 38 (séries 1 à 5 : 17, 6, 4, 3 et 8) | 33 | 40 appels au modèle et 40 `/context` pour le lot E2 |
-| H14 (E3) | 1, tapé à la main | 1 | — |
+| H14 (E3) | 1, tapé à la main | 10 par -p (+ 1 dans le panneau) | 12 `/context` pour le lot E3 |
 
 Les deux compteurs sont dans `brut/` (`compteur-context.json` et `compteur-modele.json`). Ils sont incrémentés **avant** chaque lancement ; un lancement interrompu compte. L'option `--plafond` ne peut qu'abaisser la limite d'une exécution. Un plafond ne se relève que par une décision inscrite dans le code (`RELEVEMENTS_PLAFOND`, une par lot au plus) : au lancement suivant, le compteur du lot passe au nouveau plafond en gardant ses utilisés, avec la trace du changement dans `historique_plafond`, et le lanceur l'annonce en console. Les appels au modèle passent par le quota de l'abonnement. Un appel des séries 1 à 4 fait un seul tour d'API ; un appel de déclencheur (série 5) en fait 2 ou 3.
 

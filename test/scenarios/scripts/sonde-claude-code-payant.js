@@ -11,7 +11,7 @@
  *   - la garde de flux (pendant l'appel) et les contrôles après l'appel ;
  *   - la lecture de l'usage, par appel et par tour ;
  *   - la décomposition des coûts (sections 3 et 4 de la conception) ;
- *   - les gestes de la préparation H14.
+ *   - les gestes de la préparation H14 (les autres fonctions de H14 sont dans sonde-claude-code-h14.js).
  */
 'use strict';
 
@@ -31,19 +31,24 @@ const MAX_SERIES_REJETEES = 2;
 /**
  * Les deux compteurs, distincts : un fichier et des plafonds par lot chacun. V1 (décision du 2026-11-10)
  * est le lot des vérifications de version : /context seulement, plafond de 60 (relevé de 30 le même jour),
- * sans compteur du modèle.
+ * sans compteur du modèle. E3 (décision Q2 du 2026-11-10) est le lot de H14 : les /context de référence
+ * du claude du poste et de la copie embarquée (P5 et P5b), plafond de 12, sans compteur du modèle (le
+ * seul appel au modèle de H14 est tapé à la main dans le panneau).
  */
 const COMPTEURS = {
-  context: { fichier: 'compteur-context.json', plafonds: { E1: 60, E2: 40, V1: 60 }, unite: '/context' },
+  context: { fichier: 'compteur-context.json', plafonds: { E1: 60, E2: 40, V1: 60, E3: 12 }, unite: '/context' },
   modele: { fichier: 'compteur-modele.json', plafonds: { E2: PLAFOND_MODELE }, unite: 'appel(s) au modèle' },
 };
 
 /** Les lots qui n'acceptent que /context : tout appel au modèle et toute commande payante y sont refusés. */
-const LOTS_CONTEXT_SEUL = ['V1'];
+const LOTS_CONTEXT_SEUL = ['V1', 'E3'];
+/** Le rôle de chaque lot « /context seulement », cité dans les refus. */
+const ROLES_CONTEXT_SEUL = { V1: 'vérification de version', E3: 'H14, panneau VS Code' };
 for (const lot of LOTS_CONTEXT_SEUL) {
   if (Object.prototype.hasOwnProperty.call(COMPTEURS.modele.plafonds, lot)) throw new Error(`lot ${lot} « /context seulement » doté d'un compteur du modèle`);
+  if (!ROLES_CONTEXT_SEUL[lot]) throw new Error(`lot ${lot} « /context seulement » sans rôle`);
 }
-const refusContextSeul = (lot) => new Refus(`le lot ${lot} (vérification de version) n'accepte que /context : toute commande payante y est refusée`);
+const refusContextSeul = (lot) => new Refus(`le lot ${lot} (${ROLES_CONTEXT_SEUL[lot]}) n'accepte que /context : toute commande payante y est refusée`);
 
 /**
  * Les relèvements de plafond, décidés explicitement, un au plus par compteur et par lot. Un compteur
@@ -828,32 +833,44 @@ function decomposer({ U = {}, ctx = {}, el = {}, L = {}, o = {} }) {
 
 const JEUX_H14 = ['niveaux', 'skills', 'hook-sortie'];
 
-/** Les gestes de H14, affichés par --preparer-h14 (PowerShell ordinaire). */
-function gestesH14({ configDir, projet, invite, dossierBrut = 'test/scenarios/claude-code-injection-contexte/brut' }) {
+/**
+ * Le geste qui précède la préparation (décision Q1) : le lanceur refuse de préparer tant qu'il ne le
+ * voit pas fait. Les gestes de fin sont dans sonde-claude-code-h14.js (gestesFinH14).
+ */
+const GESTE_DEBUT_H14 = 'Avant la préparation : dans la VS Code principale, règle extensions.autoUpdate sur false (paramètres utilisateur : Extensions › Auto Update › None). Il le reste pendant tout E3 ; la clôture rappelle de le rétablir.';
+
+/**
+ * Les gestes de H14 dans le panneau, affichés par --preparer-h14 (PowerShell ordinaire). Les chemins
+ * sont ceux du poste : ils ne s'affichent qu'en console.
+ */
+function gestesH14({ configDir, projet, invite, dossierInstance, dossierBrut = 'test/scenarios/claude-code-injection-contexte/brut' }) {
   return [
     '1. Ouvre un terminal PowerShell ordinaire (pas un terminal de VS Code ni de Claude Code). Inutile de fermer tes autres fenêtres de VS Code : --user-data-dir distinct démarre une instance séparée, qui hérite des variables de ce terminal. C\'est le /status du panneau qui tranche.',
     '2. Retire les variables CLAUDE* et ANTHROPIC* de ce terminal, puis pose celles du profil isolé :',
     '   Get-ChildItem Env: | Where-Object { $_.Name -match \'^(CLAUDE|ANTHROPIC)\' } | ForEach-Object { Remove-Item "Env:$($_.Name)" }',
     `   $env:CLAUDE_CONFIG_DIR = "${configDir}"`,
     '   $env:DISABLE_AUTOUPDATER = "1"',
-    '3. Lance l\'instance séparée sur le projet de l\'espace :',
-    `   code --user-data-dir "$env:TEMP\\vscode-canari" "${projet}"`,
-    '4. Dans le panneau Claude Code de cette instance, ferme tous les éditeurs, puis tape /status. Il tranche : le dossier de configuration doit être le profil isolé, la connexion claude.ai sur un abonnement, sans clé API. Sinon, ne tape rien d\'autre : ferme l\'instance et passe au point 8.',
-    `5. Tape /context (gratuit), puis copie les sections des fichiers de mémoire et des skills dans ${dossierBrut}/h14-panneau.txt. Le skill de plugin n'y figurera pas : le panneau n'a pas de --plugin-dir, et ce jeu n'a pas de MCP.`,
-    '6. Un seul appel au modèle : colle cette invite (SONDE.md, section h14-panneau), puis copie la réponse à la suite du même fichier :',
+    '3. Lance l\'instance séparée sur le projet de l\'espace. Son dossier utilisateur temporaire vient d\'être créé par le lanceur, avec ses réglages (ni mise à jour des extensions ni de VS Code, ni fichier ouvert ni sélection joints au message) :',
+    `   code --user-data-dir "${dossierInstance}" "${projet}"`,
+    '4. Si VS Code demande d\'accorder la confiance à ce dossier, accorde-la ; si le panneau demande d\'accepter la confiance du projet, accepte-la aussi.',
+    '5. Dans le panneau Claude Code de cette instance, ferme tous les éditeurs, puis tape /status. Il tranche : le dossier de configuration doit être le profil isolé, la connexion claude.ai sur un abonnement, sans clé API. Sinon, ne tape rien d\'autre : ferme l\'instance et passe au point 10.',
+    `6. Tape /context (gratuit), puis copie les sections des fichiers de mémoire, des skills et des messages (sortie du hook) dans ${dossierBrut}/h14-panneau.txt. Ne copie pas /status. Le skill de plugin n'y figurera pas : le panneau n'a pas de --plugin-dir, et ce jeu n'a pas de MCP.`,
+    '7. Un seul appel au modèle : colle cette invite (SONDE.md, section h14-panneau), puis copie la réponse à la suite du même fichier. Ne la relance jamais, même si la réponse te paraît fausse (décision D-c) :',
     `   ${invite}`,
-    '7. Note la version de Claude Code affichée par le panneau, puis ferme cette instance.',
-    '8. Retire les fixtures : node test/scenarios/scripts/sonde-claude-code.js retirer',
+    '   Si le panneau montre un appel d\'outil, note-le : le relevé des canaris est alors invalide, sans relance, et le /context du panneau reste le résultat (décision Q5).',
+    '8. Note la version de Claude Code affichée par le panneau, puis ferme cette instance.',
+    '9. Vérifie la transcription (aucun /context, aucun texte affiché) : npm run sonde:claude-context -- --verifier-h14',
+    '10. Clos l\'essai (transcription déplacée dans brut/, retrait, bases de fin, rapport) : npm run sonde:claude-context -- --lot E3 --cloturer-h14',
   ];
 }
 
 module.exports = {
-  LOT_PAYANT, PLAFOND_MODELE, MAX_SERIES_REJETEES, COMPTEURS, LOTS_CONTEXT_SEUL, EMPREINTES_INVITES, INVITES_MANUELLES,
+  LOT_PAYANT, PLAFOND_MODELE, MAX_SERIES_REJETEES, COMPTEURS, LOTS_CONTEXT_SEUL, ROLES_CONTEXT_SEUL, EMPREINTES_INVITES, INVITES_MANUELLES,
   SERIES, D_TOUS, OUTILS_DECLENCHEURS, AUTORISATIONS, REGLAGES_DECLENCHEURS, CHEMIN_REGLAGES, JEUX_H14,
   RELEVEMENTS_PLAFOND, nomArchive, lireCompteur, ouvrirLot, releverPlafond, verifierBudget, reserver, noterSerieRejetee,
   sha256, lireSonde, verifierInvites, invitesEnvoyables,
   planPayant, compterPlan, lireOptionsPayant,
   lireFluxPayant, entreeUsage, lireUsage, creerGardeFlux, controlerAppelPayant, extraireJson, lireReponse, outilsAppeles,
   o200k, ligneSkill, elementsContext, longueursChemins, o200kMesures, decomposer,
-  gestesH14,
+  GESTE_DEBUT_H14, gestesH14,
 };

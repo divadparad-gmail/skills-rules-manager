@@ -140,12 +140,13 @@ describe('Suite de Tests : Partie payante de la sonde Claude Code (lot I3, sans 
       fs.writeFileSync(path.join(brut, 'compteur-modele-E1.json'), 'archive');
       assert.throws(() => P.ouvrirLot(brut, 'modele', 'E2'), /existe déjà/);
       assert.strictEqual(fs.readFileSync(path.join(brut, 'compteur-modele-E1.json'), 'utf8'), 'archive');
-      // La commande context exige --lot ; --preparer-h14 n'en prend pas
-      assert.throws(() => S.lireOptions([]), /--lot <E1\|E2\|V1> est obligatoire/);
+      // La commande context exige --lot ; les modes H14 qui lancent /context exigent --lot E3
+      assert.throws(() => S.lireOptions([]), /--lot <E1\|E2\|V1\|E3> est obligatoire/);
       assert.throws(() => S.lireOptions(['--lot', 'I2']), S.Refus);
       assert.strictEqual(S.lireOptions(['--lot', 'E1']).lot, 'E1');
       assert.throws(() => S.lireOptions(['--preparer-h14', '--lot', 'E1']), /--preparer-h14/);
-      assert.strictEqual(S.lireOptions(['--preparer-h14']).preparerH14, true);
+      assert.throws(() => S.lireOptions(['--preparer-h14']), /--preparer-h14 exige --lot E3/);
+      assert.strictEqual(S.lireOptions(['--lot', 'E3', '--preparer-h14']).preparerH14, true);
     } finally {
       supprimer(brut);
     }
@@ -159,10 +160,10 @@ describe('Suite de Tests : Partie payante de la sonde Claude Code (lot I3, sans 
     const erreurs = console.error;
     try {
       // Accepté par --lot, plafond de 60 (relevé de 30 le 2026-11-10), aucun compteur du modèle
-      assert.deepStrictEqual(S.LOTS_CONTEXT, ['E1', 'E2', 'V1']);
+      assert.deepStrictEqual(S.LOTS_CONTEXT, ['E1', 'E2', 'V1', 'E3']);
       assert.strictEqual(S.lireOptions(['--lot', 'V1', '--resultats']).lot, 'V1');
       assert.strictEqual(P.COMPTEURS.context.plafonds.V1, 60);
-      assert.deepStrictEqual(P.LOTS_CONTEXT_SEUL, ['V1']);
+      assert.deepStrictEqual(P.LOTS_CONTEXT_SEUL, ['V1', 'E3']);
       assert.ok(!Object.prototype.hasOwnProperty.call(P.COMPTEURS.modele.plafonds, 'V1'));
 
       // Le compteur E1 (52 sur 60, relevé) est archivé à l'ouverture de V1, annoncé, sans remise à zéro
@@ -650,19 +651,23 @@ describe('Suite de Tests : Partie payante de la sonde Claude Code (lot I3, sans 
     }
   });
 
-  test('15. Préparation H14 : jeu complet sans MCP, instance VS Code séparée sans fermer les autres fenêtres, /status tranche', () => {
+  test('15. Préparation H14 : jeu complet sans MCP, instance VS Code séparée sans fermer les autres fenêtres, /status tranche, vérification puis clôture', () => {
     const plan = C.planDeploiement(S.listerFixtures(), P.JEUX_H14, { configDir: 'C:\\profil', espace: ESPACE_W, fixturesDir: 'C:\\depot\\fixtures' }, path.win32);
     assert.ok(plan.length > 0 && plan.every((e: any) => e.cible !== 'mcp'), 'aucun MCP');
     assert.ok(['niveaux', 'skills', 'hook-sortie'].every((j) => P.JEUX_H14.includes(j)));
-    const lignes: string[] = P.gestesH14({ configDir: 'X:\\profil-isole', projet: 'X:\\espace\\projet', invite: INVITES.get('h14-panneau') });
+    const lignes: string[] = P.gestesH14({ configDir: 'X:\\profil-isole', projet: 'X:\\espace\\projet', invite: INVITES.get('h14-panneau'), dossierInstance: 'X:\\tmp\\vscode-canari' });
     const texte = lignes.join('\n');
-    assert.match(texte, /code --user-data-dir "\$env:TEMP\\vscode-canari" "X:\\espace\\projet"/);
+    assert.match(texte, /code --user-data-dir "X:\\tmp\\vscode-canari" "X:\\espace\\projet"/);
     assert.match(texte, /\$env:CLAUDE_CONFIG_DIR = "X:\\profil-isole"/);
     assert.match(texte, /Inutile de fermer tes autres fenêtres/);
     assert.ok(!lignes.some((l) => /^\s*\d+\.\s*Ferme/.test(l)), 'aucun geste ne ferme les autres fenêtres d\'abord');
     assert.match(texte, /\/status\. Il tranche/);
     assert.ok(texte.includes(INVITES.get('h14-panneau') as string));
-    assert.match(lignes[lignes.length - 1], /sonde-claude-code\.js retirer$/);
+    assert.match(texte, /Ne la relance jamais/);
+    assert.match(texte, /appel d'outil, note-le : le relevé des canaris est alors invalide, sans relance/);
+    assert.ok(texte.indexOf('--verifier-h14') > texte.indexOf(INVITES.get('h14-panneau') as string), 'la vérification suit l\'appel');
+    assert.match(lignes[lignes.length - 1], /npm run sonde:claude-context -- --lot E3 --cloturer-h14$/);
+    assert.match(P.GESTE_DEBUT_H14, /extensions\.autoUpdate sur false/);
     assert.ok(texte.indexOf('/status') < texte.indexOf('/context') && texte.indexOf('/context') < texte.indexOf(INVITES.get('h14-panneau') as string));
   });
 
