@@ -8,6 +8,7 @@ Cette grille dit, pour chaque scénario, ce qu'il vérifie, avec quels jeux de f
 - **Appels** : les identifiants du plan de la partie payante (`npm run sonde:claude -- --a-sec` les affiche). « Gratuit » désigne une combinaison de `sonde:claude-context` ; « E3 » est l'appel manuel dans le panneau.
 - **Niveaux** : G = profil isolé (global), Pa = dossier parent (l'espace), Pr = projet.
 - **Baselines** : une colonne par baseline datée de `attendu/`. « À mesurer » signifie que l'instrument n'a pas encore été mesuré. Une colonne n'est jamais modifiée après coup, sauf pour remplir une cellule « à mesurer ». Les valeurs ne portent que sur les fixtures et sur les écarts à la base de même jeu d'outils : aucun total absolu, aucune valeur liée au compte (décision du 2026-11-09).
+- **Versions compatibles** : les valeurs « ctx » de la colonne 2.1.318 valent aussi pour la **2.1.319**, d'après la vérification gratuite du lot V1 du 2026-11-10 (0 écart sur 107 entrées, comparaison inter-versions avec `baseline-2026-11-09.json`, qui liste désormais la 2.1.319 dans `versions_compatibles`). Les valeurs de la colonne ne changent pas, et les cellules « à mesurer (E2) » restent à mesurer.
 
 ## La grille
 

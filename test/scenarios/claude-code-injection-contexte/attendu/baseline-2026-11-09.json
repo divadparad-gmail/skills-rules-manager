@@ -6,7 +6,8 @@
     "os": "Windows",
     "version": "2.1.318",
     "versions_compatibles": [
-      "2.1.318"
+      "2.1.318",
+      "2.1.319"
     ],
     "modele": "claude-opus-5",
     "effort": "high",
