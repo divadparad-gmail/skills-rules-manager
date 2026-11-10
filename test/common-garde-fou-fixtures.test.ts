@@ -145,6 +145,28 @@ describe('Garde-fou des fixtures du banc d\'essai (npm test et hook pre-commit)'
     assertRefused(list, 'a', backup);
   });
 
+  test('5b. Une sortie brute de la sonde Claude Code indexée de force est refusée (a), et brut/ doit rester ignoré (c)', () => {
+    const repo = makeRepo();
+    const transcription = `${guard.SONDE_CLAUDE_BRUT}/h14-2026-11-10-1200/transcription/session.jsonl`;
+    const releve = `${guard.SONDE_CLAUDE_BRUT}/h14-panneau.txt`;
+    write(repo, transcription, '{"type":"assistant"}\n');
+    write(repo, releve, 'relevé manuel');
+    assert.strictEqual(git(repo, 'status', '--porcelain', '--', guard.SONDE_CLAUDE_BRUT).trim(), '', 'brut/ est ignoré par le .gitignore réel');
+    git(repo, 'add', '-f', transcription, releve);
+    const list = violations(repo);
+    assertRefused(list, 'a', transcription);
+    assertRefused(list, 'a', releve);
+    // Sans la ligne du .gitignore, le contrôle c donne la ligne à rétablir
+    const repo2 = makeRepo();
+    const ligne = `/${guard.SONDE_CLAUDE_BRUT}/`;
+    const gitignore = fs.readFileSync(path.join(repo2, '.gitignore'), 'utf8');
+    assert.ok(gitignore.split(/\r?\n/).includes(ligne), `le .gitignore réel contient ${ligne}`);
+    fs.writeFileSync(path.join(repo2, '.gitignore'), gitignore.split(/\r?\n/).filter((l) => l !== ligne).join('\n'));
+    const list2 = violations(repo2);
+    assertRefused(list2, 'c', guard.SONDE_CLAUDE_BRUT_TEMOIN);
+    assert.ok(list2.some((v) => v.message.includes(ligne)), 'le message donne la ligne à ajouter');
+  });
+
   test('6. Un fichier canonique identique à sa fixture est refusé, en LF comme en CRLF (b)', () => {
     const repo = makeRepo();
     write(repo, 'GEMINI.md', fixture('GEMINI.md').replace(/\r\n/g, '\n'));

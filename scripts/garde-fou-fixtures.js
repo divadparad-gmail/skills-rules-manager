@@ -8,10 +8,13 @@
  * Les contrôles portent sur l'index et sur les fichiers d'exclusion, jamais sur les fixtures
  * présentes dans l'arbre de travail : un banc déployé mais non indexé est accepté.
  *   a. l'index ne contient ni fixture non canonique (ni sa variante .disabled), ni le manifeste,
- *      ni un fichier de .banc-essai-sauvegarde/ ;
+ *      ni un fichier de .banc-essai-sauvegarde/, ni une sortie brute de la sonde Claude Code
+ *      (test/scenarios/claude-code-injection-contexte/brut/ : relevés locaux et transcription du
+ *      panneau H14, que la garde de confidentialité des rapports n'examine pas) ;
  *   b. un chemin canonique indexé n'est pas identique à sa fixture (fins de ligne normalisées) ;
- *   c. le .gitignore couvre chaque fixture non canonique et sa variante, le manifeste et la
- *      sauvegarde (vérifié par git check-ignore --no-index) ;
+ *   c. le .gitignore couvre chaque fixture non canonique et sa variante, le manifeste, la
+ *      sauvegarde et les sorties brutes de la sonde Claude Code (vérifié par git check-ignore
+ *      --no-index) ;
  *   d. le .vscodeignore exclut la sauvegarde (contrôle textuel ; vsce ls fait foi avant publication) ;
  *   e. le .gitignore n'ignore aucun chemin canonique, où de vrais fichiers doivent rester commitables.
  *
@@ -30,6 +33,9 @@ const CANONICAL_PATHS = ['CLAUDE.md', 'GEMINI.md', '.mcp.json', '.agents/hooks.j
 const MANIFEST_FILE = '.scenario-manifest.json';
 const BACKUP_DIR = '.banc-essai-sauvegarde';
 const VSCODEIGNORE_LINE = `${BACKUP_DIR}/**`;
+/** Les sorties brutes de la sonde Claude Code : locales, jamais commitées (décision Q3 du 2026-11-10). */
+const SONDE_CLAUDE_BRUT = 'test/scenarios/claude-code-injection-contexte/brut';
+const SONDE_CLAUDE_BRUT_TEMOIN = `${SONDE_CLAUDE_BRUT}/h14-exemple/transcription/exemple.jsonl`;
 
 function git(root, args, input) {
   const result = spawnSync('git', args, { cwd: root, input, maxBuffer: 64 * 1024 * 1024 });
@@ -125,6 +131,8 @@ function checkIndex(root) {
       violations.push({ rule: 'a', path: rel, message: 'manifeste du banc d\'essai indexé' });
     } else if (rel.startsWith(`${BACKUP_DIR}/`)) {
       violations.push({ rule: 'a', path: rel, message: 'fichier de la sauvegarde du banc d\'essai indexé' });
+    } else if (rel.startsWith(`${SONDE_CLAUDE_BRUT}/`)) {
+      violations.push({ rule: 'a', path: rel, message: 'sortie brute de la sonde Claude Code indexée (données locales)' });
     } else if (CANONICAL_PATHS.includes(rel) && sources.has(rel)) {
       const blob = git(root, ['cat-file', 'blob', sha]);
       if (blob.status !== 0) throw new Error(`git cat-file a échoué pour ${rel}`);
@@ -157,12 +165,12 @@ function ignoredPaths(root, paths) {
 function checkGitignore(root) {
   const violations = [];
   const backupWitness = `${BACKUP_DIR}/index.json`;
-  const required = [...coveredPaths(root), MANIFEST_FILE, backupWitness];
+  const required = [...coveredPaths(root), MANIFEST_FILE, backupWitness, SONDE_CLAUDE_BRUT_TEMOIN];
   const ignored = ignoredPaths(root, [...required, ...CANONICAL_PATHS]);
 
   for (const rel of required) {
     if (ignored.has(rel)) continue;
-    const line = rel === backupWitness ? `/${BACKUP_DIR}/` : `/${rel}`;
+    const line = rel === backupWitness ? `/${BACKUP_DIR}/` : rel === SONDE_CLAUDE_BRUT_TEMOIN ? `/${SONDE_CLAUDE_BRUT}/` : `/${rel}`;
     violations.push({ rule: 'c', path: rel, message: `non ignoré par .gitignore (ajoutez la ligne « ${line} »)` });
   }
   for (const rel of CANONICAL_PATHS) {
@@ -206,6 +214,8 @@ module.exports = {
   MANIFEST_FILE,
   BACKUP_DIR,
   VSCODEIGNORE_LINE,
+  SONDE_CLAUDE_BRUT,
+  SONDE_CLAUDE_BRUT_TEMOIN,
   isRepoRoot,
   listFixtureFiles,
   coveredPaths,
@@ -226,7 +236,7 @@ if (require.main === module) {
     }
     if (violations.length > 0) {
       console.error(
-        `[garde-fou] Commit refusé : ${violations.length} problème(s) avec les fixtures du banc d'essai.\n` +
+        `[garde-fou] Commit refusé : ${violations.length} problème(s) avec les fixtures du banc d'essai ou les sorties brutes de la sonde.\n` +
           `${formatViolations(violations)}\n` +
           'Retirez les fixtures de l\'index (git restore --staged <chemin>), puis videz le banc avec ' +
           'npm run test:clean avant de commiter.'
