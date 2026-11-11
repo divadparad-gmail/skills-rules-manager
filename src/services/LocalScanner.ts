@@ -7,6 +7,7 @@ import {
   isRuleConditional,
 } from '../utils/frontmatter';
 import { countTokens, countTokensForFile } from '../utils/tokenizer';
+import { claudeInjectedText, CLAUDE_INJECTED_TEXT_VARIANT } from '../claude/injectedText';
 import { measureAntigravitySoul } from '../utils/antigravityRules';
 import { ScenarioManager } from './ScenarioManager';
 import { appliesInAntigravity, buildAntigravityRuleItem, countsAtBoot, hasResourceWarning, soulSizeAdvice } from './antigravityRuleItem';
@@ -396,12 +397,15 @@ export class LocalScanner {
               let fileCharCount = 0;
               let ruleMetadata: Record<string, any> = {};
               let rawRuleContent = '';
+              // Texte injecté par Claude Code : sans frontmatter ni commentaires HTML de bloc (src/claude/injectedText.ts)
+              let injectedRuleText = '';
               let rStat: fs.Stats | null = null;
 
               try {
                 rStat = await fs.promises.stat(filePath);
                 rawRuleContent = await fs.promises.readFile(filePath, 'utf8');
-                fileCharCount = rawRuleContent.length;
+                injectedRuleText = claudeInjectedText(rawRuleContent);
+                fileCharCount = injectedRuleText.length;
                 const { metadata } = extractFrontmatter(rawRuleContent);
                 ruleMetadata = metadata;
                 const parsed = extractMarkdownTitleAndSummary(rawRuleContent);
@@ -416,7 +420,7 @@ export class LocalScanner {
               const isCond = isRuleConditional(ruleMetadata, 'claude-code');
               const isWarningLines = lineCount > 200;
               const isWarningNoDesc = !summary || summary.trim().length === 0;
-              const ruleTokenCount = countTokensForFile(filePath, rStat?.size, rStat?.mtimeMs, rawRuleContent);
+              const ruleTokenCount = countTokensForFile(filePath, rStat?.size, rStat?.mtimeMs, injectedRuleText, CLAUDE_INJECTED_TEXT_VARIANT);
 
               const newItem: ResourceItem = {
                 id: cleanId,
@@ -494,17 +498,20 @@ export class LocalScanner {
         try {
           const stat = await fs.promises.stat(candidatePath);
           const rawContent = await fs.promises.readFile(candidatePath, 'utf8');
-          const fileCharCount = rawContent.length;
+          const isAntigravity = candidate.tool === 'antigravity';
+          // Claude Code : le CLAUDE.md est compté sans frontmatter ni commentaires HTML de bloc
+          // (src/claude/injectedText.ts) ; Antigravity garde la taille du fichier brut
+          const claudeText = isAntigravity ? null : claudeInjectedText(rawContent);
+          const fileCharCount = claudeText !== null ? claudeText.length : rawContent.length;
           const lineCount = rawContent.split(/\r\n|\r|\n/).length;
           const { metadata: soulMetadata } = extractFrontmatter(rawContent);
           const parsed = extractMarkdownTitleAndSummary(rawContent);
-          const isAntigravity = candidate.tool === 'antigravity';
           // Antigravity : enveloppe F1, corps tronqué à 24 000 octets après inclusions ; au-delà de
           // 200 lignes, avertissement de taille, sauf pour une âme déjà tronquée (lot A3)
           const measured = isAntigravity ? await measureAntigravitySoul(rawContent, candidatePath, stat, { truncation: profile.truncation }) : null;
           const tokenCount = measured
             ? measured.bootTokenCount
-            : countTokensForFile(candidatePath, stat.size, stat.mtimeMs, rawContent);
+            : countTokensForFile(candidatePath, stat.size, stat.mtimeMs, claudeText ?? rawContent, CLAUDE_INJECTED_TEXT_VARIANT);
           const sizeAdvice = measured ? soulSizeAdvice(rawContent, measured.truncatedBytes) : null;
           const isWarningLines = measured ? sizeAdvice !== null : lineCount > 200;
           const isWarningSize = measured?.warningSizeExceeded ?? false;

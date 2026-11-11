@@ -11,6 +11,7 @@ import {
   getEffectiveGlobalClaudePath,
 } from '../utils/paths';
 import { countTokens, countTokensForFile } from '../utils/tokenizer';
+import { claudeInjectedText, CLAUDE_INJECTED_TEXT_VARIANT } from '../claude/injectedText';
 import { measureAntigravitySoul } from '../utils/antigravityRules';
 import { appliesInAntigravity, buildAntigravityRuleItem, countsAtBoot, hasResourceWarning, soulSizeAdvice } from './antigravityRuleItem';
 import { listFlatRuleFiles } from './antigravityRuleSources';
@@ -358,10 +359,12 @@ export class GlobalScanner {
           try {
             const stat = await fs.promises.stat(claudePath);
             const rawContent = await fs.promises.readFile(claudePath, 'utf8');
-            const fileCharCount = rawContent.length;
+            // Compté sans frontmatter ni commentaires HTML de bloc (src/claude/injectedText.ts)
+            const injectedText = claudeInjectedText(rawContent);
+            const fileCharCount = injectedText.length;
             const lineCount = rawContent.split(/\r\n|\r|\n/).length;
             const parsed = extractMarkdownTitleAndSummary(rawContent);
-            const tokenCount = countTokensForFile(claudePath, stat.size, stat.mtimeMs, rawContent);
+            const tokenCount = countTokensForFile(claudePath, stat.size, stat.mtimeMs, injectedText, CLAUDE_INJECTED_TEXT_VARIANT);
             const isWarningLines = lineCount > 200;
 
             soulCharTotal += fileCharCount;
@@ -492,12 +495,15 @@ export class GlobalScanner {
             let fileCharCount = 0;
             let ruleMetadata: Record<string, any> = {};
             let rawRuleContent = '';
+            // Texte injecté par Claude Code : sans frontmatter ni commentaires HTML de bloc (src/claude/injectedText.ts)
+            let injectedRuleText = '';
             let fileStat: fs.Stats | null = null;
 
             try {
               fileStat = await fs.promises.stat(filePath);
               rawRuleContent = await fs.promises.readFile(filePath, 'utf8');
-              fileCharCount = rawRuleContent.length;
+              injectedRuleText = claudeInjectedText(rawRuleContent);
+              fileCharCount = injectedRuleText.length;
               const { metadata } = extractFrontmatter(rawRuleContent);
               ruleMetadata = metadata;
               const parsed = extractMarkdownTitleAndSummary(rawRuleContent);
@@ -512,7 +518,7 @@ export class GlobalScanner {
             const isCond = isRuleConditional(ruleMetadata, 'claude-code');
             const isWarningLines = lineCount > 200;
             const isWarningNoDesc = !summary || summary.trim().length === 0;
-            const ruleTokenCount = countTokensForFile(filePath, fileStat?.size, fileStat?.mtimeMs, rawRuleContent);
+            const ruleTokenCount = countTokensForFile(filePath, fileStat?.size, fileStat?.mtimeMs, injectedRuleText, CLAUDE_INJECTED_TEXT_VARIANT);
 
             const newItem: ResourceItem = {
               id: cleanId,
