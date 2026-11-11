@@ -68,6 +68,10 @@ export interface ResourceItem {
     claudeUnmatchablePatterns?: string[];
     /** Skill Claude Code : longueur de `description` et `when_to_use` réunis, quand elle dépasse 1 536 caractères et que la ligne est coupée. */
     claudeDescriptionOriginalLength?: number;
+    /** Skill Claude Code avec `disable-model-invocation: true` : actif, absent de la liste au démarrage (0 token). */
+    claudeSkillManualOnly?: boolean;
+    /** Skill Claude Code avec `paths` : actif, absent de la liste au démarrage (0 token). */
+    claudeSkillPathsTriggered?: boolean;
     /** Règle Antigravity écartée par l'agent (frontmatter absent ou trigger non reconnu). */
     ignoredByAgent?: boolean;
     /** Défauts de frontmatter d'une règle Antigravity (voir AntigravityRuleIssue). */

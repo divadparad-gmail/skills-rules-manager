@@ -2268,6 +2268,22 @@
         'Le frontmatter de cette règle ne semble pas être du YAML valide : Claude Code la charge alors à chaque session, comme si elle n\'avait pas de paths (documentation ; mesuré sur une fixture). Ses paths sont ignorés et elle est comptée comme permanente.\n' +
         'Critère de l\'extension, déduit de deux mesures : une tabulation dans l\'indentation, ou une ligne de premier niveau qui n\'est ni « clé: valeur », ni « - élément », ni un commentaire.');
     }
+    // Claude Code : skills actifs mais absents de la liste au démarrage (invocation manuelle, paths)
+    const isClaudeItem = item.targetTool === 'claude-code';
+    const claudeManualOnly = isClaudeItem && item.metadata && item.metadata.claudeSkillManualOnly;
+    const claudePathsTriggered = isClaudeItem && item.metadata && item.metadata.claudeSkillPathsTriggered;
+    if (claudeManualOnly) {
+      addBadge('pill-cond', '✋ Invocation manuelle seulement',
+        'Avec disable-model-invocation: true, ce skill est absent de la liste destinée au modèle (testé ; documentation) : il ne coûte rien au démarrage, et seul l\'utilisateur peut l\'appeler par /' + (item.name || item.id) + '.\n' +
+        'user-invocable: false ne change pas ce coût (documentation).');
+    }
+    if (claudePathsTriggered) {
+      addBadge('pill-cond', '📂 Sur fichier correspondant',
+        'Skill avec paths : absent au démarrage (mesuré), il ne coûte rien au boot.\n' +
+        'Il devient disponible comme commande après Read, Write ou Edit d\'un fichier correspondant, mais pas après Glob, Grep ni cat (testé : sorties brutes d\'une série de mesure).\n' +
+        'Son entrée dans le contexte du modèle n\'est pas mesurée.');
+    }
+
     // Claude Code : description et when_to_use réunis, coupés à 1 536 caractères dans la liste des skills
     const originalLength = item.targetTool === 'claude-code' && item.metadata && item.metadata.claudeDescriptionOriginalLength;
     if (originalLength) {
@@ -2494,6 +2510,10 @@
       // Claude Code : une règle paths est absente au démarrage (testé) ; son coût se paie quand elle est déclenchée
       metricsEl.innerHTML = `<span>${charStr} car.</span> <span class="tok-highlight">0 tok au boot (${tokStr} si déclenchée)</span>`;
       metricsEl.title = `Règle conditionnelle (paths) :\n• Coût au démarrage : 0 token (testé : absente au démarrage)\n• Coût si déclenchée : ${charStr} car. (${tokStr} tokens), sans frontmatter ni commentaires HTML\nEstimation : BPE o200k (repli 1 token ≈ 4 car.)`;
+    } else if (claudeManualOnly || claudePathsTriggered) {
+      // Claude Code : rien au démarrage ; le coût à l'invocation ou au déclenchement n'est pas mesuré
+      metricsEl.innerHTML = '<span class="tok-highlight">0 tok au boot</span>';
+      metricsEl.title = 'Coût au démarrage : 0 token (absent de la liste des skills).\nCoût à l\'invocation ou au déclenchement : non mesuré.';
     } else {
       metricsEl.innerHTML = `<span>${charStr} car.</span> <span class="tok-highlight">(${tokStr} tokens)</span>`;
       let metricsTitle = `Taille réelle : ${charStr} caractères (${tokStr} tokens)\nEstimation : BPE o200k (repli 1 token ≈ 4 car.)`;

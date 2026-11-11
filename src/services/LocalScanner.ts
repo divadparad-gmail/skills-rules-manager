@@ -8,7 +8,7 @@ import {
 import { countTokens, countTokensForFile } from '../utils/tokenizer';
 import { claudeInjectedText, CLAUDE_INJECTED_TEXT_VARIANT } from '../claude/injectedText';
 import { claudeRuleStatus } from '../claude/ruleFrontmatter';
-import { claudeSkillListing, CLAUDE_SKILL_LINE_VARIANT } from '../claude/skillListing';
+import { claudeSkillBootStatus, claudeSkillListing, CLAUDE_SKILL_LINE_VARIANT } from '../claude/skillListing';
 import { measureAntigravitySoul } from '../utils/antigravityRules';
 import { ScenarioManager } from './ScenarioManager';
 import { appliesInAntigravity, buildAntigravityRuleItem, countsAtBoot, hasResourceWarning, soulSizeAdvice } from './antigravityRuleItem';
@@ -346,8 +346,11 @@ export class LocalScanner {
               // Ligne de la liste des skills de Claude Code : « - <nom>: <texte> », sans chemin, texte coupé
               // à 1 536 caractères (src/claude/skillListing.ts)
               const listing = claudeSkillListing(skillMetadata, entry.name);
-              const charCount = listing.line.length;
-              const tokenCount = countTokensForFile(activeFile, sStat?.size, sStat?.mtimeMs, listing.line, CLAUDE_SKILL_LINE_VARIANT);
+              // Skill à invocation manuelle ou avec paths : actif, mais absent de la liste au démarrage (0)
+              const bootStatus = claudeSkillBootStatus(skillMetadata);
+              const notListed = bootStatus.manualOnly || bootStatus.pathsTriggered;
+              const charCount = notListed ? 0 : listing.line.length;
+              const tokenCount = notListed ? 0 : countTokensForFile(activeFile, sStat?.size, sStat?.mtimeMs, listing.line, CLAUDE_SKILL_LINE_VARIANT);
 
               if (isEnabled) {
                 skillsCharTotal += charCount;
@@ -370,7 +373,9 @@ export class LocalScanner {
                   hasDisabledSuffix: isDisabled,
                   warningLinesExceeded: isWarningLines,
                   warningNoDescription: isWarningNoDesc,
-                  ...(listing.truncated ? { claudeDescriptionOriginalLength: listing.originalLength } : {}),
+                  ...(listing.truncated && !notListed ? { claudeDescriptionOriginalLength: listing.originalLength } : {}),
+                  ...(bootStatus.manualOnly ? { claudeSkillManualOnly: true } : {}),
+                  ...(bootStatus.pathsTriggered ? { claudeSkillPathsTriggered: true } : {}),
                 },
               });
             }

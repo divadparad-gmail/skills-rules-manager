@@ -39,7 +39,7 @@ require.cache['vscode'] = {
   },
 } as any;
 
-import { CLAUDE_SKILL_DESCRIPTION_MAX_CHARS, claudeSkillListing, claudeSkillName } from '../src/claude/skillListing';
+import { CLAUDE_SKILL_DESCRIPTION_MAX_CHARS, claudeSkillBootStatus, claudeSkillListing, claudeSkillName } from '../src/claude/skillListing';
 import { extractFrontmatter } from '../src/utils/frontmatter';
 import { countTokens } from '../src/utils/tokenizer';
 import { LocalScanner } from '../src/services/LocalScanner';
@@ -243,5 +243,108 @@ describe('Suite de Tests : ligne des skills de Claude Code, sans chemin et coup�
 
     const agy = pillsOf(main.createItemCard(skill('antigravity', { claudeDescriptionOriginalLength: 2001 }), true, mockDoc()));
     assert.ok(!agy.some((p) => p.text === '✂️ Description coupée'), 'Aucune carte Antigravity ne reçoit ce badge');
+  });
+
+  // Skills absents de la liste au démarrage, mais actifs : disable-model-invocation (CC26, testé ;
+  // documentation) et paths (CC28, mesuré ; sorties brutes de la série 5)
+  test('9. Fonction pure : invocation manuelle et paths', () => {
+    assert.deepStrictEqual(claudeSkillBootStatus({ 'disable-model-invocation': true }), { manualOnly: true, pathsTriggered: false });
+    assert.deepStrictEqual(claudeSkillBootStatus({ paths: ['src/**/*.ts'] }), { manualOnly: false, pathsTriggered: true });
+    assert.deepStrictEqual(claudeSkillBootStatus({ paths: 'src/**/*.ts' }), { manualOnly: false, pathsTriggered: true });
+    assert.deepStrictEqual(claudeSkillBootStatus({ 'disable-model-invocation': false, paths: [], 'user-invocable': false }), { manualOnly: false, pathsTriggered: false });
+    assert.deepStrictEqual(claudeSkillBootStatus({ 'disable-model-invocation': 'true' }), { manualOnly: false, pathsTriggered: false }, 'Une chaîne citée n\'est pas le booléen true (non vérifié)');
+  });
+
+  test('10. Fixtures : canari-cache (skills) et canari-paths (declencheurs) à 0 au démarrage, et toujours actifs', async () => {
+    const dir = path.join(tempBaseDir, 'fixtures-0');
+    await writeFile(path.join(dir, '.claude', 'skills', 'canari-cache', 'SKILL.md'), lireFixture('skills/projet/_claude/skills/canari-cache/SKILL.md.fixture'));
+    await writeFile(path.join(dir, '.claude', 'skills', 'canari-paths', 'SKILL.md'), lireFixture('declencheurs/projet/_claude/skills/canari-paths/SKILL.md.fixture'));
+    const result = await LocalScanner.scan(workspaceFor(dir));
+    const cache = result.items.find((i) => i.id === 'canari-cache')!;
+    const paths = result.items.find((i) => i.id === 'canari-paths')!;
+    assert.strictEqual(cache.tokenCount, 0);
+    assert.strictEqual(cache.charCount, 0);
+    assert.strictEqual(cache.metadata?.claudeSkillManualOnly, true);
+    assert.strictEqual(paths.tokenCount, 0);
+    assert.strictEqual(paths.charCount, 0);
+    assert.strictEqual(paths.metadata?.claudeSkillPathsTriggered, true);
+    assert.strictEqual(result.skillsStat.tokenCount, 0);
+    assert.strictEqual(result.skillsStat.charCount, 0);
+    assert.strictEqual(result.skillsStat.activeCount, 2, 'Ces skills restent comptés parmi les actifs');
+  });
+
+  test('11. user-invocable: false ne change pas le coût', async () => {
+    const dir = path.join(tempBaseDir, 'user-invocable');
+    await writeFile(path.join(dir, '.claude', 'skills', 'u', 'SKILL.md'), skillMd({ name: 'u', description: 'Caché du menu.', 'user-invocable': 'false' }));
+    const [u] = await scanLocal(dir);
+    assert.strictEqual(u.tokenCount, countTokens('- u: Caché du menu.'));
+    assert.strictEqual(u.metadata?.claudeSkillManualOnly, undefined);
+  });
+
+  test('12. Skill à la fois manuel et paths, skill global, et nombre d\'actifs', async () => {
+    const dir = path.join(tempBaseDir, 'actifs');
+    await writeFile(path.join(dir, '.claude', 'skills', 'normal', 'SKILL.md'), skillMd({ name: 'normal', description: 'Listé.' }));
+    await writeFile(path.join(dir, '.claude', 'skills', 'manuel', 'SKILL.md'), skillMd({ name: 'manuel', description: 'Manuel.', 'disable-model-invocation': 'true' }));
+    await writeFile(path.join(dir, '.claude', 'skills', 'les-deux', 'SKILL.md'),
+      '---\nname: les-deux\ndescription: Manuel et paths.\ndisable-model-invocation: true\npaths:\n  - "**/*.md"\n---\nCorps.\n');
+    await writeFile(path.join(dir, '.claude', 'skills', 'eteint', 'SKILL.md.disabled'), skillMd({ name: 'eteint', description: 'Désactivé.' }));
+    const result = await LocalScanner.scan(workspaceFor(dir));
+    const deux = result.items.find((i) => i.id === 'les-deux')!;
+    assert.strictEqual(deux.metadata?.claudeSkillManualOnly, true);
+    assert.strictEqual(deux.metadata?.claudeSkillPathsTriggered, true);
+    assert.strictEqual(deux.tokenCount, 0);
+    assert.strictEqual(result.skillsStat.activeCount, 3, 'normal, manuel et les-deux ; le skill désactivé ne compte pas');
+    assert.strictEqual(result.skillsStat.tokenCount, countTokens('- normal: Listé.'), 'Seul le skill listé coûte au démarrage');
+    assert.strictEqual(result.skillsStat.charCount, '- normal: Listé.'.length);
+
+    const globalDir = path.join(tempBaseDir, 'global-manuel');
+    await writeFile(path.join(globalDir, 'skills', 'gm', 'SKILL.md'), skillMd({ name: 'gm', description: 'x'.repeat(2000), 'disable-model-invocation': 'true' }));
+    claudeGlobalPath = globalDir;
+    try {
+      const global = await GlobalScanner.scan(undefined, 'claude-code');
+      const gm = global.items.find((i) => i.id === 'gm')!;
+      assert.strictEqual(gm.tokenCount, 0);
+      assert.strictEqual(gm.metadata?.claudeSkillManualOnly, true);
+      assert.strictEqual(gm.metadata?.claudeDescriptionOriginalLength, undefined, 'Un skill absent de la liste n\'est pas signalé comme coupé');
+      assert.strictEqual(global.skillsStat.activeCount, 1);
+      assert.strictEqual(global.skillsStat.tokenCount, 0);
+    } finally {
+      claudeGlobalPath = '';
+    }
+  });
+
+  test('13. Webview : badges « ✋ Invocation manuelle seulement » et « 📂 Sur fichier correspondant », métrique « 0 tok au boot »', () => {
+    const skill = (targetTool: 'claude-code' | 'antigravity', metadata: Record<string, unknown>): ResourceItem => ({
+      id: 'mon-skill', name: 'mon-skill', description: 'Skill', type: 'skill', scope: 'local', enabled: true, path: 's',
+      targetTool, isFolder: true, charCount: 0, tokenCount: 0, lineCount: 5, metadata,
+    });
+    const metriqueDe = (root: MockEl): MockEl | undefined => {
+      let found: MockEl | undefined;
+      const walk = (el: MockEl) => { if (el.className.includes('item-metrics-badge')) found = el; el.children.forEach(walk); };
+      walk(root);
+      return found;
+    };
+
+    const manuel = main.createItemCard(skill('claude-code', { claudeSkillManualOnly: true }), true, mockDoc());
+    const pManuel = pillsOf(manuel);
+    const bManuel = pManuel.find((p) => p.text === '✋ Invocation manuelle seulement')!;
+    assert.ok(bManuel.title.includes('absent de la liste destinée au modèle') && bManuel.title.includes('(testé ; documentation)') && bManuel.title.includes('user-invocable: false'), bManuel.title);
+    assert.ok(bManuel.title.includes('/mon-skill'));
+    assert.ok(!pManuel.some((p) => p.text === '📂 Sur fichier correspondant'));
+    const mManuel = metriqueDe(manuel)!;
+    assert.strictEqual(mManuel.innerHTML.replace(/<[^>]+>/g, ''), '0 tok au boot', 'Aucun coût de déclenchement affiché');
+    assert.ok(mManuel.title.includes('non mesuré'), mManuel.title);
+
+    const pPaths = pillsOf(main.createItemCard(skill('claude-code', { claudeSkillPathsTriggered: true }), true, mockDoc()));
+    const bPaths = pPaths.find((p) => p.text === '📂 Sur fichier correspondant')!;
+    assert.ok(bPaths.title.includes('absent au démarrage (mesuré)') && bPaths.title.includes('Read, Write ou Edit') && bPaths.title.includes('pas après Glob, Grep ni cat') && bPaths.title.includes('n\'est pas mesurée'), bPaths.title);
+
+    const pDeux = pillsOf(main.createItemCard(skill('claude-code', { claudeSkillManualOnly: true, claudeSkillPathsTriggered: true }), true, mockDoc()));
+    assert.ok(pDeux.some((p) => p.text === '✋ Invocation manuelle seulement') && pDeux.some((p) => p.text === '📂 Sur fichier correspondant'), 'Un skill manuel et paths porte les deux badges');
+
+    const agy = main.createItemCard(skill('antigravity', { claudeSkillManualOnly: true, claudeSkillPathsTriggered: true }), true, mockDoc());
+    const pAgy = pillsOf(agy);
+    assert.ok(!pAgy.some((p) => p.text === '✋ Invocation manuelle seulement' || p.text === '📂 Sur fichier correspondant'), 'Aucune carte Antigravity ne reçoit ces badges');
+    assert.notStrictEqual(metriqueDe(agy)!.innerHTML, '<span class="tok-highlight">0 tok au boot</span>', 'Ni cette métrique');
   });
 });

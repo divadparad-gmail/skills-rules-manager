@@ -43,6 +43,28 @@ export interface ClaudeSkillListing {
   truncated: boolean;
 }
 
+/**
+ * Les skills que Claude Code ne liste pas au démarrage, alors qu'ils restent actifs et utilisables :
+ * - `disable-model-invocation: true` : absent de la liste destinée au modèle, testé (CC26) et documenté
+ *   (skills.md, « Description not in context ») ; seul l'utilisateur peut l'appeler. La valeur doit être
+ *   le booléen YAML `true` ; une chaîne citée « "true" » n'est pas reconnue (non vérifié).
+ *   `user-invocable: false` ne change pas ce coût (documentation).
+ * - un skill avec `paths` : absent au démarrage, mesuré (CC28, écart 0) ; il devient disponible comme
+ *   commande après Read, Write ou Edit d'un fichier correspondant, pas après Glob, Grep ni cat (testé
+ *   par les sorties brutes de la série 5) ; son entrée dans le contexte du modèle n'est pas mesurée.
+ * Leur coût au démarrage est 0. Leur coût à l'invocation ou au déclenchement n'est pas mesuré.
+ */
+export interface ClaudeSkillBootStatus {
+  manualOnly: boolean;
+  pathsTriggered: boolean;
+}
+
+export function claudeSkillBootStatus(metadata: Record<string, any>): ClaudeSkillBootStatus {
+  const paths = metadata.paths;
+  const pathsTriggered = (Array.isArray(paths) && paths.some(nonEmptyString)) || nonEmptyString(paths);
+  return { manualOnly: metadata['disable-model-invocation'] === true, pathsTriggered };
+}
+
 /** La ligne d'un skill dans la liste de Claude Code, d'après les métadonnées de son SKILL.md. */
 export function claudeSkillListing(metadata: Record<string, any>, folderName: string): ClaudeSkillListing {
   const name = claudeSkillName(metadata, folderName);
