@@ -2305,8 +2305,10 @@
         'Une version personnelle de ce skill existe, mais elle est à invocation manuelle ou limitée par paths. L\'extension suppose qu\'elle ne masque pas celle-ci, qui reste comptée (non vérifié).');
     }
 
-    // Claude Code : description et when_to_use réunis, coupés à 1 536 caractères dans la liste des skills
-    const originalLength = item.targetTool === 'claude-code' && item.metadata && item.metadata.claudeDescriptionOriginalLength;
+    // Claude Code : description et when_to_use réunis, coupés à 1 536 caractères dans la liste des skills.
+    // Une copie masquée n'est pas listée et compte 0 : pas de badge de coupe, comme pour un skill
+    // manuel ou paths (le scanner ne pose pas la métadonnée pour eux)
+    const originalLength = item.targetTool === 'claude-code' && !claudeMaskedBy && item.metadata && item.metadata.claudeDescriptionOriginalLength;
     if (originalLength) {
       addBadge('pill-warn-amber', '✂️ Description coupée',
         `Claude Code coupe la description et when_to_use réunis à 1 536 caractères dans la liste des skills (documentation ; la fin d'une description longue n'est pas vue : testé).\n` +

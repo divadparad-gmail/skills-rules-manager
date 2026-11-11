@@ -540,4 +540,26 @@ describe('Suite de Tests : ligne des skills de Claude Code, sans chemin et coup�
     }
     assert.ok(titreDe('antigravity', 'rule').includes('(la légère différence de taille affichée provient du chemin de fichier)'), 'Antigravity garde le texte');
   });
+
+  test('21. Copie masquée et coupée : pas de badge de coupe ; la copie personnelle coupée le porte', async () => {
+    // Les deux copies dépassent 1 536 caractères ; seule la copie personnelle est listée (CC25)
+    const state = await homonymes('masque-coupe',
+      skillMd({ name: 'homo', description: 'p'.repeat(1600) }),
+      skillMd({ name: 'homo', description: 'q'.repeat(2000) }));
+    const p = copieProjet(state);
+    const g = copiePerso(state);
+    assert.ok(p.metadata?.claudeSkillMaskedBy, 'La copie du projet est masquée');
+    assert.strictEqual(p.tokenCount, 0);
+    // La métadonnée de coupe reste posée par le scanner : c'est le webview qui écarte le badge
+    assert.strictEqual(p.metadata?.claudeDescriptionOriginalLength, 2000);
+
+    const pillsProjet = pillsOf(main.createItemCard(p, true, mockDoc()));
+    assert.ok(pillsProjet.some((b) => b.text === '🙈 Masquée'), 'Badge « Masquée » présent');
+    assert.ok(!pillsProjet.some((b) => b.text === '✂️ Description coupée'), 'Pas de badge de coupe sur une copie masquée, qui compte 0');
+
+    const pillsPerso = pillsOf(main.createItemCard(g, true, mockDoc()));
+    const coupe = pillsPerso.find((b) => b.text === '✂️ Description coupée');
+    assert.ok(coupe, 'La copie personnelle coupée porte le badge');
+    assert.ok(coupe!.title.includes((1600).toLocaleString('fr-FR')), coupe!.title);
+  });
 });
