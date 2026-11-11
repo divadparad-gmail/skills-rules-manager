@@ -36,7 +36,8 @@ Toutes les commandes se lancent depuis la racine du dépôt, dans un **terminal 
 | `npm run sonde:claude-context -- --lot E3 --preparer-h14` | H14 : 4 bases, déploiement unique du jeu complet, `/context` de référence par le `claude` du poste et par la copie embarquée dans l'extension, puis les gestes à faire dans VS Code | Nul ; 6 `/context` du lot E3 |
 | `npm run sonde:claude-context -- --verifier-h14` | H14 : lit la transcription du panneau sans en afficher le texte (une seule nouvelle session), version, outils, canaris, profil | Nul ; aucun `/context` |
 | `npm run sonde:claude-context -- --lot E3 --cloturer-h14` | H14 : transcription déplacée dans `brut/`, retrait, 4 bases de fin comparées copie par copie, rapport `brut/h14-….json` | Nul ; 4 `/context` du lot E3 |
-| `npm run sonde:claude-context -- --lot E4 --resultats` | Les vérifications gratuites (lot E4) : la base vide au début et à la fin, puis le calibrage sous `claude-opus-5` et sous `claude-opus-5-5`, et la vérification de D-6, soit 5 `/context` ; Claude Code 2.1.319 exigé ; rapport `resultats/e4-….json` | Nul ; 5 `/context` du lot E4 |
+| `npm run sonde:claude-context -- --lot E4 --combinaisons cout-calibrage,cout-calibrage-o55,doublons-d6 --resultats` | Les vérifications gratuites (lot E4, première série du 2026-11-11) : la base vide au début et à la fin, puis le calibrage sous `claude-opus-5` et sous `claude-opus-5-5`, et la vérification de D-6, soit 5 `/context` ; Claude Code 2.1.319 exigé ; rapport `resultats/e4-….json` | Nul ; 5 `/context` du lot E4 |
+| `npm run sonde:claude-context -- --lot E4 --combinaisons cout-calibrage-2 --resultats` | Le second calibrage (lot E4, décision D-1.2b) : la base vide, `cout-calibrage-2` sous `claude-opus-5`, la base vide, soit 3 `/context` | Nul ; 3 `/context` du lot E4 |
 | `node test/scenarios/scripts/sonde-claude-code.js retirer` | Retire un déploiement laissé en place (interruption, ou H14) | Nul |
 | `npm run sonde:claude-baseline -- --depuis context-AAAA-MM-JJ-HHMM.json` | Écrit `attendu/baseline-<date>.json` d'après un rapport « context » **valide** de `resultats/` (entrées « context » seulement), après la garde ; refuse d'écraser une baseline existante | Nul (aucun lancement de `claude`) |
 | `npm run sonde:claude-baseline -- --depuis context-….json --payant payant-….json,payant-….json,…` | Écrit `attendu/baseline-<date>.json` d'après un rapport « context » et les rapports « payant » d'un même lot (entrées « context », « usage » et « canari », et une section de décomposition non comparée), après la garde ; refuse d'écraser une baseline existante (voir « Construire une baseline à partir de plusieurs rapports ») | Nul (aucun lancement de `claude`) |
@@ -163,8 +164,8 @@ L'essai se fait en trois commandes sous le lot E3 (plafond de 12 `/context`, 10 
 
 Le lot E4 (décision du 2026-11-11) regroupe les vérifications gratuites d'avant la correction de l'extension, sous un plafond de 10 `/context`, sans aucun appel au modèle :
 
-- ses combinaisons lui sont réservées (`cout-calibrage`, `cout-calibrage-o55` et `doublons-d6`), et elles sont refusées sous les autres lots ; `--combinaisons` en choisit une partie ;
-- seule la base vide est mesurée, au début et à la fin : une série coûte 5 `/context`, et une relance complète tient sous le plafond ;
+- ses combinaisons lui sont réservées (`cout-calibrage`, `cout-calibrage-o55`, `doublons-d6` et `cout-calibrage-2`), et elles sont refusées sous les autres lots ; `--combinaisons` en choisit une partie ;
+- seule la base vide est mesurée, au début et à la fin : une série coûte 2 `/context` plus un par combinaison. La première série (5 `/context`) a eu lieu le 2026-11-11 ; le second calibrage se lance seul (`--combinaisons cout-calibrage-2`, 3 `/context`), et la série des quatre combinaisons (6) ne tient plus sous le plafond, ce que le lanceur refuse avant tout appel ;
 - `/context` peut compter sous `claude-opus-5` ou sous `claude-opus-5-5`, jamais sous un autre modèle ; un appel au modèle reste toujours sous `claude-opus-5`. Le rapport donne, pour chaque combinaison, le modèle demandé, celui de l'initialisation (`init.model`) et celui de `context_usage` ;
 - le lanceur refuse de partir si `claude --version` n'est pas 2.1.319, la version des baselines : seul `--version` est alors lancé, et aucun `/context` n'est consommé ;
 - à la première exécution, le compteur du lot E3 est archivé sous `brut/compteur-context-E3.json`, et E3 ne peut plus être rouvert ;
@@ -182,6 +183,17 @@ Les fixtures du lot E4 ne portent aucun canari :
   | `cal-code-js` | Code JavaScript | `esbuild.js` de ce dépôt, de la ligne 15 à la fin |
   | `cal-mixte-regle` | Français et identifiants | `.claude/rules/projet-consignes.md` de ce dépôt |
   | `cal-mixte-readme` | Français, emojis et Markdown | `README.md` de ce dépôt, lignes 22 à 30 |
+
+- **`cout-calibrage-2`** (second calibrage, décision D-1.2b du 2026-11-11, sous `claude-opus-5` seulement) : la même structure, avec six autres textes de 800 à 1 400 caractères, tous écrits pour le calibrage. Les deux textes de consignes disent la même chose, l'un en anglais et l'autre en français. Les textes JSON et YAML sont importés comme des fichiers `.md`, comme tous les textes du calibrage.
+
+  | Fichier | Nature | Source |
+  |---|---|---|
+  | `cal2-en-prose` | Prose anglaise ordinaire | Texte original écrit pour le calibrage |
+  | `cal2-en-consignes` | Markdown anglais de consignes (titres, puces, code en ligne) | Texte original écrit pour le calibrage |
+  | `cal2-fr-consignes` | Markdown français de consignes, du même genre | Texte original écrit pour le calibrage |
+  | `cal2-code-ts` | Code TypeScript, sans commentaire ni chaîne | Texte original écrit pour le calibrage |
+  | `cal2-json` | Configuration JSON (du genre d'un `tsconfig.json`) | Texte original écrit pour le calibrage |
+  | `cal2-yaml` | Configuration YAML d'application | Texte original écrit pour le calibrage |
 
 - **`doublons-d6`** (décision D-6) : deux règles `d6-meme-nom.md`, l'une globale et l'autre du projet, aux contenus de longueurs différentes ; deux skills `canari-d6-homo`, l'un dans le `.claude/skills/` du dossier parent et l'autre dans celui du projet, aux descriptions de longueurs très différentes ; un fichier `d6-commun.md` importé à la fois par le `CLAUDE.md` et par le `CLAUDE.local.md` du projet. Les longueurs différentes permettent de savoir, par les tokens, quelle copie `/context` liste.
 

@@ -24,6 +24,71 @@
       ]
     },
     {
+      "chemin": "cout-calibrage-2/projet/CLAUDE.md.fixture",
+      "sha256": "fbda7215b876f1bf60c9f5d5a2c8affb8057327280094055f25c3c39f3058b49",
+      "canaris": []
+    },
+    {
+      "chemin": "cout-calibrage-2/projet/cal2-code-ts-x2.md.fixture",
+      "sha256": "de44667ce29eac43b747bef5173dec1d105ed7cb2200eca5fff4ef4cf40404b6",
+      "canaris": []
+    },
+    {
+      "chemin": "cout-calibrage-2/projet/cal2-code-ts.md.fixture",
+      "sha256": "c0baf68aba3c831c22504ad28f60b1d671b80e6cea56545aaefd4e210180caac",
+      "canaris": []
+    },
+    {
+      "chemin": "cout-calibrage-2/projet/cal2-en-consignes-x2.md.fixture",
+      "sha256": "de587aec2389a548e44fd9fcd911ff0778a1fb219d98d041cfd79d4fee5bf14d",
+      "canaris": []
+    },
+    {
+      "chemin": "cout-calibrage-2/projet/cal2-en-consignes.md.fixture",
+      "sha256": "010758ccbdc8842522e2d0b9a0dc9b6e8270491c583ee3a555263a35d8e57f2b",
+      "canaris": []
+    },
+    {
+      "chemin": "cout-calibrage-2/projet/cal2-en-prose-x2.md.fixture",
+      "sha256": "8bbbdda1c60a3a104b24f6ab3cc4ad8766518fb38438654ede6b768ffb9dd3c0",
+      "canaris": []
+    },
+    {
+      "chemin": "cout-calibrage-2/projet/cal2-en-prose.md.fixture",
+      "sha256": "46ba75388ed9c1e7117b922ee0f9bf259462b3df2613f338da144d5827c6068f",
+      "canaris": []
+    },
+    {
+      "chemin": "cout-calibrage-2/projet/cal2-fr-consignes-x2.md.fixture",
+      "sha256": "94db1921f864f976136e20e4c47ea6231fd11f702996b012e4035b1c91077afd",
+      "canaris": []
+    },
+    {
+      "chemin": "cout-calibrage-2/projet/cal2-fr-consignes.md.fixture",
+      "sha256": "b2a9e59b5a3a81471e6c5dfd5f3524483a02d7392f7f6ec7d4661ebe0f0dd0e9",
+      "canaris": []
+    },
+    {
+      "chemin": "cout-calibrage-2/projet/cal2-json-x2.md.fixture",
+      "sha256": "78039a1d7544f08a4a42a85f3d89f85ff7e141e3c82d54d9b3ed93af252ad466",
+      "canaris": []
+    },
+    {
+      "chemin": "cout-calibrage-2/projet/cal2-json.md.fixture",
+      "sha256": "0adb04e748add88945114c03ba3e146e5794eda7ab7521f4bd7a526acfc944b2",
+      "canaris": []
+    },
+    {
+      "chemin": "cout-calibrage-2/projet/cal2-yaml-x2.md.fixture",
+      "sha256": "68dffe75ceb0e077221c1ba40790ff0756f2f302dfdb65f0d326ea6a7d9d5748",
+      "canaris": []
+    },
+    {
+      "chemin": "cout-calibrage-2/projet/cal2-yaml.md.fixture",
+      "sha256": "b87d78a8da61a7e517189da990941a038b88bbc79da13fcdc283d504c2526740",
+      "canaris": []
+    },
+    {
       "chemin": "cout-calibrage/projet/CLAUDE.md.fixture",
       "sha256": "f62c116796afa1a5abdc4c39774c3c03b8f010237f2964bf90a254d6fda31859",
       "canaris": []

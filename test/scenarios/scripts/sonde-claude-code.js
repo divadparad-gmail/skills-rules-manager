@@ -6,8 +6,9 @@
  *   npm run sonde:claude-etat                       version, auth status et préconditions ; aucun /context
  *   npm run sonde:claude-context -- --lot <E1|E2|V1>   déploiement, /context par combinaison, retrait, rapport
  *   npm run sonde:claude-context -- --lot E4 [--combinaisons <id,id>] [--resultats]   vérifications
- *                           gratuites (calibrage sous deux modèles, D-6) : base vide seule au début et à la
- *                           fin, Claude Code 2.1.319 exigé, rapport e4-….json
+ *                           gratuites (calibrage sous deux modèles, D-6, second calibrage) : base vide seule
+ *                           au début et à la fin, Claude Code 2.1.319 exigé, rapport e4-….json ; le second
+ *                           calibrage se lance seul : --combinaisons cout-calibrage-2 (3 /context)
  *   npm run sonde:claude-context -- --lot E3 --preparer-h14   H14 (lot E3), étape 1 : contrôles, 4 bases, un
  *                           seul déploiement du jeu complet, /context de référence par le claude du poste
  *                           (P5) et par la copie embarquée dans l'extension VS Code (P5b), puis les gestes
@@ -159,8 +160,10 @@ const COMBINAISONS = [
 /**
  * Le lot E4 (décision du 2026-11-11) : les vérifications gratuites, regroupées avant toute correction.
  * Ses combinaisons lui sont réservées et refusées sous les autres lots ; seule la base vide est mesurée,
- * au début et à la fin (5 /context par série, une relance complète sous le plafond de 10). Il exige la
- * version des baselines, pour que le calibrage reste comparable aux mesures du lot E2.
+ * au début et à la fin. Il exige la version des baselines, pour que le calibrage reste comparable aux
+ * mesures du lot E2. La première série (2026-11-11) a mesuré les trois premières combinaisons
+ * (5 /context) ; le second calibrage (décision D-1.2b du 2026-11-11) se lance seul, sous claude-opus-5 :
+ * --combinaisons cout-calibrage-2, soit 3 /context. La série complète (6) ne tient plus sous le plafond.
  */
 const LOT_E4 = 'E4';
 const VERSIONS_EXIGEES = { [LOT_E4]: '2.1.319' };
@@ -169,6 +172,7 @@ const COMBINAISONS_E4 = [
   { id: 'cout-calibrage', jeux: ['cout-calibrage'], outils: '' },
   { id: 'cout-calibrage-o55', jeux: ['cout-calibrage'], outils: '', modele: 'claude-opus-5-5' },
   { id: 'doublons-d6', jeux: ['doublons-d6'], outils: 'Skill' },
+  { id: 'cout-calibrage-2', jeux: ['cout-calibrage-2'], outils: '' },
 ];
 /** Les combinaisons et les bases d'un lot. */
 const combinaisonsDuLot = (lot) => (lot === LOT_E4 ? COMBINAISONS_E4 : COMBINAISONS);

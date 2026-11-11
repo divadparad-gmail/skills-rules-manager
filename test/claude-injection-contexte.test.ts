@@ -60,9 +60,14 @@ const JEUX: Record<string, { cibles: string[]; scenarios: string[] }> = {
   // Lot E4 (2026-11-11) : calibrage du tokenizer par différence (T, puis T suivi de T), et doublons de D-6
   'cout-calibrage': { cibles: ['projet'], scenarios: ['CC09', 'CC37'] },
   'doublons-d6': { cibles: ['global', 'parent', 'projet'], scenarios: ['CC38', 'CC39', 'CC40'] },
+  // Second calibrage du lot E4 (décision D-1.2b du 2026-11-11), sous claude-opus-5 seulement
+  'cout-calibrage-2': { cibles: ['projet'], scenarios: ['CC37'] },
 };
-/** Les six textes du calibrage (lot E4), chacun importé seul puis doublé (suffixe -x2). */
-const TEXTES_CALIBRAGE = ['cal-fr-original', 'cal-fr-securite', 'cal-en-mit', 'cal-code-js', 'cal-mixte-regle', 'cal-mixte-readme'];
+/** Les textes de chaque jeu de calibrage (lot E4), chacun importé seul puis doublé (suffixe -x2), et le titre de son CLAUDE.md. */
+const CALIBRAGES: Record<string, { titre: string; textes: string[] }> = {
+  'cout-calibrage': { titre: 'Calibrage', textes: ['cal-fr-original', 'cal-fr-securite', 'cal-en-mit', 'cal-code-js', 'cal-mixte-regle', 'cal-mixte-readme'] },
+  'cout-calibrage-2': { titre: 'Calibrage 2', textes: ['cal2-en-prose', 'cal2-en-consignes', 'cal2-fr-consignes', 'cal2-code-ts', 'cal2-json', 'cal2-yaml'] },
+};
 /** Le minimum de tokens o200k de chaque texte de calibrage (décision du 2026-11-11). */
 const O200K_MIN_CALIBRAGE = 150;
 const CIBLES = ['global', 'parent', 'projet', 'plugin', 'mcp'];
@@ -219,7 +224,7 @@ describe('Suite de Tests : Injection de contexte Claude Code (fixtures inertes, 
     const presents = listFiles(FIXTURES).sort();
     const attendus = INVENTAIRE.map(([rel]) => rel).sort();
     assert.deepStrictEqual(presents, attendus, 'fixtures/ doit contenir exactement les fichiers de INVENTAIRE');
-    assert.strictEqual(attendus.length, 78);
+    assert.strictEqual(attendus.length, 91);
     const ecarts = INVENTAIRE.filter(([rel, sha]) => sha256(lire(rel)) !== sha).map(([rel]) => `${rel} : empreinte observée ${sha256(lire(rel))}`);
     assert.deepStrictEqual(ecarts, [], 'Une fixture a changé : la baseline devient caduque. Mettre à jour INVENTAIRE seulement si le changement est voulu.');
   });
@@ -369,21 +374,32 @@ describe('Suite de Tests : Injection de contexte Claude Code (fixtures inertes, 
     assert.strictEqual(lire('cout-regle-long/projet/_claude/rules/regle-au-nom-volontairement-tres-long-pour-mesurer-le-cout-du-chemin.md.fixture'), r);
     assert.strictEqual(decouper(lire('cout-regle-paths/projet/_claude/rules/r-paths.md.fixture')).corps, r);
 
-    // Lot E4, calibrage : un seul CLAUDE.md importe les six textes, seuls puis doublés, au même niveau
+    // Lot E4, calibrages : dans chaque jeu, un seul CLAUDE.md importe six textes, seuls puis doublés, au même niveau
     const { o200k } = require(path.join(ROOT, 'test', 'scenarios', 'scripts', 'sonde-claude-code-payant.js')) as { o200k: (t: string) => number };
-    const imports = TEXTES_CALIBRAGE.flatMap((nom) => [`@${nom}.md`, `@${nom}-x2.md`]);
-    assert.strictEqual(lire('cout-calibrage/projet/CLAUDE.md.fixture'), `# Calibrage\n\n${imports.join('\n')}\n`);
-    const calibrage = INVENTAIRE.map(([rel]) => rel).filter((rel) => rel.startsWith('cout-calibrage/'));
-    assert.deepStrictEqual(calibrage.sort(), ['CLAUDE.md', ...imports.map((i) => i.slice(1))].map((n) => `cout-calibrage/projet/${n}.fixture`).sort());
-    for (const nom of TEXTES_CALIBRAGE) {
-      const t = lire(`cout-calibrage/projet/${nom}.md.fixture`);
-      assert.strictEqual(lire(`cout-calibrage/projet/${nom}-x2.md.fixture`), t + t, `${nom} : le texte doublé est T suivi de T`);
-      assert.ok(t.endsWith('\n') && !t.endsWith('\n\n'), `${nom} : une seule fin de ligne finale`);
-      // Aucun import, aucun canari, aucun commentaire ni frontmatter retiré par Claude Code, aucun chemin local
-      assert.ok(!t.includes('@') && !/CANARI-/i.test(t) && !t.includes('<!--') && !t.startsWith('---'), nom);
-      assert.ok(!/[A-Za-z]:[\\/]|\\\\|\/Users\/|\/home\//.test(t), `${nom} : chemin local`);
-      assert.ok(o200k(t) >= O200K_MIN_CALIBRAGE, `${nom} : ${o200k(t)} tokens o200k, ${O200K_MIN_CALIBRAGE} au moins`);
+    const tousLesTextes = Object.values(CALIBRAGES).flatMap((c) => c.textes);
+    assert.strictEqual(new Set(tousLesTextes).size, 12, 'aucun nom de texte partagé entre les deux calibrages');
+    for (const [jeu, { titre, textes }] of Object.entries(CALIBRAGES)) {
+      const imports = textes.flatMap((nom) => [`@${nom}.md`, `@${nom}-x2.md`]);
+      assert.strictEqual(lire(`${jeu}/projet/CLAUDE.md.fixture`), `# ${titre}\n\n${imports.join('\n')}\n`, jeu);
+      const calibrage = INVENTAIRE.map(([rel]) => rel).filter((rel) => rel.startsWith(`${jeu}/`));
+      assert.deepStrictEqual(calibrage.sort(), ['CLAUDE.md', ...imports.map((i) => i.slice(1))].map((n) => `${jeu}/projet/${n}.fixture`).sort(), jeu);
+      for (const nom of textes) {
+        const t = lire(`${jeu}/projet/${nom}.md.fixture`);
+        assert.strictEqual(lire(`${jeu}/projet/${nom}-x2.md.fixture`), t + t, `${nom} : le texte doublé est T suivi de T`);
+        assert.ok(t.endsWith('\n') && !t.endsWith('\n\n'), `${nom} : une seule fin de ligne finale`);
+        // Aucun import, aucun canari, aucun commentaire ni frontmatter retiré par Claude Code, aucun chemin local
+        assert.ok(!t.includes('@') && !/CANARI-/i.test(t) && !t.includes('<!--') && !t.startsWith('---'), nom);
+        assert.ok(!/[A-Za-z]:[\\/]|\\\\|\/Users\/|\/home\//.test(t), `${nom} : chemin local`);
+        assert.ok(o200k(t) >= O200K_MIN_CALIBRAGE, `${nom} : ${o200k(t)} tokens o200k, ${O200K_MIN_CALIBRAGE} au moins`);
+      }
     }
+    // Second calibrage : 800 à 1 400 caractères par texte, aucune lettre accentuée hors du texte français
+    for (const nom of CALIBRAGES['cout-calibrage-2'].textes) {
+      const t = lire(`cout-calibrage-2/projet/${nom}.md.fixture`);
+      assert.ok([...t].length >= 800 && [...t].length <= 1400, `${nom} : ${[...t].length} caractères`);
+      if (nom !== 'cal2-fr-consignes') assert.ok(!/[^\x00-\x7f]/.test(t), `${nom} : ASCII seulement`);
+    }
+    assert.doesNotThrow(() => JSON.parse(lire('cout-calibrage-2/projet/cal2-json.md.fixture')), 'le JSON est valide');
 
     // Lot E4, D-6 : deux règles de même nom (globale et du projet) aux contenus différents ; un fichier importé par deux fichiers
     const regleG = lire('doublons-d6/global/rules/d6-meme-nom.md.fixture');

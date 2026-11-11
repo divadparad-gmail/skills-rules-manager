@@ -1,0 +1,120 @@
+server:
+  host: 0.0.0.0
+  port: 8080
+  read_timeout: 15s
+  write_timeout: 15s
+  max_body_size: 10MB
+
+logging:
+  level: info
+  format: json
+  outputs:
+    - stdout
+    - file
+  file:
+    directory: logs
+    max_size_mb: 50
+    max_backups: 5
+    compress: true
+
+database:
+  driver: postgres
+  host: db
+  port: 5432
+  name: inventory
+  pool:
+    min_connections: 2
+    max_connections: 20
+    idle_timeout: 5m
+
+cache:
+  enabled: true
+  provider: redis
+  ttl: 10m
+  key_prefix: inventory
+
+features:
+  export_csv: true
+  bulk_import: false
+  audit_trail: true
+
+jobs:
+  - name: nightly-report
+    schedule: "0 2 * * *"
+    timeout: 30m
+  - name: cleanup-sessions
+    schedule: "*/15 * * * *"
+    timeout: 5m
+
+monitoring:
+  metrics:
+    enabled: true
+    port: 9090
+    interval: 30s
+  alerts:
+    - name: high-error-rate
+      threshold: 0.05
+      window: 10m
+    - name: slow-responses
+      threshold_ms: 800
+      window: 5m
+server:
+  host: 0.0.0.0
+  port: 8080
+  read_timeout: 15s
+  write_timeout: 15s
+  max_body_size: 10MB
+
+logging:
+  level: info
+  format: json
+  outputs:
+    - stdout
+    - file
+  file:
+    directory: logs
+    max_size_mb: 50
+    max_backups: 5
+    compress: true
+
+database:
+  driver: postgres
+  host: db
+  port: 5432
+  name: inventory
+  pool:
+    min_connections: 2
+    max_connections: 20
+    idle_timeout: 5m
+
+cache:
+  enabled: true
+  provider: redis
+  ttl: 10m
+  key_prefix: inventory
+
+features:
+  export_csv: true
+  bulk_import: false
+  audit_trail: true
+
+jobs:
+  - name: nightly-report
+    schedule: "0 2 * * *"
+    timeout: 30m
+  - name: cleanup-sessions
+    schedule: "*/15 * * * *"
+    timeout: 5m
+
+monitoring:
+  metrics:
+    enabled: true
+    port: 9090
+    interval: 30s
+  alerts:
+    - name: high-error-rate
+      threshold: 0.05
+      window: 10m
+    - name: slow-responses
+      threshold_ms: 800
+      window: 5m

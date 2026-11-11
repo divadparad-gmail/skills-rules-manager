@@ -1,0 +1,24 @@
+# Consignes du projet
+
+## Langue et style
+
+- Rédige toute la documentation en français, avec des phrases complètes.
+- Garde chaque commit centré sur un seul changement, et décris-le clairement.
+- Préfère des fonctions courtes aux noms explicites à de longues fonctions commentées.
+
+## Commandes
+
+- Lance `npm test` avant de proposer un commit, et signale chaque échec.
+- Utilise `npm run build` pour vérifier que le paquet se construit encore.
+- Ne lance jamais `git push` sans une demande explicite.
+
+## Conventions de code
+
+- Utilise `const` par défaut, et `let` seulement quand une valeur change vraiment.
+- Traite les erreurs là où elles se produisent ; ne les cache jamais dans un bloc `catch` vide.
+- Range les valeurs de configuration dans `config/defaults.json`, jamais en dur dans le code.
+
+## Relectures
+
+- Explique la raison d'un changement, et pas seulement ce qu'il fait.
+- Signale tout test ignoré, et dis pourquoi il l'a été.

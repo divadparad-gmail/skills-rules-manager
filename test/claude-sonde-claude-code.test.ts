@@ -858,14 +858,21 @@ describe('Suite de Tests : Lanceur de la sonde Claude Code (lot I2, sans lancer 
       assert.deepStrictEqual(JSON.parse(fs.readFileSync(path.join(brut, 'compteur-context-E3.json'), 'utf8')), e3);
       assert.ok(journal.some((m) => /Compteur context du lot E3 \(10 sur 12\) archivé sous brut\/compteur-context-E3\.json ; lot E4 ouvert/.test(m)), journal.join('\n'));
       assert.throws(() => P.ouvrirLot(brut, 'context', 'E3'), /archivé/);
-      // Une série E4 : la base vide au début et à la fin, plus trois combinaisons = 5 ; une relance complète tient
-      const serie = S.BASES_E4.length * 2 + S.COMBINAISONS_E4.length;
-      assert.strictEqual(serie, 5);
-      S.verifierBudget(brut, serie, 'E4');
-      for (let i = 1; i <= serie; i++) S.reserverContext(brut, 'E4');
-      S.verifierBudget(brut, serie, 'E4');
-      for (let i = 1; i <= serie; i++) S.reserverContext(brut, 'E4');
-      assert.throws(() => S.verifierBudget(brut, 1, 'E4'), /10 \/context déjà utilisé\(s\), 1 prévu\(s\), limite de 10 pour le lot E4/);
+      // La première série E4 : la base vide au début et à la fin, plus les trois premières combinaisons = 5
+      const premiere = S.BASES_E4.length * 2 + 3;
+      assert.strictEqual(premiere, 5);
+      S.verifierBudget(brut, premiere, 'E4');
+      for (let i = 1; i <= premiere; i++) S.reserverContext(brut, 'E4');
+      // Le second calibrage (D-1.2b), seul : base vide, cout-calibrage-2, base vide = 3 ; 5 + 3 = 8 sur 10
+      const seconde = S.BASES_E4.length * 2 + S.lireOptions(['--lot', 'E4', '--combinaisons', 'cout-calibrage-2']).combinaisons.length;
+      assert.strictEqual(seconde, 3);
+      S.verifierBudget(brut, seconde, 'E4');
+      // La série complète des quatre combinaisons (6) ne tient plus après la première série
+      assert.strictEqual(S.BASES_E4.length * 2 + S.COMBINAISONS_E4.length, 6);
+      assert.throws(() => S.verifierBudget(brut, 6, 'E4'), /5 \/context déjà utilisé\(s\), 6 prévu\(s\), limite de 10 pour le lot E4/);
+      for (let i = 1; i <= seconde; i++) S.reserverContext(brut, 'E4');
+      // Il reste 2 /context : une relance du second calibrage (3) est refusée avant tout appel
+      assert.throws(() => S.verifierBudget(brut, seconde, 'E4'), /8 \/context déjà utilisé\(s\), 3 prévu\(s\), limite de 10 pour le lot E4/);
     } finally {
       console.log = log;
       supprimer(brut);
@@ -877,6 +884,7 @@ describe('Suite de Tests : Lanceur de la sonde Claude Code (lot I2, sans lancer 
       ['cout-calibrage', 'cout-calibrage', '', 'claude-opus-5'],
       ['cout-calibrage-o55', 'cout-calibrage', '', 'claude-opus-5-5'],
       ['doublons-d6', 'doublons-d6', 'Skill', 'claude-opus-5'],
+      ['cout-calibrage-2', 'cout-calibrage-2', '', 'claude-opus-5'],
     ]);
     assert.strictEqual(S.combinaisonsDuLot('E4'), S.COMBINAISONS_E4);
     assert.strictEqual(S.combinaisonsDuLot('V1'), S.COMBINAISONS);

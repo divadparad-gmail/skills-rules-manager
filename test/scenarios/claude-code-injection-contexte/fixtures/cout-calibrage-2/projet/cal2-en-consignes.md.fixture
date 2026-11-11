@@ -1,0 +1,24 @@
+# Project guidelines
+
+## Language and style
+
+- Write all documentation in plain English, with complete sentences.
+- Keep each commit focused on a single change, and describe it in the imperative mood.
+- Prefer short functions with explicit names over long functions with comments.
+
+## Commands
+
+- Run `npm test` before proposing any commit, and report every failure.
+- Use `npm run build` to check that the bundle still compiles.
+- Never run `git push` without an explicit request.
+
+## Code conventions
+
+- Use `const` by default, and `let` only when a value really changes.
+- Handle errors where they happen; never hide them in an empty `catch` block.
+- Keep configuration values in `config/defaults.json`, never hard-coded in the source.
+
+## Reviews
+
+- Explain the reason for a change, not only what it does.
+- Mention any skipped test, and say why it was skipped.
