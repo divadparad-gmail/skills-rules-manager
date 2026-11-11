@@ -50,6 +50,12 @@ export class DuplicateService {
       const gItem = globalMap.get(key);
 
       if (gItem) {
+        // Claude Code : deux skills homonymes ne font pas un doublon, puisqu'un seul est listé ; la copie
+        // masquée est traitée à part (src/claude/skillPrecedence.ts)
+        const isClaudeSkillPair = lItem.targetTool === 'claude-code' && gItem.targetTool === 'claude-code'
+          && lItem.type === 'skill' && gItem.type === 'skill';
+        if (isClaudeSkillPair) continue;
+
         const isAntigravityPair = lItem.targetTool === 'antigravity' && gItem.targetTool === 'antigravity';
         const isIdentical = this.checkIfIdentical(lItem, gItem);
         // Antigravity : une âme globale et une âme locale sont deux fichiers distincts, chargés tous

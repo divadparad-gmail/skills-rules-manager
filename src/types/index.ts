@@ -72,6 +72,14 @@ export interface ResourceItem {
     claudeSkillManualOnly?: boolean;
     /** Skill Claude Code avec `paths` : actif, absent de la liste au démarrage (0 token). */
     claudeSkillPathsTriggered?: boolean;
+    /** Skill Claude Code masqué par une copie homonyme prioritaire (src/claude/skillPrecedence.ts) : 0 token, non actif. */
+    claudeSkillMaskedBy?: { scope: ResourceScope; path: string };
+    /** Skill Claude Code listé qui masque des copies homonymes. */
+    claudeSkillMasks?: Array<{ scope: ResourceScope; path: string }>;
+    /** Skill Claude Code du projet dont la copie personnelle homonyme est manuelle ou limitée par paths : compté (non vérifié). */
+    claudeSkillHomonymNotMasked?: boolean;
+    /** Skill Claude Code homonyme d'une autre copie de même origine et de même distance : les deux sont comptées (non vérifié). */
+    claudeSkillSameScopeHomonym?: boolean;
     /** Règle Antigravity écartée par l'agent (frontmatter absent ou trigger non reconnu). */
     ignoredByAgent?: boolean;
     /** Défauts de frontmatter d'une règle Antigravity (voir AntigravityRuleIssue). */

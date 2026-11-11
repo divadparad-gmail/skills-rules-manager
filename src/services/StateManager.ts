@@ -18,6 +18,7 @@ import { applyAntigravityIndexHeaders } from './antigravityBootCost';
 import { computeAntigravityDynamicCosts } from './antigravityDynamicCosts';
 import { readAntigravityHooks } from './antigravityHooks';
 import { markdownWorkflowPersonalizationTokens } from './antigravityWorkflowItem';
+import { applyClaudeSkillPrecedence, withoutMaskedSkills } from '../claude/skillPrecedence';
 import { DashboardPanel } from '../providers/DashboardPanel';
 import { CheatSheetPanel } from '../providers/CheatSheetPanel';
 import { getEffectiveGlobalAntigravityPath, getUserHome } from '../utils/paths';
@@ -232,20 +233,24 @@ export class StateManager {
       nasResult.status.online
     );
 
+    // Claude Code : un seul skill de même nom est listé ; la copie masquée coûte 0 et n'est pas active
+    // (src/claude/skillPrecedence.ts). Antigravity ne passe pas par cette étape.
+    const precedence = workspace.tool === 'claude-code' ? applyClaudeSkillPrecedence(enrichedGlobal, enrichedLocal) : null;
+
     // Détection des doublons Global vs Local et calcul des tokens gaspillés
     const {
       enrichedGlobal: finalGlobal,
       enrichedLocal: finalLocal,
       stats: duplicateStats,
-    } = DuplicateService.detectDuplicates(enrichedGlobal, enrichedLocal);
+    } = DuplicateService.detectDuplicates(precedence ? precedence.globalItems : enrichedGlobal, precedence ? precedence.localItems : enrichedLocal);
 
     const budgetTotal = 20000;
     const soulGlobal = globalResult.soulStat;
     const soulLocal = localResult.soulStat;
     const rulesGlobal = globalResult.rulesStat;
     const rulesLocal = localResult.rulesStat;
-    const skillsGlobal = globalResult.skillsStat;
-    const skillsLocal = localResult.skillsStat;
+    const skillsGlobal = precedence ? withoutMaskedSkills(globalResult.skillsStat, precedence.masked) : globalResult.skillsStat;
+    const skillsLocal = precedence ? withoutMaskedSkills(localResult.skillsStat, precedence.masked) : localResult.skillsStat;
     const mcpGlobal = mcpGlobalStat;
     const mcpLocal = mcpLocalStat;
 

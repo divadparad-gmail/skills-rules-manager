@@ -2284,6 +2284,27 @@
         'Son entrée dans le contexte du modèle n\'est pas mesurée.');
     }
 
+    // Claude Code : skills homonymes, un seul est listé (src/claude/skillPrecedence.ts) ; textes neutres, sans conseil
+    const claudeMaskedBy = isClaudeItem && item.metadata && item.metadata.claudeSkillMaskedBy;
+    if (claudeMaskedBy) {
+      addBadge('pill-info', '🙈 Masquée', claudeMaskedBy.scope === 'global'
+        ? 'Claude Code liste la version personnelle de ce skill. Désactiver la version personnelle ferait apparaître celle du projet.'
+        : 'Claude Code liste une autre copie de ce skill, plus proche du dossier de travail. Désactiver cette copie ferait apparaître celle-ci.');
+    }
+    const claudeMasks = (isClaudeItem && item.metadata && item.metadata.claudeSkillMasks) || [];
+    if (claudeMasks.length > 0) {
+      addBadge('pill-info', item.scope === 'global' ? 'ℹ️ Masque la copie du projet' : 'ℹ️ Masque une copie homonyme',
+        'Claude Code liste cette copie du skill, et non la copie homonyme' + (item.scope === 'global' ? ' du projet.' : ' plus éloignée du dossier de travail.'));
+    }
+    if (isClaudeItem && item.metadata && item.metadata.claudeSkillSameScopeHomonym) {
+      addBadge('pill-warn-amber', '❔ Homonyme de même portée',
+        'Claude Code liste-t-il les deux copies, ou une seule ? Non vérifié : les deux sont comptées.');
+    }
+    if (isClaudeItem && item.metadata && item.metadata.claudeSkillHomonymNotMasked) {
+      addBadge('pill-warn-amber', '❔ Homonyme non masqué',
+        'Une version personnelle de ce skill existe, mais elle est à invocation manuelle ou limitée par paths. L\'extension suppose qu\'elle ne masque pas celle-ci, qui reste comptée (non vérifié).');
+    }
+
     // Claude Code : description et when_to_use réunis, coupés à 1 536 caractères dans la liste des skills
     const originalLength = item.targetTool === 'claude-code' && item.metadata && item.metadata.claudeDescriptionOriginalLength;
     if (originalLength) {
@@ -2510,6 +2531,10 @@
       // Claude Code : une règle paths est absente au démarrage (testé) ; son coût se paie quand elle est déclenchée
       metricsEl.innerHTML = `<span>${charStr} car.</span> <span class="tok-highlight">0 tok au boot (${tokStr} si déclenchée)</span>`;
       metricsEl.title = `Règle conditionnelle (paths) :\n• Coût au démarrage : 0 token (testé : absente au démarrage)\n• Coût si déclenchée : ${charStr} car. (${tokStr} tokens), sans frontmatter ni commentaires HTML\nEstimation : BPE o200k (repli 1 token ≈ 4 car.)`;
+    } else if (claudeMaskedBy) {
+      // Claude Code : la copie masquée n'est pas listée
+      metricsEl.innerHTML = '<span class="tok-highlight">0 tok au boot</span>';
+      metricsEl.title = 'Coût au démarrage : 0 token (une copie homonyme est listée à sa place).';
     } else if (claudeManualOnly || claudePathsTriggered) {
       // Claude Code : rien au démarrage ; le coût à l'invocation ou au déclenchement n'est pas mesuré
       metricsEl.innerHTML = '<span class="tok-highlight">0 tok au boot</span>';
@@ -2520,8 +2545,11 @@
       if (isAntigravityItem) {
         metricsTitle = `Taille du fichier : ${charStr} caractères\n${describeAntigravityBootCost(item)}\nEstimation : BPE o200k (repli 1 token ≈ 4 car.)`;
       }
+      // Le chemin entre dans le compte d'Antigravity, jamais dans celui de Claude Code
       if (item.metadata && item.metadata.duplicateInfo && item.metadata.duplicateInfo.isIdentical) {
-        metricsTitle += `\nContenu identique au doublon ${item.metadata.duplicateInfo.duplicateScope} (la légère différence de taille affichée provient du chemin de fichier).`;
+        metricsTitle += isClaudeItem
+          ? `\nContenu identique au doublon ${item.metadata.duplicateInfo.duplicateScope}.`
+          : `\nContenu identique au doublon ${item.metadata.duplicateInfo.duplicateScope} (la légère différence de taille affichée provient du chemin de fichier).`;
       }
       metricsEl.title = metricsTitle;
     }
