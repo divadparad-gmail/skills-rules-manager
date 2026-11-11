@@ -33,18 +33,27 @@ const FRONTMATTER_OPEN = /^---[ \t]*\r?\n/;
 const FRONTMATTER_CLOSE = /(^|\r?\n)---[ \t]*(?:\r?\n|$)/;
 
 /**
- * Retire le frontmatter : le bloc qui ouvre le fichier par une ligne `---` et se ferme par une ligne
- * `---`, que son YAML soit valide ou non. Sans ligne de fermeture, le texte est rendu tel quel.
+ * Sépare le frontmatter du reste : le bloc qui ouvre le fichier par une ligne `---` et se ferme par
+ * une ligne `---`, que son YAML soit valide ou non. Sans frontmatter fermé, `frontmatter` vaut `null`
+ * et `body` est le texte tel quel.
  */
-export function stripClaudeFrontmatter(raw: string): string {
+export function splitClaudeFrontmatter(raw: string): { frontmatter: string | null; body: string } {
   const withoutBom = raw.replace(/^﻿/, '');
   const trimmed = withoutBom.trimStart();
   const open = trimmed.match(FRONTMATTER_OPEN);
-  if (!open) return raw;
+  if (!open) return { frontmatter: null, body: raw };
   const rest = trimmed.slice(open[0].length);
   const close = rest.match(FRONTMATTER_CLOSE);
-  if (!close || close.index === undefined) return raw;
-  return rest.slice(close.index + close[0].length).replace(/^(?:[ \t]*\r?\n)+/, '');
+  if (!close || close.index === undefined) return { frontmatter: null, body: raw };
+  return {
+    frontmatter: rest.slice(0, close.index),
+    body: rest.slice(close.index + close[0].length).replace(/^(?:[ \t]*\r?\n)+/, ''),
+  };
+}
+
+/** Retire le frontmatter (voir splitClaudeFrontmatter). Sans ligne de fermeture, le texte est rendu tel quel. */
+export function stripClaudeFrontmatter(raw: string): string {
+  return splitClaudeFrontmatter(raw).body;
 }
 
 /** Début d'une clôture de bloc de code : trois accents graves ou tildes au moins, indentés de trois espaces au plus. */

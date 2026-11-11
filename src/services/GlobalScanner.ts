@@ -4,7 +4,6 @@ import { ResourceItem, TargetTool, TokenCategoryStat } from '../types';
 import {
   extractFrontmatter,
   extractMarkdownTitleAndSummary,
-  isRuleConditional,
 } from '../utils/frontmatter';
 import {
   getEffectiveGlobalAntigravityPath,
@@ -12,6 +11,7 @@ import {
 } from '../utils/paths';
 import { countTokens, countTokensForFile } from '../utils/tokenizer';
 import { claudeInjectedText, CLAUDE_INJECTED_TEXT_VARIANT } from '../claude/injectedText';
+import { claudeRuleStatus } from '../claude/ruleFrontmatter';
 import { measureAntigravitySoul } from '../utils/antigravityRules';
 import { appliesInAntigravity, buildAntigravityRuleItem, countsAtBoot, hasResourceWarning, soulSizeAdvice } from './antigravityRuleItem';
 import { listFlatRuleFiles } from './antigravityRuleSources';
@@ -515,7 +515,10 @@ export class GlobalScanner {
 
             const isRuleEnabled = isMd;
             const lineCount = rawRuleContent ? rawRuleContent.split(/\r\n|\r|\n/).length : 0;
-            const isCond = isRuleConditional(ruleMetadata, 'claude-code');
+            // Statut Claude Code : paths d'un YAML valide (conditionnelle), ou YAML invalide (permanente,
+            // paths ignorés) ; motifs qui ne correspondent à rien (src/claude/ruleFrontmatter.ts)
+            const ruleStatus = claudeRuleStatus(rawRuleContent, ruleMetadata);
+            const isCond = ruleStatus.isConditional;
             const isWarningLines = lineCount > 200;
             const isWarningNoDesc = !summary || summary.trim().length === 0;
             const ruleTokenCount = countTokensForFile(filePath, fileStat?.size, fileStat?.mtimeMs, injectedRuleText, CLAUDE_INJECTED_TEXT_VARIANT);
@@ -536,6 +539,8 @@ export class GlobalScanner {
               metadata: {
                 ...ruleMetadata,
                 isConditional: isCond,
+                ...(ruleStatus.yamlInvalid ? { claudeYamlInvalid: true } : {}),
+                ...(ruleStatus.unmatchablePatterns.length > 0 ? { claudeUnmatchablePatterns: ruleStatus.unmatchablePatterns } : {}),
                 warningLinesExceeded: isWarningLines,
                 warningNoDescription: isWarningNoDesc,
                 hasDisabledSuffix: isDisabled,
@@ -555,7 +560,7 @@ export class GlobalScanner {
           for (const ruleItem of claudeRulesMap.values()) {
             if (ruleItem.enabled && ruleItem.charCount) {
               if (ruleItem.metadata?.isConditional) {
-                rulesCharTotal += 80;
+                // Une règle paths est absente au démarrage : 0 caractère et 0 token au boot (testé)
                 rulesConditionalCharTotal += ruleItem.charCount;
                 rulesConditionalCount++;
               } else {
@@ -597,8 +602,8 @@ export class GlobalScanner {
     // Décompte cohérent des règles :
     // - Antigravity : ce que l'agent injecte au démarrage (F1 pour les permanentes, F3 pour
     //   model_decision, 0 pour glob et manual) ; l'en-tête F2 est ajouté une fois pour toute la jauge
-    // - Claude Code : tokenCount BPE réel des permanentes, ~20 tokens par conditionnelle
-    //   (estimation de l'extension, non documentée)
+    // - Claude Code : tokenCount BPE réel des permanentes (texte injecté) ; une conditionnelle (paths)
+    //   est absente au démarrage et ne coûte rien au boot (testé)
     // - Règles ⛔ : aucun coût au boot
     // - rulesConditionalTokenTotal : somme des tokens BPE réels des cartes conditionnelles
     const isAntigravity = targetTool === 'antigravity';
@@ -606,9 +611,8 @@ export class GlobalScanner {
     const activePermanentRules = bootRules.filter((i) => !i.metadata?.isConditional);
     const activeConditionalRules = bootRules.filter((i) => i.metadata?.isConditional);
     const permanentRulesTokens = activePermanentRules.reduce((sum, i) => sum + (i.tokenCount || 0), 0);
-    const conditionalRulesBootTokens = activeConditionalRules.length * 20;
     const agyRulesBoot = isAntigravity ? antigravityRulesBootStat(bootRules) : null;
-    const rulesTokenTotal = agyRulesBoot ? agyRulesBoot.tokenCount : permanentRulesTokens + conditionalRulesBootTokens;
+    const rulesTokenTotal = agyRulesBoot ? agyRulesBoot.tokenCount : permanentRulesTokens;
     const rulesConditionalTokenTotal = activeConditionalRules.reduce((sum, i) => sum + (i.tokenCount || 0), 0);
 
     const activeSoulList = allSoulList.filter((i) => i.enabled);

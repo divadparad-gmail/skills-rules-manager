@@ -329,23 +329,21 @@ describe('Suite de Tests : comptage des tokens au démarrage d\'Antigravity (lot
     assert.strictEqual(byName.get('../../hors-cache')!.toolCount, null, 'Un nom ne sort jamais du dossier du cache');
   });
 
-  test('11. Claude Code inchangé : 20 tokens par règle conditionnelle, JSON brut des MCP, aucun champ Antigravity', async () => {
+  // Le comptage des règles et des MCP de Claude Code est vérifié par test/claude-comptage-regles.test.ts (lot C1)
+  test('11. Mode Claude Code : aucun champ propre à Antigravity dans les statistiques des règles, des skills, de l\'âme et des MCP', async () => {
     const dir = path.join(tempBaseDir, 'claude');
-    const permContent = '# Perm\nToujours.';
     const mcpJson = JSON.stringify({ mcpServers: { local: { command: 'x' } } }, null, 2);
-    await writeFile(path.join(dir, '.claude', 'rules', 'perm.md'), permContent);
+    await writeFile(path.join(dir, '.claude', 'rules', 'perm.md'), '# Perm\nToujours.');
     await writeFile(path.join(dir, '.claude', 'rules', 'cond.md'), '---\npaths: "src/**/*.ts"\n---\n# Cond\nCorps.');
     await writeFile(path.join(dir, '.mcp.json'), mcpJson);
 
     const result = await LocalScanner.scan(workspaceFor(dir, 'claude-code'));
-    assert.strictEqual(result.rulesStat.tokenCount, countTokens(permContent) + 20);
     for (const stat of [result.rulesStat, result.skillsStat, result.soulStat]) {
       for (const key of ['overheadTokens', 'conditionalIndexCount', 'truncatedCount', 'lostTokens']) {
         assert.ok(!(key in stat), `${stat.type} : ${key} absent en mode Claude Code`);
       }
     }
     const mcp = await McpScanner.scanLocal(workspaceFor(dir, 'claude-code'));
-    assert.strictEqual(mcp.tokenCount, countTokens(mcpJson));
     assert.ok(!('mcpServers' in mcp));
   });
 

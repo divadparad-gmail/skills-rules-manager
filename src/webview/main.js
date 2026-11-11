@@ -1403,8 +1403,9 @@
         ? `\n\n⚠️ ${stat.warningCount} ressource(s) dépassent les recommandations techniques dans cette catégorie (voir badges sur les cartes).`
         : '') + (isClaude ? '' : antigravityStatNotes(stat, activeState?.antigravityBehavior?.version || ''));
       // Antigravity : model_decision coûte son entrée d'index, glob et manual rien au démarrage
+      // Claude Code : une règle paths est absente au démarrage (testé)
       const conditionalBootNote = isClaude
-        ? '~20 tok au boot'
+        ? '0 tok au boot'
         : 'model_decision : entrée d\'index, glob et manual : 0 au boot';
 
       if (prefix.endsWith('Total')) {
@@ -2257,7 +2258,21 @@
     if (item.metadata && item.metadata.isConditional && (agStatus === undefined || agStatus === 'active' || agStatus === 'partial')) {
       addBadge('pill-cond', '⚡ Conditionnel', isAntigravityItem
         ? `Règle conditionnelle (trigger: ${item.metadata.trigger || 'glob'}) : ${describeAntigravityBootCost(item)}`
-        : `Règle conditionnelle (trigger: ${item.metadata.trigger || 'glob'}) : contenu complet chargé seulement à l'activation (~20 tokens au boot, estimation de l'extension)`);
+        : 'Règle conditionnelle (paths) : 0 au démarrage ; chargée après Read, Write, Edit ou cat d\'un fichier correspondant (testé) ; head selon la documentation.');
+    }
+
+    // Claude Code : frontmatter au YAML invalide (règle chargée à chaque session) et motifs qui ne
+    // correspondent à rien (src/claude/ruleFrontmatter.ts)
+    if (item.targetTool === 'claude-code' && item.metadata && item.metadata.claudeYamlInvalid) {
+      addBadge('pill-warn-amber', '⚠️ YAML invalide',
+        'Le frontmatter de cette règle ne semble pas être du YAML valide : Claude Code la charge alors à chaque session, comme si elle n\'avait pas de paths (documentation ; mesuré sur une fixture). Ses paths sont ignorés et elle est comptée comme permanente.\n' +
+        'Critère de l\'extension, déduit de deux mesures : une tabulation dans l\'indentation, ou une ligne de premier niveau qui n\'est ni « clé: valeur », ni « - élément », ni un commentaire.');
+    }
+    const unmatchable = (item.targetTool === 'claude-code' && item.metadata && item.metadata.claudeUnmatchablePatterns) || [];
+    if (unmatchable.length > 0) {
+      addBadge('pill-warn-amber', '⚠️ Ne correspond à rien',
+        `Motif${unmatchable.length > 1 ? 's' : ''} avec un « [ » sans « ] » qui le suive : ${unmatchable.join(', ')}\n` +
+        'Selon la documentation de Claude Code, un tel motif « matches nothing » : la règle ne serait jamais chargée. La mesure montre seulement que la règle est absente au démarrage, comme toute règle conditionnelle.');
     }
 
     // Ancien emplacement de skill, chargement non vérifié (un skill intégré porte un verrou à droite)
@@ -2469,8 +2484,9 @@
       metricsEl.innerHTML = `<span>${charStr} car.</span> <span class="tok-highlight">${bootStr} tok au boot (${tokStr} plein)</span>`;
       metricsEl.title = `Règle conditionnelle :\n• ${describeAntigravityBootCost(item)}\n• Corps complet, lu quand la règle s'applique : ${tokStr} tokens (frontmatter non compté)`;
     } else if (item.metadata && item.metadata.isConditional) {
-      metricsEl.innerHTML = `<span>${charStr} car.</span> <span class="tok-highlight" title="Coût au boot : ~20 tokens (estimation de l'extension). Fichier complet si activé : ${tokStr} tokens">~20 tok (${tokStr} plein)</span>`;
-      metricsEl.title = `Règle conditionnelle :\n• Coût au boot : ~20 tokens (estimation de l'extension, non chiffrée par la documentation)\n• Poids complet si activé : ${charStr} car. (${tokStr} tokens)`;
+      // Claude Code : une règle paths est absente au démarrage (testé) ; son coût se paie quand elle est déclenchée
+      metricsEl.innerHTML = `<span>${charStr} car.</span> <span class="tok-highlight">0 tok au boot (${tokStr} si déclenchée)</span>`;
+      metricsEl.title = `Règle conditionnelle (paths) :\n• Coût au démarrage : 0 token (testé : absente au démarrage)\n• Coût si déclenchée : ${charStr} car. (${tokStr} tokens), sans frontmatter ni commentaires HTML\nEstimation : BPE o200k (repli 1 token ≈ 4 car.)`;
     } else {
       metricsEl.innerHTML = `<span>${charStr} car.</span> <span class="tok-highlight">(${tokStr} tokens)</span>`;
       let metricsTitle = `Taille réelle : ${charStr} caractères (${tokStr} tokens)\nEstimation : BPE o200k (repli 1 token ≈ 4 car.)`;

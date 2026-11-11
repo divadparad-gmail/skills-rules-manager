@@ -62,6 +62,10 @@ export interface ResourceItem {
     isSoul?: boolean;
     locked?: boolean;
     isConditional?: boolean;
+    /** Règle Claude Code au frontmatter jugé invalide (src/claude/ruleFrontmatter.ts) : permanente, `paths` ignorés. */
+    claudeYamlInvalid?: boolean;
+    /** Règle Claude Code : motifs de `paths` avec un `[` sans `]` qui le suive, qui ne correspondent à rien. */
+    claudeUnmatchablePatterns?: string[];
     /** Règle Antigravity écartée par l'agent (frontmatter absent ou trigger non reconnu). */
     ignoredByAgent?: boolean;
     /** Défauts de frontmatter d'une règle Antigravity (voir AntigravityRuleIssue). */

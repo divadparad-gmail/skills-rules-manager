@@ -44,12 +44,73 @@ import {
   stripClaudeFrontmatter,
   stripClaudeHtmlBlockComments,
 } from '../src/claude/injectedText';
+import {
+  claudeRuleStatus,
+  claudeUnmatchablePatterns,
+  isClaudeFrontmatterYamlInvalid,
+} from '../src/claude/ruleFrontmatter';
+import { extractFrontmatter } from '../src/utils/frontmatter';
 import { countTokens } from '../src/utils/tokenizer';
 import { LocalScanner } from '../src/services/LocalScanner';
 import { GlobalScanner } from '../src/services/GlobalScanner';
-import { WorkspaceContext } from '../src/types';
+import { McpScanner } from '../src/services/McpScanner';
+import { ResourceItem, WorkspaceContext } from '../src/types';
 
 const ROOT = path.resolve(__dirname, '..', '..');
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const main = require(path.join(ROOT, 'src', 'webview', 'main.js'));
+
+/** Faux DOM minimal, comme dans les tests du webview d'Antigravity. */
+interface MockEl {
+  tagName: string;
+  className: string;
+  innerHTML: string;
+  textContent: string;
+  title: string;
+  children: MockEl[];
+  style: Record<string, string>;
+  appendChild: (child: MockEl) => MockEl;
+  addEventListener: () => void;
+  classList: { add: (c: string) => void; remove: (c: string) => void; contains: (c: string) => boolean };
+}
+const mockDoc = (byId: Record<string, MockEl> = {}) => {
+  const createElement = (tag: string): MockEl => {
+    const classes = new Set<string>();
+    const el: MockEl = {
+      tagName: tag.toUpperCase(),
+      className: '',
+      innerHTML: '',
+      textContent: '',
+      title: '',
+      children: [],
+      style: {},
+      appendChild(c: MockEl) {
+        this.children.push(c);
+        return c;
+      },
+      addEventListener() {},
+      classList: {
+        add: (c: string) => { classes.add(c); el.className = [...classes].join(' '); },
+        remove: (c: string) => { classes.delete(c); el.className = [...classes].join(' '); },
+        contains: (c: string) => classes.has(c),
+      },
+    };
+    return el;
+  };
+  return { createElement, getElementById: (id: string) => (byId[id] = byId[id] ?? createElement('div')) };
+};
+/** Pastilles et métrique d'une carte rendue : texte et infobulle. */
+const pillsOf = (root: MockEl): Array<{ text: string; title: string; className: string }> => {
+  const found: Array<{ text: string; title: string; className: string }> = [];
+  const walk = (el: MockEl) => {
+    if (el.className.includes('item-badge-pill') || el.className.includes('item-metrics-badge')) {
+      found.push({ text: el.textContent || el.innerHTML.replace(/<[^>]+>/g, ''), title: el.title, className: el.className });
+    }
+    el.children.forEach(walk);
+  };
+  walk(root);
+  return found;
+};
 const FIXTURES = path.join(ROOT, 'test', 'scenarios', 'claude-code-injection-contexte', 'fixtures');
 const lireFixture = (rel: string) => fs.readFileSync(path.join(FIXTURES, ...rel.split('/')), 'utf8');
 
@@ -207,5 +268,133 @@ describe('Suite de Tests : comptage des règles et des CLAUDE.md de Claude Code 
     } finally {
       claudeGlobalPath = '';
     }
+  });
+
+  // Règles paths absentes au démarrage (CC17, testé) ; YAML invalide chargé sans condition (CC21, testé ;
+  // critère de l'extension déduit de CC21 et de la fixture `paths: [src/**` de la phase 2)
+  test('13. Critère de « YAML invalide » : tabulation dans l\'indentation ou ligne de premier niveau illisible', () => {
+    assert.strictEqual(isClaudeFrontmatterYamlInvalid(null), false, 'Sans frontmatter');
+    assert.strictEqual(isClaudeFrontmatterYamlInvalid('paths:\n\t- "src/**/*.ts"'), true, 'Tabulation dans l\'indentation');
+    assert.strictEqual(isClaudeFrontmatterYamlInvalid('description: x\n: : :'), true, 'Ligne « : : : »');
+    assert.strictEqual(isClaudeFrontmatterYamlInvalid('description: x\nune phrase sans deux-points'), true, 'Ligne de premier niveau illisible');
+    assert.strictEqual(isClaudeFrontmatterYamlInvalid('paths: [src/**'), false, '`[` non fermé sans guillemets : accepté par Claude Code (phase 2)');
+    assert.strictEqual(isClaudeFrontmatterYamlInvalid('paths:\n  - "src/**/*.ts"\n  - "*.md"'), false, 'Liste YAML indentée par des espaces');
+    assert.strictEqual(isClaudeFrontmatterYamlInvalid('description: |\n  Ligne : libre\n  : : : dans le scalaire de bloc\nname: x'), false, 'Scalaire de bloc');
+    assert.strictEqual(isClaudeFrontmatterYamlInvalid('# commentaire\n"clé citée": 1\n\'autre\': 2\nvide:\n- élément'), false, 'Commentaire, clés citées, clé sans valeur, élément de premier niveau');
+    assert.strictEqual(isClaudeFrontmatterYamlInvalid('description: x\r\npaths:\r\n  - "a"'), false, 'Fins de ligne CRLF');
+  });
+
+  test('14. La fixture p-yaml-invalide est permanente : ses paths sont ignorés, son corps est compté', async () => {
+    const brut = lireFixture('niveaux/projet/_claude/rules/p-yaml-invalide.md.fixture');
+    assert.deepStrictEqual(claudeRuleStatus(brut, extractFrontmatter(brut).metadata), { isConditional: false, yamlInvalid: true, unmatchablePatterns: [] });
+
+    const dir = path.join(tempBaseDir, 'yaml-invalide');
+    await writeFile(path.join(dir, '.claude', 'rules', 'p-yaml-invalide.md'), brut);
+    const result = await LocalScanner.scan(workspaceFor(dir));
+    const rule = result.items.find((i) => i.id === 'p-yaml-invalide')!;
+    assert.strictEqual(rule.metadata?.isConditional, false);
+    assert.strictEqual(rule.metadata?.claudeYamlInvalid, true);
+    assert.strictEqual(rule.tokenCount, countTokens(claudeInjectedText(brut)));
+    assert.strictEqual(result.rulesStat.tokenCount, rule.tokenCount, 'Comptée au démarrage, comme une règle permanente');
+    assert.strictEqual(result.rulesStat.permanentCount, 1);
+    assert.strictEqual(result.rulesStat.conditionalCount, 0);
+  });
+
+  test('15. `paths: [src/**` sans guillemets : YAML valide, règle conditionnelle, motif qui ne correspond à rien', () => {
+    const brut = '---\npaths: [src/**\n---\n# Règle\nCorps.\n';
+    const statut = claudeRuleStatus(brut, extractFrontmatter(brut).metadata);
+    assert.deepStrictEqual(statut, { isConditional: true, yamlInvalid: false, unmatchablePatterns: ['[src/**'] });
+  });
+
+  test('16. Chaîne citée "src/[a.ts" : conditionnelle, signalée « ne correspond à rien » ; un motif fermé ne l\'est pas', async () => {
+    const cite = '---\npaths: "src/[a.ts"\n---\n# Règle\nCorps.\n';
+    assert.deepStrictEqual(claudeRuleStatus(cite, extractFrontmatter(cite).metadata), { isConditional: true, yamlInvalid: false, unmatchablePatterns: ['src/[a.ts'] });
+    const liste = '---\npaths:\n  - "src/**/*.ts"\n  - "src/[a.ts"\n---\n# Règle\n';
+    assert.deepStrictEqual(claudeRuleStatus(liste, extractFrontmatter(liste).metadata).unmatchablePatterns, ['src/[a.ts']);
+    assert.deepStrictEqual(claudeUnmatchablePatterns(['src/[ab].ts', 'src/**/*.ts', 'a]b']), [], 'Classes fermées et motifs ordinaires');
+    assert.deepStrictEqual(claudeUnmatchablePatterns(['[ab]/[c']), ['[ab]/[c'], 'Un `[` ouvert après une classe fermée');
+
+    const dir = path.join(tempBaseDir, 'motif');
+    await writeFile(path.join(dir, '.claude', 'rules', 'motif.md'), cite);
+    const rule = (await LocalScanner.scan(workspaceFor(dir))).items.find((i) => i.id === 'motif')!;
+    assert.strictEqual(rule.metadata?.isConditional, true);
+    assert.deepStrictEqual(rule.metadata?.claudeUnmatchablePatterns, ['src/[a.ts']);
+    assert.strictEqual(rule.metadata?.claudeYamlInvalid, undefined);
+  });
+
+  test('17. Une règle paths ajoute 0 token et 0 caractère au total ; sa carte garde son coût de déclenchement', async () => {
+    const perm = '# Permanente\nToujours chargée.\n';
+    const cond = '---\npaths:\n  - "src/**/*.ts"\n---\n# Conditionnelle\nCorps chargé à la demande.\n';
+    const projet = path.join(tempBaseDir, 'paths-projet');
+    await writeFile(path.join(projet, '.claude', 'rules', 'perm.md'), perm);
+    await writeFile(path.join(projet, '.claude', 'rules', 'cond.md'), cond);
+    const local = await LocalScanner.scan(workspaceFor(projet));
+    const carte = local.items.find((i) => i.id === 'cond')!;
+    const corps = '# Conditionnelle\nCorps chargé à la demande.\n';
+    assert.strictEqual(local.rulesStat.tokenCount, countTokens(perm), 'Seule la permanente compte au démarrage');
+    assert.strictEqual(local.rulesStat.charCount, perm.length, 'Aucun caractère forfaitaire');
+    assert.strictEqual(local.rulesStat.conditionalCount, 1);
+    assert.strictEqual(carte.tokenCount, countTokens(corps), 'Carte : texte injecté, sans frontmatter');
+    assert.strictEqual(local.rulesStat.conditionalTokenCount, countTokens(corps));
+
+    const globalDir = path.join(tempBaseDir, 'paths-global');
+    await writeFile(path.join(globalDir, 'rules', 'cond-g.md'), cond);
+    claudeGlobalPath = globalDir;
+    try {
+      const global = await GlobalScanner.scan(undefined, 'claude-code');
+      assert.strictEqual(global.rulesStat.tokenCount, 0, 'Globale : 0 au démarrage');
+      assert.strictEqual(global.rulesStat.charCount, 0);
+      assert.strictEqual(global.rulesStat.conditionalTokenCount, countTokens(corps));
+    } finally {
+      claudeGlobalPath = '';
+    }
+  });
+
+  test('18. Reprise de la partie Claude Code d\'antigravity-token-count n° 11 : 0 au démarrage pour la conditionnelle, JSON brut des MCP', async () => {
+    const dir = path.join(tempBaseDir, 'reprise-11');
+    const permContent = '# Perm\nToujours.';
+    const mcpJson = JSON.stringify({ mcpServers: { local: { command: 'x' } } }, null, 2);
+    await writeFile(path.join(dir, '.claude', 'rules', 'perm.md'), permContent);
+    await writeFile(path.join(dir, '.claude', 'rules', 'cond.md'), '---\npaths: "src/**/*.ts"\n---\n# Cond\nCorps.');
+    await writeFile(path.join(dir, '.mcp.json'), mcpJson);
+
+    const result = await LocalScanner.scan(workspaceFor(dir));
+    assert.strictEqual(result.rulesStat.tokenCount, countTokens(permContent) + 0, 'Plus de forfait de 20 tokens par conditionnelle');
+    // Le coût MCP reste celui du JSON brut jusqu'au lot qui le remplacera
+    const mcp = await McpScanner.scanLocal(workspaceFor(dir));
+    assert.strictEqual(mcp.tokenCount, countTokens(mcpJson));
+  });
+
+  test('19. Webview, Claude Code : « 0 tok au boot (N si déclenchée) », badges paths, YAML invalide et motif sans effet', () => {
+    const base = (metadata: Record<string, unknown>): ResourceItem => ({
+      id: 'r', name: 'r', description: 'Règle', type: 'rule', scope: 'local', enabled: true, path: 'r.md',
+      targetTool: 'claude-code', isFolder: false, charCount: 40, tokenCount: 12, lineCount: 4, metadata,
+    });
+    const cond = pillsOf(main.createItemCard(base({ isConditional: true, claudeUnmatchablePatterns: ['src/[a.ts'] }), true, mockDoc()));
+    const metrique = cond.find((p) => p.className.includes('item-metrics-badge'))!;
+    assert.strictEqual(metrique.text, '40 car. 0 tok au boot (12 si déclenchée)');
+    const badge = cond.find((p) => p.text === '⚡ Conditionnel')!;
+    assert.ok(badge.title.includes('0 au démarrage') && badge.title.includes('Read, Write, Edit ou cat') && badge.title.includes('(testé)') && badge.title.includes('head selon la documentation'), badge.title);
+    const rien = cond.find((p) => p.text === '⚠️ Ne correspond à rien')!;
+    assert.ok(rien.title.includes('src/[a.ts') && rien.title.includes('matches nothing') && rien.title.includes('absente au démarrage'), rien.title);
+    for (const p of cond) assert.ok(!/~20|estimation de l'extension/.test(p.text + p.title), `Texte périmé : ${p.text} ${p.title}`);
+
+    const invalide = pillsOf(main.createItemCard(base({ isConditional: false, claudeYamlInvalid: true }), true, mockDoc()));
+    const yaml = invalide.find((p) => p.text === '⚠️ YAML invalide')!;
+    assert.ok(yaml.title.includes('Critère de l\'extension, déduit de deux mesures'), yaml.title);
+    assert.ok(!invalide.some((p) => p.text === '⚡ Conditionnel'));
+
+    // Une règle Antigravity ne reçoit aucun des badges propres à Claude Code
+    const agy = pillsOf(main.createItemCard({ ...base({ isConditional: false, claudeYamlInvalid: true, claudeUnmatchablePatterns: ['[x'] }), targetTool: 'antigravity' }, true, mockDoc()));
+    assert.ok(!agy.some((p) => p.text === '⚠️ YAML invalide' || p.text === '⚠️ Ne correspond à rien'));
+
+    // Infobulle de la ligne des règles de la jauge
+    const nodes: Record<string, MockEl> = {};
+    const doc = mockDoc(nodes);
+    const stat = { type: 'rule', scope: 'local', activeCount: 2, totalCount: 2, permanentCount: 1, conditionalCount: 1, conditionalTokenCount: 12, charCount: 30, tokenCount: 9, warningCount: 0, percentage: 0, directoryPath: '.claude/rules' };
+    main.updateBreakdownRow('RuleLocal', stat, 'Rules (local)', doc, { workspace: { tool: 'claude-code' }, stats: {} });
+    const tooltip = nodes['tooltipRuleLocal'].textContent;
+    assert.ok(tooltip.includes('1 (0 tok au boot, +12 tok à l\'activation)'), tooltip);
+    assert.ok(!tooltip.includes('~20'), tooltip);
   });
 });
