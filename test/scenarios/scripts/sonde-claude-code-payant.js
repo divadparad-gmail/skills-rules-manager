@@ -33,17 +33,19 @@ const MAX_SERIES_REJETEES = 2;
  * est le lot des vérifications de version : /context seulement, plafond de 60 (relevé de 30 le même jour),
  * sans compteur du modèle. E3 (décision Q2 du 2026-11-10) est le lot de H14 : les /context de référence
  * du claude du poste et de la copie embarquée (P5 et P5b), plafond de 12, sans compteur du modèle (le
- * seul appel au modèle de H14 est tapé à la main dans le panneau).
+ * seul appel au modèle de H14 est tapé à la main dans le panneau). E4 (décision du 2026-11-11) est le lot
+ * des vérifications gratuites (calibrage du tokenizer et vérification de D-6) : plafond de 10, sans
+ * compteur du modèle.
  */
 const COMPTEURS = {
-  context: { fichier: 'compteur-context.json', plafonds: { E1: 60, E2: 40, V1: 60, E3: 12 }, unite: '/context' },
+  context: { fichier: 'compteur-context.json', plafonds: { E1: 60, E2: 40, V1: 60, E3: 12, E4: 10 }, unite: '/context' },
   modele: { fichier: 'compteur-modele.json', plafonds: { E2: PLAFOND_MODELE }, unite: 'appel(s) au modèle' },
 };
 
 /** Les lots qui n'acceptent que /context : tout appel au modèle et toute commande payante y sont refusés. */
-const LOTS_CONTEXT_SEUL = ['V1', 'E3'];
+const LOTS_CONTEXT_SEUL = ['V1', 'E3', 'E4'];
 /** Le rôle de chaque lot « /context seulement », cité dans les refus. */
-const ROLES_CONTEXT_SEUL = { V1: 'vérification de version', E3: 'H14, panneau VS Code' };
+const ROLES_CONTEXT_SEUL = { V1: 'vérification de version', E3: 'H14, panneau VS Code', E4: 'calibrage et vérifications gratuites' };
 for (const lot of LOTS_CONTEXT_SEUL) {
   if (Object.prototype.hasOwnProperty.call(COMPTEURS.modele.plafonds, lot)) throw new Error(`lot ${lot} « /context seulement » doté d'un compteur du modèle`);
   if (!ROLES_CONTEXT_SEUL[lot]) throw new Error(`lot ${lot} « /context seulement » sans rôle`);

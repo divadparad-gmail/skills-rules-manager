@@ -5,6 +5,9 @@
  * Usage (depuis la racine du dépôt) :
  *   npm run sonde:claude-etat                       version, auth status et préconditions ; aucun /context
  *   npm run sonde:claude-context -- --lot <E1|E2|V1>   déploiement, /context par combinaison, retrait, rapport
+ *   npm run sonde:claude-context -- --lot E4 [--combinaisons <id,id>] [--resultats]   vérifications
+ *                           gratuites (calibrage sous deux modèles, D-6) : base vide seule au début et à la
+ *                           fin, Claude Code 2.1.319 exigé, rapport e4-….json
  *   npm run sonde:claude-context -- --lot E3 --preparer-h14   H14 (lot E3), étape 1 : contrôles, 4 bases, un
  *                           seul déploiement du jeu complet, /context de référence par le claude du poste
  *                           (P5) et par la copie embarquée dans l'extension VS Code (P5b), puis les gestes
@@ -26,11 +29,13 @@
  *                           seulement si la série est valide, toutes les entrées couvertes et 0 écart ;
  *                           rien d'autre n'est changé ; aucun lancement de claude
  * Options de « context » :
- *   --lot <E1|E2|V1|E3>     lot du compteur de /context (obligatoire) ; au changement de lot, l'ancien
+ *   --lot <E1|E2|V1|E3|E4>  lot du compteur de /context (obligatoire) ; au changement de lot, l'ancien
  *                           compteur est archivé dans brut/, et un lot archivé ne peut pas être rouvert ;
  *                           V1 est le lot des vérifications de version (/context seulement, plafond 60) ;
- *                           E3 est réservé à H14 (/context seulement, plafond 12)
- *   --combinaisons <id,id>  ne mesure que ces combinaisons (les quatre bases sont toujours mesurées)
+ *                           E3 est réservé à H14 (/context seulement, plafond 12) ; E4 est le lot des
+ *                           vérifications gratuites (/context seulement, plafond 10, combinaisons propres)
+ *   --combinaisons <id,id>  ne mesure que ces combinaisons du lot (les bases du lot sont toujours mesurées :
+ *                           les quatre, ou la base vide seule sous E4)
  *   --resultats             écrit le rapport normalisé dans resultats/ au lieu de brut/
  *
  * Chemins par défaut calculés (aucun chemin local en dur), remplaçables par CANARI_CLAUDE_CONFIG_DIR,
@@ -53,8 +58,9 @@
  *     au modèle : apiKeySource=none (aussi dès l'initialisation, avant la première requête) ; sinon le
  *     fichier brut/ARRET.txt est écrit et bloque tout lancement suivant de claude ;
  *   - deux compteurs persistants et distincts, liés au lot, incrémentés avant chaque lancement :
- *     /context (60 en E1, relevé de 50 le 2026-11-09 ; 40 en E2 ; 60 en V1, relevé de 30 le 2026-11-10) et appels au modèle (40 en E2,
- *     ou moins avec --plafond ; aucun en V1, où tout appel au modèle est refusé) ;
+ *     /context (60 en E1, relevé de 50 le 2026-11-09 ; 40 en E2 ; 60 en V1, relevé de 30 le 2026-11-10 ; 12 en E3 ; 10 en E4)
+ *     et appels au modèle (40 en E2, ou moins avec --plafond ; aucun en V1, E3 et E4, où tout appel au modèle est refusé) ;
+ *   - --model : MODELE pour tout appel au modèle ; un /context peut aussi compter sous claude-opus-5-5 ;
  *   - garde de flux pendant chaque appel au modèle : tours, outils, chemins et commande Bash ;
  *   - empreintes SHA-256 (en LF) de chaque fixture comparées à inventaire.json avant tout déploiement :
  *     un écart refuse le déploiement et nomme le fichier ;
@@ -88,6 +94,11 @@ const ATTENDU = path.join(SUITE, 'attendu');
 
 const LOTS_CONTEXT = Object.keys(payant.COMPTEURS.context.plafonds);
 const MODELE = 'claude-opus-5';
+/**
+ * Les modèles permis pour un /context (lot E4, décision du 2026-11-11) : le modèle des baselines et
+ * celui du panneau VS Code (point 33). Un appel au modèle reste toujours sous MODELE.
+ */
+const MODELES_CONTEXT = [MODELE, 'claude-opus-5-5'];
 const EFFORT = 'high';
 const PROMPTS = ['/context', '/context all'];
 const ABONNEMENTS = ['pro', 'max', 'team', 'enterprise'];
@@ -95,7 +106,7 @@ const OUTILS_CONNUS = new Set(['Skill', 'ToolSearch', 'Read', 'Write', 'Edit', '
 const OUTILS_FICHIERS = new Set(['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Bash']);
 const OPTIONS_SEULES = new Set(['--verbose', '--no-session-persistence', '--strict-mcp-config', '--include-hook-events']);
 const OPTIONS_FIXES = {
-  '--model': MODELE, '--effort': EFFORT, '--output-format': 'stream-json', '--permission-prompts': 'none', '--permission-mode': 'dontAsk',
+  '--effort': EFFORT, '--output-format': 'stream-json', '--permission-prompts': 'none', '--permission-mode': 'dontAsk',
 };
 const OPTIONS_CHEMINS = new Set(['--mcp-config', '--plugin-dir', '--settings']);
 const TOURS_PERMIS = new Set(['1', '3']);
@@ -144,6 +155,26 @@ const COMBINAISONS = [
   { id: 'cout-mcp-b1', jeux: ['cout-mcp-b1'], outils: '' },
   { id: 'jeu-complet', jeux: ['niveaux', 'skills', 'hook-sortie', 'mcp-canari'], outils: 'Skill', hookEvents: true },
 ];
+
+/**
+ * Le lot E4 (décision du 2026-11-11) : les vérifications gratuites, regroupées avant toute correction.
+ * Ses combinaisons lui sont réservées et refusées sous les autres lots ; seule la base vide est mesurée,
+ * au début et à la fin (5 /context par série, une relance complète sous le plafond de 10). Il exige la
+ * version des baselines, pour que le calibrage reste comparable aux mesures du lot E2.
+ */
+const LOT_E4 = 'E4';
+const VERSIONS_EXIGEES = { [LOT_E4]: '2.1.319' };
+const BASES_E4 = BASES.filter((b) => b.cle === 'vide');
+const COMBINAISONS_E4 = [
+  { id: 'cout-calibrage', jeux: ['cout-calibrage'], outils: '' },
+  { id: 'cout-calibrage-o55', jeux: ['cout-calibrage'], outils: '', modele: 'claude-opus-5-5' },
+  { id: 'doublons-d6', jeux: ['doublons-d6'], outils: 'Skill' },
+];
+/** Les combinaisons et les bases d'un lot. */
+const combinaisonsDuLot = (lot) => (lot === LOT_E4 ? COMBINAISONS_E4 : COMBINAISONS);
+const basesDuLot = (lot) => (lot === LOT_E4 ? BASES_E4 : BASES);
+/** Le préfixe du rapport normalisé : « e4- » pour E4, que le comparateur et la baseline ignorent. */
+const prefixeRapport = (lot) => (lot === LOT_E4 ? 'e4' : 'context');
 
 const { Refus, RefusArgv, Arret, SerieRejetee, estSousOuEgal, estSousStrict, memeChemin } = commun;
 
@@ -349,11 +380,12 @@ function verifierPrompt(prompt) {
 
 const outilsValides = (v) => typeof v === 'string' && (v === '' || v.split(',').every((t) => OUTILS_CONNUS.has(t)));
 
-/** Les arguments d'un /context (mêmes options qu'en phase 2). */
-function argumentsContext({ prompt = '/context', outils = '', mcpConfig, pluginDir, hookEvents = false }) {
+/** Les arguments d'un /context (mêmes options qu'en phase 2) ; le modèle est l'un de MODELES_CONTEXT. */
+function argumentsContext({ prompt = '/context', outils = '', mcpConfig, pluginDir, hookEvents = false, modele = MODELE }) {
   verifierPrompt(prompt);
   if (!outilsValides(outils)) throw new RefusArgv('jeu d\'outils inconnu');
-  const argv = ['-p', prompt, '--model', MODELE, '--effort', EFFORT, '--output-format', 'stream-json', '--verbose',
+  if (!MODELES_CONTEXT.includes(modele)) throw new RefusArgv(`modèle refusé pour /context (${MODELES_CONTEXT.join(' ou ')} attendu)`);
+  const argv = ['-p', prompt, '--model', modele, '--effort', EFFORT, '--output-format', 'stream-json', '--verbose',
     '--tools', outils, '--no-session-persistence', '--strict-mcp-config'];
   if (mcpConfig) argv.push('--mcp-config', mcpConfig);
   if (pluginDir) argv.push('--plugin-dir', pluginDir);
@@ -416,6 +448,10 @@ function verifierArgv(argv, { espace, plateforme = process.platform, invites = n
     vus.add(a);
     if (a in OPTIONS_FIXES) {
       if (argv[++i] !== OPTIONS_FIXES[a]) throw new RefusArgv(`${a} : valeur refusée`);
+    } else if (a === '--model') {
+      // Un /context peut compter sous l'un des MODELES_CONTEXT ; un appel au modèle reste sous MODELE.
+      const permis = forme === 'context' ? MODELES_CONTEXT : [MODELE];
+      if (!permis.includes(argv[++i])) throw new RefusArgv('--model : valeur refusée');
     } else if (a === '--tools') {
       if (!outilsValides(argv[++i])) throw new RefusArgv('--tools : jeu d\'outils refusé');
     } else if (OPTIONS_CHEMINS.has(a)) {
@@ -448,6 +484,32 @@ function verifierArgv(argv, { espace, plateforme = process.platform, invites = n
     }
   }
   return forme;
+}
+
+/**
+ * Le modèle d'un /context (lot E4) : celui demandé par --model, celui que rapporte l'initialisation
+ * (init.model) et celui que rapporte context_usage.model ; null si le flux ne le donne pas.
+ */
+function modelesLus(flux, demande) {
+  const lu = (v) => (typeof v === 'string' && v !== '' ? v : null);
+  return { demande, init: lu(flux && flux.init && flux.init.model), context: lu(flux && flux.contextUsage && flux.contextUsage.model) };
+}
+
+/**
+ * Refuse de lancer si le lot exige une version (VERSIONS_EXIGEES) et que « claude --version » en donne
+ * une autre. Seul « --version » est lancé, sans compteur : aucune série n'est consommée.
+ */
+async function verifierVersionDuLot(ctx, lot, { lancer = lancerClaude, brut = BRUT } = {}) {
+  const exigee = VERSIONS_EXIGEES[lot];
+  if (!exigee) return null;
+  const cwd = fs.existsSync(ctx.espace) ? ctx.espace : os.tmpdir();
+  const v = await lancer({ exe: ctx.exe, argv: ['--version'], env: ctx.env, cwd, espace: ctx.espace, configDir: ctx.configDir, dossierBrut: brut, plateforme: ctx.plateforme });
+  const version = v && v.code === 0 ? (String(v.stdout).trim().match(/^(\S+)/) || [])[1] : undefined;
+  if (!version) throw new Refus(`claude --version a échoué : le lot ${lot} exige la version ${exigee}`);
+  if (version !== exigee) {
+    throw new Refus(`le lot ${lot} exige Claude Code ${exigee}, et le claude du poste répond ${version} : rien n'est lancé, aucun /context n'est consommé`);
+  }
+  return version;
 }
 
 // --- Lecture et contrôle d'un /context ---------------------------------------------------------------
@@ -994,7 +1056,7 @@ function processusFixtureRestants(espace, plateforme = process.platform) {
 /** Écrit le rapport normalisé après la garde ; rien n'est écrit au moindre problème. */
 function ecrireRapport(rapport, { destination, nom, poste, interdits, dossiers = { brut: BRUT, resultats: RESULTATS } }) {
   if (!['brut', 'resultats'].includes(destination)) throw new Refus('destination du rapport refusée (brut ou resultats seulement)');
-  if (!/^(context|payant|h14)-\d{4}-\d{2}-\d{2}-\d{4}\.json$/.test(nom)) throw new Refus('nom de rapport refusé');
+  if (!/^(context|payant|h14|e4)-\d{4}-\d{2}-\d{2}-\d{4}\.json$/.test(nom)) throw new Refus('nom de rapport refusé');
   if (nom.startsWith('h14-') && destination !== 'brut') throw new Refus('le rapport H14 ne s\'écrit que dans brut/');
   const texte = `${JSON.stringify(rapport, null, 2)}\n`;
   const problemes = [...commun.problemesTexte(texte, poste, interdits), ...commun.problemesJson(texte)];
@@ -1143,8 +1205,9 @@ function lireOptions(args) {
   if (!LOTS_CONTEXT.includes(opts.lot)) throw new Refus(`--lot <${LOTS_CONTEXT.join('|')}> est obligatoire`);
   if (opts.lot === h14.LOT_H14) throw new Refus(`le lot ${h14.LOT_H14} est réservé à H14 (--preparer-h14 et --cloturer-h14)`);
   if (opts.combinaisons) {
-    const inconnues = opts.combinaisons.filter((id) => !COMBINAISONS.some((c) => c.id === id));
-    if (inconnues.length > 0) throw new Refus(`combinaison inconnue : ${inconnues.join(', ')}`);
+    const liste = combinaisonsDuLot(opts.lot);
+    const inconnues = opts.combinaisons.filter((id) => !liste.some((c) => c.id === id));
+    if (inconnues.length > 0) throw new Refus(`combinaison inconnue pour le lot ${opts.lot} : ${inconnues.join(', ')}`);
   }
   return opts;
 }
@@ -1534,14 +1597,18 @@ async function commandeContext(args) {
   if (opts.preparerH14) return commandePreparerH14();
   if (opts.verifierH14) return commandeVerifierH14();
   if (opts.cloturerH14) return commandeCloturerH14();
-  const combinaisons = opts.combinaisons ? COMBINAISONS.filter((c) => opts.combinaisons.includes(c.id)) : COMBINAISONS;
+  const liste = combinaisonsDuLot(opts.lot);
+  const combinaisons = opts.combinaisons ? liste.filter((c) => opts.combinaisons.includes(c.id)) : liste;
+  const basesLot = basesDuLot(opts.lot);
   const ctx = preparer();
   verifierArret(BRUT);
   if (ctx.pbEspace.length > 0) throw new Refus(ctx.pbEspace.join(' ; '));
   if (ctx.pbProfil.length > 0) throw new Refus(ctx.pbProfil.join(' ; '));
   if (fs.existsSync(ctx.journal)) throw new Refus('un journal de déploiement existe : lancer « retirer »');
+  // Version exigée par le lot (E4) : contrôlée avant toute écriture et tout /context compté.
+  await verifierVersionDuLot(ctx, opts.lot);
   ouvrirLotAnnonce(BRUT, 'context', opts.lot);
-  const prevus = BASES.length * 2 + combinaisons.length;
+  const prevus = basesLot.length * 2 + combinaisons.length;
   verifierBudget(BRUT, prevus, opts.lot);
   const rels = listerFixtures();
   const inventaire = commun.lireInventaire(fs.readFileSync(INVENTAIRE, 'utf8'));
@@ -1572,7 +1639,7 @@ async function commandeContext(args) {
     let flux;
     try {
       if (fichiers.length > 0) deployer(fichiers, ctx.journal, [ctx.espace, ctx.configDir]);
-      const argv = argumentsContext({ outils: c.outils, mcpConfig, pluginDir, hookEvents: c.hookEvents });
+      const argv = argumentsContext({ outils: c.outils, mcpConfig, pluginDir, hookEvents: c.hookEvents, modele: c.modele || MODELE });
       const r = await lancerClaude({ exe: ctx.exe, argv, env: ctx.env, cwd: ctx.projet, espace: ctx.espace, configDir: ctx.configDir, dossierBrut: BRUT, plateforme: ctx.plateforme, lot: opts.lot });
       numero++;
       const base = path.join(dossierSerie, `${String(numero).padStart(2, '0')}-${c.id}`);
@@ -1610,13 +1677,14 @@ async function commandeContext(args) {
       mcp: plan.filter((e) => e.cible === 'mcp').map((e) => e.jeu),
       hook_events: Boolean(c.hookEvents),
       controle: { apiKeySource: flux.init.apiKeySource, usage: sommeUsage(flux.result.usage), num_turns: flux.result.num_turns },
+      ...(opts.lot === LOT_E4 ? { modele: modelesLus(flux, c.modele || MODELE) } : {}),
       ...normaliserCombinaison(flux, { racines, nomMemoire, plan, plateforme: ctx.plateforme, o200k: o200kDuPlan(plan) }),
     };
     return { entree, flux };
   };
 
   const bases = {};
-  for (const b of BASES) {
+  for (const b of basesLot) {
     const { entree, flux } = await mesurer(b);
     bases[b.cle] = { debut: entree };
     if (b.cle === 'vide') {
@@ -1633,9 +1701,11 @@ async function commandeContext(args) {
     const base = bases[c.outils === '' ? 'vide' : 'avec_skill'];
     entree.delta_base = base ? entree.total - base.debut.total : null;
     resultats.push(entree);
-    console.log(`[sonde-claude] ${c.id} : total ${entree.total} (${entree.delta_base >= 0 ? '+' : ''}${entree.delta_base}), ${entree.memory_files.length} mémoire(s), ${entree.skills.length} skill(s) de fixture, ${entree.fixtures_absentes.length} absente(s).`);
+    const ecart = entree.delta_base === null ? 'sans base de même jeu d\'outils' : `${entree.delta_base >= 0 ? '+' : ''}${entree.delta_base}`;
+    const modeleLu = entree.modele ? `, modèle ${entree.modele.demande} (init : ${entree.modele.init}, context_usage : ${entree.modele.context})` : '';
+    console.log(`[sonde-claude] ${c.id} : total ${entree.total} (${ecart}), ${entree.memory_files.length} mémoire(s), ${entree.skills.length} skill(s) de fixture, ${entree.fixtures_absentes.length} absente(s)${modeleLu}.`);
   }
-  for (const b of BASES) {
+  for (const b of basesLot) {
     const { entree } = await mesurer(b);
     bases[b.cle].fin = entree;
     const ecarts = comparerBases(bases[b.cle].debut, entree);
@@ -1674,7 +1744,7 @@ async function commandeContext(args) {
   };
   const poste = commun.lirePoste();
   const interdits = [...new Set([...avant.sensibles, ...apres.sensibles, ctx.espace, ctx.configDir, ctx.exe, nomMemoire, process.env.LOCALAPPDATA].filter(Boolean))];
-  const fichier = ecrireRapport(rapport, { destination: opts.resultats ? 'resultats' : 'brut', nom: `context-${stamp}.json`, poste, interdits });
+  const fichier = ecrireRapport(rapport, { destination: opts.resultats ? 'resultats' : 'brut', nom: `${prefixeRapport(opts.lot)}-${stamp}.json`, poste, interdits });
   console.log(`[sonde-claude] Rapport normalisé : ${path.relative(RACINE_DEPOT, fichier).replace(/\\/g, '/')}`);
   console.log(`[sonde-claude] /context utilisés : ${numero} dans cette série, ${compteur.utilises} sur ${compteur.plafond} pour le lot.`);
   if (raisonsRejet.length > 0) {
@@ -2141,7 +2211,9 @@ async function principal(argv) {
 }
 
 module.exports = {
-  LOTS_CONTEXT, PROMPTS, ABONNEMENTS, BASES, COMBINAISONS, FICHIER_ARRET, FICHIER_COMPTEUR, FICHIER_JOURNAL,
+  LOTS_CONTEXT, PROMPTS, ABONNEMENTS, BASES, COMBINAISONS, FICHIER_ARRET,
+  MODELE, MODELES_CONTEXT, LOT_E4, VERSIONS_EXIGEES, BASES_E4, COMBINAISONS_E4, combinaisonsDuLot, basesDuLot, prefixeRapport,
+  modelesLus, verifierVersionDuLot, FICHIER_COMPTEUR, FICHIER_JOURNAL,
   Refus, RefusArgv, Arret, SerieRejetee,
   LISTE_BLANCHE, VARIABLES_POSEES, nomPermis,
   estSousOuEgal, estSousStrict, cheminsParDefaut, resoudreExe, environnementNettoye, problemesEnvironnement,

@@ -36,6 +36,7 @@ Toutes les commandes se lancent depuis la racine du dépôt, dans un **terminal 
 | `npm run sonde:claude-context -- --lot E3 --preparer-h14` | H14 : 4 bases, déploiement unique du jeu complet, `/context` de référence par le `claude` du poste et par la copie embarquée dans l'extension, puis les gestes à faire dans VS Code | Nul ; 6 `/context` du lot E3 |
 | `npm run sonde:claude-context -- --verifier-h14` | H14 : lit la transcription du panneau sans en afficher le texte (une seule nouvelle session), version, outils, canaris, profil | Nul ; aucun `/context` |
 | `npm run sonde:claude-context -- --lot E3 --cloturer-h14` | H14 : transcription déplacée dans `brut/`, retrait, 4 bases de fin comparées copie par copie, rapport `brut/h14-….json` | Nul ; 4 `/context` du lot E3 |
+| `npm run sonde:claude-context -- --lot E4 --resultats` | Les vérifications gratuites (lot E4) : la base vide au début et à la fin, puis le calibrage sous `claude-opus-5` et sous `claude-opus-5-5`, et la vérification de D-6, soit 5 `/context` ; Claude Code 2.1.319 exigé ; rapport `resultats/e4-….json` | Nul ; 5 `/context` du lot E4 |
 | `node test/scenarios/scripts/sonde-claude-code.js retirer` | Retire un déploiement laissé en place (interruption, ou H14) | Nul |
 | `npm run sonde:claude-baseline -- --depuis context-AAAA-MM-JJ-HHMM.json` | Écrit `attendu/baseline-<date>.json` d'après un rapport « context » **valide** de `resultats/` (entrées « context » seulement), après la garde ; refuse d'écraser une baseline existante | Nul (aucun lancement de `claude`) |
 | `npm run sonde:claude-baseline -- --depuis context-….json --payant payant-….json,payant-….json,…` | Écrit `attendu/baseline-<date>.json` d'après un rapport « context » et les rapports « payant » d'un même lot (entrées « context », « usage » et « canari », et une section de décomposition non comparée), après la garde ; refuse d'écraser une baseline existante (voir « Construire une baseline à partir de plusieurs rapports ») | Nul (aucun lancement de `claude`) |
@@ -157,6 +158,17 @@ L'essai se fait en trois commandes sous le lot E3 (plafond de 12 `/context`, 10 
 - un seul appel au modèle : l'invite `h14-panneau` de `SONDE.md`, jamais relancée ; un appel d'outil rend le relevé des canaris invalide, et le `/context` du panneau reste le résultat ;
 - la vérification exige exactement une nouvelle transcription (les `/context -p` n'en laissent pas : `--no-session-persistence`) ; elle compare les canaris aux attendus déduits de l'appel 4a de la baseline, marqués « deduit », et met l'écart de version en tête ;
 - la transcription est déplacée dans `brut/` (ignoré par Git et refusé par le hook `pre-commit`), jamais affichée ; `retirer` le fait aussi en secours.
+
+### 4. Les vérifications gratuites (lot E4)
+
+Le lot E4 (décision du 2026-11-11) regroupe les vérifications gratuites d'avant la correction de l'extension, sous un plafond de 10 `/context`, sans aucun appel au modèle :
+
+- ses combinaisons lui sont réservées (`cout-calibrage`, `cout-calibrage-o55` et `doublons-d6`), et elles sont refusées sous les autres lots ; `--combinaisons` en choisit une partie ;
+- seule la base vide est mesurée, au début et à la fin : une série coûte 5 `/context`, et une relance complète tient sous le plafond ;
+- `/context` peut compter sous `claude-opus-5` ou sous `claude-opus-5-5`, jamais sous un autre modèle ; un appel au modèle reste toujours sous `claude-opus-5`. Le rapport donne, pour chaque combinaison, le modèle demandé, celui de l'initialisation (`init.model`) et celui de `context_usage` ;
+- le lanceur refuse de partir si `claude --version` n'est pas 2.1.319, la version des baselines : seul `--version` est alors lancé, et aucun `/context` n'est consommé ;
+- à la première exécution, le compteur du lot E3 est archivé sous `brut/compteur-context-E3.json`, et E3 ne peut plus être rouvert ;
+- le rapport s'appelle `e4-AAAA-MM-JJ-HHMM.json` : le comparateur et la commande de baseline l'ignorent.
 
 ## Le coût
 

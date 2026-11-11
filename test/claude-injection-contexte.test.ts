@@ -16,7 +16,7 @@ const SERVEUR = path.join(SUITE, 'mcp', 'serveur-fixture.js');
 /** Les documents de la suite (lot I3), soumis à la garde de confidentialité du test 11. */
 const DOCUMENTS = ['README.md', 'SONDE.md', 'SCENARIOS-CLAUDE-CODE.md'];
 /** Les rapports normalisés (context ou payant) et les baselines permis dans resultats/ et attendu/. */
-const RAPPORT_PERMIS = /^resultats\/(context|payant)-\d{4}-\d{2}-\d{2}-\d{4}\.json$/;
+const RAPPORT_PERMIS = /^resultats\/(context|payant|e4)-\d{4}-\d{2}-\d{2}-\d{4}\.json$/;
 const BASELINE_PERMISE = /^attendu\/baseline-\d{4}-\d{2}-\d{2}\.json$/;
 
 /**
@@ -232,7 +232,7 @@ describe('Suite de Tests : Injection de contexte Claude Code (fixtures inertes, 
     const parasites = listFiles(SUITE).filter((rel) => !rel.startsWith('brut/') && !permis.has(rel) && !rapportOuBaseline(rel));
     assert.deepStrictEqual(parasites, []);
     for (const [motif, exemples, refuses] of [
-      [RAPPORT_PERMIS, ['resultats/context-2026-11-05-0930.json', 'resultats/payant-2026-11-05-1012.json'], ['resultats/brouillon.json', 'resultats/context-2026-11-05.json', 'resultats/payant-2026-11-05-1012.jsonl']],
+      [RAPPORT_PERMIS, ['resultats/context-2026-11-05-0930.json', 'resultats/payant-2026-11-05-1012.json', 'resultats/e4-2026-11-11-1000.json'], ['resultats/brouillon.json', 'resultats/context-2026-11-05.json', 'resultats/payant-2026-11-05-1012.jsonl', 'resultats/e5-2026-11-11-1000.json']],
       [BASELINE_PERMISE, ['attendu/baseline-2026-11-05.json'], ['attendu/baseline.json', 'attendu/baseline-2026-11-05-v2.json']],
     ] as [RegExp, string[], string[]][]) {
       for (const e of exemples) assert.ok(motif.test(e), e);

@@ -141,7 +141,7 @@ describe('Suite de Tests : Partie payante de la sonde Claude Code (lot I3, sans 
       assert.throws(() => P.ouvrirLot(brut, 'modele', 'E2'), /existe déjà/);
       assert.strictEqual(fs.readFileSync(path.join(brut, 'compteur-modele-E1.json'), 'utf8'), 'archive');
       // La commande context exige --lot ; les modes H14 qui lancent /context exigent --lot E3
-      assert.throws(() => S.lireOptions([]), /--lot <E1\|E2\|V1\|E3> est obligatoire/);
+      assert.throws(() => S.lireOptions([]), /--lot <E1\|E2\|V1\|E3\|E4> est obligatoire/);
       assert.throws(() => S.lireOptions(['--lot', 'I2']), S.Refus);
       assert.strictEqual(S.lireOptions(['--lot', 'E1']).lot, 'E1');
       assert.throws(() => S.lireOptions(['--preparer-h14', '--lot', 'E1']), /--preparer-h14/);
@@ -160,10 +160,10 @@ describe('Suite de Tests : Partie payante de la sonde Claude Code (lot I3, sans 
     const erreurs = console.error;
     try {
       // Accepté par --lot, plafond de 60 (relevé de 30 le 2026-11-10), aucun compteur du modèle
-      assert.deepStrictEqual(S.LOTS_CONTEXT, ['E1', 'E2', 'V1', 'E3']);
+      assert.deepStrictEqual(S.LOTS_CONTEXT, ['E1', 'E2', 'V1', 'E3', 'E4']);
       assert.strictEqual(S.lireOptions(['--lot', 'V1', '--resultats']).lot, 'V1');
       assert.strictEqual(P.COMPTEURS.context.plafonds.V1, 60);
-      assert.deepStrictEqual(P.LOTS_CONTEXT_SEUL, ['V1', 'E3']);
+      assert.deepStrictEqual(P.LOTS_CONTEXT_SEUL, ['V1', 'E3', 'E4']);
       assert.ok(!Object.prototype.hasOwnProperty.call(P.COMPTEURS.modele.plafonds, 'V1'));
 
       // Le compteur E1 (52 sur 60, relevé) est archivé à l'ouverture de V1, annoncé, sans remise à zéro
