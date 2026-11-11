@@ -2268,6 +2268,13 @@
         'Le frontmatter de cette règle ne semble pas être du YAML valide : Claude Code la charge alors à chaque session, comme si elle n\'avait pas de paths (documentation ; mesuré sur une fixture). Ses paths sont ignorés et elle est comptée comme permanente.\n' +
         'Critère de l\'extension, déduit de deux mesures : une tabulation dans l\'indentation, ou une ligne de premier niveau qui n\'est ni « clé: valeur », ni « - élément », ni un commentaire.');
     }
+    // Claude Code : description et when_to_use réunis, coupés à 1 536 caractères dans la liste des skills
+    const originalLength = item.targetTool === 'claude-code' && item.metadata && item.metadata.claudeDescriptionOriginalLength;
+    if (originalLength) {
+      addBadge('pill-warn-amber', '✂️ Description coupée',
+        `Claude Code coupe la description et when_to_use réunis à 1 536 caractères dans la liste des skills (documentation ; la fin d'une description longue n'est pas vue : testé).\n` +
+        `Longueur d'origine : ${Number(originalLength).toLocaleString('fr-FR')} caractères ; seuls les 1 536 premiers sont comptés.`);
+    }
     const unmatchable = (item.targetTool === 'claude-code' && item.metadata && item.metadata.claudeUnmatchablePatterns) || [];
     if (unmatchable.length > 0) {
       addBadge('pill-warn-amber', '⚠️ Ne correspond à rien',

@@ -66,6 +66,8 @@ export interface ResourceItem {
     claudeYamlInvalid?: boolean;
     /** Règle Claude Code : motifs de `paths` avec un `[` sans `]` qui le suive, qui ne correspondent à rien. */
     claudeUnmatchablePatterns?: string[];
+    /** Skill Claude Code : longueur de `description` et `when_to_use` réunis, quand elle dépasse 1 536 caractères et que la ligne est coupée. */
+    claudeDescriptionOriginalLength?: number;
     /** Règle Antigravity écartée par l'agent (frontmatter absent ou trigger non reconnu). */
     ignoredByAgent?: boolean;
     /** Défauts de frontmatter d'une règle Antigravity (voir AntigravityRuleIssue). */

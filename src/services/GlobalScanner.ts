@@ -12,6 +12,7 @@ import {
 import { countTokens, countTokensForFile } from '../utils/tokenizer';
 import { claudeInjectedText, CLAUDE_INJECTED_TEXT_VARIANT } from '../claude/injectedText';
 import { claudeRuleStatus } from '../claude/ruleFrontmatter';
+import { claudeSkillListing, CLAUDE_SKILL_LINE_VARIANT } from '../claude/skillListing';
 import { measureAntigravitySoul } from '../utils/antigravityRules';
 import { appliesInAntigravity, buildAntigravityRuleItem, countsAtBoot, hasResourceWarning, soulSizeAdvice } from './antigravityRuleItem';
 import { listFlatRuleFiles } from './antigravityRuleSources';
@@ -234,12 +235,14 @@ export class GlobalScanner {
           let name = entry.name;
           let tags: string[] = [];
           let rawContent = '';
+          let skillMetadata: Record<string, any> = {};
           let fileStat: fs.Stats | null = null;
 
           try {
             fileStat = await fs.promises.stat(activeFile);
             rawContent = await fs.promises.readFile(activeFile, 'utf8');
             const { metadata } = extractFrontmatter(rawContent);
+            skillMetadata = metadata;
             if (metadata.name && typeof metadata.name === 'string') {
               name = metadata.name;
             }
@@ -257,9 +260,11 @@ export class GlobalScanner {
           const isWarningLines = lineCount > 500;
           const isWarningNoDesc = !description || description.trim().length === 0;
 
-          const discoverySignature = `name: ${name}\ndescription: ${description}\npath: ${activeFile}\n`;
-          const charCount = discoverySignature.length;
-          const tokenCount = countTokensForFile(activeFile, fileStat?.size, fileStat?.mtimeMs, discoverySignature);
+          // Ligne de la liste des skills de Claude Code : « - <nom>: <texte> », sans chemin, texte coupé
+          // à 1 536 caractères (src/claude/skillListing.ts)
+          const listing = claudeSkillListing(skillMetadata, entry.name);
+          const charCount = listing.line.length;
+          const tokenCount = countTokensForFile(activeFile, fileStat?.size, fileStat?.mtimeMs, listing.line, CLAUDE_SKILL_LINE_VARIANT);
 
           if (isEnabled) {
             skillsCharTotal += charCount;
@@ -283,6 +288,7 @@ export class GlobalScanner {
               hasDisabledSuffix: hasDisabledFile,
               warningLinesExceeded: isWarningLines,
               warningNoDescription: isWarningNoDesc,
+              ...(listing.truncated ? { claudeDescriptionOriginalLength: listing.originalLength } : {}),
             },
           });
         }

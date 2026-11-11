@@ -8,6 +8,7 @@ import {
 import { countTokens, countTokensForFile } from '../utils/tokenizer';
 import { claudeInjectedText, CLAUDE_INJECTED_TEXT_VARIANT } from '../claude/injectedText';
 import { claudeRuleStatus } from '../claude/ruleFrontmatter';
+import { claudeSkillListing, CLAUDE_SKILL_LINE_VARIANT } from '../claude/skillListing';
 import { measureAntigravitySoul } from '../utils/antigravityRules';
 import { ScenarioManager } from './ScenarioManager';
 import { appliesInAntigravity, buildAntigravityRuleItem, countsAtBoot, hasResourceWarning, soulSizeAdvice } from './antigravityRuleItem';
@@ -325,11 +326,13 @@ export class LocalScanner {
               let description = '';
               let name = entry.name;
               let rawSkillContent = '';
+              let skillMetadata: Record<string, any> = {};
               let sStat: fs.Stats | null = null;
               try {
                 sStat = await fs.promises.stat(activeFile);
                 rawSkillContent = await fs.promises.readFile(activeFile, 'utf8');
                 const { metadata } = extractFrontmatter(rawSkillContent);
+                skillMetadata = metadata;
                 if (metadata.name && typeof metadata.name === 'string') name = metadata.name;
                 if (metadata.description && typeof metadata.description === 'string') description = metadata.description;
               } catch {
@@ -340,9 +343,11 @@ export class LocalScanner {
               const isWarningLines = lineCount > 500;
               const isWarningNoDesc = !description || description.trim().length === 0;
 
-              const discoverySignature = `name: ${name}\ndescription: ${description}\npath: ${activeFile}\n`;
-              const charCount = discoverySignature.length;
-              const tokenCount = countTokensForFile(activeFile, sStat?.size, sStat?.mtimeMs, discoverySignature);
+              // Ligne de la liste des skills de Claude Code : « - <nom>: <texte> », sans chemin, texte coupé
+              // à 1 536 caractères (src/claude/skillListing.ts)
+              const listing = claudeSkillListing(skillMetadata, entry.name);
+              const charCount = listing.line.length;
+              const tokenCount = countTokensForFile(activeFile, sStat?.size, sStat?.mtimeMs, listing.line, CLAUDE_SKILL_LINE_VARIANT);
 
               if (isEnabled) {
                 skillsCharTotal += charCount;
@@ -365,6 +370,7 @@ export class LocalScanner {
                   hasDisabledSuffix: isDisabled,
                   warningLinesExceeded: isWarningLines,
                   warningNoDescription: isWarningNoDesc,
+                  ...(listing.truncated ? { claudeDescriptionOriginalLength: listing.originalLength } : {}),
                 },
               });
             }
