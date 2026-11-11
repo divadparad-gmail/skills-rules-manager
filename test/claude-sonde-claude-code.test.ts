@@ -219,6 +219,40 @@ describe('Suite de Tests : Lanceur de la sonde Claude Code (lot I2, sans lancer 
     assert.match(S.problemesEspace(ESPACE_W, contenu({ [ESPACE_W]: ['projet'], [`${ESPACE_W}\\projet`]: ['x'] })).join(), /pas vide/);
   });
 
+  test('5b. Préconditions du profil isolé : settings.json et settings.local.json refusés à sa racine, jamais ouverts (point 25)', () => {
+    const vus: string[] = [];
+    const existe = (liste: string[]) => (f: string) => {
+      vus.push(f);
+      return liste.includes(f);
+    };
+    assert.deepStrictEqual(S.REGLAGES_PROFIL_INTERDITS, ['settings.json', 'settings.local.json']);
+    assert.deepStrictEqual(S.problemesProfil(CONFIG_W, { plateforme: 'win32', existe: existe([]) }), []);
+    assert.deepStrictEqual(vus, [`${CONFIG_W}\\settings.json`, `${CONFIG_W}\\settings.local.json`], 'seule la présence est contrôlée, à la racine');
+    for (const nom of ['settings.json', 'settings.local.json']) {
+      const pb = S.problemesProfil(CONFIG_W, { plateforme: 'win32', existe: existe([`${CONFIG_W}\\${nom}`]) });
+      assert.strictEqual(pb.length, 1, nom);
+      assert.match(pb[0], new RegExp(`^${nom.replace(/\./g, '\\.')} présent à la racine du profil isolé`));
+      assert.ok(!pb[0].includes(CONFIG_W), 'le message ne contient pas le chemin du profil');
+    }
+    assert.strictEqual(S.problemesProfil(CONFIG_W, { plateforme: 'win32', existe: existe([`${CONFIG_W}\\settings.json`, `${CONFIG_W}\\settings.local.json`]) }).length, 2);
+    // Un réglage ailleurs que la racine (par exemple dans projects/) n'est pas visé
+    assert.deepStrictEqual(S.problemesProfil(CONFIG_W, { plateforme: 'win32', existe: existe([`${CONFIG_W}\\projects\\settings.json`]) }), []);
+    assert.deepStrictEqual(S.problemesProfil('/home/exemple/profil', { plateforme: 'linux', existe: existe(['/home/exemple/profil/settings.local.json']) }).length, 1);
+
+    // Le contrôle est appelé avant toute série (etat, context, payant, préparation de H14), pas à la vérification ni à la clôture de H14
+    const source = fs.readFileSync(FICHIER_LANCEUR, 'utf8');
+    const corps = (nom: string) => {
+      const debut = source.indexOf(`async function ${nom}(`);
+      assert.ok(debut >= 0, nom);
+      const fin = source.indexOf('\nasync function ', debut + 1);
+      return source.slice(debut, fin < 0 ? undefined : fin);
+    };
+    assert.match(source, /const pbProfil = problemesProfil\(configDir/);
+    assert.match(corps('commandeEtat'), /\.\.\.ctx\.pbProfil/);
+    for (const nom of ['commandeContext', 'commandePayant', 'commandePreparerH14']) assert.match(corps(nom), /if \(ctx\.pbProfil\.length > 0\) throw new Refus/, nom);
+    for (const nom of ['commandeVerifierH14', 'commandeCloturerH14']) assert.doesNotMatch(corps(nom), /pbProfil/, nom);
+  });
+
   test('6. État d\'authentification : claude.ai, firstParty, abonnement et profil isolé ; valeurs sensibles extraites', () => {
     const ok = {
       loggedIn: true, authMethod: 'claude.ai', apiProvider: 'firstParty', subscriptionType: 'team',

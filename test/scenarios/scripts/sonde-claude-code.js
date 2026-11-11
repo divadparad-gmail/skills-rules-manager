@@ -45,6 +45,7 @@
  *     CLAUDE_CONFIG_DIR et DISABLE_AUTOUPDATER=1 sont posées ; tout autre nom est refusé avant chaque
  *     lancement ;
  *   - profil connecté par claude.ai, sur un abonnement, avec le bon configDirectory, avant chaque série ;
+ *   - aucun settings.json ni settings.local.json à la racine du profil isolé avant une série (point 25) ;
  *   - profil isolé comparé au début et à la fin de chaque série : un écart dans les zones où la sonde
  *     écrit (commun.zonesSonde, dérivées de l'inventaire) rejette la série ; ailleurs, les changements
  *     de Claude Code sont comptés par premier segment, sans rejet (décision du 2026-11-10) ;
@@ -294,6 +295,23 @@ function problemesEspace(espace, { home, depot, configDir, plateforme = process.
     if (contenu.length > 0 && !seulProjetVide) out.push(`l'espace n'est pas vide (${contenu.length} élément(s)) : déploiement interrompu ? lancer « retirer »`);
   }
   return out;
+}
+
+/**
+ * Les réglages refusés à la racine du profil isolé (point 25, décision du 2026-11-11) : le panneau VS Code
+ * en a créé un au lot E3, qui ajoutait une source « User settings » absente des baselines.
+ */
+const REGLAGES_PROFIL_INTERDITS = ['settings.json', 'settings.local.json'];
+
+/**
+ * Préconditions du profil isolé : aucun fichier de réglages à sa racine. Contrôlé par « etat » et avant
+ * toute série (context, payant, préparation de H14), jamais pendant la vérification ni la clôture de H14,
+ * où le panneau peut justement en créer un. Le fichier n'est jamais ouvert : seule sa présence compte.
+ */
+function problemesProfil(configDir, { plateforme = process.platform, existe = fs.existsSync } = {}) {
+  const p = mod(plateforme);
+  return REGLAGES_PROFIL_INTERDITS.filter((nom) => existe(p.join(configDir, nom)))
+    .map((nom) => `${nom} présent à la racine du profil isolé : le déplacer dans brut/ avant toute série (point 25)`);
 }
 
 /** Contrôle de « claude auth status --json » ; `sensibles` reste en mémoire pour la liste noire. */
@@ -1031,7 +1049,8 @@ function preparer({ aSec = false } = {}) {
   if (pbEnv.length > 0) throw new Refus(pbEnv.join(' ; '));
   if (!aSec && !fs.existsSync(configDir)) throw new Refus("le profil isolé n'existe pas : le connecter d'abord (README de la suite)");
   const pbEspace = problemesEspace(espace, { home: os.homedir(), depot: RACINE_DEPOT, configDir, plateforme });
-  return { plateforme, configDir, espace, projet: path.join(espace, 'projet'), exe, env, pbEspace, journal: path.join(BRUT, FICHIER_JOURNAL) };
+  const pbProfil = problemesProfil(configDir, { plateforme });
+  return { plateforme, configDir, espace, projet: path.join(espace, 'projet'), exe, env, pbEspace, pbProfil, journal: path.join(BRUT, FICHIER_JOURNAL) };
 }
 
 /** Version et état de connexion, contrôlés ; renvoie aussi les valeurs sensibles (mémoire seulement). */
@@ -1066,7 +1085,7 @@ async function commandeEtat() {
   console.log(`[sonde-claude] configDirectory : ${etat.problemes.some((p) => p.startsWith('configDirectory')) ? 'NON CONFORME' : 'le profil isolé'}`);
   for (const type of ['context', 'modele']) console.log(`[sonde-claude] compteur ${type} : ${resumeCompteur(BRUT, type)}`);
   console.log(`[sonde-claude] journal de déploiement en attente : ${fs.existsSync(ctx.journal) ? 'oui' : 'non'}`);
-  const problemes = [...etat.problemes, ...ctx.pbEspace];
+  const problemes = [...etat.problemes, ...ctx.pbEspace, ...ctx.pbProfil];
   if (problemes.length > 0) {
     console.error(`[sonde-claude] Préconditions non remplies :\n  - ${problemes.map(masquer).join('\n  - ')}`);
     return 2;
@@ -1247,6 +1266,7 @@ async function commandePreparerH14() {
   const ctx = preparer();
   verifierArret(BRUT);
   if (ctx.pbEspace.length > 0) throw new Refus(ctx.pbEspace.join(' ; '));
+  if (ctx.pbProfil.length > 0) throw new Refus(ctx.pbProfil.join(' ; '));
   if (fs.existsSync(ctx.journal)) throw new Refus('un journal de déploiement existe : lancer « retirer »');
   if (lireEtatH14()) throw new Refus(`un essai H14 est en cours (brut/${h14.FICHIER_ETAT}) : le clore par --lot E3 --cloturer-h14`);
   const home = os.homedir();
@@ -1518,6 +1538,7 @@ async function commandeContext(args) {
   const ctx = preparer();
   verifierArret(BRUT);
   if (ctx.pbEspace.length > 0) throw new Refus(ctx.pbEspace.join(' ; '));
+  if (ctx.pbProfil.length > 0) throw new Refus(ctx.pbProfil.join(' ; '));
   if (fs.existsSync(ctx.journal)) throw new Refus('un journal de déploiement existe : lancer « retirer »');
   ouvrirLotAnnonce(BRUT, 'context', opts.lot);
   const prevus = BASES.length * 2 + combinaisons.length;
@@ -1851,6 +1872,7 @@ async function commandePayant(args) {
   const ctx = preparer();
   verifierArret(BRUT);
   if (ctx.pbEspace.length > 0) throw new Refus(ctx.pbEspace.join(' ; '));
+  if (ctx.pbProfil.length > 0) throw new Refus(ctx.pbProfil.join(' ; '));
   if (fs.existsSync(ctx.journal)) throw new Refus('un journal de déploiement existe : lancer « retirer »');
   const lot = payant.LOT_PAYANT;
   payant.verifierBudget(BRUT, 'modele', lot, compte.modele, opts.plafond);
@@ -2123,7 +2145,7 @@ module.exports = {
   Refus, RefusArgv, Arret, SerieRejetee,
   LISTE_BLANCHE, VARIABLES_POSEES, nomPermis,
   estSousOuEgal, estSousStrict, cheminsParDefaut, resoudreExe, environnementNettoye, problemesEnvironnement,
-  problemesEspace, problemesAuth, verifierPrompt, argumentsContext, argumentsAppel, verifierArgv, lireFlux, sommeUsage,
+  problemesEspace, REGLAGES_PROFIL_INTERDITS, problemesProfil, problemesAuth, verifierPrompt, argumentsContext, argumentsAppel, verifierArgv, lireFlux, sommeUsage,
   controlerAppel, verifierArret, ecrireArret, lireCompteur, verifierBudget, reserverContext, ouvrirLotAnnonce,
   racinesNormalisation, reecrireChemin, fixturesAttendues, o200kDuPlan, normaliserCombinaison, comparerBases,
   listerProfil, ecartsProfil, resumeProfil, lignesProfil, listerFixtures, fichiersADeployer, deployer, retirer, lancerClaude, ecrireRapport,

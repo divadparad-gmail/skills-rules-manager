@@ -56,6 +56,7 @@ Le lanceur les vérifie et refuse de partir si l'une manque.
 2. **L'espace isolé** est hors du dossier personnel, du dépôt et du profil, et aucun `CLAUDE.md`, `CLAUDE.local.md`, `AGENTS.md` ni `.claude` ne se trouve dans ses dossiers parents. Il est vide au départ.
 3. **Aucun journal de déploiement n'est en attente**, et le fichier `brut/ARRET.txt` est absent.
 4. **L'environnement du processus enfant est nettoyé** : toutes les variables `CLAUDE*` et `ANTHROPIC*` sont retirées, puis seules `CLAUDE_CONFIG_DIR` (le profil isolé) et `DISABLE_AUTOUPDATER=1` sont posées.
+5. **Aucun `settings.json` ni `settings.local.json` à la racine du profil isolé** (décision du 2026-11-11). Ces fichiers ajouteraient une source « User settings » que les baselines n'ont pas : le panneau VS Code en a créé un au lot E3. `sonde:claude-etat` le signale, et une série « context », la partie payante ou la préparation de H14 refuse de partir. Le fichier n'est jamais ouvert ; il faut le déplacer à la main dans `brut/`. Le contrôle n'est pas fait pendant la vérification ni la clôture de H14, puisque le panneau peut justement en créer un pendant l'essai.
 
 Les chemins par défaut sont calculés : le profil est `%LOCALAPPDATA%\canari-claude-code\config`, l'espace `<lecteur système>\canari-claude-code\espace`, et l'exécutable est cherché dans le `PATH` (jamais un `.cmd`). Les variables `CANARI_CLAUDE_CONFIG_DIR`, `CANARI_CLAUDE_ESPACE` et `CANARI_CLAUDE_EXE` les remplacent.
 
