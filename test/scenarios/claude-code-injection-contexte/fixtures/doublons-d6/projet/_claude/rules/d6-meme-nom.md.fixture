@@ -1,0 +1,3 @@
+# Règle de même nom, version du projet
+
+Cette règle du projet porte le même nom qu'une règle globale, mais son contenu est différent et nettement plus long. Si les deux règles sont chargées ensemble, chacune garde sa propre ligne dans le contexte, avec un nombre de tokens différent.

@@ -1,0 +1,8 @@
+## 💡 Pourquoi Skills & Rules Manager ?
+
+Lorsqu'on orchestre des agents IA modernes (Google Antigravity, Claude Code), l'accumulation de règles globales, de prompts et de dizaines de compétences entraîne une **saturation de la fenêtre de contexte** (Tier-1 Discovery) dès le premier message.
+
+**Skills & Rules Manager** résout ce défi en offrant :
+- 📉 **Jauge de tokens dynamique** : visualisez en temps réel l'empreinte mémoire injectée au boot et désactivez les workflows non pertinents en 1 clic.
+- 🏛️ **Vue comparative en 3 colonnes** : cartographiez et synchronisez instantanément vos briques entre le Catalogue NAS maître, votre machine globale et votre projet local.
+- 🛡️ **Coach IA Proactif & Résilience NAS** : alertes automatiques sur les règles trop verbeuses (> 200 lignes), les compétences surchargées (> 500 lignes), et tolérance aux pannes réseau SMB.

@@ -24,6 +24,71 @@
       ]
     },
     {
+      "chemin": "cout-calibrage/projet/CLAUDE.md.fixture",
+      "sha256": "f62c116796afa1a5abdc4c39774c3c03b8f010237f2964bf90a254d6fda31859",
+      "canaris": []
+    },
+    {
+      "chemin": "cout-calibrage/projet/cal-code-js-x2.md.fixture",
+      "sha256": "e70406734dc7d7f0869a561ac457a19a6774fe1178e5e37402c105ff07d2e1be",
+      "canaris": []
+    },
+    {
+      "chemin": "cout-calibrage/projet/cal-code-js.md.fixture",
+      "sha256": "34282c823694bfb7bfd8db4bb4b6a5c4e59a91b63a2159b785f8e09d4e3574de",
+      "canaris": []
+    },
+    {
+      "chemin": "cout-calibrage/projet/cal-en-mit-x2.md.fixture",
+      "sha256": "a3b975661e6870f961bc9a0556aec7c68c9f3ee74e66b283eb37a617c030dd89",
+      "canaris": []
+    },
+    {
+      "chemin": "cout-calibrage/projet/cal-en-mit.md.fixture",
+      "sha256": "f9c4c77baa3828004ee54b8a4f2db2e88ed44a6237a493965bf551fac0fcb62d",
+      "canaris": []
+    },
+    {
+      "chemin": "cout-calibrage/projet/cal-fr-original-x2.md.fixture",
+      "sha256": "b326f5fbc6c7f5e45e8ffaf06e655e5bdd27ebe6e29181b68fbc901cef52ac37",
+      "canaris": []
+    },
+    {
+      "chemin": "cout-calibrage/projet/cal-fr-original.md.fixture",
+      "sha256": "1529d8536d77b88eddfcf9a37d9f426ddb6afb0beed3a420791f9aa860ab9790",
+      "canaris": []
+    },
+    {
+      "chemin": "cout-calibrage/projet/cal-fr-securite-x2.md.fixture",
+      "sha256": "03efb44bd0db4c5525894e896b2b43b88ad149b12bb014125360458fd817c101",
+      "canaris": []
+    },
+    {
+      "chemin": "cout-calibrage/projet/cal-fr-securite.md.fixture",
+      "sha256": "588780c7393db288b401ef3727e86a0ed21a9b0e047bd902cd511fed87d6627d",
+      "canaris": []
+    },
+    {
+      "chemin": "cout-calibrage/projet/cal-mixte-readme-x2.md.fixture",
+      "sha256": "1b40956a71f2b9821bdf0dc77ca8107c55c75f194e84501397f27d5d703b1fd4",
+      "canaris": []
+    },
+    {
+      "chemin": "cout-calibrage/projet/cal-mixte-readme.md.fixture",
+      "sha256": "ccb2708346ff7fb64089d464dd9dbb9f0b70f43ef233635dcc7b9168394262fd",
+      "canaris": []
+    },
+    {
+      "chemin": "cout-calibrage/projet/cal-mixte-regle-x2.md.fixture",
+      "sha256": "5362c72b09bca454723d9d3e66766548e6f6de6454bf21ba8152047cee30b76a",
+      "canaris": []
+    },
+    {
+      "chemin": "cout-calibrage/projet/cal-mixte-regle.md.fixture",
+      "sha256": "a17830bc3123248196315c5964fcac60d231122f09f244d46b34790f9c5a8213",
+      "canaris": []
+    },
+    {
       "chemin": "cout-f-global/global/CLAUDE.md.fixture",
       "sha256": "399e76edebcd4426fcd8af976ab2cdeda5c279bb608d1693a33cc2904d4074e1",
       "canaris": []
@@ -138,6 +203,41 @@
     {
       "chemin": "declencheurs/projet/src/a.ts.fixture",
       "sha256": "037ecd1db38c230c248787e60fd7bfc0cb0101b187b59535b6e7483be762d350",
+      "canaris": []
+    },
+    {
+      "chemin": "doublons-d6/global/rules/d6-meme-nom.md.fixture",
+      "sha256": "cce31f4bbd13a9e7e557528d7570642fdd030e91dc533c30eeeb9611f2d2a1a3",
+      "canaris": []
+    },
+    {
+      "chemin": "doublons-d6/parent/_claude/skills/canari-d6-homo/SKILL.md.fixture",
+      "sha256": "a5c0f25691a6905dd3bf250109608e1ffd50d7daa50d69966c7fba49814b75f4",
+      "canaris": []
+    },
+    {
+      "chemin": "doublons-d6/projet/CLAUDE.local.md.fixture",
+      "sha256": "1225dd455413b0307c00261ca1bb7c93f8f64b96c14de71fb52355eb5ec100d8",
+      "canaris": []
+    },
+    {
+      "chemin": "doublons-d6/projet/CLAUDE.md.fixture",
+      "sha256": "c2a0eebc8a781b5e78edd82bb26382c2201c17324e77ffaa87e69e196edc28db",
+      "canaris": []
+    },
+    {
+      "chemin": "doublons-d6/projet/_claude/rules/d6-meme-nom.md.fixture",
+      "sha256": "6127164ff791249fe265eee93a4d23ee74e9c963ef9ee9f40a1b26ffaa3870b2",
+      "canaris": []
+    },
+    {
+      "chemin": "doublons-d6/projet/_claude/skills/canari-d6-homo/SKILL.md.fixture",
+      "sha256": "00daa238d41de4e5ba0218587951068382811e2d7f921848a9a76e2e10510b9f",
+      "canaris": []
+    },
+    {
+      "chemin": "doublons-d6/projet/d6-commun.md.fixture",
+      "sha256": "8af01f143ce5e5936a84317b49e920ecad9ee682724ed8ca052578c3c5b4c4c4",
       "canaris": []
     },
     {

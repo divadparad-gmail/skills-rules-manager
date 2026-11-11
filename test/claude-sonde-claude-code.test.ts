@@ -824,7 +824,7 @@ describe('Suite de Tests : Lanceur de la sonde Claude Code (lot I2, sans lancer 
       const reel = C.lireInventaire(fs.readFileSync(path.join(suite, 'inventaire.json'), 'utf8'));
       const rels = S.listerFixtures(path.join(suite, 'fixtures'));
       assert.deepStrictEqual(rels, [...reel.keys()].sort());
-      for (const c of [...S.BASES, ...S.COMBINAISONS]) {
+      for (const c of [...S.BASES, ...S.COMBINAISONS, ...S.COMBINAISONS_E4]) {
         const p = c.jeux.length > 0 ? C.planDeploiement(rels, c.jeux, { configDir: config, espace, fixturesDir: path.join(suite, 'fixtures') }) : [];
         S.fichiersADeployer(p, { espace, inventaire: reel, jeux: c.jeux });
       }

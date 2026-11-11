@@ -170,6 +170,21 @@ Le lot E4 (décision du 2026-11-11) regroupe les vérifications gratuites d'avan
 - à la première exécution, le compteur du lot E3 est archivé sous `brut/compteur-context-E3.json`, et E3 ne peut plus être rouvert ;
 - le rapport s'appelle `e4-AAAA-MM-JJ-HHMM.json` : le comparateur et la commande de baseline l'ignorent.
 
+Les fixtures du lot E4 ne portent aucun canari :
+
+- **`cout-calibrage`** : un seul `CLAUDE.md` du projet importe, au même niveau, six textes, chacun seul (`cal-….md`) puis doublé (`cal-…-x2.md`, le texte suivi de lui-même). Le contenu d'un texte vaut ctx(doublé) − ctx(seul), sans dépendre de la constante d'en-tête. Le même `/context` donne la largeur des imports, et le `CLAUDE.md`, qui ne contient qu'un titre et douze lignes `@`, dit si la ligne `@chemin` reste dans le texte injecté. Chaque texte fait au moins 150 tokens o200k, et il ne contient ni `@`, ni canari, ni commentaire HTML, ni frontmatter, ni chemin local. Les textes :
+
+  | Fichier | Nature | Source |
+  |---|---|---|
+  | `cal-fr-original` | Prose française | Texte original écrit pour le calibrage |
+  | `cal-fr-securite` | Prose française, avec un tableau | `SECURITY.md` de ce dépôt, sans le lien vers le formulaire de signalement |
+  | `cal-en-mit` | Prose anglaise | `LICENSE` de ce dépôt (texte de la licence MIT), sans la ligne de copyright |
+  | `cal-code-js` | Code JavaScript | `esbuild.js` de ce dépôt, de la ligne 15 à la fin |
+  | `cal-mixte-regle` | Français et identifiants | `.claude/rules/projet-consignes.md` de ce dépôt |
+  | `cal-mixte-readme` | Français, emojis et Markdown | `README.md` de ce dépôt, lignes 22 à 30 |
+
+- **`doublons-d6`** (décision D-6) : deux règles `d6-meme-nom.md`, l'une globale et l'autre du projet, aux contenus de longueurs différentes ; deux skills `canari-d6-homo`, l'un dans le `.claude/skills/` du dossier parent et l'autre dans celui du projet, aux descriptions de longueurs très différentes ; un fichier `d6-commun.md` importé à la fois par le `CLAUDE.md` et par le `CLAUDE.local.md` du projet. Les longueurs différentes permettent de savoir, par les tokens, quelle copie `/context` liste.
+
 ## Le coût
 
 | Partie | Appels au modèle | `/context` | Plafond |

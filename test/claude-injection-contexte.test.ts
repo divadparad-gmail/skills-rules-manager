@@ -57,7 +57,14 @@ const JEUX: Record<string, { cibles: string[]; scenarios: string[] }> = {
   'cout-mcp-a1': { cibles: ['mcp'], scenarios: ['CC30', 'CC31'] },
   'cout-mcp-a2': { cibles: ['mcp'], scenarios: ['CC30'] },
   'cout-mcp-b1': { cibles: ['mcp'], scenarios: ['CC30'] },
+  // Lot E4 (2026-11-11) : calibrage du tokenizer par différence (T, puis T suivi de T), et doublons de D-6
+  'cout-calibrage': { cibles: ['projet'], scenarios: ['CC09', 'CC37'] },
+  'doublons-d6': { cibles: ['global', 'parent', 'projet'], scenarios: ['CC38', 'CC39', 'CC40'] },
 };
+/** Les six textes du calibrage (lot E4), chacun importé seul puis doublé (suffixe -x2). */
+const TEXTES_CALIBRAGE = ['cal-fr-original', 'cal-fr-securite', 'cal-en-mit', 'cal-code-js', 'cal-mixte-regle', 'cal-mixte-readme'];
+/** Le minimum de tokens o200k de chaque texte de calibrage (décision du 2026-11-11). */
+const O200K_MIN_CALIBRAGE = 150;
 const CIBLES = ['global', 'parent', 'projet', 'plugin', 'mcp'];
 /** Jeu complet des scénarios CC35 (enveloppes) et CC36 (panneau, sans le MCP). */
 const JEU_COMPLET = ['niveaux', 'skills', 'hook-sortie', 'mcp-canari'];
@@ -212,7 +219,7 @@ describe('Suite de Tests : Injection de contexte Claude Code (fixtures inertes, 
     const presents = listFiles(FIXTURES).sort();
     const attendus = INVENTAIRE.map(([rel]) => rel).sort();
     assert.deepStrictEqual(presents, attendus, 'fixtures/ doit contenir exactement les fichiers de INVENTAIRE');
-    assert.strictEqual(attendus.length, 58);
+    assert.strictEqual(attendus.length, 78);
     const ecarts = INVENTAIRE.filter(([rel, sha]) => sha256(lire(rel)) !== sha).map(([rel]) => `${rel} : empreinte observée ${sha256(lire(rel))}`);
     assert.deepStrictEqual(ecarts, [], 'Une fixture a changé : la baseline devient caduque. Mettre à jour INVENTAIRE seulement si le changement est voulu.');
   });
@@ -270,7 +277,7 @@ describe('Suite de Tests : Injection de contexte Claude Code (fixtures inertes, 
     assert.deepStrictEqual([...ciblesObservees.keys()].sort(), Object.keys(JEUX).sort());
     for (const [jeu, { cibles, scenarios }] of Object.entries(JEUX)) {
       assert.deepStrictEqual([...ciblesObservees.get(jeu)!].sort(), [...cibles].sort(), jeu);
-      assert.ok(scenarios.length > 0 && scenarios.every((s) => /^CC(0[1-9]|[12]\d|3[0-7])$/.test(s)), jeu);
+      assert.ok(scenarios.length > 0 && scenarios.every((s) => /^CC(0[1-9]|[123]\d|40)$/.test(s)), jeu);
     }
 
     // Conversion : les noms actifs n'apparaissent qu'après conversion, dans l'espace isolé
@@ -361,12 +368,37 @@ describe('Suite de Tests : Injection de contexte Claude Code (fixtures inertes, 
     const r = lire('cout-regle-court/projet/_claude/rules/r.md.fixture');
     assert.strictEqual(lire('cout-regle-long/projet/_claude/rules/regle-au-nom-volontairement-tres-long-pour-mesurer-le-cout-du-chemin.md.fixture'), r);
     assert.strictEqual(decouper(lire('cout-regle-paths/projet/_claude/rules/r-paths.md.fixture')).corps, r);
+
+    // Lot E4, calibrage : un seul CLAUDE.md importe les six textes, seuls puis doublés, au même niveau
+    const { o200k } = require(path.join(ROOT, 'test', 'scenarios', 'scripts', 'sonde-claude-code-payant.js')) as { o200k: (t: string) => number };
+    const imports = TEXTES_CALIBRAGE.flatMap((nom) => [`@${nom}.md`, `@${nom}-x2.md`]);
+    assert.strictEqual(lire('cout-calibrage/projet/CLAUDE.md.fixture'), `# Calibrage\n\n${imports.join('\n')}\n`);
+    const calibrage = INVENTAIRE.map(([rel]) => rel).filter((rel) => rel.startsWith('cout-calibrage/'));
+    assert.deepStrictEqual(calibrage.sort(), ['CLAUDE.md', ...imports.map((i) => i.slice(1))].map((n) => `cout-calibrage/projet/${n}.fixture`).sort());
+    for (const nom of TEXTES_CALIBRAGE) {
+      const t = lire(`cout-calibrage/projet/${nom}.md.fixture`);
+      assert.strictEqual(lire(`cout-calibrage/projet/${nom}-x2.md.fixture`), t + t, `${nom} : le texte doublé est T suivi de T`);
+      assert.ok(t.endsWith('\n') && !t.endsWith('\n\n'), `${nom} : une seule fin de ligne finale`);
+      // Aucun import, aucun canari, aucun commentaire ni frontmatter retiré par Claude Code, aucun chemin local
+      assert.ok(!t.includes('@') && !/CANARI-/i.test(t) && !t.includes('<!--') && !t.startsWith('---'), nom);
+      assert.ok(!/[A-Za-z]:[\\/]|\\\\|\/Users\/|\/home\//.test(t), `${nom} : chemin local`);
+      assert.ok(o200k(t) >= O200K_MIN_CALIBRAGE, `${nom} : ${o200k(t)} tokens o200k, ${O200K_MIN_CALIBRAGE} au moins`);
+    }
+
+    // Lot E4, D-6 : deux règles de même nom (globale et du projet) aux contenus différents ; un fichier importé par deux fichiers
+    const regleG = lire('doublons-d6/global/rules/d6-meme-nom.md.fixture');
+    const regleP = lire('doublons-d6/projet/_claude/rules/d6-meme-nom.md.fixture');
+    assert.ok(regleG !== regleP && o200k(regleP) > o200k(regleG) + 10, 'contenus différents, de longueurs distinctes');
+    for (const rel of ['doublons-d6/projet/CLAUDE.md.fixture', 'doublons-d6/projet/CLAUDE.local.md.fixture']) {
+      assert.deepStrictEqual(lire(rel).split('\n').filter((l) => l.includes('@')), ['@d6-commun.md'], rel);
+    }
+    assert.ok(!lire('doublons-d6/projet/d6-commun.md.fixture').includes('@'));
   });
 
   test('6. Skills et plugin : noms, disable-model-invocation, longueurs de description, contenus de mesure', () => {
     const canari = (code: string) => INVENTAIRE.flatMap(([, , c]) => c).find((c) => c.startsWith(`CANARI-CC-${code}-`))!;
     const skills = INVENTAIRE.map(([rel]) => rel).filter((rel) => rel.endsWith('/SKILL.md.fixture'));
-    assert.strictEqual(skills.length, 13);
+    assert.strictEqual(skills.length, 15);
     for (const rel of skills) {
       const { fm } = decouper(lire(rel));
       const dossier = rel.split('/').slice(-2)[0];
@@ -391,6 +423,11 @@ describe('Suite de Tests : Injection de contexte Claude Code (fixtures inertes, 
     const d = description('cout-skill-projet/projet/_claude/skills/canari-s1/SKILL.md.fixture');
     assert.strictEqual(description('cout-skill-global/global/skills/canari-s2/SKILL.md.fixture'), d);
     assert.strictEqual(description('cout-skill-x2/projet/_claude/skills/canari-s1/SKILL.md.fixture'), `${d} ${d}`);
+
+    // Lot E4, D-6 : deux skills homonymes au niveau projet (parent et projet), descriptions de longueurs très différentes
+    const homoParent = description('doublons-d6/parent/_claude/skills/canari-d6-homo/SKILL.md.fixture');
+    const homoProjet = description('doublons-d6/projet/_claude/skills/canari-d6-homo/SKILL.md.fixture');
+    assert.ok(homoProjet.length > 2 * homoParent.length, 'la description du projet est nettement plus longue');
 
     // Plugin : manifeste JSON valide, nommé canari-plugin
     const plugin = jsonDe('skills/plugin/canari-plugin/_claude-plugin/plugin.json.fixture');
