@@ -223,7 +223,7 @@
                   <strong>Comment se calcule le total de tokens des règles (Claude Code) :</strong>
                   <ul style="margin: 4px 0 0 0; padding-left: 18px; line-height: 1.5;">
                     <li><strong>Règles permanentes (sans champ <code>paths</code>) :</strong> Comptées pour la totalité de leur contenu (estimation BPE o200k).</li>
-                    <li><strong>Règles conditionnelles (avec champ <code>paths</code>) :</strong> Ne comptent que pour <strong>≈ 20 tokens</strong> chacune dans le total affiché au démarrage. Ce chiffre est une estimation de l'extension pour les métadonnées de déclenchement : la documentation de Claude Code ne le précise pas. Leur coût complet en cas d'activation est affiché à part.</li>
+                    <li><strong>Règles conditionnelles (avec champ <code>paths</code>) :</strong> Comptent pour <strong>0 token</strong> dans le total affiché au démarrage : Claude Code ne les charge pas au démarrage (mesuré). Leur coût complet en cas d'activation est affiché à part.</li>
                     <li><strong>Conséquence sur la jauge :</strong> Additionner les tokens affichés sur les cartes des règles conditionnelles ne redonne pas le total des règles. C'est normal et voulu — le total reflète la consommation au démarrage, pas la consommation maximale si toutes les règles conditionnelles étaient déclenchées en même temps.</li>
                     <li><strong>Skills et Âme :</strong> À l'inverse des règles, les totaux des compétences (skills) et de l'Âme (<code>CLAUDE.md</code>) correspondent exactement à la somme des cartes actives.</li>
                   </ul>
@@ -245,7 +245,7 @@
             </div>
           </div>
           <ul style="margin: 0; padding-left: 20px; line-height: 1.6; color: var(--fg-color); font-size: 11px;">
-            <li><strong>Au démarrage (Boot) :</strong> Seules les métadonnées de frontmatter (<code>name</code>, <code>description</code> et optionnellement <code>paths</code>) sont scannées pour indexation rapide. Coût minime : ~20 tokens par skill.</li>
+            <li><strong>Au démarrage (Boot) :</strong> Chaque skill coûte sa ligne <code>- nom: description</code> dans la liste des skills, sans son chemin (mesuré) ; la description, avec <code>when_to_use</code>, y est coupée à 1 536 caractères (documentation).</li>
             <li><strong>Mode 1 — Skills sans <code>paths</code> (À la demande) :</strong> Le corps complet du fichier <code>SKILL.md</code> n'est chargé en mémoire que si Claude juge la compétence pertinente pour la tâche courante, ou sur invocation manuelle explicite de l'utilisateur (<code>/nom-du-skill</code>).</li>
             <li><strong>Mode 2 — Skills avec <code>paths: [...]</code> (Auto-chargement ciblé) :</strong> Dès qu'un fichier correspondant aux motifs glob est manipulé (lecture, écriture, édition), le corps complet du skill est injecté automatiquement en contexte sans attendre d'évaluation de pertinence.</li>
           </ul>
