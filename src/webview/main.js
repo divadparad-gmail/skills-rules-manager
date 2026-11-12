@@ -344,6 +344,7 @@
     renderHeaderStats(currentState);
     renderTimingConsole(currentState);
     renderBancEssaiBanner(currentState);
+    renderClaudeImportsBanner(currentState);
 
     // La barre latérale reste un résumé (statistiques d'en-tête) : seules les colonnes du Grand
     // Dashboard affichent les cartes
@@ -371,6 +372,41 @@
     banner.title = banc.infobulle || '';
     titre.textContent = banc.titre;
     detail.textContent = banc.detail;
+    banner.style.display = 'flex';
+  }
+
+  /**
+   * Claude Code : bandeau des imports hors du dossier de travail (src/claude/memoryImports.ts), créé par le
+   * JavaScript juste après le bandeau du banc d'essai, et retiré sans import extérieur ou sous Antigravity :
+   * le document d'Antigravity reste celui des fichiers HTML. Texte posé par textContent.
+   */
+  function renderClaudeImportsBanner(state, doc) {
+    const targetDoc = doc || (typeof document !== 'undefined' ? document : null);
+    if (!targetDoc) return;
+    const isClaude = !!(state && state.workspace && state.workspace.tool === 'claude-code');
+    const items = isClaude ? [...(state.globalResources || []), ...(state.localResources || [])] : [];
+    const count = items.filter((i) => i.targetTool === 'claude-code' && i.metadata && i.metadata.claudeImport
+      && i.metadata.claudeImport.externe && !i.metadata.claudeMemoryNotLoaded).length;
+    const existing = targetDoc.getElementById('claudeImportsBanner');
+    if (count === 0) {
+      if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
+      return;
+    }
+    let banner = existing;
+    if (!banner) {
+      const anchor = targetDoc.getElementById('bancEssaiBanner');
+      if (!anchor || !anchor.parentNode) return;
+      banner = targetDoc.createElement('div');
+      banner.id = 'claudeImportsBanner';
+      banner.className = 'status-banner status-warning';
+      if (anchor.style && anchor.style.margin) banner.style.margin = anchor.style.margin;
+      anchor.parentNode.insertBefore(banner, anchor.nextSibling);
+    }
+    banner.textContent = count === 1
+      ? '🔐 1 import hors du projet : chargé seulement après approbation dans Claude Code'
+      : `🔐 ${count} imports hors du projet : chargés seulement après approbation dans Claude Code`;
+    banner.title = 'Un import d\'un fichier de mémoire du projet ou d\'un dossier parent qui sort du dossier de travail est chargé seulement après une approbation, demandée une fois par projet (documentation) ; en -p, il n\'est pas chargé tant qu\'il n\'est pas approuvé (mesuré).\n' +
+      'L\'extension compte ces imports dans la jauge, sans lire l\'état de l\'approbation. Ils portent le badge « 🔐 Chargé seulement après approbation ».';
     banner.style.display = 'flex';
   }
 
@@ -2275,6 +2311,23 @@
     }
     // Claude Code : skills actifs mais absents de la liste au démarrage (invocation manuelle, paths)
     const isClaudeItem = item.targetTool === 'claude-code';
+    // Claude Code : les trois états d'un fichier de mémoire ou d'un import qui changent le compte
+    // (src/claude/memoryImports.ts) ; un import ordinaire n'a pas de badge, le cadenas nomme qui l'importe
+    const claudeNotLoaded = isClaudeItem && item.metadata && item.metadata.claudeMemoryNotLoaded;
+    if (claudeNotLoaded === 'niveau-5') {
+      addBadge('pill-info', '🚫 Non chargé (5ᵉ niveau)',
+        'Claude Code développe les imports sur quatre sauts au plus (mesuré : le fichier du cinquième saut est absent du contexte ; documentation : « four hops »).\n' +
+        'Ce fichier, importé au cinquième saut, n\'est pas chargé : il compte 0, et ses propres imports ne sont pas lus.');
+    } else if (claudeNotLoaded === 'plus-de-4-mio') {
+      const octets = Number(item.metadata.claudeByteSize || 0).toLocaleString('fr-FR');
+      addBadge('pill-warn-amber', '⚠️ Plus de 4 Mio : ignoré par Claude Code (documentation)',
+        `Claude Code ignore un fichier de mémoire de plus de 4 Mio (4 194 304 octets) et n'en charge rien (documentation, non mesuré).\n` +
+        `Taille : ${octets} octets. Il compte 0, et ses imports ne sont pas développés. L'extension ne le lit pas.`);
+    } else if (isClaudeItem && item.metadata && item.metadata.claudeImport && item.metadata.claudeImport.externe) {
+      addBadge('pill-warn-amber', '🔐 Chargé seulement après approbation',
+        'Import hors du dossier de travail, depuis un fichier de mémoire du projet ou d\'un dossier parent : Claude Code demande une approbation, une fois par projet, avant de le charger (documentation) ; en -p, non chargé tant qu\'il n\'est pas approuvé (mesuré).\n' +
+        'L\'extension le compte, sans lire l\'état de l\'approbation.');
+    }
     const claudeManualOnly = isClaudeItem && item.metadata && item.metadata.claudeSkillManualOnly;
     const claudePathsTriggered = isClaudeItem && item.metadata && item.metadata.claudeSkillPathsTriggered;
     if (claudeManualOnly) {
@@ -2546,6 +2599,12 @@
       // Claude Code : rien au démarrage ; le coût à l'invocation ou au déclenchement n'est pas mesuré
       metricsEl.innerHTML = '<span class="tok-highlight">0 tok au boot</span>';
       metricsEl.title = 'Coût au démarrage : 0 token (absent de la liste des skills).\nCoût à l\'invocation ou au déclenchement : non mesuré.';
+    } else if (claudeNotLoaded) {
+      // Claude Code : fichier de mémoire ou import présent mais non chargé (cinquième saut, plus de 4 Mio)
+      metricsEl.innerHTML = '<span class="tok-highlight">0 tok au boot</span>';
+      metricsEl.title = claudeNotLoaded === 'niveau-5'
+        ? 'Coût au démarrage : 0 token (import du cinquième saut, non chargé).'
+        : 'Coût au démarrage : 0 token (fichier de plus de 4 Mio, ignoré par Claude Code ; non lu par l\'extension).';
     } else {
       metricsEl.innerHTML = `<span>${charStr} car.</span> <span class="tok-highlight">(${tokStr} tokens)</span>`;
       let metricsTitle = `Taille réelle : ${charStr} caractères (${tokStr} tokens)\nEstimation : BPE o200k (repli 1 token ≈ 4 car.)`;
@@ -2585,9 +2644,13 @@
       const lockedBadge = targetDoc.createElement('div');
       lockedBadge.className = 'soul-locked-badge';
       const raison = String(claudeReadOnly.raison || 'Lecture seule');
-      // Fichier d'un dossier parent : son chemin relatif ; un CLAUDE.local.md de parent est lu d'après la documentation
+      // Fichier d'un dossier parent : son chemin relatif ; un CLAUDE.local.md de parent est lu d'après la documentation.
+      // Fichier importé : le fichier qui l'importe et le saut
       const inheritedFrom = item.metadata.inheritedFrom;
-      const origine = inheritedFrom === undefined
+      const claudeImport = item.metadata.claudeImport;
+      const origine = claudeImport
+        ? ` Importé par ${claudeImport.par} (niveau ${claudeImport.niveau}).`
+        : inheritedFrom === undefined
         ? ''
         : item.metadata.claudeMemoryType === 'Local'
           ? ` Fichier du dossier parent ${inheritedFrom}, chargé par Claude Code (documentation, non mesuré pour un dossier parent).`
@@ -3261,6 +3324,7 @@
       markdownWorkflowPathItem,
       updateBreakdownRow,
       renderBancEssaiBanner,
+      renderClaudeImportsBanner,
       localRulesHeaderCount,
       updateBulkControl,
       setFilterState: (state) => {

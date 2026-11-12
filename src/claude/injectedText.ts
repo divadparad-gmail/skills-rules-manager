@@ -58,6 +58,8 @@ export function stripClaudeFrontmatter(raw: string): string {
 
 /** Début d'une clôture de bloc de code : trois accents graves ou tildes au moins, indentés de trois espaces au plus. */
 const FENCE = /^ {0,3}(`{3,}|~{3,})/;
+/** La même clôture, pour l'analyse des imports (src/claude/memoryImports.ts). */
+export { FENCE as CLAUDE_CODE_FENCE };
 /** Début d'un commentaire HTML de bloc : `<!--` en début de ligne, indenté de trois espaces au plus. */
 const COMMENT_OPEN = /^ {0,3}<!--/;
 /** Fin d'un commentaire de bloc : `-->` suivi seulement d'espaces jusqu'à la fin de la ligne. */

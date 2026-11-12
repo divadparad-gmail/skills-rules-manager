@@ -1,4 +1,5 @@
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 import { AntigravityParentsInfo, ClaudeMemoryType, ResourceItem, TokenCategoryStat, WorkspaceContext } from '../types';
 import {
@@ -10,6 +11,14 @@ import { claudeInjectedText, CLAUDE_INJECTED_TEXT_VARIANT } from '../claude/inje
 import { claudeRuleStatus } from '../claude/ruleFrontmatter';
 import { claudeSkillBootStatus, claudeSkillListing, CLAUDE_SKILL_LINE_VARIANT } from '../claude/skillListing';
 import { claudeParentMemoryCandidates, claudeResolvedPathKey } from '../claude/memorySources';
+import { CLAUDE_MEMORY_MAX_BYTES, ClaudeImportRoot, expandClaudeImports } from '../claude/memoryImports';
+import {
+  buildClaudeImportItems,
+  claudeImportFsPort,
+  claudeMemoryRootText,
+  claudeOversizedWarningCount,
+  isClaudeMemoryNotLoaded,
+} from './claudeMemoryItems';
 import { getEffectiveGlobalClaudePath } from '../utils/paths';
 import { measureAntigravitySoul } from '../utils/antigravityRules';
 import { ScenarioManager } from './ScenarioManager';
@@ -516,9 +525,21 @@ export class LocalScanner {
     const claudeMemoryKeys = new Set<string>();
     /** Fichiers du projet déjà comptés ailleurs (le CLAUDE.md global, ou un autre fichier du projet) : sans carte. */
     const claudeProjectFilesSkipped = new Set<string>();
+    // Imports « @ » (src/claude/memoryImports.ts) : le CLAUDE.md global se charge en premier, et ses imports
+    // avec lui ; ils sont réservés ici, sans carte (GlobalScanner les montre dans l'Âme G). Les fichiers de
+    // mémoire du projet et des parents viennent ensuite, puis leurs imports, dans l'ordre de chargement.
+    const claudeImportPort = claudeImportFsPort();
+    const claudeImportRoots: ClaudeImportRoot[] = [];
     if (targetTool === 'claude-code') {
       const globalClaudeMd = path.join(getEffectiveGlobalClaudePath(), 'CLAUDE.md');
-      if (fs.existsSync(globalClaudeMd)) claudeMemoryKeys.add(claudeResolvedPathKey(globalClaudeMd));
+      if (fs.existsSync(globalClaudeMd)) {
+        claudeMemoryKeys.add(claudeResolvedPathKey(globalClaudeMd));
+        expandClaudeImports(
+          [{ path: globalClaudeMd, text: claudeMemoryRootText(globalClaudeMd, claudeImportPort), projectLevel: false }],
+          { cwd: rootPath, home: os.homedir(), seen: claudeMemoryKeys },
+          claudeImportPort
+        );
+      }
       for (const candidate of projectClaudeCandidates) {
         const candidatePath = path.join(rootPath, candidate.file);
         if (!fs.existsSync(candidatePath)) continue;
@@ -561,8 +582,38 @@ export class LocalScanner {
         }
         try {
           const stat = await fs.promises.stat(candidatePath);
-          const rawContent = await fs.promises.readFile(candidatePath, 'utf8');
           const isAntigravity = candidate.tool === 'antigravity';
+          // Claude Code : un fichier de mémoire de plus de 4 Mio est ignoré (documentation) ; il n'est pas lu,
+          // compte 0, n'est pas actif, et ses imports ne sont pas développés
+          if (!isAntigravity && stat.size > CLAUDE_MEMORY_MAX_BYTES) {
+            items.push({
+              id: soulId,
+              name: soulId,
+              description: 'Fichier de plus de 4 Mio, ignoré par Claude Code',
+              type: 'soul',
+              scope: 'local',
+              enabled: true,
+              path: candidatePath,
+              targetTool: candidate.tool,
+              isFolder: false,
+              charCount: 0,
+              tokenCount: 0,
+              lineCount: 0,
+              metadata: {
+                isSoul: true,
+                locked: true,
+                ...(candidate.inheritedFrom !== undefined ? { inheritedFrom: candidate.inheritedFrom } : {}),
+                ...(candidate.claudeMemoryType ? { claudeMemoryType: candidate.claudeMemoryType } : {}),
+                ...(isClaudeParent ? { claudeReadOnly: { raison: 'Fichier hors du projet' as const } } : {}),
+                claudeMemoryNotLoaded: 'plus-de-4-mio',
+                claudeByteSize: stat.size,
+                warningLinesExceeded: false,
+                warningSizeExceeded: false,
+              },
+            });
+            continue;
+          }
+          const rawContent = await fs.promises.readFile(candidatePath, 'utf8');
           // Claude Code : le CLAUDE.md est compté sans frontmatter ni commentaires HTML de bloc
           // (src/claude/injectedText.ts) ; Antigravity garde la taille du fichier brut
           const claudeText = isAntigravity ? null : claudeInjectedText(rawContent);
@@ -583,6 +634,8 @@ export class LocalScanner {
           soulCharTotal += measured ? measured.bootCharCount : fileCharCount;
           // Le chemin de l'Âme L reste celui d'un fichier du projet pour Claude Code
           if (!soulPathFound && !isClaudeParent) soulPathFound = candidatePath;
+          // Claude Code : ses imports seront développés après tous les fichiers de mémoire, dans cet ordre
+          if (claudeText !== null) claudeImportRoots.push({ path: candidatePath, text: claudeText, projectLevel: true });
 
           items.push({
             id: soulId,
@@ -618,6 +671,20 @@ export class LocalScanner {
           // Ignorer
         }
       }
+    }
+
+    // Claude Code : les fichiers importés par la mémoire du projet et des parents (type Project, Âme L),
+    // chacun une fois, au premier rencontré dans l'ordre de chargement, en lecture seule
+    if (targetTool === 'claude-code' && claudeImportRoots.length > 0) {
+      const entries = expandClaudeImports(claudeImportRoots, { cwd: rootPath, home: os.homedir(), seen: claudeMemoryKeys }, claudeImportPort);
+      const importItems = buildClaudeImportItems(entries, {
+        scope: 'local',
+        claudeMemoryType: 'Project',
+        labelBase: { cwd: rootPath },
+        cwdKey: claudeImportPort.key(rootPath),
+      });
+      for (const item of importItems) soulCharTotal += item.charCount ?? 0;
+      items.push(...importItems);
     }
 
     // Les workflows Markdown ne sont pas des skills : ils comptent dans « Other Customizations » (StateManager)
@@ -660,7 +727,9 @@ export class LocalScanner {
     const isInherited = (i: ResourceItem) => i.metadata?.inheritedFrom !== undefined;
     const rulesInheritedCount = bootRules.filter(isInherited).length;
 
-    const activeSoulList = allSoulList.filter((i) => i.enabled);
+    // Claude Code : une carte présente mais non chargée (cinquième saut, plus de 4 Mio) n'est pas active ;
+    // une carte de plus de 4 Mio compte pour un avertissement (rien de tel n'existe pour Antigravity)
+    const activeSoulList = allSoulList.filter((i) => i.enabled && !isClaudeMemoryNotLoaded(i));
     const soulInheritedCount = activeSoulList.filter(isInherited).length;
     const activeSoulCount = activeSoulList.length;
     const soulWarningCount = activeSoulList.filter((i) => (
@@ -668,7 +737,7 @@ export class LocalScanner {
       i.metadata?.warningLinesExceeded ||
       i.metadata?.warningMcpExceeded ||
       i.metadata?.warningNoDescription
-    )).length;
+    )).length + claudeOversizedWarningCount(allSoulList);
     // Somme directe des tokens BPE de l'Âme active
     const soulTokenTotal = activeSoulList.reduce((sum, i) => sum + (i.tokenCount || 0), 0);
 

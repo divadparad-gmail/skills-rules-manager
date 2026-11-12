@@ -13,12 +13,15 @@ export type TargetTool = 'antigravity' | 'claude-code';
 
 /**
  * Raison pour laquelle une carte de Claude Code est en lecture seule : un fichier situé hors du projet
- * ouvert, ou un fichier écrit par Claude lui-même.
+ * ouvert, un fichier écrit par Claude lui-même, ou un fichier du projet importé par un fichier de mémoire.
  */
-export type ClaudeReadOnlyReason = 'Fichier hors du projet' | 'Écrit par Claude';
+export type ClaudeReadOnlyReason = 'Fichier hors du projet' | 'Écrit par Claude' | 'Fichier importé';
 
 /** Type d'un fichier de mémoire de Claude Code, tel que `/context` le liste (mesuré, lots E1 à E5). */
 export type ClaudeMemoryType = 'User' | 'Project' | 'Local' | 'AutoMem';
+
+/** Raison pour laquelle un fichier de mémoire de Claude Code présent n'est pas chargé. */
+export type ClaudeMemoryNotLoaded = 'niveau-5' | 'plus-de-4-mio';
 
 export type SyncStatus = 'synced' | 'modified' | 'local_only' | 'nas_offline';
 
@@ -96,6 +99,18 @@ export interface ResourceItem {
     claudeReadOnly?: { raison: ClaudeReadOnlyReason };
     /** Fichier de mémoire de Claude Code : son type dans `/context` (métadonnée seulement, sans rendu). */
     claudeMemoryType?: ClaudeMemoryType;
+    /**
+     * Fichier importé par un fichier de mémoire de Claude Code (src/claude/memoryImports.ts) : le libellé
+     * du fichier qui importe, le saut (1 à 5) et l'import extérieur (chargé seulement après approbation).
+     */
+    claudeImport?: { par: string; niveau: number; externe: boolean };
+    /**
+     * Fichier de mémoire ou import de Claude Code présent mais non chargé : cinquième saut d'import, ou
+     * fichier de plus de 4 Mio (jamais lu). La carte compte 0 et n'est pas active.
+     */
+    claudeMemoryNotLoaded?: ClaudeMemoryNotLoaded;
+    /** Taille en octets d'un fichier de mémoire de Claude Code de plus de 4 Mio (lue par stat seulement). */
+    claudeByteSize?: number;
     /** Règle Antigravity écartée par l'agent (frontmatter absent ou trigger non reconnu). */
     ignoredByAgent?: boolean;
     /** Défauts de frontmatter d'une règle Antigravity (voir AntigravityRuleIssue). */

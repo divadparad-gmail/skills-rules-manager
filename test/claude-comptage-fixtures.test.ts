@@ -54,7 +54,9 @@ import { ManagerFullState, ResourceItem } from '../src/types';
  *   SCENARIOS-CLAUDE-CODE.md (lignes CC38 à CC40, lot E4, 2.1.319) ;
  * - les tokens o200k de chaque élément lu, en valeurs exactes figées au lot C1, puis à chaque commit du
  *   lot C2a qui ajoute une source (le .claude/CLAUDE.md et le CLAUDE.local.md du projet au commit a3, la
- *   mémoire des dossiers parents au commit a4).
+ *   mémoire des dossiers parents au commit a4, les imports « @ » des fichiers de mémoire au commit a5).
+ * Pour les jeux cout-calibrage et e5-imports, absents de toute baseline publiée, la référence est la
+ * grille commitée (CC09 au lot E4 ; CC42, CC43, CC45, CC46 et CC54 au lot E5).
  * La remontée vers les dossiers parents s'arrête au dossier du jeu (réglage de test de StateManager) :
  * sans cet arrêt, l'oracle lirait les fichiers de mémoire réels au-dessus du dossier temporaire.
  * Les tokens de Claude (champ `tokens` de la baseline, en /context) ne sont pas comparés : ils le seront
@@ -80,7 +82,11 @@ interface EntreeContext {
   combinaison: string;
   element?: string;
   skill?: string;
-  attendu: { present?: boolean; type?: string; source?: string; delta?: number };
+  /**
+   * `exterieur` : un import hors du dossier de travail, absent en -p tant qu'il n'est pas approuvé
+   * (mesuré, CC46 et CC54), que l'extension compte avec la marque de l'approbation (décision D-7.3).
+   */
+  attendu: { present?: boolean; type?: string; source?: string; delta?: number; exterieur?: boolean };
 }
 
 /** Ce que l'extension montre d'un élément lu : portée, présence au démarrage, statut et tokens o200k de la carte. */
@@ -100,6 +106,12 @@ const ATTENDUS_C1: Record<string, Vu[]> = {
     { cle: '<projet>/.claude/rules/p-yaml-invalide.md', portee: 'local', auDemarrage: true, statut: 'règle permanente (YAML invalide)', o200k: 24 },
     { cle: '<projet>/CLAUDE.local.md', portee: 'local', auDemarrage: true, statut: 'âme', o200k: 17 },
     { cle: '<projet>/CLAUDE.md', portee: 'local', auDemarrage: true, statut: 'âme', o200k: 26 },
+    { cle: '<projet>/import-1.md', portee: 'local', auDemarrage: true, statut: 'âme importée', o200k: 27 },
+    { cle: '<projet>/import-2.md', portee: 'local', auDemarrage: true, statut: 'âme importée', o200k: 26 },
+    { cle: '<projet>/import-3.md', portee: 'local', auDemarrage: true, statut: 'âme importée', o200k: 27 },
+    { cle: '<projet>/import-4.md', portee: 'local', auDemarrage: true, statut: 'âme importée', o200k: 26 },
+    // Le cinquième saut n'est pas chargé (CC09) : une carte à 0, présente mais non active
+    { cle: '<projet>/import-5.md', portee: 'local', auDemarrage: false, statut: 'âme non chargée (5ᵉ niveau)', o200k: 0 },
   ],
   skills: [
     { cle: 'skill canari-cache@<projet>', portee: 'local', auDemarrage: false, statut: 'skill manuel', o200k: 0 },
@@ -124,6 +136,8 @@ const ATTENDUS_C1: Record<string, Vu[]> = {
     { cle: '<projet>/.claude/rules/d6-meme-nom.md', portee: 'local', auDemarrage: true, statut: 'règle permanente', o200k: 61 },
     { cle: '<projet>/CLAUDE.local.md', portee: 'local', auDemarrage: true, statut: 'âme', o200k: 26 },
     { cle: '<projet>/CLAUDE.md', portee: 'local', auDemarrage: true, statut: 'âme', o200k: 22 },
+    // Importé par le CLAUDE.md et le CLAUDE.local.md : une seule carte (CC40)
+    { cle: '<projet>/d6-commun.md', portee: 'local', auDemarrage: true, statut: 'âme importée', o200k: 17 },
     { cle: 'skill canari-d6-homo@<projet>', portee: 'local', auDemarrage: true, statut: 'skill listé', o200k: 50 },
   ],
   'cout-f-projet-claude': [
@@ -132,7 +146,49 @@ const ATTENDUS_C1: Record<string, Vu[]> = {
   'cout-f-parent': [
     { cle: '<parent>/CLAUDE.md', portee: 'local', auDemarrage: true, statut: 'âme', o200k: 33 },
   ],
+  // Douze imports au même niveau, tous listés (CC09, lot E4)
+  'cout-calibrage': [
+    { cle: '<projet>/cal-code-js-x2.md', portee: 'local', auDemarrage: true, statut: 'âme importée', o200k: 633 },
+    { cle: '<projet>/cal-code-js.md', portee: 'local', auDemarrage: true, statut: 'âme importée', o200k: 317 },
+    { cle: '<projet>/cal-en-mit-x2.md', portee: 'local', auDemarrage: true, statut: 'âme importée', o200k: 416 },
+    { cle: '<projet>/cal-en-mit.md', portee: 'local', auDemarrage: true, statut: 'âme importée', o200k: 208 },
+    { cle: '<projet>/cal-fr-original-x2.md', portee: 'local', auDemarrage: true, statut: 'âme importée', o200k: 454 },
+    { cle: '<projet>/cal-fr-original.md', portee: 'local', auDemarrage: true, statut: 'âme importée', o200k: 227 },
+    { cle: '<projet>/cal-fr-securite-x2.md', portee: 'local', auDemarrage: true, statut: 'âme importée', o200k: 356 },
+    { cle: '<projet>/cal-fr-securite.md', portee: 'local', auDemarrage: true, statut: 'âme importée', o200k: 178 },
+    { cle: '<projet>/cal-mixte-readme-x2.md', portee: 'local', auDemarrage: true, statut: 'âme importée', o200k: 418 },
+    { cle: '<projet>/cal-mixte-readme.md', portee: 'local', auDemarrage: true, statut: 'âme importée', o200k: 209 },
+    { cle: '<projet>/cal-mixte-regle-x2.md', portee: 'local', auDemarrage: true, statut: 'âme importée', o200k: 564 },
+    { cle: '<projet>/cal-mixte-regle.md', portee: 'local', auDemarrage: true, statut: 'âme importée', o200k: 282 },
+    { cle: '<projet>/CLAUDE.md', portee: 'local', auDemarrage: true, statut: 'âme', o200k: 107 },
+  ],
+  // Les cas d'import du lot E5 (les skills du jeu ne sont pas comparés : voir JEUX_SANS_SKILLS). Le code et
+  // les guillemets ne sont pas importés (CC42) ; le cycle est compté une fois (CC43) ; le frontmatter et le
+  // commentaire d'un fichier importé sont retirés : 42 chacun, comme le même corps sans eux (CC45) ;
+  // l'import extérieur du projet (CC46) et celui du parent vers son propre dossier (CC54) sont comptés,
+  // marqués extérieurs ; le témoin du parent vers le projet est un import ordinaire (CC54).
+  'e5-imports': [
+    { cle: '<parent>/CLAUDE.md', portee: 'local', auDemarrage: true, statut: 'âme', o200k: 35 },
+    { cle: '<parent>/e5-exterieur.md', portee: 'local', auDemarrage: true, statut: 'âme importée (extérieure, approbation)', o200k: 17 },
+    { cle: '<parent>/e5-parent-cible.md', portee: 'local', auDemarrage: true, statut: 'âme importée (extérieure, approbation)', o200k: 18 },
+    { cle: '<projet>/.claude/rules/e5-ref-lignes.md', portee: 'local', auDemarrage: true, statut: 'règle permanente', o200k: 2900 },
+    { cle: '<projet>/.claude/rules/e5-regle-import.md', portee: 'local', auDemarrage: true, statut: 'règle permanente', o200k: 28 },
+    { cle: '<projet>/CLAUDE.md', portee: 'local', auDemarrage: true, statut: 'âme', o200k: 113 },
+    { cle: '<projet>/e5-code-temoin.md', portee: 'local', auDemarrage: true, statut: 'âme importée', o200k: 12 },
+    { cle: '<projet>/e5-comm-avec.md', portee: 'local', auDemarrage: true, statut: 'âme importée', o200k: 42 },
+    { cle: '<projet>/e5-cycle-1.md', portee: 'local', auDemarrage: true, statut: 'âme importée', o200k: 16 },
+    { cle: '<projet>/e5-cycle-2.md', portee: 'local', auDemarrage: true, statut: 'âme importée', o200k: 16 },
+    { cle: '<projet>/e5-fm-avec.md', portee: 'local', auDemarrage: true, statut: 'âme importée', o200k: 42 },
+    { cle: '<projet>/e5-fm-sans.md', portee: 'local', auDemarrage: true, statut: 'âme importée', o200k: 42 },
+    { cle: '<projet>/e5-parent-vers-projet.md', portee: 'local', auDemarrage: true, statut: 'âme importée', o200k: 17 },
+  ],
 };
+
+/**
+ * Les jeux dont les skills ne sont pas comparés. e5-imports : ses skills mesurent la clé d'homonymie
+ * (CC48 à CC51), corrigée plus tard (lot C2b) ; ils restent « plus tard », hors de cette comparaison.
+ */
+const JEUX_SANS_SKILLS = new Set(['e5-imports']);
 
 /**
  * Les éléments chargés par Claude Code que l'extension ne lit pas encore (mémoire du projet et des
@@ -145,19 +201,18 @@ const ATTENDUS_PLUS_TARD: Record<string, string[]> = {
     '<global>/projects/<memoire>/memory/MEMORY.md',
     '<parent>/.claude/rules/par-regle.md',
     '<projet>/.claude/rules/sous/p-sous.md',
-    '<projet>/import-1.md',
-    '<projet>/import-2.md',
-    '<projet>/import-3.md',
-    '<projet>/import-4.md',
   ],
   skills: ['skill canari-parent', 'skill canari-plugin:canari-plug'],
   'skill-long-1500': [],
   declencheurs: [],
   'cout-regle-paths': [],
   // CC39 : la copie du parent n'est pas listée par Claude Code, et l'extension ne lit pas encore les parents
-  'doublons-d6': ['<projet>/d6-commun.md', 'skill canari-d6-homo@<parent>'],
+  'doublons-d6': ['skill canari-d6-homo@<parent>'],
   'cout-f-projet-claude': [],
   'cout-f-parent': [],
+  'cout-calibrage': [],
+  // L'import d'une règle permanente (CC44) attend le lot C2b ; MEMORY.md attend le commit a7
+  'e5-imports': ['<global>/projects/<memoire>/memory/MEMORY.md', '<projet>/e5-regle-cible.md'],
 };
 
 /**
@@ -176,7 +231,42 @@ const GRILLE_DOUBLONS_D6: EntreeContext[] = [
   { id: 'CC40:local', combinaison: 'doublons-d6', element: '<projet>/CLAUDE.local.md', attendu: { present: true, type: 'Local' } },
 ];
 
-const JEUX = ['niveaux', 'skills', 'skill-long-1500', 'declencheurs', 'cout-regle-paths', 'doublons-d6', 'cout-f-projet-claude', 'cout-f-parent'];
+/** Jeu cout-calibrage : CC09 au lot E4 (/context, 2.1.319) : le CLAUDE.md et ses douze imports au même niveau, tous listés. */
+const GRILLE_COUT_CALIBRAGE: EntreeContext[] = [
+  { id: 'CC09:E4:claude', combinaison: 'cout-calibrage', element: '<projet>/CLAUDE.md', attendu: { present: true, type: 'Project' } },
+  ...['cal-fr-original', 'cal-fr-securite', 'cal-en-mit', 'cal-code-js', 'cal-mixte-regle', 'cal-mixte-readme']
+    .flatMap((n) => [n, `${n}-x2`])
+    .map((n): EntreeContext => ({ id: `CC09:E4:${n}`, combinaison: 'cout-calibrage', element: `<projet>/${n}.md`, attendu: { present: true, type: 'Project' } })),
+];
+
+/** Jeu e5-imports : la grille du lot E5 (/context, série 2026-11-12-0833), pour ses cas d'import. */
+const GRILLE_E5_IMPORTS: EntreeContext[] = [
+  { id: 'CC42:temoin', combinaison: 'e5-imports', element: '<projet>/e5-code-temoin.md', attendu: { present: true, type: 'Project' } },
+  { id: 'CC42:bloc', combinaison: 'e5-imports', element: '<projet>/e5-code-bloc.md', attendu: { present: false } },
+  { id: 'CC42:segment', combinaison: 'e5-imports', element: '<projet>/e5-code-segment.md', attendu: { present: false } },
+  { id: 'CC42:guillemets', combinaison: 'e5-imports', element: '<projet>/e5-guillemets.md', attendu: { present: false } },
+  { id: 'CC43:cycle-1', combinaison: 'e5-imports', element: '<projet>/e5-cycle-1.md', attendu: { present: true, type: 'Project' } },
+  { id: 'CC43:cycle-2', combinaison: 'e5-imports', element: '<projet>/e5-cycle-2.md', attendu: { present: true, type: 'Project' } },
+  { id: 'CC44:cible', combinaison: 'e5-imports', element: '<projet>/e5-regle-cible.md', attendu: { present: true, type: 'Project' } },
+  { id: 'CC44:cible-cwd', combinaison: 'e5-imports', element: '<projet>/e5-regle-cible-cwd.md', attendu: { present: false } },
+  { id: 'CC45:sans', combinaison: 'e5-imports', element: '<projet>/e5-fm-sans.md', attendu: { present: true, type: 'Project' } },
+  { id: 'CC45:fm', combinaison: 'e5-imports', element: '<projet>/e5-fm-avec.md', attendu: { present: true, type: 'Project' } },
+  { id: 'CC45:comm', combinaison: 'e5-imports', element: '<projet>/e5-comm-avec.md', attendu: { present: true, type: 'Project' } },
+  { id: 'CC46:claude', combinaison: 'e5-imports', element: '<projet>/CLAUDE.md', attendu: { present: true, type: 'Project' } },
+  { id: 'CC46:exterieur', combinaison: 'e5-imports', element: '<parent>/e5-exterieur.md', attendu: { present: false, exterieur: true } },
+  { id: 'CC54:parent', combinaison: 'e5-imports', element: '<parent>/CLAUDE.md', attendu: { present: true, type: 'Project' } },
+  { id: 'CC54:temoin', combinaison: 'e5-imports', element: '<projet>/e5-parent-vers-projet.md', attendu: { present: true, type: 'Project' } },
+  { id: 'CC54:cible', combinaison: 'e5-imports', element: '<parent>/e5-parent-cible.md', attendu: { present: false, exterieur: true } },
+];
+
+/** Les jeux sans entrée dans une baseline publiée : leur référence est la grille. */
+const GRILLES: Record<string, EntreeContext[]> = {
+  'doublons-d6': GRILLE_DOUBLONS_D6,
+  'cout-calibrage': GRILLE_COUT_CALIBRAGE,
+  'e5-imports': GRILLE_E5_IMPORTS,
+};
+
+const JEUX = ['niveaux', 'skills', 'skill-long-1500', 'declencheurs', 'cout-regle-paths', 'doublons-d6', 'cout-f-projet-claude', 'cout-f-parent', 'cout-calibrage', 'e5-imports'];
 /**
  * Combinaison de la baseline qui porte les entrées d'un jeu : le jeu cout-regle-paths est mesuré dans
  * cout-regles, et les jeux cout-f-projet-claude et cout-f-parent dans cout-f-quatre-chemins (CC13).
@@ -263,7 +353,14 @@ describe('Suite de Tests : oracle du comptage de Claude Code sur les fixtures in
             : m.claudeDescriptionOriginalLength ? 'skill listé (coupé)' : 'skill listé';
           return { cle: `skill ${i.name}@${lieu}`, portee, auDemarrage: statut.startsWith('skill listé') && i.enabled, statut, o200k: i.tokenCount ?? 0 };
         }
-        if (i.type === 'soul') return { cle: masquer(i.path, racines), portee, auDemarrage: i.enabled, statut: 'âme', o200k: i.tokenCount ?? 0 };
+        if (i.type === 'soul') {
+          // Un fichier importé : chargé, extérieur (marqué « après approbation »), ou non chargé (5ᵉ saut, plus de 4 Mio)
+          const statut = m.claudeMemoryNotLoaded === 'niveau-5' ? 'âme non chargée (5ᵉ niveau)'
+            : m.claudeMemoryNotLoaded === 'plus-de-4-mio' ? 'âme ignorée (plus de 4 Mio)'
+            : m.claudeImport?.externe ? 'âme importée (extérieure, approbation)'
+            : m.claudeImport ? 'âme importée' : 'âme';
+          return { cle: masquer(i.path, racines), portee, auDemarrage: i.enabled && !m.claudeMemoryNotLoaded, statut, o200k: i.tokenCount ?? 0 };
+        }
         const statut = m.isConditional ? 'règle conditionnelle' : m.claudeYamlInvalid ? 'règle permanente (YAML invalide)' : 'règle permanente';
         return { cle: masquer(i.path, racines), portee, auDemarrage: i.enabled && !m.isConditional, statut, o200k: i.tokenCount ?? 0 };
       })
@@ -293,6 +390,12 @@ describe('Suite de Tests : oracle du comptage de Claude Code sur les fixtures in
       return;
     }
     const vu = liste.find((v) => v.cle === element);
+    if (entree.attendu.exterieur) {
+      // Absent en -p sans approbation (mesuré) ; compté par l'extension, avec la marque de l'approbation
+      assert.ok(vu && vu.auDemarrage, `${entree.id} : ${element} compté`);
+      assert.strictEqual(vu!.statut, 'âme importée (extérieure, approbation)', `${entree.id} : marqué extérieur`);
+      return;
+    }
     if (present) {
       assert.ok(vu && vu.auDemarrage, `${entree.id} : ${element} présent au démarrage`);
       assert.strictEqual(vu!.portee, type === 'User' ? 'global' : 'local', `${entree.id} : portée`);
@@ -302,7 +405,7 @@ describe('Suite de Tests : oracle du comptage de Claude Code sur les fixtures in
   };
 
   const entreesDe = (jeu: string): EntreeContext[] => {
-    if (jeu === 'doublons-d6') return GRILLE_DOUBLONS_D6;
+    if (GRILLES[jeu]) return GRILLES[jeu];
     const combinaison = COMBINAISON[jeu] ?? jeu;
     const fichiersDuJeu = new Set(toutes.filter((r) => r.split('/')[0] === jeu).map((r) => {
       const { cible, chemin } = commun.convertir(r, '<memoire>');
@@ -325,7 +428,7 @@ describe('Suite de Tests : oracle du comptage de Claude Code sur les fixtures in
       assert.strictEqual(state.workspace.tool, 'claude-code');
       assert.deepStrictEqual(commun.ecartsEmpreintes([jeu], contenus, inventaire), [], 'Fixtures conformes à l\'inventaire');
 
-      const liste = vus(state, racines);
+      const liste = vus(state, racines).filter((v) => !(JEUX_SANS_SKILLS.has(jeu) && v.cle.startsWith('skill ')));
       // Ce que l'extension lit au lot C1, ni plus ni moins, avec les tokens o200k exacts
       assert.deepStrictEqual(liste, ATTENDUS_C1[jeu]);
 

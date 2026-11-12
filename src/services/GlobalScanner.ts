@@ -1,4 +1,5 @@
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 import { ResourceItem, TargetTool, TokenCategoryStat } from '../types';
 import {
@@ -13,6 +14,9 @@ import { countTokens, countTokensForFile } from '../utils/tokenizer';
 import { claudeInjectedText, CLAUDE_INJECTED_TEXT_VARIANT } from '../claude/injectedText';
 import { claudeRuleStatus } from '../claude/ruleFrontmatter';
 import { claudeSkillBootStatus, claudeSkillListing, CLAUDE_SKILL_LINE_VARIANT } from '../claude/skillListing';
+import { claudeResolvedPathKey } from '../claude/memorySources';
+import { CLAUDE_MEMORY_MAX_BYTES, expandClaudeImports } from '../claude/memoryImports';
+import { buildClaudeImportItems, claudeImportFsPort, claudeOversizedWarningCount, isClaudeMemoryNotLoaded } from './claudeMemoryItems';
 import { measureAntigravitySoul } from '../utils/antigravityRules';
 import { appliesInAntigravity, buildAntigravityRuleItem, countsAtBoot, hasResourceWarning, soulSizeAdvice } from './antigravityRuleItem';
 import { listFlatRuleFiles } from './antigravityRuleSources';
@@ -369,6 +373,31 @@ export class GlobalScanner {
         if (fs.existsSync(claudePath) && fs.statSync(claudePath).isFile()) {
           try {
             const stat = await fs.promises.stat(claudePath);
+            // Plus de 4 Mio : ignoré par Claude Code (documentation) ; ni lu, ni compté, ni actif, sans import
+            if (stat.size > CLAUDE_MEMORY_MAX_BYTES) {
+              items.push({
+                id: 'CLAUDE.md',
+                name: 'CLAUDE.md',
+                description: 'Fichier de plus de 4 Mio, ignoré par Claude Code',
+                type: 'soul',
+                scope: 'global',
+                enabled: true,
+                path: claudePath,
+                targetTool: 'claude-code',
+                isFolder: false,
+                charCount: 0,
+                tokenCount: 0,
+                lineCount: 0,
+                metadata: {
+                  isSoul: true,
+                  locked: true,
+                  claudeMemoryNotLoaded: 'plus-de-4-mio',
+                  claudeByteSize: stat.size,
+                  warningLinesExceeded: false,
+                },
+              });
+              break;
+            }
             const rawContent = await fs.promises.readFile(claudePath, 'utf8');
             // Compté sans frontmatter ni commentaires HTML de bloc (src/claude/injectedText.ts)
             const injectedText = claudeInjectedText(rawContent);
@@ -400,6 +429,22 @@ export class GlobalScanner {
                 warningLinesExceeded: isWarningLines,
               },
             });
+            // Ses imports « @ » (src/claude/memoryImports.ts) : type User (non vérifié), Âme G, en lecture
+            // seule ; jamais extérieurs (documentation). LocalScanner les réserve avant ceux du projet.
+            const port = claudeImportFsPort();
+            const entries = expandClaudeImports(
+              [{ path: claudePath, text: injectedText, projectLevel: false }],
+              { cwd: claudeGlobalPath, home: os.homedir(), seen: new Set([claudeResolvedPathKey(claudePath)]) },
+              port
+            );
+            const importItems = buildClaudeImportItems(entries, {
+              scope: 'global',
+              claudeMemoryType: 'User',
+              labelBase: { home: os.homedir() },
+              cwdKey: null,
+            });
+            for (const item of importItems) soulCharTotal += item.charCount ?? 0;
+            items.push(...importItems);
             break;
           } catch {
             // Ignorer
@@ -626,14 +671,16 @@ export class GlobalScanner {
     const rulesTokenTotal = agyRulesBoot ? agyRulesBoot.tokenCount : permanentRulesTokens;
     const rulesConditionalTokenTotal = activeConditionalRules.reduce((sum, i) => sum + (i.tokenCount || 0), 0);
 
-    const activeSoulList = allSoulList.filter((i) => i.enabled);
+    // Claude Code : une carte présente mais non chargée (cinquième saut, plus de 4 Mio) n'est pas active ;
+    // une carte de plus de 4 Mio compte pour un avertissement (rien de tel n'existe pour Antigravity)
+    const activeSoulList = allSoulList.filter((i) => i.enabled && !isClaudeMemoryNotLoaded(i));
     const activeSoulCount = activeSoulList.length;
     const soulWarningCount = activeSoulList.filter((i) => (
       i.metadata?.warningSizeExceeded ||
       i.metadata?.warningLinesExceeded ||
       i.metadata?.warningMcpExceeded ||
       i.metadata?.warningNoDescription
-    )).length;
+    )).length + claudeOversizedWarningCount(allSoulList);
     // Somme directe des tokens BPE de l'Âme active
     const soulTokenTotal = activeSoulList.reduce((sum, i) => sum + (i.tokenCount || 0), 0);
 
