@@ -220,7 +220,8 @@ Le lot E5 (décision du 2026-11-12) vérifie, avant que l'extension ne lise ces 
 | Vérification de version (V1) | 0 (refusés) | 26 | 60 `/context` pour le lot V1 (relevé de 30 le 2026-11-10) |
 | Payante (E2) | 38 (séries 1 à 5 : 17, 6, 4, 3 et 8) | 33 | 40 appels au modèle et 40 `/context` pour le lot E2 |
 | H14 (E3) | 1, tapé à la main | 10 par -p (+ 1 dans le panneau) | 12 `/context` pour le lot E3 |
-| Sources de mémoire, de règles et de skills (E5) | 0 (refusés) | 5 par série | 10 `/context` pour le lot E5 |
+| Vérifications gratuites (E4) | 0 (refusés) | 8 | 10 `/context` pour le lot E4 |
+| Sources de mémoire, de règles et de skills (E5) | 0 (refusés) | 5 (une série, le 2026-11-12) | 10 `/context` pour le lot E5 |
 
 Les deux compteurs sont dans `brut/` (`compteur-context.json` et `compteur-modele.json`). Ils sont incrémentés **avant** chaque lancement ; un lancement interrompu compte. L'option `--plafond` ne peut qu'abaisser la limite d'une exécution. Un plafond ne se relève que par une décision inscrite dans le code (`RELEVEMENTS_PLAFOND`, une par lot au plus) : au lancement suivant, le compteur du lot passe au nouveau plafond en gardant ses utilisés, avec la trace du changement dans `historique_plafond`, et le lanceur l'annonce en console. Les appels au modèle passent par le quota de l'abonnement. Un appel des séries 1 à 4 fait un seul tour d'API ; un appel de déclencheur (série 5) en fait 2 ou 3.
 
