@@ -254,22 +254,29 @@ describe('Suite de Tests : Lanceur de la sonde Claude Code (lot I2, sans lancer 
   });
 
   test('6. État d\'authentification : claude.ai, firstParty, abonnement et profil isolé ; valeurs sensibles extraites', () => {
-    const ok = {
-      loggedIn: true, authMethod: 'claude.ai', apiProvider: 'firstParty', subscriptionType: 'team',
+    // Aucune valeur d'abonnement n'est privilégiée : chaque valeur acceptée par le lanceur sert tour à tour
+    // d'état connecté, et aucune n'est écrite ici en dur.
+    const abonnements: string[] = S.ABONNEMENTS;
+    assert.strictEqual(abonnements.length, 4, 'quatre abonnements acceptés');
+    assert.strictEqual(new Set(abonnements).size, abonnements.length, 'abonnements distincts');
+    const etatConnecte = (abonnement: string) => ({
+      loggedIn: true, authMethod: 'claude.ai', apiProvider: 'firstParty', subscriptionType: abonnement,
       email: SENSIBLES[0], orgName: SENSIBLES[1], orgId: SENSIBLES[2],
       configDirectory: 'c:/users/exemple-compte/appdata/local/canari-claude-code/config',
-    };
-    const { problemes, sensibles } = S.problemesAuth(ok, CONFIG_W, 'win32');
-    assert.deepStrictEqual(problemes, []);
-    for (const v of [...SENSIBLES, ok.configDirectory]) assert.ok(sensibles.includes(v), 'valeur sensible extraite');
-    for (const v of ['claude.ai', 'firstParty', 'team']) assert.ok(!sensibles.includes(v), `${v} n'est pas sensible`);
-    for (const abonnement of ['pro', 'max', 'enterprise']) assert.deepStrictEqual(S.problemesAuth({ ...ok, subscriptionType: abonnement }, CONFIG_W, 'win32').problemes, []);
+    });
     const refus: object[] = [
       { authMethod: 'console' }, { authMethod: 'none' }, { apiProvider: 'bedrock' }, { loggedIn: false }, { loggedIn: 'true' },
       { subscriptionType: null }, { subscriptionType: 'free' }, { configDirectory: `${HOME_W}\\.claude` }, { configDirectory: undefined },
       { apiKeySource: 'ANTHROPIC_API_KEY' },
     ];
-    for (const r of refus) assert.ok(S.problemesAuth({ ...ok, ...r }, CONFIG_W, 'win32').problemes.length > 0, JSON.stringify(r));
+    for (const abonnement of abonnements) {
+      const ok = etatConnecte(abonnement);
+      const { problemes, sensibles } = S.problemesAuth(ok, CONFIG_W, 'win32');
+      assert.deepStrictEqual(problemes, [], `abonnement n° ${abonnements.indexOf(abonnement) + 1} accepté`);
+      for (const v of [...SENSIBLES, ok.configDirectory]) assert.ok(sensibles.includes(v), 'valeur sensible extraite');
+      for (const v of ['claude.ai', 'firstParty', abonnement]) assert.ok(!sensibles.includes(v), `${v} n'est pas sensible`);
+      for (const r of refus) assert.ok(S.problemesAuth({ ...ok, ...r }, CONFIG_W, 'win32').problemes.length > 0, JSON.stringify(r));
+    }
     assert.deepStrictEqual(S.problemesAuth(null, CONFIG_W, 'win32').problemes, ['état de connexion illisible']);
   });
 
@@ -468,7 +475,7 @@ describe('Suite de Tests : Lanceur de la sonde Claude Code (lot I2, sans lancer 
       });
       const rapport = {
         rapport: 'claude-code-context', format: 1, lot: 'I2',
-        environnement: { outil: 'Claude Code', version_avant: '9.9.9', methode: 'claude.ai', abonnement: 'team', date_mesure: '2026-01-01' },
+        environnement: { outil: 'Claude Code', version_avant: '9.9.9', methode: 'claude.ai', abonnement: 'abonnement-exemple', date_mesure: '2026-01-01' },
         serie: { valide: true, raisons_rejet: [] },
         bases: { vide: { debut: entree, fin: entree, identiques: true } },
         combinaisons: [{ id: 'jeu', jeux: ['jeu'], outils: 'vide', ...entree }],
@@ -477,6 +484,11 @@ describe('Suite de Tests : Lanceur de la sonde Claude Code (lot I2, sans lancer 
       const ecrit = S.ecrireRapport(rapport, { destination: 'brut', nom: 'context-2026-01-01-0000.json', poste: POSTE, interdits, dossiers });
       assert.strictEqual(path.dirname(ecrit), brut);
       assert.deepStrictEqual(C.garder('resultats/context.json', fs.readFileSync(ecrit, 'utf8'), POSTE, interdits), [], 'le rapport passe aussi la garde d\'I1');
+      // Chaque abonnement accepté, sans en privilégier aucun, passe la garde dans le champ « abonnement ».
+      for (const abonnement of S.ABONNEMENTS as string[]) {
+        const avecAbonnement = { ...rapport, environnement: { ...rapport.environnement, abonnement } };
+        assert.deepStrictEqual(C.garder('resultats/context.json', `${JSON.stringify(avecAbonnement, null, 2)}\n`, POSTE, interdits), [], `abonnement n° ${S.ABONNEMENTS.indexOf(abonnement) + 1}`);
+      }
       assert.throws(() => S.ecrireRapport(rapport, { destination: 'brut', nom: 'context-2026-01-01-0000.json', poste: POSTE, interdits, dossiers }), /EEXIST/);
 
       const fuites: object[] = [
