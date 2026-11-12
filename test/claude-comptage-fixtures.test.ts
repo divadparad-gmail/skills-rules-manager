@@ -52,7 +52,8 @@ import { ManagerFullState, ResourceItem } from '../src/types';
  *   cout-regle-paths dans la combinaison cout-regles) ;
  * - pour le jeu doublons-d6, absent de toute baseline publiée, aux mesures de la grille commitée
  *   SCENARIOS-CLAUDE-CODE.md (lignes CC38 à CC40, lot E4, 2.1.319) ;
- * - les tokens o200k de chaque élément lu, en valeurs exactes figées au lot C1.
+ * - les tokens o200k de chaque élément lu, en valeurs exactes figées au lot C1, puis à chaque commit du
+ *   lot C2a qui ajoute une source (le .claude/CLAUDE.md et le CLAUDE.local.md du projet au commit a3).
  * Les tokens de Claude (champ `tokens` de la baseline, en /context) ne sont pas comparés : ils le seront
  * avec le facteur de la jauge, à un lot ultérieur. Les éléments que Claude Code charge et que l'extension
  * ne lit pas encore sont listés à part (ATTENDUS_PLUS_TARD), et le test vérifie qu'ils sont absents.
@@ -82,15 +83,17 @@ interface EntreeContext {
 /** Ce que l'extension montre d'un élément lu : portée, présence au démarrage, statut et tokens o200k de la carte. */
 interface Vu { cle: string; portee: 'global' | 'local'; auDemarrage: boolean; statut: string; o200k: number }
 
-/** Les éléments de chaque jeu que l'extension lit au lot C1, avec leurs valeurs figées (o200k mesurés au lot C1). */
+/** Les éléments de chaque jeu que l'extension lit, avec leurs valeurs figées (o200k mesurés au lot C1, puis en C2a). */
 const ATTENDUS_C1: Record<string, Vu[]> = {
   niveaux: [
     { cle: '<global>/CLAUDE.md', portee: 'global', auDemarrage: true, statut: 'âme', o200k: 27 },
     { cle: '<global>/rules/g-paths.md', portee: 'global', auDemarrage: false, statut: 'règle conditionnelle', o200k: 21 },
     { cle: '<global>/rules/g-perm.md', portee: 'global', auDemarrage: true, statut: 'règle permanente', o200k: 20 },
+    { cle: '<projet>/.claude/CLAUDE.md', portee: 'local', auDemarrage: true, statut: 'âme', o200k: 24 },
     { cle: '<projet>/.claude/rules/p-paths.md', portee: 'local', auDemarrage: false, statut: 'règle conditionnelle', o200k: 24 },
     { cle: '<projet>/.claude/rules/p-perm.md', portee: 'local', auDemarrage: true, statut: 'règle permanente', o200k: 21 },
     { cle: '<projet>/.claude/rules/p-yaml-invalide.md', portee: 'local', auDemarrage: true, statut: 'règle permanente (YAML invalide)', o200k: 24 },
+    { cle: '<projet>/CLAUDE.local.md', portee: 'local', auDemarrage: true, statut: 'âme', o200k: 17 },
     { cle: '<projet>/CLAUDE.md', portee: 'local', auDemarrage: true, statut: 'âme', o200k: 26 },
   ],
   skills: [
@@ -114,8 +117,12 @@ const ATTENDUS_C1: Record<string, Vu[]> = {
   'doublons-d6': [
     { cle: '<global>/rules/d6-meme-nom.md', portee: 'global', auDemarrage: true, statut: 'règle permanente', o200k: 29 },
     { cle: '<projet>/.claude/rules/d6-meme-nom.md', portee: 'local', auDemarrage: true, statut: 'règle permanente', o200k: 61 },
+    { cle: '<projet>/CLAUDE.local.md', portee: 'local', auDemarrage: true, statut: 'âme', o200k: 26 },
     { cle: '<projet>/CLAUDE.md', portee: 'local', auDemarrage: true, statut: 'âme', o200k: 22 },
     { cle: 'skill canari-d6-homo@<projet>', portee: 'local', auDemarrage: true, statut: 'skill listé', o200k: 50 },
+  ],
+  'cout-f-projet-claude': [
+    { cle: '<projet>/.claude/CLAUDE.md', portee: 'local', auDemarrage: true, statut: 'âme', o200k: 33 },
   ],
 };
 
@@ -131,9 +138,7 @@ const ATTENDUS_PLUS_TARD: Record<string, string[]> = {
     '<parent>/.claude/CLAUDE.md',
     '<parent>/.claude/rules/par-regle.md',
     '<parent>/CLAUDE.md',
-    '<projet>/.claude/CLAUDE.md',
     '<projet>/.claude/rules/sous/p-sous.md',
-    '<projet>/CLAUDE.local.md',
     '<projet>/import-1.md',
     '<projet>/import-2.md',
     '<projet>/import-3.md',
@@ -144,7 +149,8 @@ const ATTENDUS_PLUS_TARD: Record<string, string[]> = {
   declencheurs: [],
   'cout-regle-paths': [],
   // CC39 : la copie du parent n'est pas listée par Claude Code, et l'extension ne lit pas encore les parents
-  'doublons-d6': ['<projet>/CLAUDE.local.md', '<projet>/d6-commun.md', 'skill canari-d6-homo@<parent>'],
+  'doublons-d6': ['<projet>/d6-commun.md', 'skill canari-d6-homo@<parent>'],
+  'cout-f-projet-claude': [],
 };
 
 /**
@@ -163,9 +169,12 @@ const GRILLE_DOUBLONS_D6: EntreeContext[] = [
   { id: 'CC40:local', combinaison: 'doublons-d6', element: '<projet>/CLAUDE.local.md', attendu: { present: true, type: 'Local' } },
 ];
 
-const JEUX = ['niveaux', 'skills', 'skill-long-1500', 'declencheurs', 'cout-regle-paths', 'doublons-d6'];
-/** Combinaison de la baseline qui porte les entrées d'un jeu (le jeu cout-regle-paths est mesuré dans cout-regles). */
-const COMBINAISON: Record<string, string> = { 'cout-regle-paths': 'cout-regles' };
+const JEUX = ['niveaux', 'skills', 'skill-long-1500', 'declencheurs', 'cout-regle-paths', 'doublons-d6', 'cout-f-projet-claude'];
+/**
+ * Combinaison de la baseline qui porte les entrées d'un jeu : le jeu cout-regle-paths est mesuré dans
+ * cout-regles, et le jeu cout-f-projet-claude dans cout-f-quatre-chemins (CC13).
+ */
+const COMBINAISON: Record<string, string> = { 'cout-regle-paths': 'cout-regles', 'cout-f-projet-claude': 'cout-f-quatre-chemins' };
 
 const lister = (dir: string, base = ''): string[] =>
   fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) =>

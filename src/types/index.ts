@@ -17,6 +17,9 @@ export type TargetTool = 'antigravity' | 'claude-code';
  */
 export type ClaudeReadOnlyReason = 'Fichier hors du projet' | 'Écrit par Claude';
 
+/** Type d'un fichier de mémoire de Claude Code, tel que `/context` le liste (mesuré, lots E1 à E5). */
+export type ClaudeMemoryType = 'User' | 'Project' | 'Local' | 'AutoMem';
+
 export type SyncStatus = 'synced' | 'modified' | 'local_only' | 'nas_offline';
 
 export interface DuplicateInfo {
@@ -91,6 +94,8 @@ export interface ResourceItem {
      * suppression, refusées aussi par ToggleManager et DeleteService. Ignorée pour Antigravity.
      */
     claudeReadOnly?: { raison: ClaudeReadOnlyReason };
+    /** Fichier de mémoire de Claude Code : son type dans `/context` (métadonnée seulement, sans rendu). */
+    claudeMemoryType?: ClaudeMemoryType;
     /** Règle Antigravity écartée par l'agent (frontmatter absent ou trigger non reconnu). */
     ignoredByAgent?: boolean;
     /** Défauts de frontmatter d'une règle Antigravity (voir AntigravityRuleIssue). */

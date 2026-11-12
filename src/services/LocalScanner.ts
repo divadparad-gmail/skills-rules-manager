@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { AntigravityParentsInfo, ResourceItem, TokenCategoryStat, WorkspaceContext } from '../types';
+import { AntigravityParentsInfo, ClaudeMemoryType, ResourceItem, TokenCategoryStat, WorkspaceContext } from '../types';
 import {
   extractFrontmatter,
   extractMarkdownTitleAndSummary,
@@ -491,14 +491,23 @@ export class LocalScanner {
     }
 
     // 3. Scan des fichiers maîtres d'Âme locale selon targetTool
+    // Claude Code : les trois fichiers de mémoire du projet, chargés tous les trois (mesuré, CC03 et CC04),
+    // dans l'ordre de la documentation (CLAUDE.local.md après CLAUDE.md dans un même dossier). Le CLAUDE.md
+    // garde son identifiant ; les deux autres ont pour identifiant leur chemin relatif, unique, qui ne
+    // forme aucune paire de nom avec le CLAUDE.md global
     const soulCandidates: Array<{
       file: string;
       tool: 'antigravity' | 'claude-code';
       absolutePath?: string;
       inheritedFrom?: string;
+      claudeMemoryType?: ClaudeMemoryType;
     }> =
       targetTool === 'claude-code'
-        ? [{ file: 'CLAUDE.md', tool: 'claude-code' }]
+        ? [
+            { file: 'CLAUDE.md', tool: 'claude-code', claudeMemoryType: 'Project' },
+            { file: '.claude/CLAUDE.md', tool: 'claude-code', claudeMemoryType: 'Project' },
+            { file: 'CLAUDE.local.md', tool: 'claude-code', claudeMemoryType: 'Local' },
+          ]
         : [
             { file: 'GEMINI.md', tool: 'antigravity' },
             { file: 'AGENTS.md', tool: 'antigravity' },
@@ -555,6 +564,7 @@ export class LocalScanner {
               isSoul: true,
               locked: true,
               ...(candidate.inheritedFrom !== undefined ? { inheritedFrom: candidate.inheritedFrom } : {}),
+              ...(candidate.claudeMemoryType ? { claudeMemoryType: candidate.claudeMemoryType } : {}),
               ...(measured ? { byteSize: measured.byteSize, bootTokenCount: measured.bootTokenCount, bootCharCount: measured.bootCharCount } : {}),
               ...(measured && measured.truncatedBytes > 0 ? { truncatedBytes: measured.truncatedBytes, lostTokens: measured.lostTokens } : {}),
               ...(measured?.truncationRule ? { truncationRule: measured.truncationRule } : {}),
