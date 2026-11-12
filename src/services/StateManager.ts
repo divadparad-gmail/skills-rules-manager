@@ -95,6 +95,7 @@ export class StateManager {
   private static timingHistory: string[] = [];
   private static _debugTimingOverride: boolean | null = null;
   private static _antigravityProfileOverride: ResolvedAntigravityProfile | null = null;
+  private static _claudeMemoryStopAtOverride: string | null = null;
   /** Profil de comportement d'Antigravity transmis aux scanners lors du dernier scan. */
   public static lastAntigravityProfile: ResolvedAntigravityProfile | null = null;
 
@@ -105,6 +106,15 @@ export class StateManager {
   /** Impose un profil aux scans suivants, sans lire le réglage ni le disque ; null rétablit la résolution normale. */
   public static setAntigravityProfileForTesting(resolved: ResolvedAntigravityProfile | null): void {
     this._antigravityProfileOverride = resolved;
+  }
+
+  /**
+   * Arrête la remontée de Claude Code vers les dossiers parents à ce dossier (compris), pour qu'un test ne
+   * lise jamais les fichiers de mémoire réels au-dessus de son dossier temporaire ; null rétablit la
+   * remontée jusqu'à la racine du disque.
+   */
+  public static setClaudeMemoryStopAtForTesting(dir: string | null): void {
+    this._claudeMemoryStopAtOverride = dir;
   }
 
   public static isDebugTimingActive(): boolean {
@@ -207,7 +217,11 @@ export class StateManager {
     const [nasResult, globalResult, localResult, mcpGlobalStat, mcpLocalStat] = await Promise.all([
       NasScanner.scan(undefined, workspace.tool, antigravityProfile),
       GlobalScanner.scan(undefined, workspace.tool, antigravityProfile),
-      LocalScanner.scan(workspace, antigravityProfile),
+      LocalScanner.scan(
+        workspace,
+        antigravityProfile,
+        this._claudeMemoryStopAtOverride !== null ? { claudeMemoryStopAt: this._claudeMemoryStopAtOverride } : {}
+      ),
       McpScanner.scanGlobal(undefined, workspace.tool, antigravityProfile),
       McpScanner.scanLocal(workspace, antigravityProfile),
     ]);

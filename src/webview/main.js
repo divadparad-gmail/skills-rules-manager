@@ -1487,7 +1487,9 @@
       const header = document.createElement('div');
       header.className = 'resource-group-header';
       header.textContent = `⬆️ Dossiers parents (${inherited.length})`;
-      header.title = 'Ressources chargées par Antigravity depuis les dossiers parents, jusqu\'à la racine du dépôt Git. Elles comptent dans la jauge et sont verrouillées.';
+      header.title = state && state.workspace && state.workspace.tool === 'claude-code'
+        ? 'Fichiers de mémoire chargés par Claude Code depuis les dossiers parents, jusqu\'à la racine du disque. Ils comptent dans la jauge et sont en lecture seule.'
+        : 'Ressources chargées par Antigravity depuis les dossiers parents, jusqu\'à la racine du dépôt Git. Elles comptent dans la jauge et sont verrouillées.';
       container.appendChild(header);
       inherited.forEach((item) => container.appendChild(createItemCard(item, isDetailed)));
     }
@@ -2250,8 +2252,9 @@
         `${behavior.version} ne charge jamais les règles des sous-dossiers du dossier ouvert (testé le ${behavior.testedOn}). Déplacez-la dans .agents/rules/ à la racine.${alsoIgnored}`);
     }
 
-    // R2 : ressource héritée d'un dossier parent
-    if (item.metadata && item.metadata.inheritedFrom !== undefined) {
+    // R2 : ressource héritée d'un dossier parent (Antigravity ; une carte de parent de Claude Code donne
+    // son chemin relatif dans l'infobulle de son cadenas)
+    if (item.targetTool !== 'claude-code' && item.metadata && item.metadata.inheritedFrom !== undefined) {
       addBadge('pill-plugin', '⬆️ Héritée',
         `Chargée depuis un dossier parent (${item.metadata.inheritedFrom}, jusqu'à la racine Git). Elle s'ajoute au budget de 20 000 tokens.`);
     }
@@ -2582,7 +2585,14 @@
       const lockedBadge = targetDoc.createElement('div');
       lockedBadge.className = 'soul-locked-badge';
       const raison = String(claudeReadOnly.raison || 'Lecture seule');
-      lockedBadge.title = `${raison} : carte en lecture seule. Elle n'a ni interrupteur ni corbeille dans le tableau de bord ; modifiez le fichier lui-même.`;
+      // Fichier d'un dossier parent : son chemin relatif ; un CLAUDE.local.md de parent est lu d'après la documentation
+      const inheritedFrom = item.metadata.inheritedFrom;
+      const origine = inheritedFrom === undefined
+        ? ''
+        : item.metadata.claudeMemoryType === 'Local'
+          ? ` Fichier du dossier parent ${inheritedFrom}, chargé par Claude Code (documentation, non mesuré pour un dossier parent).`
+          : ` Fichier du dossier parent ${inheritedFrom}.`;
+      lockedBadge.title = `${raison} : carte en lecture seule.${origine} Elle n'a ni interrupteur ni corbeille dans le tableau de bord ; modifiez le fichier lui-même.`;
       const lockIconEl = targetDoc.createElement('span');
       lockIconEl.className = 'soul-locked-icon';
       lockIconEl.textContent = '🔒';

@@ -72,7 +72,7 @@ describe('Suite de Tests : fixtures du banc d\'essai Claude Code', () => {
         agentsDir: null,
         claudeDir: path.join(ws, '.claude'),
         hasClaudeMd: false,
-      });
+      }, undefined, { claudeMemoryStopAt: ws }); // aucune lecture au-dessus du dossier temporaire
 
       const rule = scanResult.items.find((i) => i.id === '05-rule-claude-warn-lines');
       assert.ok(rule, 'La fixture 05 doit être scannée');

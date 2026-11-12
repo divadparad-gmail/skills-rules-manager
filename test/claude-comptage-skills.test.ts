@@ -140,7 +140,11 @@ describe('Suite de Tests : ligne des skills de Claude Code, sans chemin et coup�
     hasClaudeMd: false,
   });
 
-  const scanLocal = async (dir: string) => (await LocalScanner.scan(workspaceFor(dir))).items.filter((i) => i.type === 'skill');
+  // La remontée vers les dossiers parents s'arrête au dossier ouvert : aucun fichier au-dessus du dossier
+  // temporaire n'est lu
+  const scanLocalClaude = (ws: WorkspaceContext) => LocalScanner.scan(ws, undefined, { claudeMemoryStopAt: ws.workspacePath! });
+
+  const scanLocal = async (dir: string) => (await scanLocalClaude(workspaceFor(dir))).items.filter((i) => i.type === 'skill');
 
   test('1. Fonction pure : la ligne « - <nom>: <texte> », le nom du frontmatter sinon celui du dossier', () => {
     assert.deepStrictEqual(claudeSkillListing({ name: 'mon-skill', description: 'Fait une chose.' }, 'dossier'), {
@@ -267,7 +271,7 @@ describe('Suite de Tests : ligne des skills de Claude Code, sans chemin et coup�
     const dir = path.join(tempBaseDir, 'fixtures-0');
     await writeFile(path.join(dir, '.claude', 'skills', 'canari-cache', 'SKILL.md'), lireFixture('skills/projet/_claude/skills/canari-cache/SKILL.md.fixture'));
     await writeFile(path.join(dir, '.claude', 'skills', 'canari-paths', 'SKILL.md'), lireFixture('declencheurs/projet/_claude/skills/canari-paths/SKILL.md.fixture'));
-    const result = await LocalScanner.scan(workspaceFor(dir));
+    const result = await scanLocalClaude(workspaceFor(dir));
     const cache = result.items.find((i) => i.id === 'canari-cache')!;
     const paths = result.items.find((i) => i.id === 'canari-paths')!;
     assert.strictEqual(cache.tokenCount, 0);
@@ -296,7 +300,7 @@ describe('Suite de Tests : ligne des skills de Claude Code, sans chemin et coup�
     await writeFile(path.join(dir, '.claude', 'skills', 'les-deux', 'SKILL.md'),
       '---\nname: les-deux\ndescription: Manuel et paths.\ndisable-model-invocation: true\npaths:\n  - "**/*.md"\n---\nCorps.\n');
     await writeFile(path.join(dir, '.claude', 'skills', 'eteint', 'SKILL.md.disabled'), skillMd({ name: 'eteint', description: 'Désactivé.' }));
-    const result = await LocalScanner.scan(workspaceFor(dir));
+    const result = await scanLocalClaude(workspaceFor(dir));
     const deux = result.items.find((i) => i.id === 'les-deux')!;
     assert.strictEqual(deux.metadata?.claudeSkillManualOnly, true);
     assert.strictEqual(deux.metadata?.claudeSkillPathsTriggered, true);
@@ -364,10 +368,13 @@ describe('Suite de Tests : ligne des skills de Claude Code, sans chemin et coup�
     vscodeMock.workspace.workspaceFolders = [{ uri: { fsPath: projet } }];
     WorkspaceDetector.setOverriddenTool('claude-code');
     claudeGlobalPath = globalDir;
+    // La remontée vers les dossiers parents s'arrête au dossier ouvert : rien n'est lu au-dessus
+    StateManager.setClaudeMemoryStopAtForTesting(projet);
     try {
       return await StateManager.loadFullState(true);
     } finally {
       claudeGlobalPath = '';
+      StateManager.setClaudeMemoryStopAtForTesting(null);
       WorkspaceDetector.setOverriddenTool(null);
       vscodeMock.workspace.workspaceFolders = origFolders;
     }

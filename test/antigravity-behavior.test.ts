@@ -301,7 +301,8 @@ describe('Suite de Tests : comportement mesuré d\'Antigravity IDE 2.5.5 (lot A1
     await writeFile(path.join(work, '.claude', 'rules', 'api.md'), '---\npaths:\n  - "src/api/**/*.ts"\n---\n# API');
     await writeFile(path.join(work, '.claude', 'rules', 'perm.md'), '# Permanente');
 
-    const result = await LocalScanner.scan(workspaceFor(work, 'claude-code'));
+    // La remontée de Claude Code vers les dossiers parents s'arrête au dossier ouvert : rien n'est lu au-dessus
+    const result = await LocalScanner.scan(workspaceFor(work, 'claude-code'), undefined, { claudeMemoryStopAt: work });
     // État actuel figé : seul le CLAUDE.md racine est recensé (constat hors périmètre de A1)
     assert.deepStrictEqual(result.items.filter((i) => i.type === 'soul').map((i) => i.id), ['CLAUDE.md']);
     assert.strictEqual(result.antigravityParents, undefined);

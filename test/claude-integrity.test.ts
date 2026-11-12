@@ -83,7 +83,8 @@ describe('Suite de Tests : Intégrité Claude Code (isolation, scan global, MCP,
       hasClaudeMd: true,
     };
 
-    const scanResult = await LocalScanner.scan(fakeWorkspaceClaude);
+    // La remontée vers les dossiers parents s'arrête au dossier ouvert : rien n'est lu au-dessus
+    const scanResult = await LocalScanner.scan(fakeWorkspaceClaude, undefined, { claudeMemoryStopAt: localDir });
 
     // 1. L'Âme doit être CLAUDE.md, pas GEMINI.md
     const geminiSoul = scanResult.items.find((i) => i.id === 'GEMINI.md');

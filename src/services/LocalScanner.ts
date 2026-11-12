@@ -9,6 +9,8 @@ import { countTokens, countTokensForFile } from '../utils/tokenizer';
 import { claudeInjectedText, CLAUDE_INJECTED_TEXT_VARIANT } from '../claude/injectedText';
 import { claudeRuleStatus } from '../claude/ruleFrontmatter';
 import { claudeSkillBootStatus, claudeSkillListing, CLAUDE_SKILL_LINE_VARIANT } from '../claude/skillListing';
+import { claudeParentMemoryCandidates, claudeResolvedPathKey } from '../claude/memorySources';
+import { getEffectiveGlobalClaudePath } from '../utils/paths';
 import { measureAntigravitySoul } from '../utils/antigravityRules';
 import { ScenarioManager } from './ScenarioManager';
 import { appliesInAntigravity, buildAntigravityRuleItem, countsAtBoot, hasResourceWarning, soulSizeAdvice } from './antigravityRuleItem';
@@ -36,7 +38,12 @@ export class LocalScanner {
    */
   public static async scan(
     workspace: WorkspaceContext,
-    profile: AntigravityBehaviorProfile = ANTIGRAVITY_PROFILES['2.5.5']
+    profile: AntigravityBehaviorProfile = ANTIGRAVITY_PROFILES['2.5.5'],
+    /**
+     * Claude Code : `claudeMemoryStopAt` arrête la remontée vers les dossiers parents à ce dossier
+     * (compris). Réservé aux tests ; sans lui, la remontée va jusqu'à la racine du disque.
+     */
+    options: { claudeMemoryStopAt?: string } = {}
   ): Promise<{
     items: ResourceItem[];
     soulStat: TokenCategoryStat;
@@ -494,7 +501,32 @@ export class LocalScanner {
     // Claude Code : les trois fichiers de mémoire du projet, chargés tous les trois (mesuré, CC03 et CC04),
     // dans l'ordre de la documentation (CLAUDE.local.md après CLAUDE.md dans un même dossier). Le CLAUDE.md
     // garde son identifiant ; les deux autres ont pour identifiant leur chemin relatif, unique, qui ne
-    // forme aucune paire de nom avec le CLAUDE.md global
+    // forme aucune paire de nom avec le CLAUDE.md global.
+    // Les mêmes fichiers des dossiers parents viennent avant, de la racine du disque vers le projet, sans
+    // arrêt à la racine Git (src/claude/memorySources.ts) : identifiant « ../CLAUDE.md », « ../../… »,
+    // carte en lecture seule. Un fichier déjà compté n'a pas de seconde carte (chemin résolu, un seul
+    // ensemble pour toute la mémoire) : le CLAUDE.md global garde sa carte globale, même atteint comme
+    // fichier du projet (dossier personnel ouvert comme dossier de travail) ; puis les fichiers du projet
+    // gardent la leur ; entre parents, le premier dans l'ordre de chargement la garde.
+    const projectClaudeCandidates: Array<{ file: string; tool: 'claude-code'; claudeMemoryType: ClaudeMemoryType }> = [
+      { file: 'CLAUDE.md', tool: 'claude-code', claudeMemoryType: 'Project' },
+      { file: '.claude/CLAUDE.md', tool: 'claude-code', claudeMemoryType: 'Project' },
+      { file: 'CLAUDE.local.md', tool: 'claude-code', claudeMemoryType: 'Local' },
+    ];
+    const claudeMemoryKeys = new Set<string>();
+    /** Fichiers du projet déjà comptés ailleurs (le CLAUDE.md global, ou un autre fichier du projet) : sans carte. */
+    const claudeProjectFilesSkipped = new Set<string>();
+    if (targetTool === 'claude-code') {
+      const globalClaudeMd = path.join(getEffectiveGlobalClaudePath(), 'CLAUDE.md');
+      if (fs.existsSync(globalClaudeMd)) claudeMemoryKeys.add(claudeResolvedPathKey(globalClaudeMd));
+      for (const candidate of projectClaudeCandidates) {
+        const candidatePath = path.join(rootPath, candidate.file);
+        if (!fs.existsSync(candidatePath)) continue;
+        const key = claudeResolvedPathKey(candidatePath);
+        if (claudeMemoryKeys.has(key)) claudeProjectFilesSkipped.add(candidate.file);
+        else claudeMemoryKeys.add(key);
+      }
+    }
     const soulCandidates: Array<{
       file: string;
       tool: 'antigravity' | 'claude-code';
@@ -504,9 +536,8 @@ export class LocalScanner {
     }> =
       targetTool === 'claude-code'
         ? [
-            { file: 'CLAUDE.md', tool: 'claude-code', claudeMemoryType: 'Project' },
-            { file: '.claude/CLAUDE.md', tool: 'claude-code', claudeMemoryType: 'Project' },
-            { file: 'CLAUDE.local.md', tool: 'claude-code', claudeMemoryType: 'Local' },
+            ...claudeParentMemoryCandidates(rootPath, { stopAt: options.claudeMemoryStopAt }).map((c) => ({ ...c, tool: 'claude-code' as const })),
+            ...projectClaudeCandidates,
           ]
         : [
             { file: 'GEMINI.md', tool: 'antigravity' },
@@ -519,7 +550,15 @@ export class LocalScanner {
     for (const candidate of soulCandidates) {
       const candidatePath = candidate.absolutePath ?? path.join(rootPath, candidate.file);
       const soulId = candidate.inheritedFrom !== undefined ? `${candidate.inheritedFrom}/${candidate.file}` : candidate.file;
+      // Fichier de mémoire d'un parent pour Claude Code : hors du projet, en lecture seule
+      const isClaudeParent = candidate.tool === 'claude-code' && candidate.inheritedFrom !== undefined;
+      if (candidate.tool === 'claude-code' && !isClaudeParent && claudeProjectFilesSkipped.has(candidate.file)) continue;
       if (fs.existsSync(candidatePath) && fs.statSync(candidatePath).isFile()) {
+        if (isClaudeParent) {
+          const key = claudeResolvedPathKey(candidatePath);
+          if (claudeMemoryKeys.has(key)) continue;
+          claudeMemoryKeys.add(key);
+        }
         try {
           const stat = await fs.promises.stat(candidatePath);
           const rawContent = await fs.promises.readFile(candidatePath, 'utf8');
@@ -542,7 +581,8 @@ export class LocalScanner {
           const isWarningSize = measured?.warningSizeExceeded ?? false;
 
           soulCharTotal += measured ? measured.bootCharCount : fileCharCount;
-          if (!soulPathFound) soulPathFound = candidatePath;
+          // Le chemin de l'Âme L reste celui d'un fichier du projet pour Claude Code
+          if (!soulPathFound && !isClaudeParent) soulPathFound = candidatePath;
 
           items.push({
             id: soulId,
@@ -565,6 +605,7 @@ export class LocalScanner {
               locked: true,
               ...(candidate.inheritedFrom !== undefined ? { inheritedFrom: candidate.inheritedFrom } : {}),
               ...(candidate.claudeMemoryType ? { claudeMemoryType: candidate.claudeMemoryType } : {}),
+              ...(isClaudeParent ? { claudeReadOnly: { raison: 'Fichier hors du projet' as const } } : {}),
               ...(measured ? { byteSize: measured.byteSize, bootTokenCount: measured.bootTokenCount, bootCharCount: measured.bootCharCount } : {}),
               ...(measured && measured.truncatedBytes > 0 ? { truncatedBytes: measured.truncatedBytes, lostTokens: measured.lostTokens } : {}),
               ...(measured?.truncationRule ? { truncationRule: measured.truncationRule } : {}),

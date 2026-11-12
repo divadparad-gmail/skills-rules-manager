@@ -337,7 +337,8 @@ describe('Suite de Tests : comptage des tokens au démarrage d\'Antigravity (lot
     await writeFile(path.join(dir, '.claude', 'rules', 'cond.md'), '---\npaths: "src/**/*.ts"\n---\n# Cond\nCorps.');
     await writeFile(path.join(dir, '.mcp.json'), mcpJson);
 
-    const result = await LocalScanner.scan(workspaceFor(dir, 'claude-code'));
+    // La remontée de Claude Code vers les dossiers parents s'arrête au dossier ouvert : rien n'est lu au-dessus
+    const result = await LocalScanner.scan(workspaceFor(dir, 'claude-code'), undefined, { claudeMemoryStopAt: dir });
     for (const stat of [result.rulesStat, result.skillsStat, result.soulStat]) {
       for (const key of ['overheadTokens', 'conditionalIndexCount', 'truncatedCount', 'lostTokens']) {
         assert.ok(!(key in stat), `${stat.type} : ${key} absent en mode Claude Code`);
@@ -807,6 +808,8 @@ describe('Suite de Tests : comptage des tokens au démarrage d\'Antigravity (lot
       await fs.promises.mkdir(path.join(projetClaude, '.claude', 'rules'), { recursive: true });
       vscodeMock.workspace.workspaceFolders = [{ uri: { fsPath: projetClaude } }];
       vscodeMock.env.appName = 'Visual Studio Code';
+      // La remontée de Claude Code vers les dossiers parents s'arrête au dossier ouvert : rien n'est lu au-dessus
+      StateManager.setClaudeMemoryStopAtForTesting(projetClaude);
       const stateClaude = await StateManager.loadFullState(true);
       assert.strictEqual(stateClaude.workspace.tool, 'claude-code');
       assert.strictEqual('personalizationBudgetTotal' in stateClaude.stats, false, 'Claude Code : pas de personalizationBudgetTotal');
@@ -814,6 +817,7 @@ describe('Suite de Tests : comptage des tokens au démarrage d\'Antigravity (lot
       assert.strictEqual('personalizationAvailablePercentage' in stateClaude.stats, false, 'Claude Code : pas de personalizationAvailablePercentage');
     } finally {
       StateManager.setAntigravityProfileForTesting(null);
+      StateManager.setClaudeMemoryStopAtForTesting(null);
       vscodeMock.workspace.workspaceFolders = origFolders;
       vscodeMock.workspace.getConfiguration = origGetConfig;
       vscodeMock.env.appName = origAppName;

@@ -53,7 +53,10 @@ import { ManagerFullState, ResourceItem } from '../src/types';
  * - pour le jeu doublons-d6, absent de toute baseline publiée, aux mesures de la grille commitée
  *   SCENARIOS-CLAUDE-CODE.md (lignes CC38 à CC40, lot E4, 2.1.319) ;
  * - les tokens o200k de chaque élément lu, en valeurs exactes figées au lot C1, puis à chaque commit du
- *   lot C2a qui ajoute une source (le .claude/CLAUDE.md et le CLAUDE.local.md du projet au commit a3).
+ *   lot C2a qui ajoute une source (le .claude/CLAUDE.md et le CLAUDE.local.md du projet au commit a3, la
+ *   mémoire des dossiers parents au commit a4).
+ * La remontée vers les dossiers parents s'arrête au dossier du jeu (réglage de test de StateManager) :
+ * sans cet arrêt, l'oracle lirait les fichiers de mémoire réels au-dessus du dossier temporaire.
  * Les tokens de Claude (champ `tokens` de la baseline, en /context) ne sont pas comparés : ils le seront
  * avec le facteur de la jauge, à un lot ultérieur. Les éléments que Claude Code charge et que l'extension
  * ne lit pas encore sont listés à part (ATTENDUS_PLUS_TARD), et le test vérifie qu'ils sont absents.
@@ -89,6 +92,8 @@ const ATTENDUS_C1: Record<string, Vu[]> = {
     { cle: '<global>/CLAUDE.md', portee: 'global', auDemarrage: true, statut: 'âme', o200k: 27 },
     { cle: '<global>/rules/g-paths.md', portee: 'global', auDemarrage: false, statut: 'règle conditionnelle', o200k: 21 },
     { cle: '<global>/rules/g-perm.md', portee: 'global', auDemarrage: true, statut: 'règle permanente', o200k: 20 },
+    { cle: '<parent>/.claude/CLAUDE.md', portee: 'local', auDemarrage: true, statut: 'âme', o200k: 28 },
+    { cle: '<parent>/CLAUDE.md', portee: 'local', auDemarrage: true, statut: 'âme', o200k: 20 },
     { cle: '<projet>/.claude/CLAUDE.md', portee: 'local', auDemarrage: true, statut: 'âme', o200k: 24 },
     { cle: '<projet>/.claude/rules/p-paths.md', portee: 'local', auDemarrage: false, statut: 'règle conditionnelle', o200k: 24 },
     { cle: '<projet>/.claude/rules/p-perm.md', portee: 'local', auDemarrage: true, statut: 'règle permanente', o200k: 21 },
@@ -124,6 +129,9 @@ const ATTENDUS_C1: Record<string, Vu[]> = {
   'cout-f-projet-claude': [
     { cle: '<projet>/.claude/CLAUDE.md', portee: 'local', auDemarrage: true, statut: 'âme', o200k: 33 },
   ],
+  'cout-f-parent': [
+    { cle: '<parent>/CLAUDE.md', portee: 'local', auDemarrage: true, statut: 'âme', o200k: 33 },
+  ],
 };
 
 /**
@@ -135,9 +143,7 @@ const ATTENDUS_C1: Record<string, Vu[]> = {
 const ATTENDUS_PLUS_TARD: Record<string, string[]> = {
   niveaux: [
     '<global>/projects/<memoire>/memory/MEMORY.md',
-    '<parent>/.claude/CLAUDE.md',
     '<parent>/.claude/rules/par-regle.md',
-    '<parent>/CLAUDE.md',
     '<projet>/.claude/rules/sous/p-sous.md',
     '<projet>/import-1.md',
     '<projet>/import-2.md',
@@ -151,6 +157,7 @@ const ATTENDUS_PLUS_TARD: Record<string, string[]> = {
   // CC39 : la copie du parent n'est pas listée par Claude Code, et l'extension ne lit pas encore les parents
   'doublons-d6': ['<projet>/d6-commun.md', 'skill canari-d6-homo@<parent>'],
   'cout-f-projet-claude': [],
+  'cout-f-parent': [],
 };
 
 /**
@@ -169,12 +176,16 @@ const GRILLE_DOUBLONS_D6: EntreeContext[] = [
   { id: 'CC40:local', combinaison: 'doublons-d6', element: '<projet>/CLAUDE.local.md', attendu: { present: true, type: 'Local' } },
 ];
 
-const JEUX = ['niveaux', 'skills', 'skill-long-1500', 'declencheurs', 'cout-regle-paths', 'doublons-d6', 'cout-f-projet-claude'];
+const JEUX = ['niveaux', 'skills', 'skill-long-1500', 'declencheurs', 'cout-regle-paths', 'doublons-d6', 'cout-f-projet-claude', 'cout-f-parent'];
 /**
  * Combinaison de la baseline qui porte les entrées d'un jeu : le jeu cout-regle-paths est mesuré dans
- * cout-regles, et le jeu cout-f-projet-claude dans cout-f-quatre-chemins (CC13).
+ * cout-regles, et les jeux cout-f-projet-claude et cout-f-parent dans cout-f-quatre-chemins (CC13).
  */
-const COMBINAISON: Record<string, string> = { 'cout-regle-paths': 'cout-regles', 'cout-f-projet-claude': 'cout-f-quatre-chemins' };
+const COMBINAISON: Record<string, string> = {
+  'cout-regle-paths': 'cout-regles',
+  'cout-f-projet-claude': 'cout-f-quatre-chemins',
+  'cout-f-parent': 'cout-f-quatre-chemins',
+};
 
 const lister = (dir: string, base = ''): string[] =>
   fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
@@ -194,6 +205,7 @@ describe('Suite de Tests : oracle du comptage de Claude Code sur les fixtures in
 
   after(async () => {
     claudeGlobalPath = '';
+    StateManager.setClaudeMemoryStopAtForTesting(null);
     await fs.promises.rm(tempBaseDir, { recursive: true, force: true });
   });
 
@@ -216,11 +228,14 @@ describe('Suite de Tests : oracle du comptage de Claude Code sur les fixtures in
     vscodeMock.workspace.workspaceFolders = [{ uri: { fsPath: racines.projet } }];
     WorkspaceDetector.setOverriddenTool('claude-code');
     claudeGlobalPath = racines.global;
+    // La remontée vers les dossiers parents s'arrête au dossier du jeu (au-dessus de <parent>)
+    StateManager.setClaudeMemoryStopAtForTesting(path.join(tempBaseDir, jeu));
     try {
       const state = await StateManager.loadFullState(true);
       return { state, racines, contenus };
     } finally {
       claudeGlobalPath = '';
+      StateManager.setClaudeMemoryStopAtForTesting(null);
       WorkspaceDetector.setOverriddenTool(null);
       vscodeMock.workspace.workspaceFolders = origFolders;
     }

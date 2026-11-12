@@ -142,6 +142,10 @@ describe('Suite de Tests : comptage des règles et des CLAUDE.md de Claude Code 
     hasClaudeMd: fs.existsSync(path.join(dir, 'CLAUDE.md')),
   });
 
+  // La remontée vers les dossiers parents s'arrête au dossier ouvert : aucun fichier au-dessus du dossier
+  // temporaire n'est lu
+  const scanLocalClaude = (ws: WorkspaceContext) => LocalScanner.scan(ws, undefined, { claudeMemoryStopAt: ws.workspacePath! });
+
   test('1. Le frontmatter fermé par une ligne --- est retiré, avec les lignes vides qui le suivent', () => {
     assert.strictEqual(stripClaudeFrontmatter('---\ndescription: x\n---\n\n# Titre\nCorps.\n'), '# Titre\nCorps.\n');
     assert.strictEqual(stripClaudeFrontmatter('---\n---\n# Titre\n'), '# Titre\n', 'Un frontmatter vide est retiré');
@@ -228,7 +232,7 @@ describe('Suite de Tests : comptage des règles et des CLAUDE.md de Claude Code 
     await writeFile(path.join(dir, '.claude', 'rules', 'regle.md'), regle);
     await writeFile(path.join(dir, 'CLAUDE.md'), ame);
 
-    const result = await LocalScanner.scan(workspaceFor(dir));
+    const result = await scanLocalClaude(workspaceFor(dir));
     const rule = result.items.find((i) => i.type === 'rule' && i.id === 'regle')!;
     const soul = result.items.find((i) => i.type === 'soul' && i.id === 'CLAUDE.md')!;
     const regleInjectee = '# Règle\nCorps de la règle.\n';
@@ -290,7 +294,7 @@ describe('Suite de Tests : comptage des règles et des CLAUDE.md de Claude Code 
 
     const dir = path.join(tempBaseDir, 'yaml-invalide');
     await writeFile(path.join(dir, '.claude', 'rules', 'p-yaml-invalide.md'), brut);
-    const result = await LocalScanner.scan(workspaceFor(dir));
+    const result = await scanLocalClaude(workspaceFor(dir));
     const rule = result.items.find((i) => i.id === 'p-yaml-invalide')!;
     assert.strictEqual(rule.metadata?.isConditional, false);
     assert.strictEqual(rule.metadata?.claudeYamlInvalid, true);
@@ -316,7 +320,7 @@ describe('Suite de Tests : comptage des règles et des CLAUDE.md de Claude Code 
 
     const dir = path.join(tempBaseDir, 'motif');
     await writeFile(path.join(dir, '.claude', 'rules', 'motif.md'), cite);
-    const rule = (await LocalScanner.scan(workspaceFor(dir))).items.find((i) => i.id === 'motif')!;
+    const rule = (await scanLocalClaude(workspaceFor(dir))).items.find((i) => i.id === 'motif')!;
     assert.strictEqual(rule.metadata?.isConditional, true);
     assert.deepStrictEqual(rule.metadata?.claudeUnmatchablePatterns, ['src/[a.ts']);
     assert.strictEqual(rule.metadata?.claudeYamlInvalid, undefined);
@@ -328,7 +332,7 @@ describe('Suite de Tests : comptage des règles et des CLAUDE.md de Claude Code 
     const projet = path.join(tempBaseDir, 'paths-projet');
     await writeFile(path.join(projet, '.claude', 'rules', 'perm.md'), perm);
     await writeFile(path.join(projet, '.claude', 'rules', 'cond.md'), cond);
-    const local = await LocalScanner.scan(workspaceFor(projet));
+    const local = await scanLocalClaude(workspaceFor(projet));
     const carte = local.items.find((i) => i.id === 'cond')!;
     const corps = '# Conditionnelle\nCorps chargé à la demande.\n';
     assert.strictEqual(local.rulesStat.tokenCount, countTokens(perm), 'Seule la permanente compte au démarrage');
@@ -358,7 +362,7 @@ describe('Suite de Tests : comptage des règles et des CLAUDE.md de Claude Code 
     await writeFile(path.join(dir, '.claude', 'rules', 'cond.md'), '---\npaths: "src/**/*.ts"\n---\n# Cond\nCorps.');
     await writeFile(path.join(dir, '.mcp.json'), mcpJson);
 
-    const result = await LocalScanner.scan(workspaceFor(dir));
+    const result = await scanLocalClaude(workspaceFor(dir));
     assert.strictEqual(result.rulesStat.tokenCount, countTokens(permContent) + 0, 'Plus de forfait de 20 tokens par conditionnelle');
     // Le coût MCP reste celui du JSON brut jusqu'au lot qui le remplacera
     const mcp = await McpScanner.scanLocal(workspaceFor(dir));

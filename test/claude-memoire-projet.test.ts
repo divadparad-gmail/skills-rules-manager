@@ -8,9 +8,9 @@ import { test, describe, before, after } from 'node:test';
 // et <projet>/CLAUDE.local.md, chargés tous les trois (mesuré, CC03 et CC04).
 //
 // Tous les fichiers vivent dans un dossier temporaire au nom fixe, protégé par un fichier témoin : un
-// dossier de ce nom sans le témoin n'est ni vidé ni supprimé. Pendant chaque scan, un espion note toute
-// lecture du système de fichiers hors de ce dossier (hors code et données de l'extension) : la liste
-// doit rester vide.
+// dossier de ce nom sans le témoin n'est ni vidé ni supprimé. La remontée de Claude Code vers les
+// dossiers parents s'arrête à ce dossier. Pendant chaque scan, un espion note toute lecture du système
+// de fichiers hors de ce dossier (hors code et données de l'extension) : la liste doit rester vide.
 
 const DOSSIER = path.join(os.tmpdir(), 'claude-memoire-projet-a3');
 const TEMOIN = '.temoin-claude-memoire-projet';
@@ -140,7 +140,7 @@ const espace = (): WorkspaceContext => ({
 
 async function scanner(): Promise<{ local: Awaited<ReturnType<typeof LocalScanner.scan>>; global: Awaited<ReturnType<typeof GlobalScanner.scan>> }> {
   const { resultat, horsDossier } = await sousEspion(async () => ({
-    local: await LocalScanner.scan(espace()),
+    local: await LocalScanner.scan(espace(), undefined, { claudeMemoryStopAt: DOSSIER }),
     global: await GlobalScanner.scan(AG_GLOBAL, 'claude-code'),
   }));
   assert.deepStrictEqual(horsDossier, [], 'aucune lecture hors du dossier temporaire');
