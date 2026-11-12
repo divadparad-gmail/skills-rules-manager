@@ -1,0 +1,8 @@
+---
+name: canari-e5-tem
+description: Skill de mesure E5 pour les réglages skillOverrides. Les quatre skills de ce groupe portent exactement cette description, assez longue pour que la ligne listée avec sa description pèse nettement plus que le nom seul, et que les états du réglage se lisent par les tokens.
+---
+
+# Mesure E5
+
+Corps du skill, jamais chargé au démarrage.

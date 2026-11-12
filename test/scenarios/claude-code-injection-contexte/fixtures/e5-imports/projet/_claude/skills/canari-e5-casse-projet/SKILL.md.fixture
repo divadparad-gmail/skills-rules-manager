@@ -1,0 +1,8 @@
+---
+name: canari-e5-casse
+description: Skill de mesure E5, copie du projet, description longue. Elle est volontairement bien plus longue que la copie courte, pour que sa ligne se distingue sans ambiguïté dans la liste des skills, par ses seuls tokens, sans aucun calcul extérieur.
+---
+
+# Mesure E5
+
+Corps du skill, jamais chargé au démarrage.

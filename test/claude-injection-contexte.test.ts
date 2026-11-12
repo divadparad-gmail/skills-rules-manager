@@ -62,6 +62,13 @@ const JEUX: Record<string, { cibles: string[]; scenarios: string[] }> = {
   'doublons-d6': { cibles: ['global', 'parent', 'projet'], scenarios: ['CC38', 'CC39', 'CC40'] },
   // Second calibrage du lot E4 (décision D-1.2b du 2026-11-11), sous claude-opus-5 seulement
   'cout-calibrage-2': { cibles: ['projet'], scenarios: ['CC37'] },
+  // Lot E5 (2026-11-12) : vérifications gratuites avant la lecture des sources oubliées, mesurées par /context
+  // seulement, sans canari. Combinaison A : coupe de MEMORY.md par les lignes, imports (code, cycle, règle,
+  // frontmatter et commentaire, extérieurs, parent), homonymes de skills ; B : coupe par la taille, copie
+  // personnelle paths, skillOverrides ; C : AGENTS.md sans CLAUDE.md, autoMemoryEnabled du projet.
+  'e5-imports': { cibles: ['global', 'parent', 'projet'], scenarios: ['CC41', 'CC42', 'CC43', 'CC44', 'CC45', 'CC46', 'CC48', 'CC49', 'CC54'] },
+  'e5-coupe-octets': { cibles: ['global', 'projet'], scenarios: ['CC50', 'CC51', 'CC52'] },
+  'e5-agents': { cibles: ['global', 'parent', 'projet'], scenarios: ['CC47', 'CC53'] },
 };
 /** Les textes de chaque jeu de calibrage (lot E4), chacun importé seul puis doublé (suffixe -x2), et le titre de son CLAUDE.md. */
 const CALIBRAGES: Record<string, { titre: string; textes: string[] }> = {
@@ -224,7 +231,7 @@ describe('Suite de Tests : Injection de contexte Claude Code (fixtures inertes, 
     const presents = listFiles(FIXTURES).sort();
     const attendus = INVENTAIRE.map(([rel]) => rel).sort();
     assert.deepStrictEqual(presents, attendus, 'fixtures/ doit contenir exactement les fichiers de INVENTAIRE');
-    assert.strictEqual(attendus.length, 91);
+    assert.strictEqual(attendus.length, 132);
     const ecarts = INVENTAIRE.filter(([rel, sha]) => sha256(lire(rel)) !== sha).map(([rel]) => `${rel} : empreinte observée ${sha256(lire(rel))}`);
     assert.deepStrictEqual(ecarts, [], 'Une fixture a changé : la baseline devient caduque. Mettre à jour INVENTAIRE seulement si le changement est voulu.');
   });
@@ -282,7 +289,7 @@ describe('Suite de Tests : Injection de contexte Claude Code (fixtures inertes, 
     assert.deepStrictEqual([...ciblesObservees.keys()].sort(), Object.keys(JEUX).sort());
     for (const [jeu, { cibles, scenarios }] of Object.entries(JEUX)) {
       assert.deepStrictEqual([...ciblesObservees.get(jeu)!].sort(), [...cibles].sort(), jeu);
-      assert.ok(scenarios.length > 0 && scenarios.every((s) => /^CC(0[1-9]|[123]\d|40)$/.test(s)), jeu);
+      assert.ok(scenarios.length > 0 && scenarios.every((s) => /^CC(0[1-9]|[1-4]\d|5[0-4])$/.test(s)), jeu);
     }
 
     // Conversion : les noms actifs n'apparaissent qu'après conversion, dans l'espace isolé
@@ -306,7 +313,7 @@ describe('Suite de Tests : Injection de contexte Claude Code (fixtures inertes, 
     }
   });
 
-  test('4. Canaris : chacun est unique dans fixtures/ et mcp/, et les jeux cout-* n\'en portent aucun', () => {
+  test('4. Canaris : chacun est unique dans fixtures/ et mcp/, et les jeux cout-* et e5-* n\'en portent aucun', () => {
     const tous = INVENTAIRE.flatMap(([, , canaris]) => canaris);
     assert.strictEqual(tous.length, NOMBRE_CANARIS);
     assert.strictEqual(new Set(tous).size, NOMBRE_CANARIS, 'Un canari est déclaré deux fois');
@@ -320,6 +327,8 @@ describe('Suite de Tests : Injection de contexte Claude Code (fixtures inertes, 
       const trouves = (lire(rel).match(CANARY_PATTERN) ?? []).sort();
       if (JSON.stringify(trouves) !== JSON.stringify([...canaris].sort())) ecarts.push(`${rel} : ${trouves.join(', ') || 'aucun'}`);
       if (rel.startsWith('cout-') && canaris.length > 0) ecarts.push(`${rel} : un jeu de mesure ne porte aucun canari`);
+      // Lot E5 : mesuré par /context seulement, sans aucun canari
+      if (rel.startsWith('e5-') && (canaris.length > 0 || /CANARI-/.test(lire(rel)))) ecarts.push(`${rel} : un jeu du lot E5 ne porte aucun canari`);
     }
     // Le serveur, seul autre fichier de mcp/, n'en contient aucun
     const dansServeur = fs.readFileSync(SERVEUR, 'utf8').match(CANARY_PATTERN) ?? [];
@@ -409,16 +418,75 @@ describe('Suite de Tests : Injection de contexte Claude Code (fixtures inertes, 
       assert.deepStrictEqual(lire(rel).split('\n').filter((l) => l.includes('@')), ['@d6-commun.md'], rel);
     }
     assert.ok(!lire('doublons-d6/projet/d6-commun.md.fixture').includes('@'));
+
+    // Lot E5 : chaque coupe se lit par un nombre de lignes, n = N_ref × c(MEMORY.md) ÷ c(référence), avec des lignes
+    // identiques dans le fichier mesuré et dans sa règle de référence (tailles en octets UTF-8 et en caractères, en LF)
+    const octets = (t: string) => Buffer.byteLength(t, 'utf8');
+    const caracteres = (t: string) => [...t].length;
+    const lignesIdentiques = (rel: string, n: number): string => {
+      const lignes = lire(rel).split('\n');
+      assert.strictEqual(lignes.pop(), '', `${rel} : une fin de ligne finale`);
+      assert.strictEqual(lignes.length, n, `${rel} : ${lignes.length} lignes`);
+      assert.strictEqual(new Set(lignes).size, 1, `${rel} : lignes identiques`);
+      return `${lignes[0]}\n`;
+    };
+    // CC41 (V1) : 250 lignes ASCII de 90 octets (22 500 octets, sous 25 000) ; référence de 100 lignes
+    const v1 = lignesIdentiques('e5-imports/global/projects/__projet__/memory/MEMORY.md.fixture', 250);
+    assert.strictEqual(lignesIdentiques('e5-imports/projet/_claude/rules/e5-ref-lignes.md.fixture', 100), v1);
+    assert.ok(/^[\x00-\x7f]*$/.test(v1) && octets(v1) === 90);
+    assert.strictEqual(octets(lire('e5-imports/global/projects/__projet__/memory/MEMORY.md.fixture')), 22500);
+    // CC50 (V10) : 180 lignes de 200 octets et 160 caractères (36 000 octets, 28 800 caractères) ; référence de 40 lignes
+    const v10 = lignesIdentiques('e5-coupe-octets/global/projects/__projet__/memory/MEMORY.md.fixture', 180);
+    assert.strictEqual(lignesIdentiques('e5-coupe-octets/projet/_claude/rules/e5-ref-octets.md.fixture', 40), v10);
+    assert.deepStrictEqual([octets(v10), caracteres(v10), v10.length], [200, 160, 160]);
+    const m10 = lire('e5-coupe-octets/global/projects/__projet__/memory/MEMORY.md.fixture');
+    assert.deepStrictEqual([octets(m10), caracteres(m10)], [36000, 28800]);
+    // Les cinq fenêtres de V10 (de la partie entière de la coupe moins 0,8 ligne à la coupe plus 1 ligne) sont disjointes
+    const coupes = [25000 / 200, 25600 / 200, 25000 / 160, 25600 / 160, 180];
+    const fenetres = coupes.map((v) => [Math.floor(v) - 0.8, v + 1]).sort((a, b) => a[0] - b[0]);
+    for (let i = 1; i < fenetres.length; i++) assert.ok(fenetres[i][0] > fenetres[i - 1][1], `fenêtres ${i - 1} et ${i}`);
+
+    // CC42 à CC46 et CC54 : les imports du CLAUDE.md du projet, de la règle et du CLAUDE.md du parent
+    const importsDe = (rel: string) => lire(rel).split('\n').filter((l) => l.includes('@'));
+    assert.deepStrictEqual(importsDe('e5-imports/projet/CLAUDE.md.fixture'), [
+      '@e5-code-bloc.md', 'Le chemin `@e5-code-segment.md` est cité dans un segment de code.', '"@e5-guillemets.md"',
+      '@e5-code-temoin.md', '@e5-cycle-1.md', '@e5-fm-sans.md', '@e5-fm-avec.md', '@e5-comm-avec.md', '@../e5-exterieur.md',
+    ]);
+    assert.ok(lire('e5-imports/projet/CLAUDE.md.fixture').includes('```text\n@e5-code-bloc.md\n```\n'), 'import dans un bloc clôturé');
+    assert.deepStrictEqual(importsDe('e5-imports/projet/e5-cycle-1.md.fixture'), ['@e5-cycle-2.md']);
+    assert.deepStrictEqual(importsDe('e5-imports/projet/e5-cycle-2.md.fixture'), ['@e5-cycle-1.md']);
+    assert.deepStrictEqual(importsDe('e5-imports/projet/_claude/rules/e5-regle-import.md.fixture'), ['@../../e5-regle-cible.md', '@e5-regle-cible-cwd.md']);
+    assert.deepStrictEqual(importsDe('e5-imports/parent/CLAUDE.md.fixture'), ['@e5-parent-cible.md', '@projet/e5-parent-vers-projet.md']);
+    // CC45 (V5) : trois imports de même corps, l'un sans rien, l'un avec un frontmatter, l'un avec un commentaire de bloc
+    const corps5 = lire('e5-imports/projet/e5-fm-sans.md.fixture');
+    const avecFm = decouper(lire('e5-imports/projet/e5-fm-avec.md.fixture'));
+    assert.ok(avecFm.fm !== null && avecFm.fm.length === 8 && avecFm.corps === corps5, 'frontmatter de 8 lignes, puis le même corps');
+    const avecComm = lire('e5-imports/projet/e5-comm-avec.md.fixture');
+    assert.ok(avecComm.startsWith('<!--\n') && avecComm.endsWith(`\n-->\n${corps5}`), 'commentaire de bloc, puis le même corps');
+    assert.strictEqual(avecComm.split('\n').indexOf('-->'), 9, 'commentaire de 8 lignes');
+    for (const t of [corps5, ...(avecFm.fm ?? []), avecComm]) assert.ok(!t.includes('@'), 'aucun import dans les fichiers de V5');
+    for (const rel of ['e5-code-bloc', 'e5-code-segment', 'e5-guillemets', 'e5-code-temoin', 'e5-regle-cible', 'e5-regle-cible-cwd', 'e5-parent-vers-projet']) {
+      assert.ok(!lire(`e5-imports/projet/${rel}.md.fixture`).includes('@'), rel);
+    }
+    // CC47 (V7) : aucun fichier de mémoire du projet ni du parent dans le jeu d'AGENTS.md
+    const agents = INVENTAIRE.map(([rel]) => rel).filter((rel) => rel.startsWith('e5-agents/'));
+    assert.ok(!agents.some((rel) => /\/(CLAUDE\.md|CLAUDE\.local\.md)\.fixture$/.test(rel)), 'aucun CLAUDE.md dans e5-agents');
   });
 
   test('6. Skills et plugin : noms, disable-model-invocation, longueurs de description, contenus de mesure', () => {
     const canari = (code: string) => INVENTAIRE.flatMap(([, , c]) => c).find((c) => c.startsWith(`CANARI-CC-${code}-`))!;
     const skills = INVENTAIRE.map(([rel]) => rel).filter((rel) => rel.endsWith('/SKILL.md.fixture'));
-    assert.strictEqual(skills.length, 15);
+    assert.strictEqual(skills.length, 29);
+    // Lot E5, CC48 : seuls ces six skills ont un name différent de leur dossier (clé d'homonymie : name ou dossier, casse)
+    const NAME_HORS_DOSSIER: Record<string, string> = {
+      'canari-e5-meme-a': 'canari-e5-meme', 'canari-e5-meme-b': 'canari-e5-meme',
+      'canari-e5-cle-perso': 'canari-e5-cle', 'canari-e5-cle-projet': 'canari-e5-cle',
+      'canari-e5-casse-perso': 'Canari-E5-Casse', 'canari-e5-casse-projet': 'canari-e5-casse',
+    };
     for (const rel of skills) {
       const { fm } = decouper(lire(rel));
       const dossier = rel.split('/').slice(-2)[0];
-      assert.strictEqual(champ(fm, 'name'), dossier, `${rel} : name = dossier`);
+      assert.strictEqual(champ(fm, 'name'), NAME_HORS_DOSSIER[dossier] ?? dossier, `${rel} : name = dossier, sauf exception déclarée`);
       assert.match(dossier, /^canari-/, rel);
       assert.ok((champ(fm, 'description') ?? '').length > 0, rel);
     }
@@ -444,6 +512,30 @@ describe('Suite de Tests : Injection de contexte Claude Code (fixtures inertes, 
     const homoParent = description('doublons-d6/parent/_claude/skills/canari-d6-homo/SKILL.md.fixture');
     const homoProjet = description('doublons-d6/projet/_claude/skills/canari-d6-homo/SKILL.md.fixture');
     assert.ok(homoProjet.length > 2 * homoParent.length, 'la description du projet est nettement plus longue');
+
+    // Lot E5 : chaque paire distingue ses deux copies par la longueur de leur description (au moins trois fois)
+    const e5 = (jeu: string, cible: string, dossier: string) =>
+      `${jeu}/${cible === 'global' ? 'global/skills' : 'projet/_claude/skills'}/${dossier}/SKILL.md.fixture`;
+    for (const [jeu, courte, longue] of [
+      ['e5-imports', e5('e5-imports', 'global', 'canari-e5-meme-a'), e5('e5-imports', 'global', 'canari-e5-meme-b')],
+      ['e5-imports', e5('e5-imports', 'global', 'canari-e5-cle-perso'), e5('e5-imports', 'projet', 'canari-e5-cle-projet')],
+      ['e5-imports', e5('e5-imports', 'global', 'canari-e5-casse-perso'), e5('e5-imports', 'projet', 'canari-e5-casse-projet')],
+      ['e5-imports', e5('e5-imports', 'global', 'canari-e5-manuel'), e5('e5-imports', 'projet', 'canari-e5-manuel')],
+      ['e5-coupe-octets', e5('e5-coupe-octets', 'global', 'canari-e5-paths'), e5('e5-coupe-octets', 'projet', 'canari-e5-paths')],
+    ]) {
+      assert.ok(description(longue).length >= 3 * description(courte).length, `${jeu} : ${courte} et ${longue}`);
+    }
+    // CC49 (V9) et CC51 (V11) : la copie personnelle est manuelle, ou limitée par un motif qui ne correspond à rien
+    assert.strictEqual(champ(decouper(lire(e5('e5-imports', 'global', 'canari-e5-manuel'))).fm, 'disable-model-invocation'), 'true');
+    assert.deepStrictEqual(decouper(lire(e5('e5-coupe-octets', 'global', 'canari-e5-paths'))).fm!.slice(-2), ['paths:', '  - "**/*.e5-aucun"']);
+    for (const rel of skills.filter((r) => r.startsWith('e5-') && !r.includes('canari-e5-manuel') && !r.includes('/global/skills/canari-e5-paths/'))) {
+      const fm = decouper(lire(rel)).fm!;
+      assert.ok(!fm.some((l) => l.startsWith('disable-model-invocation') || l.startsWith('paths')), `${rel} : skill listé normalement`);
+    }
+    // CC52 (V12) : quatre skills du projet de même description et de noms de même longueur
+    const v12 = ['canari-e5-tem', 'canari-e5-off', 'canari-e5-nom', 'canari-e5-inv'];
+    assert.strictEqual(new Set(v12.map((n) => description(e5('e5-coupe-octets', 'projet', n)))).size, 1, 'même description');
+    assert.strictEqual(new Set(v12.map((n) => n.length)).size, 1, 'noms de même longueur');
 
     // Plugin : manifeste JSON valide, nommé canari-plugin
     const plugin = jsonDe('skills/plugin/canari-plugin/_claude-plugin/plugin.json.fixture');
@@ -485,6 +577,16 @@ describe('Suite de Tests : Injection de contexte Claude Code (fixtures inertes, 
     };
     assert.deepStrictEqual(commande('hook-sortie'), { type: 'command', command: `echo ${canari('HOOK')}` });
     assert.deepStrictEqual(commande('hook-muet'), { type: 'command', command: 'exit 0' });
+
+    // Lot E5 : les deux fichiers de réglages du projet portent exactement ces clés (CC52 et CC53), et aucun autre
+    // fichier de réglages n'est déployé par le lot (le profil isolé refuse un settings.json à sa racine)
+    assert.deepStrictEqual(jsonDe('e5-coupe-octets/projet/_claude/settings.local.json.fixture'), {
+      skillOverrides: { 'canari-e5-off': 'off', 'canari-e5-nom': 'name-only', 'canari-e5-inv': 'user-invocable-only' },
+    });
+    assert.deepStrictEqual(jsonDe('e5-agents/projet/_claude/settings.json.fixture'), { autoMemoryEnabled: false });
+    assert.deepStrictEqual(INVENTAIRE.map(([rel]) => rel).filter((rel) => rel.startsWith('e5-') && /settings(\.local)?\.json\.fixture$/.test(rel)).sort(), [
+      'e5-agents/projet/_claude/settings.json.fixture', 'e5-coupe-octets/projet/_claude/settings.local.json.fixture',
+    ]);
   });
 
   test('8. Le jeu complet (CC35, CC36) se combine sans collision de chemins', () => {

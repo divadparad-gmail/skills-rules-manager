@@ -1,0 +1,7 @@
+{
+  "skillOverrides": {
+    "canari-e5-off": "off",
+    "canari-e5-nom": "name-only",
+    "canari-e5-inv": "user-invocable-only"
+  }
+}

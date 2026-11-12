@@ -1,0 +1,17 @@
+<!--
+Commentaire de bloc de mesure du lot E5, assez long pour peser plusieurs dizaines de tokens.
+Il ne doit jamais entrer dans le contexte si les commentaires HTML de bloc sont retirés.
+Il est placé en tête du fichier importé, avant le même corps que les deux autres fichiers.
+Chaque ligne de ce commentaire ajoute des tokens faciles à repérer dans la mesure.
+La comparaison se fait avec le fichier importé sans commentaire, de même corps.
+Aucun nom de personne, aucun chemin et aucune donnée locale ne figurent ici.
+Ce commentaire compte huit lignes de texte, entre ses deux balises.
+Fin du commentaire de bloc de mesure du lot E5.
+-->
+# Consignes de mesure
+
+- Écrire des phrases complètes.
+- Garder les fichiers courts.
+- Nommer les fichiers en français.
+- Tester avant de livrer.
+- Relire chaque message.

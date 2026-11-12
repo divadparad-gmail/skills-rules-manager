@@ -306,6 +306,211 @@
       "canaris": []
     },
     {
+      "chemin": "e5-agents/global/projects/__projet__/memory/MEMORY.md.fixture",
+      "sha256": "6f0365cb10ce4a4fa87a330721f42ea4fdcb404545385cfc9c9efa4bda9e661c",
+      "canaris": []
+    },
+    {
+      "chemin": "e5-agents/parent/AGENTS.md.fixture",
+      "sha256": "013a4fde2970e8b43ff8cab414a29e2ee7fdde2f0ae89ab7a0734f926f17c86d",
+      "canaris": []
+    },
+    {
+      "chemin": "e5-agents/projet/AGENTS.md.fixture",
+      "sha256": "5aa92c7383c1cd57652f61bc02036dc6db7839509166dc317d2552c34b61cc4d",
+      "canaris": []
+    },
+    {
+      "chemin": "e5-agents/projet/_claude/AGENTS.md.fixture",
+      "sha256": "53665a46d98886b0ef3fc7592870f16b2473217aa6c7e7f6e6c0f84366fa37c9",
+      "canaris": []
+    },
+    {
+      "chemin": "e5-agents/projet/_claude/settings.json.fixture",
+      "sha256": "930912b39eb0312c2210e78d13c25de2565ecec3a44d702865fb16f2c0274c91",
+      "canaris": []
+    },
+    {
+      "chemin": "e5-coupe-octets/global/projects/__projet__/memory/MEMORY.md.fixture",
+      "sha256": "4d4ec9534f86107d5bb0455c3ee0cd3fa1d4ba1a13e78b7c637bb571f84fca0c",
+      "canaris": []
+    },
+    {
+      "chemin": "e5-coupe-octets/global/skills/canari-e5-paths/SKILL.md.fixture",
+      "sha256": "57b6f97bcf6f1105e8a6e5e0ff49caec069c028c040eaaf96c9dd639d61d409b",
+      "canaris": []
+    },
+    {
+      "chemin": "e5-coupe-octets/projet/_claude/rules/e5-ref-octets.md.fixture",
+      "sha256": "d785fa818549982426feb8f80c4384658f11242b0cc63637bd1ceeb1bef336f2",
+      "canaris": []
+    },
+    {
+      "chemin": "e5-coupe-octets/projet/_claude/settings.local.json.fixture",
+      "sha256": "33e837c706c09f43536ea8fa78ad371f51f9fd1ed763e4e49eea8b12a5e61c1e",
+      "canaris": []
+    },
+    {
+      "chemin": "e5-coupe-octets/projet/_claude/skills/canari-e5-inv/SKILL.md.fixture",
+      "sha256": "df59cf7a5fd686ea0b47be2efe399f57d9f646c159836a53c6c04a235416b4be",
+      "canaris": []
+    },
+    {
+      "chemin": "e5-coupe-octets/projet/_claude/skills/canari-e5-nom/SKILL.md.fixture",
+      "sha256": "646b844073ec0f5e2423871284bbbc0ca3459dceefe00b0286670c4b9260c952",
+      "canaris": []
+    },
+    {
+      "chemin": "e5-coupe-octets/projet/_claude/skills/canari-e5-off/SKILL.md.fixture",
+      "sha256": "18b3ecfd836573984588e000d7907ad8e2357786efddb68ef7719049d770a21f",
+      "canaris": []
+    },
+    {
+      "chemin": "e5-coupe-octets/projet/_claude/skills/canari-e5-paths/SKILL.md.fixture",
+      "sha256": "131b7f5445f648318c8d24378c52d78c1366b9b81db3564115af94b6fa17811c",
+      "canaris": []
+    },
+    {
+      "chemin": "e5-coupe-octets/projet/_claude/skills/canari-e5-tem/SKILL.md.fixture",
+      "sha256": "106d4c0b57a20fd7639cdfe62da9c648d49f1890d0e6d04f9d0032f74614c5c6",
+      "canaris": []
+    },
+    {
+      "chemin": "e5-imports/global/projects/__projet__/memory/MEMORY.md.fixture",
+      "sha256": "3f01e9ccc1456f6ce5f620ad0244d8d7a1d77a83932f86d91506d47ab632bcb6",
+      "canaris": []
+    },
+    {
+      "chemin": "e5-imports/global/skills/canari-e5-casse-perso/SKILL.md.fixture",
+      "sha256": "2efb72cb44a82d92f23c7d0de2fa620ecda5f7ecee0a9db5273ddb16fd3df713",
+      "canaris": []
+    },
+    {
+      "chemin": "e5-imports/global/skills/canari-e5-cle-perso/SKILL.md.fixture",
+      "sha256": "c4449215439202d4c50df4159ae389b1b1570d9df1934811dd0d77d27f7af2de",
+      "canaris": []
+    },
+    {
+      "chemin": "e5-imports/global/skills/canari-e5-manuel/SKILL.md.fixture",
+      "sha256": "958d947c4bc4d8742759e98fdbe4506c40a6b35aba8b007181d63bb87f5cda31",
+      "canaris": []
+    },
+    {
+      "chemin": "e5-imports/global/skills/canari-e5-meme-a/SKILL.md.fixture",
+      "sha256": "aa0e310f102abe5a86c2f1e61d255351018f3faa322903397150956d46dcd8a0",
+      "canaris": []
+    },
+    {
+      "chemin": "e5-imports/global/skills/canari-e5-meme-b/SKILL.md.fixture",
+      "sha256": "58367896a8bd93d2eaf127b2862ebf146c8378556cb9922178fff735cd96aabe",
+      "canaris": []
+    },
+    {
+      "chemin": "e5-imports/parent/CLAUDE.md.fixture",
+      "sha256": "7830520c24a0165727dad05ce335e8029ed4f1ba56e0ce0e01b5d59dbd83acd7",
+      "canaris": []
+    },
+    {
+      "chemin": "e5-imports/parent/e5-exterieur.md.fixture",
+      "sha256": "63abd3d1150231fdf932e39d230f09293f43d74990e75876c7d48b82ce925027",
+      "canaris": []
+    },
+    {
+      "chemin": "e5-imports/parent/e5-parent-cible.md.fixture",
+      "sha256": "4c2998bf61c07040b59065aaf02c35ef19e0681fc7a72753f7833b165e633fde",
+      "canaris": []
+    },
+    {
+      "chemin": "e5-imports/projet/CLAUDE.md.fixture",
+      "sha256": "b7c5c8bc99f1935bb0e4f15db9b55c628dfd68915b407cdf25ecd4636b1450bb",
+      "canaris": []
+    },
+    {
+      "chemin": "e5-imports/projet/_claude/rules/e5-ref-lignes.md.fixture",
+      "sha256": "c44913368846737457f7e18e4df7ab8a391a9edc4b13f325c26dd1c05af673cd",
+      "canaris": []
+    },
+    {
+      "chemin": "e5-imports/projet/_claude/rules/e5-regle-import.md.fixture",
+      "sha256": "eba32b4c7399551c719d364889eddad6bef082bf225480c00ff382c17a3a1f7d",
+      "canaris": []
+    },
+    {
+      "chemin": "e5-imports/projet/_claude/skills/canari-e5-casse-projet/SKILL.md.fixture",
+      "sha256": "88c1262c8548cfc1b00e2654e40718bf09bb2637453931a3ae8aac39a43c0020",
+      "canaris": []
+    },
+    {
+      "chemin": "e5-imports/projet/_claude/skills/canari-e5-cle-projet/SKILL.md.fixture",
+      "sha256": "7d9cf3a9b6a775d764cf1ce252ab7452b03ee9d070da56a293b06bee82be7ee5",
+      "canaris": []
+    },
+    {
+      "chemin": "e5-imports/projet/_claude/skills/canari-e5-manuel/SKILL.md.fixture",
+      "sha256": "99b4859448935b8964db796fb5ad56cadaecc3de1b11e81a634573f4f1dc58a3",
+      "canaris": []
+    },
+    {
+      "chemin": "e5-imports/projet/e5-code-bloc.md.fixture",
+      "sha256": "f30359f471a480a0ff342a92242433219011f4ec542fe9dfca22bb9d64f6b12c",
+      "canaris": []
+    },
+    {
+      "chemin": "e5-imports/projet/e5-code-segment.md.fixture",
+      "sha256": "088dc9b4c41e1e27b2ea8ad7a7e58fa5fe693b1847f501ebd56e84f26df89a01",
+      "canaris": []
+    },
+    {
+      "chemin": "e5-imports/projet/e5-code-temoin.md.fixture",
+      "sha256": "dbaa857384f7eb60101c50c91e97e2fc102e8117225b22b44093b73977fbd6e2",
+      "canaris": []
+    },
+    {
+      "chemin": "e5-imports/projet/e5-comm-avec.md.fixture",
+      "sha256": "87221132d3b81b36ce6c92aa18c257337c6e0c509b13c298e30fc58aa76191bd",
+      "canaris": []
+    },
+    {
+      "chemin": "e5-imports/projet/e5-cycle-1.md.fixture",
+      "sha256": "c881021a939fbb4fcebb42a7b0a26871b10276e13185acb0b07ffe1b12b62343",
+      "canaris": []
+    },
+    {
+      "chemin": "e5-imports/projet/e5-cycle-2.md.fixture",
+      "sha256": "66b2d6f3e2f8e58004bc1388925002e2b93c422d1fb2112e402386c9cca6e866",
+      "canaris": []
+    },
+    {
+      "chemin": "e5-imports/projet/e5-fm-avec.md.fixture",
+      "sha256": "9ea8bab59a28a8282916b80a84870b12ba77d9732050175c575089a658033b26",
+      "canaris": []
+    },
+    {
+      "chemin": "e5-imports/projet/e5-fm-sans.md.fixture",
+      "sha256": "ab3dc35ed5f123a9f83fd4b4e6532f914fea1ebb8aa39617fa7223eff4ef8b2f",
+      "canaris": []
+    },
+    {
+      "chemin": "e5-imports/projet/e5-guillemets.md.fixture",
+      "sha256": "076c710861fb5cbfb7ed5f7538bed0c129b731d8c2e0d77b19b2dbc2ef01a49d",
+      "canaris": []
+    },
+    {
+      "chemin": "e5-imports/projet/e5-parent-vers-projet.md.fixture",
+      "sha256": "a5319183f18415e068797d10bffe3b9d9ddc2037e7102842a078a230f7d83a3e",
+      "canaris": []
+    },
+    {
+      "chemin": "e5-imports/projet/e5-regle-cible-cwd.md.fixture",
+      "sha256": "c17125066eb3768a31f59182e34d772434b31d46a3a0278c8a6482de4f73314d",
+      "canaris": []
+    },
+    {
+      "chemin": "e5-imports/projet/e5-regle-cible.md.fixture",
+      "sha256": "9003b9431af6bbecc1ee91dacd1510c0819e0329799acb7c5ef1a01fb38d7460",
+      "canaris": []
+    },
+    {
       "chemin": "hook-muet/projet/_claude/settings.json.fixture",
       "sha256": "622162b72cf622d722dc8e259becf19c208304bffc58a31a52475a48c778b0e5",
       "canaris": []

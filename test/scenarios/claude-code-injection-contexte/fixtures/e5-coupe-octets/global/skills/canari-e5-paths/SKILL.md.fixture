@@ -1,0 +1,10 @@
+---
+name: canari-e5-paths
+description: Skill de mesure E5, copie personnelle limitée par paths, description courte.
+paths:
+  - "**/*.e5-aucun"
+---
+
+# Mesure E5
+
+Corps du skill, jamais chargé au démarrage.

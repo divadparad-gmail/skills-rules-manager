@@ -1,0 +1,17 @@
+---
+titre: frontmatter de mesure du lot E5, assez long pour peser plusieurs dizaines de tokens
+description: une valeur qui ne doit jamais entrer dans le contexte si le frontmatter est retiré
+auteur: la suite de mesure de l extension, sans aucun nom de personne
+version: une chaîne de version écrite en toutes lettres pour la mesure
+portee: le fichier importé par le CLAUDE.md du projet, et lui seul
+motif: comparer ce fichier au même corps importé sans frontmatter
+remarque: chaque ligne de ce bloc ajoute des tokens faciles à repérer
+fin: dernière ligne du frontmatter de mesure du lot E5
+---
+# Consignes de mesure
+
+- Écrire des phrases complètes.
+- Garder les fichiers courts.
+- Nommer les fichiers en français.
+- Tester avant de livrer.
+- Relire chaque message.
