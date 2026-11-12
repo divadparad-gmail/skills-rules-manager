@@ -14,6 +14,14 @@ const K = require(path.join(ROOT, 'test', 'scenarios', 'scripts', 'compare-injec
 const B = require(path.join(ROOT, 'test', 'scenarios', 'scripts', 'sonde-claude-code-baseline.js'));
 const S = require(path.join(ROOT, 'test', 'scenarios', 'scripts', 'sonde-claude-code.js'));
 const COMPARE = process.env.INJECTION_CLAUDE_COMPARE === '1';
+/** Les abonnements acceptés par le lanceur, lus dans sa liste : aucun n'est écrit ici en dur. */
+const ABONNEMENTS: string[] = S.ABONNEMENTS;
+/** L'abonnement fictif des rapports d'exemple. */
+const ABONNEMENT_EXEMPLE = 'abonnement-exemple';
+/** Les textes d'abonnement interdits dans une baseline : chaque valeur acceptée, et la valeur fictive. */
+const ABONNEMENTS_INTERDITS = [...ABONNEMENTS, ABONNEMENT_EXEMPLE].map((v) => `"${v}"`);
+/** Un rapport dont le champ abonnement porte la valeur donnée. */
+const avecAbonnement = (rapport: any, abonnement: string): any => ({ ...rapport, environnement: { ...rapport.environnement, abonnement } });
 
 const tmp = (prefixe: string) => fs.mkdtempSync(path.join(os.tmpdir(), `canari-cmp-${prefixe}-`));
 const supprimer = (d: string) => fs.rmSync(d, { recursive: true, force: true });
@@ -51,7 +59,7 @@ const rapportContext = (): any => {
     rapport: 'claude-code-context',
     format: 1,
     lot: 'E1',
-    environnement: { outil: 'Claude Code', entree: 'cli -p', os: 'Windows', version_avant: '2.1.318', version_apres: '2.1.318', modele: 'claude-opus-5', effort: 'high', methode: 'claude.ai', fournisseur: 'firstParty', abonnement: 'pro', sonde: 'v1', date_mesure: '2026-11-09' },
+    environnement: { outil: 'Claude Code', entree: 'cli -p', os: 'Windows', version_avant: '2.1.318', version_apres: '2.1.318', modele: 'claude-opus-5', effort: 'high', methode: 'claude.ai', fournisseur: 'firstParty', abonnement: ABONNEMENT_EXEMPLE, sonde: 'v1', date_mesure: '2026-11-09' },
     serie: { valide: true, raisons_rejet: [], context_utilises: 26, compteur_lot: 52, plafond: 60 },
     bases: { vide: { debut: base('base-vide', 3094), fin: base('base-vide', 3094), identiques: true }, avec_skill: { debut: base('base-skill', 8721), fin: base('base-skill', 8721), identiques: true } },
     combinaisons: [
@@ -90,7 +98,7 @@ const ensemble = (): any => {
       rapport: 'claude-code-payant',
       format: 1,
       lot: 'E2',
-      environnement: { outil: 'Claude Code', entree: 'cli -p', os: 'Windows', version_avant: '2.1.318', modele: 'claude-opus-5', effort: 'high', methode: 'claude.ai', fournisseur: 'firstParty', abonnement: 'pro', sonde: 'v1', date_mesure: '2026-11-09' },
+      environnement: { outil: 'Claude Code', entree: 'cli -p', os: 'Windows', version_avant: '2.1.318', modele: 'claude-opus-5', effort: 'high', methode: 'claude.ai', fournisseur: 'firstParty', abonnement: ABONNEMENT_EXEMPLE, sonde: 'v1', date_mesure: '2026-11-09' },
       execution: { series_demandees: [s.numero], arret: null },
       series: [{ numero: s.numero, titre: s.titre, valide: true, raisons_rejet: [] }],
       appels: s.appels.map((a: any, k: number) => {
@@ -234,8 +242,14 @@ describe('Suite de Tests : Comparateur de la suite d\'injection Claude Code (lot
     ]);
     assert.strictEqual(baseline.entrees.find((e: any) => e.id === 'CC32:mcp-long:delta').sans_outils_mcp, true);
     const texte = JSON.stringify(baseline);
-    for (const interdit of ['"total"', 'hors_fixtures', 'skills_hors', '"init"', 'categories', 'abonnement', '"pro"', 'methode', 'fournisseur', 'firstParty']) {
+    for (const interdit of ['"total"', 'hors_fixtures', 'skills_hors', '"init"', 'categories', 'abonnement', ...ABONNEMENTS_INTERDITS, 'methode', 'fournisseur', 'firstParty']) {
       assert.ok(!texte.includes(interdit), `aucun ${interdit} dans la baseline`);
+    }
+    // Chaque abonnement accepté, porté à son tour par le rapport, reste hors de la baseline.
+    assert.strictEqual(ABONNEMENTS.length, 4, 'quatre abonnements acceptés');
+    for (const abonnement of ABONNEMENTS) {
+      const t = JSON.stringify(B.baselineDepuisRapport(avecAbonnement(rapportContext(), abonnement), { source: 'context-2026-11-09-0856.json' }));
+      assert.ok(!t.includes(`"${abonnement}"`) && !t.includes('abonnement'), `abonnement n° ${ABONNEMENTS.indexOf(abonnement) + 1} hors de la baseline`);
     }
     assert.ok(baseline.remarques.some((r: string) => /Anomalie A2/.test(r)));
     assert.ok(baseline.remarques.some((r: string) => /^CC07 \(H16b\), observation manuelle/.test(r)));
@@ -471,8 +485,18 @@ describe('Suite de Tests : Comparateur de la suite d\'injection Claude Code (lot
     assert.deepStrictEqual(b.decomposition.enveloppes_4a, { nombre: 3 });
     assert.strictEqual(b.decomposition.declencheurs_delta_tour.ER, 100);
     const texte = JSON.stringify(b);
-    for (const interdit of ['decalage', '"empreinte"', 'abonnement', '"pro"', 'methode', 'fournisseur', 'hors_fixtures', '"total"', '"par_tour"', '5000', '12000']) {
+    for (const interdit of ['decalage', '"empreinte"', 'abonnement', ...ABONNEMENTS_INTERDITS, 'methode', 'fournisseur', 'hors_fixtures', '"total"', '"par_tour"', '5000', '12000']) {
       assert.ok(!texte.includes(interdit), `aucun ${interdit} dans la baseline`);
+    }
+    // Chaque abonnement accepté, porté à son tour par tous les rapports de l'ensemble, reste hors de la baseline.
+    for (const abonnement of ABONNEMENTS) {
+      const e = ensemble();
+      const ens = {
+        context: { ...e.context, contenu: avecAbonnement(e.context.contenu, abonnement) },
+        payants: e.payants.map((p: any) => ({ ...p, contenu: avecAbonnement(p.contenu, abonnement) })),
+      };
+      const t = JSON.stringify(B.baselineDepuisRapports(ens, { inventaire: INVENTAIRE }));
+      assert.ok(!t.includes(`"${abonnement}"`) && !t.includes('abonnement'), `abonnement n° ${ABONNEMENTS.indexOf(abonnement) + 1} hors de la baseline de l'ensemble`);
     }
     assert.ok(b.remarques.some((r: string) => /^Sources : .*context-2026-11-09-0856\.json \(lot E1\).*lot E2, séries 1 à 5, 38 appels/.test(r)));
     assert.ok(b.remarques.some((r: string) => /signal d'enquête, pas une conclusion/.test(r)));
