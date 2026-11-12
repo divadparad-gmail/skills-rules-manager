@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { ResourceItem, ResourceScope, ResourceType } from '../types';
+import { ResourceItem, ResourceScope, ResourceType, TargetTool } from '../types';
 import { getEffectiveGlobalAntigravityPath } from '../utils/paths';
 
 let vscodeModule: any = null;
@@ -84,22 +84,24 @@ export class ToggleManager {
     if (refusal) {
       return { success: false, newState: item.enabled, error: refusal };
     }
-    return await this.toggle(item.path, targetState, item.type, item.scope, item.id);
+    return await this.toggle(item.path, targetState, item.type, item.scope, item.id, item.targetTool);
   }
 
   /**
-   * Bascule l'état ON/OFF d'une ressource (renommage physique + sync JSON).
+   * Bascule l'état ON/OFF d'une ressource (renommage physique, plus skills.json pour un skill global
+   * d'Antigravity). Sans outil précisé, la ressource est traitée comme une ressource d'Antigravity.
    */
   public static async toggle(
     itemPath: string,
     targetState: boolean,
     type: ResourceType,
     scope: ResourceScope,
-    id: string
+    id: string,
+    targetTool: TargetTool = 'antigravity'
   ): Promise<{ success: boolean; newState: boolean; error?: string }> {
     try {
       if (type === 'skill' || type === 'workflow') {
-        return await this.toggleSkill(itemPath, targetState, scope, id);
+        return await this.toggleSkill(itemPath, targetState, scope, id, targetTool);
       } else {
         return await this.toggleRule(itemPath, targetState);
       }
@@ -114,13 +116,15 @@ export class ToggleManager {
   }
 
   /**
-   * Bascule d'un skill ou workflow (SKILL.md <-> SKILL.md.disabled + skills.json)
+   * Bascule d'un skill ou workflow (SKILL.md <-> SKILL.md.disabled, plus skills.json pour un skill
+   * global d'Antigravity)
    */
   private static async toggleSkill(
     folderOrFilePath: string,
     targetState: boolean,
     scope: ResourceScope,
-    id: string
+    id: string,
+    targetTool: TargetTool
   ): Promise<{ success: boolean; newState: boolean }> {
     const stat = await fs.promises.stat(folderOrFilePath);
     const folderPath = stat.isDirectory() ? folderOrFilePath : path.dirname(folderOrFilePath);
@@ -141,8 +145,9 @@ export class ToggleManager {
       }
     }
 
-    // 2. Synchronisation skills.json si Global (ou local si config existe)
-    if (scope === 'global' && vscodeModule) {
+    // 2. Synchronisation du skills.json d'Antigravity pour un skill global d'Antigravity seulement :
+    // un skill de Claude Code n'a que son renommage, et ce fichier ne le concerne pas
+    if (scope === 'global' && targetTool === 'antigravity' && vscodeModule) {
       const globalPath = getEffectiveGlobalAntigravityPath();
       await this.updateSkillsJson(globalPath, id, targetState);
     }
