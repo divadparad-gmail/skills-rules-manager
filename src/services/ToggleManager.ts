@@ -40,6 +40,17 @@ export function isNotRead(item: ResourceItem): boolean {
   return item.metadata?.antigravityStatus === 'not-read';
 }
 
+/** Claude Code : carte en lecture seule (fichier hors du projet, ou écrit par Claude). Jamais vrai pour Antigravity. */
+export function isClaudeReadOnly(item: ResourceItem): boolean {
+  return item.targetTool === 'claude-code' && !!item.metadata?.claudeReadOnly;
+}
+
+/** Message renvoyé quand une carte de Claude Code en lecture seule est visée par une bascule ou une suppression. */
+export function claudeReadOnlyRefusal(item: ResourceItem): string {
+  const raison = item.metadata?.claudeReadOnly?.raison ?? 'Lecture seule';
+  return `${raison} : cette carte de Claude Code est en lecture seule, et elle ne peut être ni basculée ni supprimée depuis le tableau de bord. Modifiez le fichier lui-même.`;
+}
+
 /** Motif de refus si la ressource est jamais chargée (R1) ou non lue par le profil (`not-read`), sinon null. */
 export function getUnloadedResourceRefusal(item: ResourceItem): string | null {
   if (isNeverLoaded(item)) {
@@ -52,10 +63,14 @@ export function getUnloadedResourceRefusal(item: ResourceItem): string | null {
 }
 
 /**
- * Motif de refus d'une bascule ou d'une suppression : workflow Markdown (lecture seule), puis
- * ressource jamais chargée ou non lue (getUnloadedResourceRefusal) ; sinon null.
+ * Motif de refus d'une bascule ou d'une suppression : carte de Claude Code en lecture seule, workflow
+ * Markdown (lecture seule), puis ressource jamais chargée ou non lue (getUnloadedResourceRefusal) ;
+ * sinon null.
  */
 export function getProtectedResourceRefusal(item: ResourceItem): string | null {
+  if (isClaudeReadOnly(item)) {
+    return claudeReadOnlyRefusal(item);
+  }
   if (item.metadata?.markdownWorkflow) {
     return markdownWorkflowRefusal(item);
   }
@@ -64,17 +79,18 @@ export function getProtectedResourceRefusal(item: ResourceItem): string | null {
 
 /**
  * Vrai si la ressource peut basculer en masse et compter dans les compteurs ON/OFF : ni verrouillée
- * (héritée d'un dossier parent, intégrée, non lue), ni jamais chargée (R1).
+ * (héritée d'un dossier parent, intégrée, non lue), ni jamais chargée (R1), ni en lecture seule
+ * (Claude Code).
  */
 export function isBulkToggleable(item: ResourceItem): boolean {
-  return !item.metadata?.locked && !isNeverLoaded(item) && !isNotRead(item);
+  return !item.metadata?.locked && !isNeverLoaded(item) && !isNotRead(item) && !isClaudeReadOnly(item);
 }
 
 export class ToggleManager {
   /**
    * Bascule une ressource connue de l'état chargé. Refuse une règle jamais chargée (R1), un skill
-   * d'un emplacement non lu par la version du profil (`not-read`) ou un workflow Markdown (lecture
-   * seule), même si la demande arrive.
+   * d'un emplacement non lu par la version du profil (`not-read`), un workflow Markdown (lecture
+   * seule) ou une carte de Claude Code en lecture seule, même si la demande arrive.
    */
   public static async toggleItem(
     item: ResourceItem,

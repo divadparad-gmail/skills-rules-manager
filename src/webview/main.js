@@ -1824,10 +1824,12 @@
 
   function updateBulkControl(scope, type, items, doc) {
     const targetDoc = doc || document;
-    // Les ressources verrouillées (héritées d'un dossier parent) et les règles de sous-dossier
-    // jamais chargées (R1) ne basculent pas en masse et ne comptent pas (miroir de isBulkToggleable)
+    // Les ressources verrouillées (héritées d'un dossier parent), les règles de sous-dossier jamais
+    // chargées (R1) et les cartes de Claude Code en lecture seule ne basculent pas en masse et ne
+    // comptent pas (miroir de isBulkToggleable)
     const matching = (items || []).filter((i) => i.type === type && !(i.metadata && (
-      i.metadata.locked || i.metadata.antigravityStatus === 'never-loaded'
+      i.metadata.locked || i.metadata.antigravityStatus === 'never-loaded' ||
+      (i.targetTool === 'claude-code' && i.metadata.claudeReadOnly)
     )));
     const total = matching.length;
     const active = matching.filter((i) => i.enabled).length;
@@ -2571,7 +2573,26 @@
     const isWithoutEffect = agStatus === 'never-loaded' || agStatus === 'not-read';
     // Workflow Markdown (profil 2.6.0) : lecture seule, aucun état désactivé connu
     const isWorkflowFile = isMarkdownWorkflow(item);
-    if (item.scope !== 'nas' && (isInherited || isBuiltin || isWithoutEffect || isWorkflowFile)) {
+    // Carte de Claude Code en lecture seule (fichier hors du projet, ou écrit par Claude) : cadenas et
+    // raison en infobulle, ni interrupteur ni corbeille ; textContent et title seulement
+    const claudeReadOnly = isClaudeItem && item.metadata && item.metadata.claudeReadOnly;
+    if (item.scope !== 'nas' && claudeReadOnly) {
+      const rightControls = targetDoc.createElement('div');
+      rightControls.className = 'item-right-controls';
+      const lockedBadge = targetDoc.createElement('div');
+      lockedBadge.className = 'soul-locked-badge';
+      const raison = String(claudeReadOnly.raison || 'Lecture seule');
+      lockedBadge.title = `${raison} : carte en lecture seule. Elle n'a ni interrupteur ni corbeille dans le tableau de bord ; modifiez le fichier lui-même.`;
+      const lockIconEl = targetDoc.createElement('span');
+      lockIconEl.className = 'soul-locked-icon';
+      lockIconEl.textContent = '🔒';
+      const lockLabelEl = targetDoc.createElement('span');
+      lockLabelEl.textContent = 'Lecture seule';
+      lockedBadge.appendChild(lockIconEl);
+      lockedBadge.appendChild(lockLabelEl);
+      rightControls.appendChild(lockedBadge);
+      topRow.appendChild(rightControls);
+    } else if (item.scope !== 'nas' && (isInherited || isBuiltin || isWithoutEffect || isWorkflowFile)) {
       const rightControls = targetDoc.createElement('div');
       rightControls.className = 'item-right-controls';
       const lockedBadge = targetDoc.createElement('div');

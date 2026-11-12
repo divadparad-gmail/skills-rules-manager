@@ -11,6 +11,12 @@ export type ResourceScope = 'nas' | 'global' | 'local';
 
 export type TargetTool = 'antigravity' | 'claude-code';
 
+/**
+ * Raison pour laquelle une carte de Claude Code est en lecture seule : un fichier situé hors du projet
+ * ouvert, ou un fichier écrit par Claude lui-même.
+ */
+export type ClaudeReadOnlyReason = 'Fichier hors du projet' | 'Écrit par Claude';
+
 export type SyncStatus = 'synced' | 'modified' | 'local_only' | 'nas_offline';
 
 export interface DuplicateInfo {
@@ -80,6 +86,11 @@ export interface ResourceItem {
     claudeSkillHomonymNotMasked?: boolean;
     /** Skill Claude Code homonyme d'une autre copie de même origine et de même distance : les deux sont comptées (non vérifié). */
     claudeSkillSameScopeHomonym?: boolean;
+    /**
+     * Carte de Claude Code en lecture seule, posée par le scanner avec `locked: true` : ni bascule ni
+     * suppression, refusées aussi par ToggleManager et DeleteService. Ignorée pour Antigravity.
+     */
+    claudeReadOnly?: { raison: ClaudeReadOnlyReason };
     /** Règle Antigravity écartée par l'agent (frontmatter absent ou trigger non reconnu). */
     ignoredByAgent?: boolean;
     /** Défauts de frontmatter d'une règle Antigravity (voir AntigravityRuleIssue). */

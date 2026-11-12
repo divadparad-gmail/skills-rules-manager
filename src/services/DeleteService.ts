@@ -16,7 +16,8 @@ export class DeleteService {
   ): Promise<{ success: boolean; error?: string }> {
     try {
       // Antigravity : une règle de sous-dossier (R1) ou un skill d'un emplacement non lu par le profil est
-      // sans effet ; un workflow Markdown est en lecture seule
+      // sans effet ; un workflow Markdown est en lecture seule. Claude Code : une carte en lecture seule
+      // (fichier hors du projet, ou écrit par Claude)
       const unloadedRefusal = getProtectedResourceRefusal(item);
       if (unloadedRefusal) {
         vscode.window.showErrorMessage(`Suppression impossible : ${unloadedRefusal}`);
