@@ -38,6 +38,7 @@ Toutes les commandes se lancent depuis la racine du dépôt, dans un **terminal 
 | `npm run sonde:claude-context -- --lot E3 --cloturer-h14` | H14 : transcription déplacée dans `brut/`, retrait, 4 bases de fin comparées copie par copie, rapport `brut/h14-….json` | Nul ; 4 `/context` du lot E3 |
 | `npm run sonde:claude-context -- --lot E4 --combinaisons cout-calibrage,cout-calibrage-o55,doublons-d6 --resultats` | Les vérifications gratuites (lot E4, première série du 2026-11-11) : la base vide au début et à la fin, puis le calibrage sous `claude-opus-5` et sous `claude-opus-5-5`, et la vérification de D-6, soit 5 `/context` ; Claude Code 2.1.319 exigé ; rapport `resultats/e4-….json` | Nul ; 5 `/context` du lot E4 |
 | `npm run sonde:claude-context -- --lot E4 --combinaisons cout-calibrage-2 --resultats` | Le second calibrage (lot E4, décision D-1.2b) : la base vide, `cout-calibrage-2` sous `claude-opus-5`, la base vide, soit 3 `/context` | Nul ; 3 `/context` du lot E4 |
+| `npm run sonde:claude-context -- --lot E5 --resultats` | Les vérifications des sources de mémoire, de règles et de skills (lot E5) : la base vide au début et à la fin, puis `e5-agents`, `e5-coupe-octets` et `e5-imports`, dans cet ordre, soit 5 `/context` ; Claude Code 2.1.319 exigé ; rapport `resultats/e5-….json` | Nul ; 5 `/context` du lot E5 |
 | `node test/scenarios/scripts/sonde-claude-code.js retirer` | Retire un déploiement laissé en place (interruption, ou H14) | Nul |
 | `npm run sonde:claude-baseline -- --depuis context-AAAA-MM-JJ-HHMM.json` | Écrit `attendu/baseline-<date>.json` d'après un rapport « context » **valide** de `resultats/` (entrées « context » seulement), après la garde ; refuse d'écraser une baseline existante | Nul (aucun lancement de `claude`) |
 | `npm run sonde:claude-baseline -- --depuis context-….json --payant payant-….json,payant-….json,…` | Écrit `attendu/baseline-<date>.json` d'après un rapport « context » et les rapports « payant » d'un même lot (entrées « context », « usage » et « canari », et une section de décomposition non comparée), après la garde ; refuse d'écraser une baseline existante (voir « Construire une baseline à partir de plusieurs rapports ») | Nul (aucun lancement de `claude`) |
@@ -197,6 +198,20 @@ Les fixtures du lot E4 ne portent aucun canari :
 
 - **`doublons-d6`** (décision D-6) : deux règles `d6-meme-nom.md`, l'une globale et l'autre du projet, aux contenus de longueurs différentes ; deux skills `canari-d6-homo`, l'un dans le `.claude/skills/` du dossier parent et l'autre dans celui du projet, aux descriptions de longueurs très différentes ; un fichier `d6-commun.md` importé à la fois par le `CLAUDE.md` et par le `CLAUDE.local.md` du projet. Les longueurs différentes permettent de savoir, par les tokens, quelle copie `/context` liste.
 
+### 5. Les vérifications des sources de mémoire, de règles et de skills (lot E5)
+
+Le lot E5 (décision du 2026-11-12) vérifie, avant que l'extension ne lise ces sources, ce que la documentation dit sans que la suite l'ait mesuré. Il suit les règles du lot E4 : `/context` seulement, aucun appel au modèle, combinaisons réservées au lot et refusées sous les autres, base vide seule au début et à la fin, Claude Code 2.1.319 exigé, rapport `e5-AAAA-MM-JJ-HHMM.json` ignoré par le comparateur et par la baseline, modèle relevé pour chaque combinaison.
+
+- **Le plafond** est de 10 `/context` : une série en coûte 5 (2 + 3), et une relance complète reste possible. À la première exécution, le compteur du lot E4 est archivé sous `brut/compteur-context-E4.json`, et E4 ne peut plus être rouvert.
+- **L'ordre des combinaisons** est voulu : `e5-imports`, qui contient des imports hors du dossier de travail, passe en dernier, pour que les sorties brutes des deux autres soient déjà écrites dans `brut/serie-…/` si un appel dépassait le délai.
+- **Aucune fixture ne porte de canari** : chaque point se lit par la présence d'un fichier ou d'un skill dans `/context`, et par ses tokens. Pour les coupes de `MEMORY.md`, le fichier et une règle de référence sont faits de la même ligne répétée, et le nombre de lignes chargées vaut `N_ref × (t(MEMORY.md) − 5) ÷ (t(référence) − 5)`.
+
+| Jeu | Outils | Ce qu'il contient |
+|---|---|---|
+| `e5-agents` | aucun | `AGENTS.md` du projet, de son dossier `.claude` et du dossier parent, sans aucun `CLAUDE.md` ; `autoMemoryEnabled: false` dans les réglages du projet, avec un `MEMORY.md` d'une ligne |
+| `e5-coupe-octets` | `Skill` | un `MEMORY.md` de 180 lignes de 200 octets et 160 caractères, et sa règle de référence de 40 lignes (coupe par la taille, et son unité) ; une copie personnelle limitée par `paths` et son homonyme du projet ; quatre skills du projet de même description et `skillOverrides` dans `.claude/settings.local.json` |
+| `e5-imports` | `Skill` | un `MEMORY.md` de 250 lignes de 90 octets, et sa règle de référence de 100 lignes (coupe par les lignes) ; des imports dans un bloc de code, dans un segment de code, entre guillemets, et un témoin ; un cycle d'imports ; une règle qui importe ; trois imports de même corps, sans rien, avec un frontmatter, avec un commentaire ; des imports hors du dossier de travail, depuis le projet et depuis le `CLAUDE.md` du parent, et un import du parent vers le projet ; des skills homonymes (même portée, `name` ou dossier, casse) ; une copie personnelle manuelle et son homonyme du projet |
+
 ## Le coût
 
 | Partie | Appels au modèle | `/context` | Plafond |
@@ -205,6 +220,7 @@ Les fixtures du lot E4 ne portent aucun canari :
 | Vérification de version (V1) | 0 (refusés) | 26 | 60 `/context` pour le lot V1 (relevé de 30 le 2026-11-10) |
 | Payante (E2) | 38 (séries 1 à 5 : 17, 6, 4, 3 et 8) | 33 | 40 appels au modèle et 40 `/context` pour le lot E2 |
 | H14 (E3) | 1, tapé à la main | 10 par -p (+ 1 dans le panneau) | 12 `/context` pour le lot E3 |
+| Sources de mémoire, de règles et de skills (E5) | 0 (refusés) | 5 par série | 10 `/context` pour le lot E5 |
 
 Les deux compteurs sont dans `brut/` (`compteur-context.json` et `compteur-modele.json`). Ils sont incrémentés **avant** chaque lancement ; un lancement interrompu compte. L'option `--plafond` ne peut qu'abaisser la limite d'une exécution. Un plafond ne se relève que par une décision inscrite dans le code (`RELEVEMENTS_PLAFOND`, une par lot au plus) : au lancement suivant, le compteur du lot passe au nouveau plafond en gardant ses utilisés, avec la trace du changement dans `historique_plafond`, et le lanceur l'annonce en console. Les appels au modèle passent par le quota de l'abonnement. Un appel des séries 1 à 4 fait un seul tour d'API ; un appel de déclencheur (série 5) en fait 2 ou 3.
 

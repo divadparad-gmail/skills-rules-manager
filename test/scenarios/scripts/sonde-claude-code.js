@@ -9,6 +9,10 @@
  *                           gratuites (calibrage sous deux modèles, D-6, second calibrage) : base vide seule
  *                           au début et à la fin, Claude Code 2.1.319 exigé, rapport e4-….json ; le second
  *                           calibrage se lance seul : --combinaisons cout-calibrage-2 (3 /context)
+ *   npm run sonde:claude-context -- --lot E5 [--combinaisons <id,id>] [--resultats]   vérifications des
+ *                           sources de mémoire, de règles et de skills : base vide seule au début et à la
+ *                           fin, trois combinaisons (e5-agents, e5-coupe-octets, puis e5-imports), soit
+ *                           5 /context ; Claude Code 2.1.319 exigé, rapport e5-….json
  *   npm run sonde:claude-context -- --lot E3 --preparer-h14   H14 (lot E3), étape 1 : contrôles, 4 bases, un
  *                           seul déploiement du jeu complet, /context de référence par le claude du poste
  *                           (P5) et par la copie embarquée dans l'extension VS Code (P5b), puis les gestes
@@ -30,13 +34,15 @@
  *                           seulement si la série est valide, toutes les entrées couvertes et 0 écart ;
  *                           rien d'autre n'est changé ; aucun lancement de claude
  * Options de « context » :
- *   --lot <E1|E2|V1|E3|E4>  lot du compteur de /context (obligatoire) ; au changement de lot, l'ancien
+ *   --lot <E1|E2|V1|E3|E4|E5>  lot du compteur de /context (obligatoire) ; au changement de lot, l'ancien
  *                           compteur est archivé dans brut/, et un lot archivé ne peut pas être rouvert ;
  *                           V1 est le lot des vérifications de version (/context seulement, plafond 60) ;
  *                           E3 est réservé à H14 (/context seulement, plafond 12) ; E4 est le lot des
- *                           vérifications gratuites (/context seulement, plafond 10, combinaisons propres)
+ *                           vérifications gratuites (/context seulement, plafond 10, combinaisons propres) ;
+ *                           E5 est le lot des vérifications des sources de mémoire, de règles et de skills
+ *                           (/context seulement, plafond 10, combinaisons propres)
  *   --combinaisons <id,id>  ne mesure que ces combinaisons du lot (les bases du lot sont toujours mesurées :
- *                           les quatre, ou la base vide seule sous E4)
+ *                           les quatre, ou la base vide seule sous E4 et E5)
  *   --resultats             écrit le rapport normalisé dans resultats/ au lieu de brut/
  *
  * Chemins par défaut calculés (aucun chemin local en dur), remplaçables par CANARI_CLAUDE_CONFIG_DIR,
@@ -59,8 +65,8 @@
  *     au modèle : apiKeySource=none (aussi dès l'initialisation, avant la première requête) ; sinon le
  *     fichier brut/ARRET.txt est écrit et bloque tout lancement suivant de claude ;
  *   - deux compteurs persistants et distincts, liés au lot, incrémentés avant chaque lancement :
- *     /context (60 en E1, relevé de 50 le 2026-11-09 ; 40 en E2 ; 60 en V1, relevé de 30 le 2026-11-10 ; 12 en E3 ; 10 en E4)
- *     et appels au modèle (40 en E2, ou moins avec --plafond ; aucun en V1, E3 et E4, où tout appel au modèle est refusé) ;
+ *     /context (60 en E1, relevé de 50 le 2026-11-09 ; 40 en E2 ; 60 en V1, relevé de 30 le 2026-11-10 ; 12 en E3 ; 10 en E4 ; 10 en E5)
+ *     et appels au modèle (40 en E2, ou moins avec --plafond ; aucun en V1, E3, E4 et E5, où tout appel au modèle est refusé) ;
  *   - --model : MODELE pour tout appel au modèle ; un /context peut aussi compter sous claude-opus-5-5 ;
  *   - garde de flux pendant chaque appel au modèle : tours, outils, chemins et commande Bash ;
  *   - empreintes SHA-256 (en LF) de chaque fixture comparées à inventaire.json avant tout déploiement :
@@ -166,7 +172,6 @@ const COMBINAISONS = [
  * --combinaisons cout-calibrage-2, soit 3 /context. La série complète (6) ne tient plus sous le plafond.
  */
 const LOT_E4 = 'E4';
-const VERSIONS_EXIGEES = { [LOT_E4]: '2.1.319' };
 const BASES_E4 = BASES.filter((b) => b.cle === 'vide');
 const COMBINAISONS_E4 = [
   { id: 'cout-calibrage', jeux: ['cout-calibrage'], outils: '' },
@@ -174,11 +179,35 @@ const COMBINAISONS_E4 = [
   { id: 'doublons-d6', jeux: ['doublons-d6'], outils: 'Skill' },
   { id: 'cout-calibrage-2', jeux: ['cout-calibrage-2'], outils: '' },
 ];
+
+/**
+ * Le lot E5 (décision du 2026-11-12) : les vérifications d'avant la lecture des sources oubliées, par
+ * /context seulement, sans canari. Comme sous E4 : combinaisons réservées au lot, base vide seule au
+ * début et à la fin, version des baselines exigée. Une série = 2 + 3 = 5 /context, sous un plafond de 10
+ * qui garde une relance complète possible. L'ordre est voulu : la combinaison des imports, qui contient
+ * des imports hors du dossier de travail, passe en dernier, pour que les sorties brutes des deux autres
+ * soient déjà écrites si un appel dépassait le délai.
+ */
+const LOT_E5 = 'E5';
+const BASES_E5 = BASES.filter((b) => b.cle === 'vide');
+const COMBINAISONS_E5 = [
+  { id: 'e5-agents', jeux: ['e5-agents'], outils: '' },
+  { id: 'e5-coupe-octets', jeux: ['e5-coupe-octets'], outils: 'Skill' },
+  { id: 'e5-imports', jeux: ['e5-imports'], outils: 'Skill' },
+];
+
+/** La version exigée par lot (contrôlée avant tout /context compté). */
+const VERSIONS_EXIGEES = { [LOT_E4]: '2.1.319', [LOT_E5]: '2.1.319' };
+/** Les lots de vérification : combinaisons et bases propres, rapport à préfixe propre, modèle relevé. */
+const LOTS_VERIFICATION = {
+  [LOT_E4]: { combinaisons: COMBINAISONS_E4, bases: BASES_E4, prefixe: 'e4' },
+  [LOT_E5]: { combinaisons: COMBINAISONS_E5, bases: BASES_E5, prefixe: 'e5' },
+};
 /** Les combinaisons et les bases d'un lot. */
-const combinaisonsDuLot = (lot) => (lot === LOT_E4 ? COMBINAISONS_E4 : COMBINAISONS);
-const basesDuLot = (lot) => (lot === LOT_E4 ? BASES_E4 : BASES);
-/** Le préfixe du rapport normalisé : « e4- » pour E4, que le comparateur et la baseline ignorent. */
-const prefixeRapport = (lot) => (lot === LOT_E4 ? 'e4' : 'context');
+const combinaisonsDuLot = (lot) => (LOTS_VERIFICATION[lot] ? LOTS_VERIFICATION[lot].combinaisons : COMBINAISONS);
+const basesDuLot = (lot) => (LOTS_VERIFICATION[lot] ? LOTS_VERIFICATION[lot].bases : BASES);
+/** Le préfixe du rapport normalisé : « e4- » ou « e5- » pour un lot de vérification, que le comparateur et la baseline ignorent. */
+const prefixeRapport = (lot) => (LOTS_VERIFICATION[lot] ? LOTS_VERIFICATION[lot].prefixe : 'context');
 
 const { Refus, RefusArgv, Arret, SerieRejetee, estSousOuEgal, estSousStrict, memeChemin } = commun;
 
@@ -491,7 +520,7 @@ function verifierArgv(argv, { espace, plateforme = process.platform, invites = n
 }
 
 /**
- * Le modèle d'un /context (lot E4) : celui demandé par --model, celui que rapporte l'initialisation
+ * Le modèle d'un /context (lots E4 et E5) : celui demandé par --model, celui que rapporte l'initialisation
  * (init.model) et celui que rapporte context_usage.model ; null si le flux ne le donne pas.
  */
 function modelesLus(flux, demande) {
@@ -1060,7 +1089,7 @@ function processusFixtureRestants(espace, plateforme = process.platform) {
 /** Écrit le rapport normalisé après la garde ; rien n'est écrit au moindre problème. */
 function ecrireRapport(rapport, { destination, nom, poste, interdits, dossiers = { brut: BRUT, resultats: RESULTATS } }) {
   if (!['brut', 'resultats'].includes(destination)) throw new Refus('destination du rapport refusée (brut ou resultats seulement)');
-  if (!/^(context|payant|h14|e4)-\d{4}-\d{2}-\d{2}-\d{4}\.json$/.test(nom)) throw new Refus('nom de rapport refusé');
+  if (!/^(context|payant|h14|e4|e5)-\d{4}-\d{2}-\d{2}-\d{4}\.json$/.test(nom)) throw new Refus('nom de rapport refusé');
   if (nom.startsWith('h14-') && destination !== 'brut') throw new Refus('le rapport H14 ne s\'écrit que dans brut/');
   const texte = `${JSON.stringify(rapport, null, 2)}\n`;
   const problemes = [...commun.problemesTexte(texte, poste, interdits), ...commun.problemesJson(texte)];
@@ -1681,7 +1710,7 @@ async function commandeContext(args) {
       mcp: plan.filter((e) => e.cible === 'mcp').map((e) => e.jeu),
       hook_events: Boolean(c.hookEvents),
       controle: { apiKeySource: flux.init.apiKeySource, usage: sommeUsage(flux.result.usage), num_turns: flux.result.num_turns },
-      ...(opts.lot === LOT_E4 ? { modele: modelesLus(flux, c.modele || MODELE) } : {}),
+      ...(LOTS_VERIFICATION[opts.lot] ? { modele: modelesLus(flux, c.modele || MODELE) } : {}),
       ...normaliserCombinaison(flux, { racines, nomMemoire, plan, plateforme: ctx.plateforme, o200k: o200kDuPlan(plan) }),
     };
     return { entree, flux };
@@ -2216,7 +2245,8 @@ async function principal(argv) {
 
 module.exports = {
   LOTS_CONTEXT, PROMPTS, ABONNEMENTS, BASES, COMBINAISONS, FICHIER_ARRET,
-  MODELE, MODELES_CONTEXT, LOT_E4, VERSIONS_EXIGEES, BASES_E4, COMBINAISONS_E4, combinaisonsDuLot, basesDuLot, prefixeRapport,
+  MODELE, MODELES_CONTEXT, LOT_E4, VERSIONS_EXIGEES, BASES_E4, COMBINAISONS_E4, LOT_E5, BASES_E5, COMBINAISONS_E5, LOTS_VERIFICATION,
+  combinaisonsDuLot, basesDuLot, prefixeRapport,
   modelesLus, verifierVersionDuLot, FICHIER_COMPTEUR, FICHIER_JOURNAL,
   Refus, RefusArgv, Arret, SerieRejetee,
   LISTE_BLANCHE, VARIABLES_POSEES, nomPermis,

@@ -824,7 +824,7 @@ describe('Suite de Tests : Lanceur de la sonde Claude Code (lot I2, sans lancer 
       const reel = C.lireInventaire(fs.readFileSync(path.join(suite, 'inventaire.json'), 'utf8'));
       const rels = S.listerFixtures(path.join(suite, 'fixtures'));
       assert.deepStrictEqual(rels, [...reel.keys()].sort());
-      for (const c of [...S.BASES, ...S.COMBINAISONS, ...S.COMBINAISONS_E4]) {
+      for (const c of [...S.BASES, ...S.COMBINAISONS, ...S.COMBINAISONS_E4, ...S.COMBINAISONS_E5]) {
         const p = c.jeux.length > 0 ? C.planDeploiement(rels, c.jeux, { configDir: config, espace, fixturesDir: path.join(suite, 'fixtures') }) : [];
         S.fichiersADeployer(p, { espace, inventaire: reel, jeux: c.jeux });
       }
@@ -921,7 +921,7 @@ describe('Suite de Tests : Lanceur de la sonde Claude Code (lot I2, sans lancer 
     assert.deepStrictEqual(S.modelesLus(S.lireFlux(''), 'claude-opus-5'), { demande: 'claude-opus-5', init: null, context: null });
 
     // Version exigée : seul --version est lancé, sans lot (aucun /context compté) ; une autre version refuse
-    assert.deepStrictEqual(S.VERSIONS_EXIGEES, { E4: '2.1.319' });
+    assert.deepStrictEqual(S.VERSIONS_EXIGEES, { E4: '2.1.319', E5: '2.1.319' });
     const appels: any[] = [];
     const lancer = (reponse: object) => async (a: any) => {
       appels.push(a);
@@ -952,8 +952,92 @@ describe('Suite de Tests : Lanceur de la sonde Claude Code (lot I2, sans lancer 
       const dossiers = { brut: resultats, resultats };
       const rapport = { rapport: 'claude-code-context', format: 1, lot: 'E4', combinaisons: [] };
       assert.ok(fs.existsSync(S.ecrireRapport(rapport, { destination: 'resultats', nom: 'e4-2026-11-11-1000.json', poste: POSTE, interdits: [], dossiers })));
-      assert.throws(() => S.ecrireRapport(rapport, { destination: 'resultats', nom: 'e5-2026-11-11-1000.json', poste: POSTE, interdits: [], dossiers }), /nom de rapport refusé/);
+      assert.throws(() => S.ecrireRapport(rapport, { destination: 'resultats', nom: 'e6-2026-11-11-1000.json', poste: POSTE, interdits: [], dossiers }), /nom de rapport refusé/);
       assert.throws(() => S.commandeBaseline(['--depuis', 'e4-2026-11-11-1000.json'], { resultats, attendu: resultats, poste: POSTE }), S.Refus);
+    } finally {
+      supprimer(resultats);
+    }
+  });
+
+  test('19. Lot E5 : plafond de 10 sans compteur du modèle, E4 archivé, trois combinaisons propres dans l\'ordre voulu, base vide seule, version 2.1.319 exigée, rapport e5-', async () => {
+    const P = require(path.join(SCRIPTS, 'sonde-claude-code-payant.js'));
+    const K = require(path.join(SCRIPTS, 'compare-injection-claude.js'));
+
+    // Compteur : plafond de 10, /context seulement, aucun compteur du modèle
+    assert.strictEqual(S.LOT_E5, 'E5');
+    assert.strictEqual(P.COMPTEURS.context.plafonds.E5, 10);
+    assert.ok(P.LOTS_CONTEXT_SEUL.includes('E5') && !Object.prototype.hasOwnProperty.call(P.COMPTEURS.modele.plafonds, 'E5'));
+    const brut = tmp('e5');
+    const journal: string[] = [];
+    const log = console.log;
+    try {
+      assert.throws(() => P.lireCompteur(brut, 'modele', 'E5'), /le lot E5 \(vérifications des sources de mémoire, de règles et de skills\) n'accepte que \/context/);
+      // Le compteur E4 (8 sur 10) est archivé à l'ouverture de E5, sans remise à zéro, et E4 ne se rouvre plus
+      const e4 = { lot: 'E4', plafond: 10, utilises: 8 };
+      fs.writeFileSync(path.join(brut, 'compteur-context.json'), JSON.stringify(e4));
+      console.log = (m: string) => journal.push(m);
+      const r = S.ouvrirLotAnnonce(brut, 'context', 'E5');
+      console.log = log;
+      assert.deepStrictEqual([r.archive, r.ancien.utilises], ['compteur-context-E4.json', 8]);
+      assert.deepStrictEqual(JSON.parse(fs.readFileSync(path.join(brut, 'compteur-context-E4.json'), 'utf8')), e4);
+      assert.ok(journal.some((m) => /Compteur context du lot E4 \(8 sur 10\) archivé sous brut\/compteur-context-E4\.json ; lot E5 ouvert/.test(m)), journal.join('\n'));
+      assert.throws(() => P.ouvrirLot(brut, 'context', 'E4'), /archivé/);
+      // Une série : la base vide au début et à la fin, plus les trois combinaisons = 5 ; une relance complète tient encore
+      const serie = S.BASES_E5.length * 2 + S.COMBINAISONS_E5.length;
+      assert.strictEqual(serie, 5);
+      S.verifierBudget(brut, serie, 'E5');
+      for (let i = 1; i <= serie; i++) S.reserverContext(brut, 'E5');
+      S.verifierBudget(brut, serie, 'E5');
+      for (let i = 1; i <= serie; i++) S.reserverContext(brut, 'E5');
+      // Après deux séries complètes, plus rien ne tient sous le plafond
+      assert.throws(() => S.verifierBudget(brut, 1, 'E5'), /10 \/context déjà utilisé\(s\), 1 prévu\(s\), limite de 10 pour le lot E5/);
+    } finally {
+      console.log = log;
+      supprimer(brut);
+    }
+
+    // Combinaisons et bases propres au lot, dans l'ordre voulu (la combinaison des imports extérieurs en dernier)
+    assert.deepStrictEqual(S.BASES_E5.map((b: any) => b.id), ['base-vide']);
+    assert.deepStrictEqual(S.COMBINAISONS_E5.map((c: any) => [c.id, c.jeux.join('+'), c.outils, c.modele ?? S.MODELE]), [
+      ['e5-agents', 'e5-agents', '', 'claude-opus-5'],
+      ['e5-coupe-octets', 'e5-coupe-octets', 'Skill', 'claude-opus-5'],
+      ['e5-imports', 'e5-imports', 'Skill', 'claude-opus-5'],
+    ]);
+    assert.strictEqual(S.combinaisonsDuLot('E5'), S.COMBINAISONS_E5);
+    assert.strictEqual(S.basesDuLot('E5'), S.BASES_E5);
+    assert.strictEqual(S.combinaisonsDuLot('E4'), S.COMBINAISONS_E4);
+    for (const autre of [S.COMBINAISONS, S.COMBINAISONS_E4]) {
+      assert.ok(!autre.some((c: any) => S.COMBINAISONS_E5.some((e: any) => e.id === c.id)), 'aucun identifiant partagé');
+    }
+    assert.strictEqual(S.lireOptions(['--lot', 'E5', '--resultats']).lot, 'E5');
+    assert.deepStrictEqual(S.lireOptions(['--lot', 'E5', '--combinaisons', 'e5-imports']).combinaisons, ['e5-imports']);
+    assert.throws(() => S.lireOptions(['--lot', 'E5', '--combinaisons', 'niveaux']), /combinaison inconnue pour le lot E5 : niveaux/);
+    assert.throws(() => S.lireOptions(['--lot', 'E4', '--combinaisons', 'e5-agents']), /combinaison inconnue pour le lot E4 : e5-agents/);
+    assert.throws(() => S.lireOptions(['--lot', 'V1', '--combinaisons', 'e5-agents']), /combinaison inconnue pour le lot V1 : e5-agents/);
+
+    // Version exigée : seul --version est lancé, sans lot ; une autre version refuse avant tout /context
+    const appels: any[] = [];
+    const lancer = (reponse: object) => async (a: any) => {
+      appels.push(a);
+      return reponse;
+    };
+    const ctx = { exe: 'C:\\x\\claude.exe', env: {}, espace: path.join(os.tmpdir(), 'canari-e5-espace-absent'), configDir: CONFIG_W, plateforme: 'win32' };
+    assert.strictEqual(await S.verifierVersionDuLot(ctx, 'E5', { lancer: lancer({ code: 0, stdout: '2.1.319 (Claude Code)\n' }) }), '2.1.319');
+    assert.deepStrictEqual(appels[0].argv, ['--version']);
+    assert.strictEqual(appels[0].lot, undefined, 'aucun compteur réservé');
+    await assert.rejects(S.verifierVersionDuLot(ctx, 'E5', { lancer: lancer({ code: 0, stdout: '2.1.322 (Claude Code)\n' }) }),
+      (e: Error) => e instanceof S.Refus && /le lot E5 exige Claude Code 2\.1\.319, et le claude du poste répond 2\.1\.322/.test(e.message));
+
+    // Rapport : préfixe e5-, accepté par l'écriture, ignoré par le comparateur et par la baseline ; modèle relevé
+    assert.strictEqual(S.prefixeRapport('E5'), 'e5');
+    assert.ok(S.LOTS_VERIFICATION.E5 && S.LOTS_VERIFICATION.E4);
+    assert.ok(!K.NOM_RAPPORT.test('e5-2026-11-12-1000.json'));
+    const resultats = tmp('e5-resultats');
+    try {
+      const dossiers = { brut: resultats, resultats };
+      const rapport = { rapport: 'claude-code-context', format: 1, lot: 'E5', combinaisons: [] };
+      assert.ok(fs.existsSync(S.ecrireRapport(rapport, { destination: 'resultats', nom: 'e5-2026-11-12-1000.json', poste: POSTE, interdits: [], dossiers })));
+      assert.throws(() => S.commandeBaseline(['--depuis', 'e5-2026-11-12-1000.json'], { resultats, attendu: resultats, poste: POSTE }), S.Refus);
     } finally {
       supprimer(resultats);
     }
