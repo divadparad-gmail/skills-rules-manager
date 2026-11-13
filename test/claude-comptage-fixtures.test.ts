@@ -55,9 +55,10 @@ import { ManagerFullState, ResourceItem } from '../src/types';
  * - les tokens o200k de chaque élément lu, en valeurs exactes figées au lot C1, puis à chaque commit du
  *   lot C2a qui ajoute une source (le .claude/CLAUDE.md et le CLAUDE.local.md du projet au commit a3, la
  *   mémoire des dossiers parents au commit a4, les imports « @ » des fichiers de mémoire au commit a5,
- *   AGENTS.md au commit a6 : agents-seul et agents-avec-claude dans la baseline, CC22).
- * Pour les jeux cout-calibrage, e5-imports et e5-agents, absents de toute baseline publiée, la référence
- * est la grille commitée (CC09 au lot E4 ; CC42, CC43, CC45, CC46, CC47, CC53 et CC54 au lot E5).
+ *   AGENTS.md au commit a6 : agents-seul et agents-avec-claude dans la baseline, CC22 ; MEMORY.md au commit a7,
+ *   sur sa ligne à part : CC23 dans la baseline, CC41, CC50 et CC53 dans la grille).
+ * Pour les jeux cout-calibrage, e5-imports, e5-agents et e5-coupe-octets, absents de toute baseline publiée, la
+ * référence est la grille commitée (CC09 au lot E4 ; CC41 à CC43, CC45 à CC47, CC50, CC53 et CC54 au lot E5).
  * La remontée vers les dossiers parents s'arrête au dossier du jeu (réglage de test de StateManager) :
  * sans cet arrêt, l'oracle lirait les fichiers de mémoire réels au-dessus du dossier temporaire.
  * Les tokens de Claude (champ `tokens` de la baseline, en /context) ne sont pas comparés : ils le seront
@@ -97,6 +98,8 @@ interface Vu { cle: string; portee: 'global' | 'local'; auDemarrage: boolean; st
 const ATTENDUS_C1: Record<string, Vu[]> = {
   niveaux: [
     { cle: '<global>/CLAUDE.md', portee: 'global', auDemarrage: true, statut: 'âme', o200k: 27 },
+    // La mémoire automatique (CC23) : sa carte, hors du total de l'Âme, et la ligne à part de la jauge
+    { cle: '<global>/projects/<memoire>/memory/MEMORY.md', portee: 'global', auDemarrage: true, statut: 'mémoire automatique', o200k: 22 },
     { cle: '<global>/rules/g-paths.md', portee: 'global', auDemarrage: false, statut: 'règle conditionnelle', o200k: 21 },
     { cle: '<global>/rules/g-perm.md', portee: 'global', auDemarrage: true, statut: 'règle permanente', o200k: 20 },
     { cle: '<parent>/.claude/CLAUDE.md', portee: 'local', auDemarrage: true, statut: 'âme', o200k: 28 },
@@ -169,6 +172,8 @@ const ATTENDUS_C1: Record<string, Vu[]> = {
   // l'import extérieur du projet (CC46) et celui du parent vers son propre dossier (CC54) sont comptés,
   // marqués extérieurs ; le témoin du parent vers le projet est un import ordinaire (CC54).
   'e5-imports': [
+    // 250 lignes : coupé à 200 lignes (CC41)
+    { cle: '<global>/projects/<memoire>/memory/MEMORY.md', portee: 'global', auDemarrage: true, statut: 'mémoire automatique (coupée à 200 lignes)', o200k: 5800 },
     { cle: '<parent>/CLAUDE.md', portee: 'local', auDemarrage: true, statut: 'âme', o200k: 35 },
     { cle: '<parent>/e5-exterieur.md', portee: 'local', auDemarrage: true, statut: 'âme importée (extérieure, approbation)', o200k: 17 },
     { cle: '<parent>/e5-parent-cible.md', portee: 'local', auDemarrage: true, statut: 'âme importée (extérieure, approbation)', o200k: 18 },
@@ -182,6 +187,12 @@ const ATTENDUS_C1: Record<string, Vu[]> = {
     { cle: '<projet>/e5-fm-avec.md', portee: 'local', auDemarrage: true, statut: 'âme importée', o200k: 42 },
     { cle: '<projet>/e5-fm-sans.md', portee: 'local', auDemarrage: true, statut: 'âme importée', o200k: 42 },
     { cle: '<projet>/e5-parent-vers-projet.md', portee: 'local', auDemarrage: true, statut: 'âme importée', o200k: 17 },
+  ],
+  // 180 lignes de 160 caractères : coupé à 25 000 caractères (CC50, déduit après coup) ; la règle de référence
+  // de 40 lignes (les skills du jeu ne sont pas comparés : voir JEUX_SANS_SKILLS)
+  'e5-coupe-octets': [
+    { cle: '<global>/projects/<memoire>/memory/MEMORY.md', portee: 'global', auDemarrage: true, statut: 'mémoire automatique (coupée à 25 000 caractères)', o200k: 10775 },
+    { cle: '<projet>/.claude/rules/e5-ref-octets.md', portee: 'local', auDemarrage: true, statut: 'règle permanente', o200k: 2760 },
   ],
   // AGENTS.md seul : lu, Project (CC22)
   'agents-seul': [
@@ -204,8 +215,9 @@ const ATTENDUS_C1: Record<string, Vu[]> = {
 /**
  * Les jeux dont les skills ne sont pas comparés. e5-imports : ses skills mesurent la clé d'homonymie
  * (CC48 à CC51), corrigée plus tard (lot C2b) ; ils restent « plus tard », hors de cette comparaison.
+ * e5-coupe-octets : ses skills mesurent skillOverrides (CC52), lu au lot C2b.
  */
-const JEUX_SANS_SKILLS = new Set(['e5-imports']);
+const JEUX_SANS_SKILLS = new Set(['e5-imports', 'e5-coupe-octets']);
 
 /**
  * Les éléments chargés par Claude Code que l'extension ne lit pas encore (mémoire du projet et des
@@ -215,7 +227,6 @@ const JEUX_SANS_SKILLS = new Set(['e5-imports']);
  */
 const ATTENDUS_PLUS_TARD: Record<string, string[]> = {
   niveaux: [
-    '<global>/projects/<memoire>/memory/MEMORY.md',
     '<parent>/.claude/rules/par-regle.md',
     '<projet>/.claude/rules/sous/p-sous.md',
   ],
@@ -228,12 +239,13 @@ const ATTENDUS_PLUS_TARD: Record<string, string[]> = {
   'cout-f-projet-claude': [],
   'cout-f-parent': [],
   'cout-calibrage': [],
-  // L'import d'une règle permanente (CC44) attend le lot C2b ; MEMORY.md attend le commit a7
-  'e5-imports': ['<global>/projects/<memoire>/memory/MEMORY.md', '<projet>/e5-regle-cible.md'],
+  // L'import d'une règle permanente (CC44) attend le lot C2b
+  'e5-imports': ['<projet>/e5-regle-cible.md'],
+  'e5-coupe-octets': [],
   'agents-seul': [],
   'agents-avec-claude': [],
-  // MEMORY.md (désactivé par le settings.json du projet, CC53) attend le commit a7
-  'e5-agents': ['<global>/projects/<memoire>/memory/MEMORY.md'],
+  // MEMORY.md est absent : la mémoire automatique est désactivée par le settings.json du projet (CC53)
+  'e5-agents': [],
 };
 
 /**
@@ -278,6 +290,7 @@ const GRILLE_E5_IMPORTS: EntreeContext[] = [
   { id: 'CC54:parent', combinaison: 'e5-imports', element: '<parent>/CLAUDE.md', attendu: { present: true, type: 'Project' } },
   { id: 'CC54:temoin', combinaison: 'e5-imports', element: '<projet>/e5-parent-vers-projet.md', attendu: { present: true, type: 'Project' } },
   { id: 'CC54:cible', combinaison: 'e5-imports', element: '<parent>/e5-parent-cible.md', attendu: { present: false, exterieur: true } },
+  { id: 'CC41', combinaison: 'e5-imports', element: '<global>/projects/<memoire>/memory/MEMORY.md', attendu: { present: true, type: 'AutoMem' } },
 ];
 
 /**
@@ -291,15 +304,22 @@ const GRILLE_E5_AGENTS: EntreeContext[] = [
   { id: 'CC53', combinaison: 'e5-agents', element: '<global>/projects/<memoire>/memory/MEMORY.md', attendu: { present: false } },
 ];
 
+/** Jeu e5-coupe-octets : la grille du lot E5 (/context, série 2026-11-12-0833) : CC50, MEMORY.md présent, AutoMem, coupé. */
+const GRILLE_E5_COUPE_OCTETS: EntreeContext[] = [
+  { id: 'CC50', combinaison: 'e5-coupe-octets', element: '<global>/projects/<memoire>/memory/MEMORY.md', attendu: { present: true, type: 'AutoMem' } },
+  { id: 'CC50:reference', combinaison: 'e5-coupe-octets', element: '<projet>/.claude/rules/e5-ref-octets.md', attendu: { present: true, type: 'Project' } },
+];
+
 /** Les jeux sans entrée dans une baseline publiée : leur référence est la grille. */
 const GRILLES: Record<string, EntreeContext[]> = {
   'doublons-d6': GRILLE_DOUBLONS_D6,
   'cout-calibrage': GRILLE_COUT_CALIBRAGE,
   'e5-imports': GRILLE_E5_IMPORTS,
   'e5-agents': GRILLE_E5_AGENTS,
+  'e5-coupe-octets': GRILLE_E5_COUPE_OCTETS,
 };
 
-const JEUX = ['niveaux', 'skills', 'skill-long-1500', 'declencheurs', 'cout-regle-paths', 'doublons-d6', 'cout-f-projet-claude', 'cout-f-parent', 'cout-calibrage', 'e5-imports', 'agents-seul', 'agents-avec-claude', 'e5-agents'];
+const JEUX = ['niveaux', 'skills', 'skill-long-1500', 'declencheurs', 'cout-regle-paths', 'doublons-d6', 'cout-f-projet-claude', 'cout-f-parent', 'cout-calibrage', 'e5-imports', 'agents-seul', 'agents-avec-claude', 'e5-agents', 'e5-coupe-octets'];
 /**
  * Combinaison de la baseline qui porte les entrées d'un jeu : le jeu cout-regle-paths est mesuré dans
  * cout-regles, et les jeux cout-f-projet-claude et cout-f-parent dans cout-f-quatre-chemins (CC13).
@@ -309,6 +329,12 @@ const COMBINAISON: Record<string, string> = {
   'cout-f-projet-claude': 'cout-f-quatre-chemins',
   'cout-f-parent': 'cout-f-quatre-chemins',
 };
+
+/**
+ * L'état attendu de la ligne « Mémoire automatique » : présent pour les jeux qui déposent un MEMORY.md, désactivé
+ * pour e5-agents (autoMemoryEnabled: false dans le projet, CC53), absent ailleurs.
+ */
+const ETAT_MEMOIRE_AUTO: Record<string, string> = { niveaux: 'present', 'e5-imports': 'present', 'e5-coupe-octets': 'present', 'e5-agents': 'desactivee' };
 
 const lister = (dir: string, base = ''): string[] =>
   fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
@@ -353,12 +379,15 @@ describe('Suite de Tests : oracle du comptage de Claude Code sur les fixtures in
     claudeGlobalPath = racines.global;
     // La remontée vers les dossiers parents s'arrête au dossier du jeu (au-dessus de <parent>)
     StateManager.setClaudeMemoryStopAtForTesting(path.join(tempBaseDir, jeu));
+    // La mémoire automatique ne voit aucune variable de l'environnement du poste
+    StateManager.setClaudeAutoMemoryEnvForTesting({});
     try {
       const state = await StateManager.loadFullState(true);
       return { state, racines, contenus };
     } finally {
       claudeGlobalPath = '';
       StateManager.setClaudeMemoryStopAtForTesting(null);
+      StateManager.setClaudeAutoMemoryEnvForTesting(null);
       WorkspaceDetector.setOverriddenTool(null);
       vscodeMock.workspace.workspaceFolders = origFolders;
     }
@@ -366,6 +395,9 @@ describe('Suite de Tests : oracle du comptage de Claude Code sur les fixtures in
 
   /** Le nom masqué d'un chemin réel : <projet>, <parent> ou <global>, en séparateurs « / ». */
   const masquer = (p: string, racines: Record<string, string>) => {
+    const memoire = path.join(racines.global, 'projects', commun.nomDossierMemoire(racines.projet));
+    const relMemoire = path.relative(memoire, p);
+    if (!relMemoire.startsWith('..') && !path.isAbsolute(relMemoire)) return `<global>/projects/<memoire>/${posix(relMemoire)}`;
     for (const [nom, racine] of [['projet', racines.projet], ['parent', racines.parent], ['global', racines.global]] as const) {
       const rel = path.relative(racine, p);
       if (!rel.startsWith('..') && !path.isAbsolute(rel)) return `<${nom}>${rel ? `/${posix(rel)}` : ''}`;
@@ -388,6 +420,10 @@ describe('Suite de Tests : oracle du comptage de Claude Code sur les fixtures in
         }
         if (i.type === 'soul') {
           // Un fichier importé : chargé, extérieur (marqué « après approbation »), ou non chargé (5ᵉ saut, plus de 4 Mio)
+          if (m.claudeMemoryType === 'AutoMem') {
+            const coupe = m.claudeAutoMemory?.coupe === 'lignes' ? ' (coupée à 200 lignes)' : m.claudeAutoMemory?.coupe === 'caracteres' ? ' (coupée à 25 000 caractères)' : '';
+            return { cle: masquer(i.path, racines), portee, auDemarrage: i.enabled, statut: `mémoire automatique${coupe}`, o200k: i.tokenCount ?? 0 };
+          }
           const statut = m.claudeMemoryNotLoaded === 'niveau-5' ? 'âme non chargée (5ᵉ niveau)'
             : m.claudeMemoryNotLoaded === 'plus-de-4-mio' ? 'âme ignorée (plus de 4 Mio)'
             : m.claudeMemoryNotLoaded === 'agents-ignore' ? 'âme ignorée (CLAUDE.md présent)'
@@ -432,7 +468,7 @@ describe('Suite de Tests : oracle du comptage de Claude Code sur les fixtures in
     }
     if (present) {
       assert.ok(vu && vu.auDemarrage, `${entree.id} : ${element} présent au démarrage`);
-      assert.strictEqual(vu!.portee, type === 'User' ? 'global' : 'local', `${entree.id} : portée`);
+      assert.strictEqual(vu!.portee, type === 'User' || type === 'AutoMem' ? 'global' : 'local', `${entree.id} : portée`);
     } else {
       assert.ok(!vu || !vu.auDemarrage, `${entree.id} : ${element} absent au démarrage`);
     }
@@ -475,6 +511,21 @@ describe('Suite de Tests : oracle du comptage de Claude Code sur les fixtures in
       for (const cle of ATTENDUS_PLUS_TARD[jeu]) {
         assert.ok(!liste.some((v) => v.cle === cle || v.cle.startsWith(`${cle}@`)), `${jeu} : ${cle} est lu, à rattacher à l'oracle`);
       }
+      // La ligne « Mémoire automatique » : son état ; la carte hors du total de l'Âme ; la ligne comptée une fois
+      const s = state.stats;
+      const auto = s.claudeAutoMemory!;
+      assert.ok(auto, `${jeu} : ligne de la mémoire automatique`);
+      assert.strictEqual(auto.etat, ETAT_MEMOIRE_AUTO[jeu] ?? 'absent', `${jeu} : état de la mémoire automatique`);
+      const carteAuto = state.globalResources.filter((i) => i.metadata?.claudeMemoryType === 'AutoMem');
+      assert.strictEqual(carteAuto.length, auto.etat === 'present' ? 1 : 0, `${jeu} : une carte seulement si présent`);
+      assert.strictEqual(auto.tokenCount, carteAuto[0]?.tokenCount ?? 0, `${jeu} : la ligne vaut la carte`);
+      const ameG = state.globalResources.filter((i) => i.type === 'soul' && i.enabled && !i.metadata?.claudeMemoryNotLoaded && i.metadata?.claudeMemoryType !== 'AutoMem')
+        .reduce((t, i) => t + (i.tokenCount ?? 0), 0);
+      assert.strictEqual(s.soulGlobal.tokenCount, ameG, `${jeu} : la carte de MEMORY.md est hors du total de l'Âme`);
+      const categories = s.soulGlobal.tokenCount + s.soulLocal.tokenCount + s.rulesGlobal.tokenCount + s.rulesLocal.tokenCount
+        + s.skillsGlobal.tokenCount + s.skillsLocal.tokenCount + s.mcpGlobal.tokenCount + s.mcpLocal.tokenCount;
+      assert.strictEqual(s.usedTokensTotal, categories + auto.tokenCount, `${jeu} : la ligne est comptée une fois dans le total`);
+
       // Aucun doublon ni gaspillage parmi les skills
       const doublonsSkills = [...state.globalResources, ...state.localResources].filter((i) => i.type === 'skill' && i.metadata?.duplicateInfo);
       assert.strictEqual(doublonsSkills.length, 0, `${jeu} : aucun skill en doublon`);

@@ -21,7 +21,8 @@ import { markdownWorkflowPersonalizationTokens } from './antigravityWorkflowItem
 import { applyClaudeSkillPrecedence, withoutMaskedSkills } from '../claude/skillPrecedence';
 import { DashboardPanel } from '../providers/DashboardPanel';
 import { CheatSheetPanel } from '../providers/CheatSheetPanel';
-import { getEffectiveGlobalAntigravityPath, getUserHome } from '../utils/paths';
+import { getEffectiveGlobalAntigravityPath, getEffectiveGlobalClaudePath, getUserHome } from '../utils/paths';
+import { scanClaudeAutoMemory } from './claudeAutoMemory';
 import { resetTokenizerMetrics, getTokenizerMetrics } from '../utils/tokenizer';
 import { debounce } from '../utils/debounce';
 import { ResolvedAntigravityProfile, resolveConfiguredAntigravityProfile } from '../antigravity/behaviorProfile';
@@ -96,6 +97,7 @@ export class StateManager {
   private static _debugTimingOverride: boolean | null = null;
   private static _antigravityProfileOverride: ResolvedAntigravityProfile | null = null;
   private static _claudeMemoryStopAtOverride: string | null = null;
+  private static _claudeAutoMemoryEnvOverride: Record<string, string | undefined> | null = null;
   /** Profil de comportement d'Antigravity transmis aux scanners lors du dernier scan. */
   public static lastAntigravityProfile: ResolvedAntigravityProfile | null = null;
 
@@ -115,6 +117,14 @@ export class StateManager {
    */
   public static setClaudeMemoryStopAtForTesting(dir: string | null): void {
     this._claudeMemoryStopAtOverride = dir;
+  }
+
+  /**
+   * Impose l'environnement que voit la mémoire automatique de Claude Code (src/services/claudeAutoMemory.ts),
+   * pour qu'un test ne dépende pas des variables du poste ; null rétablit process.env.
+   */
+  public static setClaudeAutoMemoryEnvForTesting(env: Record<string, string | undefined> | null): void {
+    this._claudeAutoMemoryEnvOverride = env;
   }
 
   public static isDebugTimingActive(): boolean {
@@ -293,9 +303,23 @@ export class StateManager {
       mcpGlobal.tokenCount +
       mcpLocal.tokenCount +
       personalizationWorkflowTokens;
-    const usedTokensTotal = budgetExcludesPersonalization
+    // Claude Code : la mémoire automatique (MEMORY.md), sur sa ligne à part, comptée une fois dans le total ;
+    // sa carte, en lecture seule, vient après la détection des doublons et hors du total de l'Âme
+    const claudeAutoMemoryScan = workspace.tool === 'claude-code' && workspace.workspacePath
+      ? scanClaudeAutoMemory({
+          cwd: workspace.workspacePath,
+          globalPath: getEffectiveGlobalClaudePath(),
+          ...(this._claudeMemoryStopAtOverride !== null ? { stopAt: this._claudeMemoryStopAtOverride } : {}),
+          env: this._claudeAutoMemoryEnvOverride ?? process.env,
+          budgetTotal,
+        })
+      : null;
+    if (claudeAutoMemoryScan?.item) finalGlobal.push(claudeAutoMemoryScan.item);
+    const claudeAutoMemoryTokens = claudeAutoMemoryScan ? claudeAutoMemoryScan.stat.tokenCount : 0;
+
+    const usedTokensTotal = (budgetExcludesPersonalization
       ? rulesAndSoulTokens
-      : rulesAndSoulTokens + personalizationTokens;
+      : rulesAndSoulTokens + personalizationTokens) + claudeAutoMemoryTokens;
 
     const availablePercentage = Number(Math.max(0, 100 - (usedTokensTotal / budgetTotal) * 100).toFixed(1));
     const personalizationBudgetTotal =
@@ -329,6 +353,7 @@ export class StateManager {
       mcpGlobal,
       mcpLocal,
       duplicateStats,
+      ...(claudeAutoMemoryScan ? { claudeAutoMemory: claudeAutoMemoryScan.stat } : {}),
       // Antigravity : réinjection des règles glob, dépassement du budget et hooks, hors des totaux
       ...(workspace.tool === 'antigravity'
         ? { dynamicCosts: computeAntigravityDynamicCosts([...finalGlobal, ...finalLocal], await readAntigravityHooks(workspace.workspacePath)) }

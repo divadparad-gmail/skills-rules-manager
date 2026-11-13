@@ -26,6 +26,38 @@ export type ClaudeMemoryType = 'User' | 'Project' | 'Local' | 'AutoMem';
  */
 export type ClaudeMemoryNotLoaded = 'niveau-5' | 'plus-de-4-mio' | 'agents-ignore';
 
+/** Portée d'un fichier de réglages de Claude Code : le profil, le projet partagé ou le projet local. */
+export type ClaudeSettingsScope = 'utilisateur' | 'projet' | 'local';
+
+/** La coupe et la lecture du MEMORY.md de la mémoire automatique de Claude Code. */
+export interface ClaudeAutoMemoryDetail {
+  coupe: 'lignes' | 'caracteres' | null;
+  lignesOrigine: number | null;
+  lignesGardees: number;
+  plusDe4Mio: boolean;
+  importsNonDeveloppes: boolean;
+  octets: number;
+}
+
+/**
+ * La ligne « Mémoire automatique, écrite par Claude » de la jauge de Claude Code : l'état du MEMORY.md et ce
+ * qui l'explique. Les tokens sont ceux du texte gardé après la coupe (o200k), comptés une fois dans le total.
+ */
+export interface ClaudeAutoMemoryStat extends Partial<ClaudeAutoMemoryDetail> {
+  etat: 'present' | 'absent' | 'desactivee' | 'non-determine';
+  cause?:
+    | { type: 'variable'; nom: string }
+    | { type: 'reglage'; portee: ClaudeSettingsScope }
+    | { type: 'reglage-dossier'; portees: ClaudeSettingsScope[] }
+    | { type: 'worktree' }
+    | { type: 'longueur' };
+  tokenCount: number;
+  charCount: number;
+  percentage: number;
+  /** Les variables vues dans l'environnement de l'extension et non suivies (CLAUDE_CONFIG_DIR). */
+  mentions: string[];
+}
+
 export type SyncStatus = 'synced' | 'modified' | 'local_only' | 'nas_offline';
 
 export interface DuplicateInfo {
@@ -120,6 +152,12 @@ export interface ResourceItem {
      * instructions posé à une valeur autre que celle par défaut, détecté seulement.
      */
     claudeAgentsMd?: { ignorePar?: string; reglageProjectInstructions?: boolean };
+    /**
+     * Carte du MEMORY.md de la mémoire automatique de Claude Code (src/services/claudeAutoMemory.ts) : la
+     * coupe, les lignes d'origine (null si seul le début a été lu) et gardées, la taille au-delà de 4 Mio,
+     * et la présence d'une ligne « @ », jamais développée.
+     */
+    claudeAutoMemory?: ClaudeAutoMemoryDetail;
     /** Règle Antigravity écartée par l'agent (frontmatter absent ou trigger non reconnu). */
     ignoredByAgent?: boolean;
     /** Défauts de frontmatter d'une règle Antigravity (voir AntigravityRuleIssue). */
@@ -388,6 +426,8 @@ export interface ManagerStats {
   mcpGlobal: TokenCategoryStat;
   mcpLocal: TokenCategoryStat;
   duplicateStats?: DuplicateStats;
+  /** Claude Code : la ligne à part de la mémoire automatique (MEMORY.md), comprise dans `usedTokensTotal`. */
+  claudeAutoMemory?: ClaudeAutoMemoryStat;
   /** Antigravity : empilement des règles `glob` et dépassement du budget, sans effet sur les totaux. */
   dynamicCosts?: AntigravityDynamicCosts;
 }

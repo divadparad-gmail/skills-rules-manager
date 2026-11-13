@@ -410,6 +410,140 @@
     banner.style.display = 'flex';
   }
 
+  /** Le libellé d'une portée de réglages de Claude Code. */
+  const CLAUDE_SETTINGS_SCOPE_LABELS = {
+    utilisateur: 'du profil (settings.json)',
+    projet: 'du projet (.claude/settings.json)',
+    local: 'locaux du projet (.claude/settings.local.json)',
+  };
+
+  /** L'explication d'un état de la mémoire automatique de Claude Code (src/services/claudeAutoMemory.ts). */
+  function describeClaudeAutoMemoryCause(stat) {
+    const cause = stat.cause || {};
+    if (stat.etat === 'desactivee') {
+      return cause.type === 'variable'
+        ? `• Désactivée : ${cause.nom} est posée dans l'environnement de l'extension (documentation). Rien d'autre n'est lu.`
+        : `• Désactivée : autoMemoryEnabled vaut false dans les réglages ${CLAUDE_SETTINGS_SCOPE_LABELS[cause.portee] || ''} (documentation ; mesuré pour le projet). MEMORY.md n'est pas lu.`;
+    }
+    if (stat.etat === 'non-determine') {
+      if (cause.type === 'longueur') return '• ❔ Chemin du projet de plus de 200 caractères : le nom du dossier de mémoire n\'est pas prévisible (non vérifié). L\'extension ne cherche pas de nom raccourci.';
+      if (cause.type === 'worktree') return '• ❔ Le .git du dépôt est un fichier (worktree) : l\'emplacement de la mémoire n\'est pas vérifié.';
+      if (cause.type === 'variable') return `• ❔ Emplacement modifié par ${cause.nom}, posée dans l'environnement de l'extension : non suivi (documentation).`;
+      if (cause.type === 'reglage-dossier') {
+        const portees = (cause.portees || []).map((p) => CLAUDE_SETTINGS_SCOPE_LABELS[p] || p).join(', ');
+        return `• ❔ Emplacement modifié par autoMemoryDirectory (réglages ${portees}) : non suivi ; le chemin choisi n'est jamais lu.`;
+      }
+      return '• ❔ Emplacement non déterminé.';
+    }
+    if (stat.etat === 'absent') return '• Aucun MEMORY.md à l\'emplacement calculé : 0 token.';
+    const lignes = `• Chargé au démarrage : ${stat.lignesGardees || 0} ligne(s), ${(stat.tokenCount || 0).toLocaleString()} tokens (o200k ; le facteur de la jauge ne s'applique pas encore).`;
+    const coupe = stat.coupe === 'lignes'
+      ? `\n• Coupé à 200 lignes${typeof stat.lignesOrigine === 'number' ? ` (sur ${stat.lignesOrigine})` : ''} (mesuré).`
+      : stat.coupe === 'caracteres'
+        ? `\n• Coupé à 25 000 caractères${typeof stat.lignesOrigine === 'number' ? ` (fichier de ${stat.lignesOrigine} lignes)` : ''}, comptés en points de code (déduit après coup ; unité non vérifiée).`
+        : '';
+    const ajout = stat.coupe ? '\n• Texte d\'environ 120 tokens ajouté par Claude Code à un MEMORY.md coupé : non compté (déduit, non vérifié).' : '';
+    const imports = stat.importsNonDeveloppes ? '\n• ❔ Une ligne « @ » n\'est pas développée (non mesuré).' : '';
+    return lignes + coupe + ajout + imports;
+  }
+
+  /**
+   * Claude Code : la ligne « Mémoire automatique, écrite par Claude » de la jauge et son segment dans la barre,
+   * créés par le JavaScript (les fichiers HTML d'Antigravity ne changent pas), et retirés sous Antigravity.
+   * Tableau de bord : après la ligne « MCP (total) » ; barre latérale : à la fin de la légende. Texte posé par
+   * textContent.
+   */
+  function renderClaudeAutoMemoryLine(state, doc) {
+    const targetDoc = doc || (typeof document !== 'undefined' ? document : null);
+    if (!targetDoc) return;
+    const isClaude = !!(state && state.workspace && state.workspace.tool === 'claude-code');
+    const stat = isClaude && state.stats ? state.stats.claudeAutoMemory : null;
+    const retirer = (id) => {
+      const el = targetDoc.getElementById(id);
+      if (el && el.parentNode) el.parentNode.removeChild(el);
+    };
+    if (!stat) {
+      retirer('rowClaudeAutoMemory');
+      retirer('barClaudeAutoMemory');
+      return;
+    }
+
+    let row = targetDoc.getElementById('rowClaudeAutoMemory');
+    if (!row) {
+      const dashboardAnchor = targetDoc.getElementById('rowMcpTotal');
+      const sidebarList = targetDoc.getElementById('tokenBreakdownList');
+      if (!dashboardAnchor && !sidebarList) return;
+      const isDashboard = !!dashboardAnchor;
+      row = targetDoc.createElement('div');
+      row.id = 'rowClaudeAutoMemory';
+      row.className = isDashboard ? 'budget-card-row has-tooltip' : 'breakdown-row has-tooltip';
+      const labelWrap = targetDoc.createElement('div');
+      labelWrap.className = isDashboard ? 'budget-card-title' : 'breakdown-label-wrap';
+      const titleEl = targetDoc.createElement('span');
+      titleEl.id = 'titleClaudeAutoMemory';
+      if (!isDashboard) titleEl.className = 'breakdown-title';
+      labelWrap.appendChild(titleEl);
+      const valEl = targetDoc.createElement('span');
+      valEl.id = 'valClaudeAutoMemory';
+      valEl.className = isDashboard ? 'budget-card-stats' : 'breakdown-values';
+      const tooltipEl = targetDoc.createElement('div');
+      tooltipEl.id = 'tooltipClaudeAutoMemory';
+      tooltipEl.className = 'tooltip-box';
+      row.appendChild(labelWrap);
+      row.appendChild(valEl);
+      row.appendChild(tooltipEl);
+      if (isDashboard) dashboardAnchor.parentNode.insertBefore(row, dashboardAnchor.nextSibling);
+      else sidebarList.appendChild(row);
+    }
+
+    const titre = '🧠 Mémoire automatique, écrite par Claude';
+    const titleEl = targetDoc.getElementById('titleClaudeAutoMemory');
+    if (titleEl) {
+      titleEl.textContent = stat.etat === 'non-determine'
+        ? '🧠 Mémoire automatique : emplacement non déterminé ❔'
+        : stat.etat === 'absent'
+          ? `${titre} : absent`
+          : stat.etat === 'desactivee'
+            ? `${titre} : désactivée`
+            : titre;
+    }
+    const tokens = stat.tokenCount || 0;
+    const pct = stat.percentage || 0;
+    const valEl = targetDoc.getElementById('valClaudeAutoMemory');
+    if (valEl) valEl.textContent = `${tokens.toLocaleString()} tok (${pct}%)`;
+    const tooltipEl = targetDoc.getElementById('tooltipClaudeAutoMemory');
+    if (tooltipEl) {
+      const invite = stat.etat === 'desactivee'
+        ? ''
+        : '\n• Invite système de la mémoire automatique : environ 700 tokens, hors jauge (mesuré une fois par /context).';
+      const mentions = (stat.mentions || []).includes('CLAUDE_CONFIG_DIR')
+        ? '\n• ❔ CLAUDE_CONFIG_DIR est posée dans l\'environnement de l\'extension : non suivie ; le profil reste celui du réglage de l\'extension.'
+        : '';
+      tooltipEl.textContent =
+        '🧠 Mémoire automatique (MEMORY.md), écrite par Claude :\n' +
+        describeClaudeAutoMemoryCause(stat) +
+        invite +
+        mentions +
+        '\n• Les autres fichiers du dossier memory/ ne sont pas chargés au démarrage (documentation), ni lus par l\'extension.' +
+        '\n• Sa carte, en lecture seule, est hors du total de l\'Âme : ces tokens ne sont comptés qu\'ici.';
+    }
+
+    let segment = targetDoc.getElementById('barClaudeAutoMemory');
+    if (!segment) {
+      const after = targetDoc.getElementById('barMcpLocal');
+      if (after && after.parentNode) {
+        segment = targetDoc.createElement('div');
+        segment.id = 'barClaudeAutoMemory';
+        segment.className = 'segment segment-soul-global';
+        after.parentNode.insertBefore(segment, after.nextSibling);
+      }
+    }
+    if (segment) {
+      segment.style.width = `${Math.max(0, pct)}%`;
+      segment.title = 'Mémoire automatique (MEMORY.md)';
+    }
+  }
+
   function renderTimingConsole(state) {
     const btnToggle = document.getElementById('btnToggleDebugTiming');
     const toggleText = document.getElementById('timingToggleText');
@@ -846,6 +980,8 @@
       }
 
       renderDynamicCosts(state);
+      // Claude Code : la ligne de la mémoire automatique ; retirée sous Antigravity
+      renderClaudeAutoMemoryLine(state);
     }
   }
 
@@ -2344,6 +2480,30 @@
         'Import hors du dossier de travail, depuis un fichier de mémoire du projet ou d\'un dossier parent : Claude Code demande une approbation, une fois par projet, avant de le charger (documentation) ; en -p, non chargé tant qu\'il n\'est pas approuvé (mesuré).\n' +
         'L\'extension le compte, sans lire l\'état de l\'approbation.');
     }
+    // Claude Code : MEMORY.md de la mémoire automatique (src/services/claudeAutoMemory.ts) : sa coupe, et une
+    // ligne « @ » qui n'est pas développée
+    const claudeAutoMemory = isClaudeItem && item.metadata && item.metadata.claudeAutoMemory;
+    if (claudeAutoMemory) {
+      const origine = claudeAutoMemory.lignesOrigine === null || claudeAutoMemory.lignesOrigine === undefined
+        ? 'plus de 200 lignes'
+        : `${claudeAutoMemory.lignesOrigine} lignes`;
+      const gardees = `La carte compte les ${claudeAutoMemory.lignesGardees} lignes gardées.`;
+      const ajout = 'Claude Code semble ajouter à un MEMORY.md coupé un texte d\'environ 120 tokens : il n\'est pas compté (déduit, non vérifié).';
+      const grosFichier = claudeAutoMemory.plusDe4Mio
+        ? `\nFichier de plus de 4 Mio (${Number(claudeAutoMemory.octets || 0).toLocaleString('fr-FR')} octets) : l'extension n'en lit que le début. La limite de 4 Mio de Claude Code vise les CLAUDE.md (documentation) ; son effet sur MEMORY.md n'est pas vérifié.`
+        : '';
+      if (claudeAutoMemory.coupe === 'lignes') {
+        addBadge('pill-cond', '✂️ Coupé à 200 lignes',
+          `MEMORY.md compte ${origine} : Claude Code n'en charge que les 200 premières (mesuré), ou les 25 000 premiers caractères si cette limite vient avant. ${gardees}\n${ajout}${grosFichier}`);
+      } else if (claudeAutoMemory.coupe === 'caracteres') {
+        addBadge('pill-cond', '✂️ Coupé à 25 000 caractères',
+          `MEMORY.md (${origine}) dépasse 25 000 caractères avant sa 200ᵉ ligne : Claude Code n'en charge que le début (déduit après coup de deux mesures). Les caractères sont comptés en points de code, et la coupe tombe sur un caractère complet : cette unité n'est pas vérifiée. ${gardees}\n${ajout}${grosFichier}`);
+      }
+      if (claudeAutoMemory.importsNonDeveloppes) {
+        addBadge('pill-warn-amber', '❔ Import non développé',
+          'Une ligne « @chemin » de MEMORY.md n\'est pas développée : l\'extension la compte comme du texte, sans lire le fichier visé. Ce que fait Claude Code d\'une telle ligne : non mesuré.');
+      }
+    }
     const claudeManualOnly = isClaudeItem && item.metadata && item.metadata.claudeSkillManualOnly;
     const claudePathsTriggered = isClaudeItem && item.metadata && item.metadata.claudeSkillPathsTriggered;
     if (claudeManualOnly) {
@@ -2668,6 +2828,8 @@
       const claudeImport = item.metadata.claudeImport;
       const origine = claudeImport
         ? ` Importé par ${claudeImport.par} (niveau ${claudeImport.niveau}).`
+        : item.metadata.claudeMemoryType === 'AutoMem'
+        ? ' Mémoire automatique : ses tokens comptent une seule fois, sur la ligne « Mémoire automatique » de la jauge, et non dans l\'Âme.'
         : inheritedFrom === undefined
         ? ''
         : item.metadata.claudeMemoryType === 'Local'
@@ -3343,6 +3505,7 @@
       updateBreakdownRow,
       renderBancEssaiBanner,
       renderClaudeImportsBanner,
+      renderClaudeAutoMemoryLine,
       localRulesHeaderCount,
       updateBulkControl,
       setFilterState: (state) => {
