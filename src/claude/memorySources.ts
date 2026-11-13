@@ -78,14 +78,19 @@ export function claudeAncestorDirs(cwd: string, options: ClaudeMemoryOptions = {
 
 /**
  * Les fichiers de mémoire candidats des dossiers parents, dans l'ordre de chargement : de la racine
- * vers le dossier de travail, et, dans chaque dossier, CLAUDE.md, .claude/CLAUDE.md puis CLAUDE.local.md.
+ * vers le dossier de travail, et, dans chaque dossier, CLAUDE.md, .claude/CLAUDE.md puis CLAUDE.local.md
+ * (ou les fichiers donnés par `files`, dans leur ordre : AGENTS.md s'y ajoute, src/claude/agentsMd.ts).
  * L'existence des fichiers n'est pas vérifiée ici.
  */
-export function claudeParentMemoryCandidates(cwd: string, options: ClaudeMemoryOptions = {}): ClaudeParentMemoryCandidate[] {
+export function claudeParentMemoryCandidates(
+  cwd: string,
+  options: ClaudeMemoryOptions = {},
+  files: ReadonlyArray<{ file: string; claudeMemoryType: ClaudeMemoryType }> = CLAUDE_MEMORY_FILES
+): ClaudeParentMemoryCandidate[] {
   const start = path.resolve(cwd);
   return claudeAncestorDirs(start, options).flatMap((dir) => {
     const inheritedFrom = path.relative(start, dir).split(path.sep).join('/');
-    return CLAUDE_MEMORY_FILES.map(({ file, claudeMemoryType }) => ({
+    return files.map(({ file, claudeMemoryType }) => ({
       file,
       absolutePath: path.join(dir, ...file.split('/')),
       inheritedFrom,

@@ -20,8 +20,11 @@ export type ClaudeReadOnlyReason = 'Fichier hors du projet' | 'Écrit par Claude
 /** Type d'un fichier de mémoire de Claude Code, tel que `/context` le liste (mesuré, lots E1 à E5). */
 export type ClaudeMemoryType = 'User' | 'Project' | 'Local' | 'AutoMem';
 
-/** Raison pour laquelle un fichier de mémoire de Claude Code présent n'est pas chargé. */
-export type ClaudeMemoryNotLoaded = 'niveau-5' | 'plus-de-4-mio';
+/**
+ * Raison pour laquelle un fichier de mémoire de Claude Code présent n'est pas chargé : cinquième saut
+ * d'import, plus de 4 Mio, ou AGENTS.md ignoré parce qu'un CLAUDE.md est présent.
+ */
+export type ClaudeMemoryNotLoaded = 'niveau-5' | 'plus-de-4-mio' | 'agents-ignore';
 
 export type SyncStatus = 'synced' | 'modified' | 'local_only' | 'nas_offline';
 
@@ -111,6 +114,12 @@ export interface ResourceItem {
     claudeMemoryNotLoaded?: ClaudeMemoryNotLoaded;
     /** Taille en octets d'un fichier de mémoire de Claude Code de plus de 4 Mio (lue par stat seulement). */
     claudeByteSize?: number;
+    /**
+     * Carte d'un AGENTS.md ou .claude/AGENTS.md de Claude Code (src/claude/agentsMd.ts) : le fichier de
+     * mémoire qui l'exclut (chemin relatif au dossier de travail), s'il est ignoré ; et le réglage Project
+     * instructions posé à une valeur autre que celle par défaut, détecté seulement.
+     */
+    claudeAgentsMd?: { ignorePar?: string; reglageProjectInstructions?: boolean };
     /** Règle Antigravity écartée par l'agent (frontmatter absent ou trigger non reconnu). */
     ignoredByAgent?: boolean;
     /** Défauts de frontmatter d'une règle Antigravity (voir AntigravityRuleIssue). */

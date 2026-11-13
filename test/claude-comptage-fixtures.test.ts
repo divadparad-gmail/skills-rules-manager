@@ -54,9 +54,10 @@ import { ManagerFullState, ResourceItem } from '../src/types';
  *   SCENARIOS-CLAUDE-CODE.md (lignes CC38 à CC40, lot E4, 2.1.319) ;
  * - les tokens o200k de chaque élément lu, en valeurs exactes figées au lot C1, puis à chaque commit du
  *   lot C2a qui ajoute une source (le .claude/CLAUDE.md et le CLAUDE.local.md du projet au commit a3, la
- *   mémoire des dossiers parents au commit a4, les imports « @ » des fichiers de mémoire au commit a5).
- * Pour les jeux cout-calibrage et e5-imports, absents de toute baseline publiée, la référence est la
- * grille commitée (CC09 au lot E4 ; CC42, CC43, CC45, CC46 et CC54 au lot E5).
+ *   mémoire des dossiers parents au commit a4, les imports « @ » des fichiers de mémoire au commit a5,
+ *   AGENTS.md au commit a6 : agents-seul et agents-avec-claude dans la baseline, CC22).
+ * Pour les jeux cout-calibrage, e5-imports et e5-agents, absents de toute baseline publiée, la référence
+ * est la grille commitée (CC09 au lot E4 ; CC42, CC43, CC45, CC46, CC47, CC53 et CC54 au lot E5).
  * La remontée vers les dossiers parents s'arrête au dossier du jeu (réglage de test de StateManager) :
  * sans cet arrêt, l'oracle lirait les fichiers de mémoire réels au-dessus du dossier temporaire.
  * Les tokens de Claude (champ `tokens` de la baseline, en /context) ne sont pas comparés : ils le seront
@@ -182,6 +183,22 @@ const ATTENDUS_C1: Record<string, Vu[]> = {
     { cle: '<projet>/e5-fm-sans.md', portee: 'local', auDemarrage: true, statut: 'âme importée', o200k: 42 },
     { cle: '<projet>/e5-parent-vers-projet.md', portee: 'local', auDemarrage: true, statut: 'âme importée', o200k: 17 },
   ],
+  // AGENTS.md seul : lu, Project (CC22)
+  'agents-seul': [
+    { cle: '<projet>/AGENTS.md', portee: 'local', auDemarrage: true, statut: 'âme', o200k: 23 },
+  ],
+  // AGENTS.md avec un CLAUDE.md : AGENTS.md absent (CC22), une carte ignorée à 0
+  'agents-avec-claude': [
+    { cle: '<projet>/AGENTS.md', portee: 'local', auDemarrage: false, statut: 'âme ignorée (CLAUDE.md présent)', o200k: 0 },
+    { cle: '<projet>/CLAUDE.md', portee: 'local', auDemarrage: true, statut: 'âme', o200k: 30 },
+  ],
+  // Sans aucun CLAUDE.md : AGENTS.md et .claude/AGENTS.md du projet, AGENTS.md du parent, tous lus,
+  // Project (CC47 ; /context : 45, 40 et 51, non comparés ici)
+  'e5-agents': [
+    { cle: '<parent>/AGENTS.md', portee: 'local', auDemarrage: true, statut: 'âme', o200k: 26 },
+    { cle: '<projet>/.claude/AGENTS.md', portee: 'local', auDemarrage: true, statut: 'âme', o200k: 23 },
+    { cle: '<projet>/AGENTS.md', portee: 'local', auDemarrage: true, statut: 'âme', o200k: 24 },
+  ],
 };
 
 /**
@@ -213,6 +230,10 @@ const ATTENDUS_PLUS_TARD: Record<string, string[]> = {
   'cout-calibrage': [],
   // L'import d'une règle permanente (CC44) attend le lot C2b ; MEMORY.md attend le commit a7
   'e5-imports': ['<global>/projects/<memoire>/memory/MEMORY.md', '<projet>/e5-regle-cible.md'],
+  'agents-seul': [],
+  'agents-avec-claude': [],
+  // MEMORY.md (désactivé par le settings.json du projet, CC53) attend le commit a7
+  'e5-agents': ['<global>/projects/<memoire>/memory/MEMORY.md'],
 };
 
 /**
@@ -259,14 +280,26 @@ const GRILLE_E5_IMPORTS: EntreeContext[] = [
   { id: 'CC54:cible', combinaison: 'e5-imports', element: '<parent>/e5-parent-cible.md', attendu: { present: false, exterieur: true } },
 ];
 
+/**
+ * Jeu e5-agents : la grille du lot E5 (/context, série 2026-11-12-0833) : CC47, les trois AGENTS.md
+ * présents, Project ; MEMORY.md absent (CC53, autoMemoryEnabled: false dans le projet), attendu au commit a7.
+ */
+const GRILLE_E5_AGENTS: EntreeContext[] = [
+  { id: 'CC47:projet', combinaison: 'e5-agents', element: '<projet>/AGENTS.md', attendu: { present: true, type: 'Project' } },
+  { id: 'CC47:projet-claude', combinaison: 'e5-agents', element: '<projet>/.claude/AGENTS.md', attendu: { present: true, type: 'Project' } },
+  { id: 'CC47:parent', combinaison: 'e5-agents', element: '<parent>/AGENTS.md', attendu: { present: true, type: 'Project' } },
+  { id: 'CC53', combinaison: 'e5-agents', element: '<global>/projects/<memoire>/memory/MEMORY.md', attendu: { present: false } },
+];
+
 /** Les jeux sans entrée dans une baseline publiée : leur référence est la grille. */
 const GRILLES: Record<string, EntreeContext[]> = {
   'doublons-d6': GRILLE_DOUBLONS_D6,
   'cout-calibrage': GRILLE_COUT_CALIBRAGE,
   'e5-imports': GRILLE_E5_IMPORTS,
+  'e5-agents': GRILLE_E5_AGENTS,
 };
 
-const JEUX = ['niveaux', 'skills', 'skill-long-1500', 'declencheurs', 'cout-regle-paths', 'doublons-d6', 'cout-f-projet-claude', 'cout-f-parent', 'cout-calibrage', 'e5-imports'];
+const JEUX = ['niveaux', 'skills', 'skill-long-1500', 'declencheurs', 'cout-regle-paths', 'doublons-d6', 'cout-f-projet-claude', 'cout-f-parent', 'cout-calibrage', 'e5-imports', 'agents-seul', 'agents-avec-claude', 'e5-agents'];
 /**
  * Combinaison de la baseline qui porte les entrées d'un jeu : le jeu cout-regle-paths est mesuré dans
  * cout-regles, et les jeux cout-f-projet-claude et cout-f-parent dans cout-f-quatre-chemins (CC13).
@@ -357,6 +390,7 @@ describe('Suite de Tests : oracle du comptage de Claude Code sur les fixtures in
           // Un fichier importé : chargé, extérieur (marqué « après approbation »), ou non chargé (5ᵉ saut, plus de 4 Mio)
           const statut = m.claudeMemoryNotLoaded === 'niveau-5' ? 'âme non chargée (5ᵉ niveau)'
             : m.claudeMemoryNotLoaded === 'plus-de-4-mio' ? 'âme ignorée (plus de 4 Mio)'
+            : m.claudeMemoryNotLoaded === 'agents-ignore' ? 'âme ignorée (CLAUDE.md présent)'
             : m.claudeImport?.externe ? 'âme importée (extérieure, approbation)'
             : m.claudeImport ? 'âme importée' : 'âme';
           return { cle: masquer(i.path, racines), portee, auDemarrage: i.enabled && !m.claudeMemoryNotLoaded, statut, o200k: i.tokenCount ?? 0 };

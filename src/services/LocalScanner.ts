@@ -10,7 +10,8 @@ import { countTokens, countTokensForFile } from '../utils/tokenizer';
 import { claudeInjectedText, CLAUDE_INJECTED_TEXT_VARIANT } from '../claude/injectedText';
 import { claudeRuleStatus } from '../claude/ruleFrontmatter';
 import { claudeSkillBootStatus, claudeSkillListing, CLAUDE_SKILL_LINE_VARIANT } from '../claude/skillListing';
-import { claudeParentMemoryCandidates, claudeResolvedPathKey } from '../claude/memorySources';
+import { claudeAncestorDirs, claudeParentMemoryCandidates, claudeResolvedPathKey, CLAUDE_MEMORY_FILES } from '../claude/memorySources';
+import { claudeAgentsMdExcluder, claudeProjectInstructionsIsNonDefault, CLAUDE_AGENTS_FILES, isClaudeAgentsFile } from '../claude/agentsMd';
 import { CLAUDE_MEMORY_MAX_BYTES, ClaudeImportRoot, expandClaudeImports } from '../claude/memoryImports';
 import {
   buildClaudeImportItems,
@@ -39,6 +40,18 @@ import {
   PARENT_RULES_DIR,
   PARENT_SOUL_FILES,
 } from '../antigravity/behavior';
+
+/**
+ * Claude Code : le texte du settings.json du profil, pour la seule clé du réglage Project instructions
+ * (src/claude/agentsMd.ts) ; `null` s'il est absent ou illisible. Il n'est ni gardé, ni journalisé.
+ */
+function readClaudeUserSettingsText(): string | null {
+  try {
+    return fs.readFileSync(path.join(getEffectiveGlobalClaudePath(), 'settings.json'), 'utf8');
+  } catch {
+    return null;
+  }
+}
 
 export class LocalScanner {
   /**
@@ -517,14 +530,24 @@ export class LocalScanner {
     // ensemble pour toute la mémoire) : le CLAUDE.md global garde sa carte globale, même atteint comme
     // fichier du projet (dossier personnel ouvert comme dossier de travail) ; puis les fichiers du projet
     // gardent la leur ; entre parents, le premier dans l'ordre de chargement la garde.
+    // AGENTS.md et .claude/AGENTS.md (src/claude/agentsMd.ts) suivent, dans chaque dossier, les trois
+    // fichiers de mémoire, avec les mêmes règles (lecture seule pour un parent, imports, 4 Mio, chemin
+    // résolu) ; ils ne sont lus que si aucun fichier de mémoire n'existe dans le projet ni au-dessus (le
+    // CLAUDE.md global excepté) ; sinon, chacun a une carte « ignoré » à 0, sans être lu.
     const projectClaudeCandidates: Array<{ file: string; tool: 'claude-code'; claudeMemoryType: ClaudeMemoryType }> = [
       { file: 'CLAUDE.md', tool: 'claude-code', claudeMemoryType: 'Project' },
       { file: '.claude/CLAUDE.md', tool: 'claude-code', claudeMemoryType: 'Project' },
       { file: 'CLAUDE.local.md', tool: 'claude-code', claudeMemoryType: 'Local' },
+      ...CLAUDE_AGENTS_FILES.map((f) => ({ ...f, tool: 'claude-code' as const })),
     ];
     const claudeMemoryKeys = new Set<string>();
     /** Fichiers du projet déjà comptés ailleurs (le CLAUDE.md global, ou un autre fichier du projet) : sans carte. */
     const claudeProjectFilesSkipped = new Set<string>();
+    /** Le fichier de mémoire qui exclut AGENTS.md (chemin relatif), ou null : AGENTS.md est alors lu. */
+    let claudeAgentsExcluder: string | null = null;
+    /** Le réglage Project instructions posé à une valeur autre que celle par défaut (détecté seulement, Q14). */
+    let claudeAgentsSettingNonDefault = false;
+    const claudeAgentsIgnored: Array<{ path: string; soulId: string; inheritedFrom?: string }> = [];
     // Imports « @ » (src/claude/memoryImports.ts) : le CLAUDE.md global se charge en premier, et ses imports
     // avec lui ; ils sont réservés ici, sans carte (GlobalScanner les montre dans l'Âme G). Les fichiers de
     // mémoire du projet et des parents viennent ensuite, puis leurs imports, dans l'ordre de chargement.
@@ -532,6 +555,15 @@ export class LocalScanner {
     const claudeImportRoots: ClaudeImportRoot[] = [];
     if (targetTool === 'claude-code') {
       const globalClaudeMd = path.join(getEffectiveGlobalClaudePath(), 'CLAUDE.md');
+      claudeAgentsExcluder = claudeAgentsMdExcluder(
+        {
+          cwd: rootPath,
+          ancestors: claudeAncestorDirs(rootPath, { stopAt: options.claudeMemoryStopAt }),
+          globalClaudeMdKey: claudeResolvedPathKey(globalClaudeMd),
+        },
+        { isFile: (f) => fs.existsSync(f) && fs.statSync(f).isFile(), key: (f) => claudeResolvedPathKey(f) }
+      );
+      claudeAgentsSettingNonDefault = claudeProjectInstructionsIsNonDefault(readClaudeUserSettingsText());
       if (fs.existsSync(globalClaudeMd)) {
         claudeMemoryKeys.add(claudeResolvedPathKey(globalClaudeMd));
         expandClaudeImports(
@@ -541,6 +573,8 @@ export class LocalScanner {
         );
       }
       for (const candidate of projectClaudeCandidates) {
+        // Un AGENTS.md ignoré n'est pas chargé : il ne réserve pas sa clé
+        if (claudeAgentsExcluder !== null && isClaudeAgentsFile(candidate.file)) continue;
         const candidatePath = path.join(rootPath, candidate.file);
         if (!fs.existsSync(candidatePath)) continue;
         const key = claudeResolvedPathKey(candidatePath);
@@ -557,7 +591,8 @@ export class LocalScanner {
     }> =
       targetTool === 'claude-code'
         ? [
-            ...claudeParentMemoryCandidates(rootPath, { stopAt: options.claudeMemoryStopAt }).map((c) => ({ ...c, tool: 'claude-code' as const })),
+            ...claudeParentMemoryCandidates(rootPath, { stopAt: options.claudeMemoryStopAt }, [...CLAUDE_MEMORY_FILES, ...CLAUDE_AGENTS_FILES])
+              .map((c) => ({ ...c, tool: 'claude-code' as const })),
             ...projectClaudeCandidates,
           ]
         : [
@@ -574,6 +609,19 @@ export class LocalScanner {
       // Fichier de mémoire d'un parent pour Claude Code : hors du projet, en lecture seule
       const isClaudeParent = candidate.tool === 'claude-code' && candidate.inheritedFrom !== undefined;
       if (candidate.tool === 'claude-code' && !isClaudeParent && claudeProjectFilesSkipped.has(candidate.file)) continue;
+      // Claude Code : AGENTS.md, et la mention du réglage Project instructions sur sa carte
+      const isClaudeAgents = candidate.tool === 'claude-code' && isClaudeAgentsFile(candidate.file);
+      const claudeAgentsMd = isClaudeAgents
+        ? { ...(claudeAgentsSettingNonDefault ? { reglageProjectInstructions: true } : {}) }
+        : undefined;
+      if (isClaudeAgents && claudeAgentsExcluder !== null) {
+        // Ignoré : un fichier de mémoire est présent. Sa carte vient après les imports, s'il n'est pas déjà
+        // chargé autrement (un CLAUDE.md qui l'importe) ; il n'est jamais lu
+        if (fs.existsSync(candidatePath) && fs.statSync(candidatePath).isFile()) {
+          claudeAgentsIgnored.push({ path: candidatePath, soulId, inheritedFrom: candidate.inheritedFrom });
+        }
+        continue;
+      }
       if (fs.existsSync(candidatePath) && fs.statSync(candidatePath).isFile()) {
         if (isClaudeParent) {
           const key = claudeResolvedPathKey(candidatePath);
@@ -605,6 +653,7 @@ export class LocalScanner {
                 ...(candidate.inheritedFrom !== undefined ? { inheritedFrom: candidate.inheritedFrom } : {}),
                 ...(candidate.claudeMemoryType ? { claudeMemoryType: candidate.claudeMemoryType } : {}),
                 ...(isClaudeParent ? { claudeReadOnly: { raison: 'Fichier hors du projet' as const } } : {}),
+                ...(claudeAgentsMd ? { claudeAgentsMd } : {}),
                 claudeMemoryNotLoaded: 'plus-de-4-mio',
                 claudeByteSize: stat.size,
                 warningLinesExceeded: false,
@@ -659,6 +708,7 @@ export class LocalScanner {
               ...(candidate.inheritedFrom !== undefined ? { inheritedFrom: candidate.inheritedFrom } : {}),
               ...(candidate.claudeMemoryType ? { claudeMemoryType: candidate.claudeMemoryType } : {}),
               ...(isClaudeParent ? { claudeReadOnly: { raison: 'Fichier hors du projet' as const } } : {}),
+              ...(claudeAgentsMd ? { claudeAgentsMd } : {}),
               ...(measured ? { byteSize: measured.byteSize, bootTokenCount: measured.bootTokenCount, bootCharCount: measured.bootCharCount } : {}),
               ...(measured && measured.truncatedBytes > 0 ? { truncatedBytes: measured.truncatedBytes, lostTokens: measured.lostTokens } : {}),
               ...(measured?.truncationRule ? { truncationRule: measured.truncationRule } : {}),
@@ -685,6 +735,46 @@ export class LocalScanner {
       });
       for (const item of importItems) soulCharTotal += item.charCount ?? 0;
       items.push(...importItems);
+    }
+
+    // Claude Code : les AGENTS.md ignorés, chacun une fois (chemin résolu), sauf celui qui est déjà chargé
+    // (importé par un CLAUDE.md, ou atteint par un lien) ; carte à 0, non active, jamais lue
+    if (targetTool === 'claude-code' && claudeAgentsExcluder !== null) {
+      const ignoredKeys = new Set<string>();
+      for (const ignored of claudeAgentsIgnored) {
+        const key = claudeResolvedPathKey(ignored.path);
+        if (claudeMemoryKeys.has(key) || ignoredKeys.has(key)) continue;
+        ignoredKeys.add(key);
+        const isParent = ignored.inheritedFrom !== undefined;
+        items.push({
+          id: ignored.soulId,
+          name: ignored.soulId,
+          description: 'AGENTS.md ignoré par Claude Code : un CLAUDE.md est présent',
+          type: 'soul',
+          scope: 'local',
+          enabled: true,
+          path: ignored.path,
+          targetTool: 'claude-code',
+          isFolder: false,
+          charCount: 0,
+          tokenCount: 0,
+          lineCount: 0,
+          metadata: {
+            isSoul: true,
+            locked: true,
+            ...(isParent ? { inheritedFrom: ignored.inheritedFrom } : {}),
+            claudeMemoryType: 'Project',
+            ...(isParent ? { claudeReadOnly: { raison: 'Fichier hors du projet' as const } } : {}),
+            claudeMemoryNotLoaded: 'agents-ignore',
+            claudeAgentsMd: {
+              ignorePar: claudeAgentsExcluder,
+              ...(claudeAgentsSettingNonDefault ? { reglageProjectInstructions: true } : {}),
+            },
+            warningLinesExceeded: false,
+            warningSizeExceeded: false,
+          },
+        });
+      }
     }
 
     // Les workflows Markdown ne sont pas des skills : ils comptent dans « Other Customizations » (StateManager)

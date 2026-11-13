@@ -2152,6 +2152,17 @@
     return dupBadge;
   }
 
+  /**
+   * Claude Code : la mention ajoutée à l'infobulle du cadenas d'une carte AGENTS.md quand le réglage Project
+   * instructions est posé à une valeur autre que celle par défaut (src/claude/agentsMd.ts, détecté seulement) ;
+   * une chaîne vide sinon.
+   */
+  function claudeAgentsSettingNote(item) {
+    const agents = item && item.targetTool === 'claude-code' && item.metadata && item.metadata.claudeAgentsMd;
+    if (!agents || !agents.reglageProjectInstructions) return '';
+    return '\n❔ réglage Project instructions non pris en compte : une valeur autre que celle par défaut (claude-md-or-agents-md) est posée dans le settings.json du profil de Claude Code. L\'extension applique la règle par défaut (documentation, non mesuré).';
+  }
+
   function createItemCard(item, isDetailed, doc) {
     const targetDoc = doc || (typeof document !== 'undefined' ? document : null);
     if (!targetDoc) return null;
@@ -2323,6 +2334,11 @@
       addBadge('pill-warn-amber', '⚠️ Plus de 4 Mio : ignoré par Claude Code (documentation)',
         `Claude Code ignore un fichier de mémoire de plus de 4 Mio (4 194 304 octets) et n'en charge rien (documentation, non mesuré).\n` +
         `Taille : ${octets} octets. Il compte 0, et ses imports ne sont pas développés. L'extension ne le lit pas.`);
+    } else if (claudeNotLoaded === 'agents-ignore') {
+      const excluant = String((item.metadata.claudeAgentsMd && item.metadata.claudeAgentsMd.ignorePar) || 'CLAUDE.md');
+      addBadge('pill-info', '⏭️ Ignoré : un CLAUDE.md est présent',
+        'Claude Code lit AGENTS.md seulement si aucun CLAUDE.md, .claude/CLAUDE.md ni CLAUDE.local.md n\'existe dans le dossier de travail ni au-dessus ; le CLAUDE.md du profil ne compte pas (documentation ; mesuré pour le dossier de travail).\n' +
+        `Fichier présent : ${excluant}. Cet AGENTS.md compte 0, et ses imports ne sont pas développés. L'extension ne le lit pas.`);
     } else if (isClaudeItem && item.metadata && item.metadata.claudeImport && item.metadata.claudeImport.externe) {
       addBadge('pill-warn-amber', '🔐 Chargé seulement après approbation',
         'Import hors du dossier de travail, depuis un fichier de mémoire du projet ou d\'un dossier parent : Claude Code demande une approbation, une fois par projet, avant de le charger (documentation) ; en -p, non chargé tant qu\'il n\'est pas approuvé (mesuré).\n' +
@@ -2604,7 +2620,9 @@
       metricsEl.innerHTML = '<span class="tok-highlight">0 tok au boot</span>';
       metricsEl.title = claudeNotLoaded === 'niveau-5'
         ? 'Coût au démarrage : 0 token (import du cinquième saut, non chargé).'
-        : 'Coût au démarrage : 0 token (fichier de plus de 4 Mio, ignoré par Claude Code ; non lu par l\'extension).';
+        : claudeNotLoaded === 'agents-ignore'
+          ? 'Coût au démarrage : 0 token (AGENTS.md ignoré par Claude Code, un CLAUDE.md étant présent ; non lu par l\'extension).'
+          : 'Coût au démarrage : 0 token (fichier de plus de 4 Mio, ignoré par Claude Code ; non lu par l\'extension).';
     } else {
       metricsEl.innerHTML = `<span>${charStr} car.</span> <span class="tok-highlight">(${tokStr} tokens)</span>`;
       let metricsTitle = `Taille réelle : ${charStr} caractères (${tokStr} tokens)\nEstimation : BPE o200k (repli 1 token ≈ 4 car.)`;
@@ -2655,7 +2673,7 @@
         : item.metadata.claudeMemoryType === 'Local'
           ? ` Fichier du dossier parent ${inheritedFrom}, chargé par Claude Code (documentation, non mesuré pour un dossier parent).`
           : ` Fichier du dossier parent ${inheritedFrom}.`;
-      lockedBadge.title = `${raison} : carte en lecture seule.${origine} Elle n'a ni interrupteur ni corbeille dans le tableau de bord ; modifiez le fichier lui-même.`;
+      lockedBadge.title = `${raison} : carte en lecture seule.${origine} Elle n'a ni interrupteur ni corbeille dans le tableau de bord ; modifiez le fichier lui-même.${claudeAgentsSettingNote(item)}`;
       const lockIconEl = targetDoc.createElement('span');
       lockIconEl.className = 'soul-locked-icon';
       lockIconEl.textContent = '🔒';
@@ -2695,7 +2713,7 @@
         // 3.A. Fichier marqué comme Verrouillé / Permanent (Always-On)
         const lockedBadge = targetDoc.createElement('div');
         lockedBadge.className = 'soul-locked-badge';
-        lockedBadge.title = 'Fichier maître permanent et actif en continu (Always-On)';
+        lockedBadge.title = `Fichier maître permanent et actif en continu (Always-On)${isClaudeItem ? claudeAgentsSettingNote(item) : ''}`;
         lockedBadge.innerHTML = '<span class="soul-locked-icon">🔒</span><span>Always-On</span>';
         rightControls.appendChild(lockedBadge);
       } else {
