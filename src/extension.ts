@@ -12,6 +12,7 @@ import { extensionEventBus } from './common/ExtensionEventBus';
 import { DiscoveryViewProvider } from './ui/DiscoveryViewProvider';
 import { EnvironmentStatusBar } from './ui/EnvironmentStatusBar';
 import { registerBancEssai } from './ui/bancEssaiCommandes';
+import { registerClaudeWatchers } from './ui/claudeWatchers';
 import {
   DISCOVERY_ENABLED_SETTING,
   isDiscoveryEnabled,
@@ -108,6 +109,10 @@ export function activate(context: vscode.ExtensionContext): void {
   soulWatcher.onDidCreate(() => StateManager.requestDebouncedReload(350));
   soulWatcher.onDidDelete(() => StateManager.requestDebouncedReload(350));
   context.subscriptions.push(soulWatcher);
+
+  // 6a. Claude Code : observateurs des fichiers de mémoire de l'espace que ces deux motifs ne couvrent pas
+  // (CLAUDE.local.md, fichiers importés hors de .claude/) ; recalculés à chaque état, aucun pour Antigravity
+  registerClaudeWatchers(context);
 
   // 6b. Banc d'essai : commande « Vider et restaurer », barre d'état, observateur du manifeste et
   // de la sauvegarde, avertissement au démarrage tant qu'un banc est déployé ou inachevé
