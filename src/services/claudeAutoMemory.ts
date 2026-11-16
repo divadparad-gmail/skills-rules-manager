@@ -61,19 +61,56 @@ function readTextOrNull(file: string): string | null {
   }
 }
 
-/** La racine Git trouvée en remontant (un `.git` dossier), le cas du worktree (un `.git` fichier), ou aucune. */
-function findGitRoot(cwd: string, stopAt: string | undefined): { kind: 'dossier' | 'fichier'; root: string } | null {
-  const start = path.resolve(cwd);
-  for (const dir of [start, ...claudeAncestorDirs(start, { stopAt }).reverse()]) {
-    try {
-      const stat = fs.statSync(path.join(dir, '.git'));
-      if (stat.isDirectory()) return { kind: 'dossier', root: dir };
-      if (stat.isFile()) return { kind: 'fichier', root: dir };
-    } catch {
-      // Pas de .git ici
-    }
+/** Ce qui se trouve à `<dossier>/.git` : un dossier, un fichier (worktree, sous-module), ou rien. */
+export type ClaudeGitEntry = (dir: string) => 'dossier' | 'fichier' | null;
+
+/** L'accès réel au `.git` d'un dossier, par stat seulement. */
+export const claudeGitEntryFs: ClaudeGitEntry = (dir) => {
+  try {
+    const stat = fs.statSync(path.join(dir, '.git'));
+    if (stat.isDirectory()) return 'dossier';
+    if (stat.isFile()) return 'fichier';
+  } catch {
+    // Pas de .git ici
   }
   return null;
+};
+
+/**
+ * La racine Git trouvée en remontant (un `.git` dossier), le cas du worktree (un `.git` fichier), ou aucune.
+ * Partagée avec les observateurs (src/claude/claudeWatchTargets.ts) ; `gitEntry` est injectable.
+ */
+export function findClaudeGitRoot(
+  cwd: string,
+  stopAt: string | undefined,
+  gitEntry: ClaudeGitEntry = claudeGitEntryFs
+): { kind: 'dossier' | 'fichier'; root: string } | null {
+  const start = path.resolve(cwd);
+  for (const dir of [start, ...claudeAncestorDirs(start, { stopAt }).reverse()]) {
+    const entry = gitEntry(dir);
+    if (entry === 'dossier') return { kind: 'dossier', root: dir };
+    if (entry === 'fichier') return { kind: 'fichier', root: dir };
+  }
+  return null;
+}
+
+/**
+ * L'emplacement de MEMORY.md pour un dossier de travail : `<profil>/projects/<nom>/memory/MEMORY.md`, le nom
+ * venant de la racine Git trouvée en remontant, sinon du dossier de travail. Non déterminé pour un `.git`
+ * fichier (worktree) ou un nom trop long. Partagé avec les observateurs ; `gitEntry` est injectable.
+ */
+export function claudeAutoMemoryLocation(options: {
+  cwd: string;
+  globalPath: string;
+  stopAt?: string;
+  gitEntry?: ClaudeGitEntry;
+}): { file: string } | { nonDetermine: 'worktree' | 'longueur' } {
+  const cwd = path.resolve(options.cwd);
+  const git = findClaudeGitRoot(cwd, options.stopAt, options.gitEntry);
+  if (git?.kind === 'fichier') return { nonDetermine: 'worktree' };
+  const name = claudeAutoMemoryDirName(git ? git.root : cwd);
+  if (name === null) return { nonDetermine: 'longueur' };
+  return { file: path.join(options.globalPath, 'projects', name, 'memory', 'MEMORY.md') };
 }
 
 /** Les premiers octets d'un fichier, sans le dernier caractère s'il est incomplet. */
@@ -126,12 +163,10 @@ export function scanClaudeAutoMemory(options: ClaudeAutoMemoryScanOptions): Clau
     return vide('non-determine', { type: 'reglage-dossier', portees: settings.dossierPose }, mentions);
   }
 
-  const git = findGitRoot(cwd, options.stopAt);
-  if (git?.kind === 'fichier') return vide('non-determine', { type: 'worktree' }, mentions);
-  const name = claudeAutoMemoryDirName(git ? git.root : cwd);
-  if (name === null) return vide('non-determine', { type: 'longueur' }, mentions);
+  const location = claudeAutoMemoryLocation({ cwd, globalPath: options.globalPath, stopAt: options.stopAt });
+  if ('nonDetermine' in location) return vide('non-determine', { type: location.nonDetermine }, mentions);
 
-  const file = path.join(options.globalPath, 'projects', name, 'memory', 'MEMORY.md');
+  const file = location.file;
   let stat: fs.Stats;
   try {
     stat = fs.statSync(file);

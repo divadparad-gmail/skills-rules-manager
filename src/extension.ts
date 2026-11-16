@@ -110,8 +110,10 @@ export function activate(context: vscode.ExtensionContext): void {
   soulWatcher.onDidDelete(() => StateManager.requestDebouncedReload(350));
   context.subscriptions.push(soulWatcher);
 
-  // 6a. Claude Code : observateurs des fichiers de mémoire de l'espace que ces deux motifs ne couvrent pas
-  // (CLAUDE.local.md, fichiers importés hors de .claude/) ; recalculés à chaque état, aucun pour Antigravity
+  // 6a. Claude Code : observateurs des fichiers de mémoire que ces deux motifs ne couvrent pas, dans l'espace
+  // (CLAUDE.local.md, fichiers importés hors de .claude/) et hors de l'espace (fichiers des parents, imports
+  // extérieurs, CLAUDE.md global et ses imports, MEMORY.md, settings.json du profil) ; un par fichier, sous
+  // un seul plafond, recalculés à chaque état, aucun pour Antigravity
   registerClaudeWatchers(context);
 
   // 6b. Banc d'essai : commande « Vider et restaurer », barre d'état, observateur du manifeste et

@@ -6,8 +6,9 @@ import { test, describe, before, after } from 'node:test';
 
 // Les observateurs propres à Claude Code pour les fichiers de mémoire situés DANS l'espace de travail et
 // non couverts par les motifs communs (WATCHER_PATTERNS, inchangés, décision Q11) : le CLAUDE.local.md de la
-// racine, et les fichiers importés par la mémoire du niveau projet hors de .claude/. Les cibles hors de
-// l'espace (parents, imports du CLAUDE.md global ou extérieurs, MEMORY.md) relèvent d'un commit suivant.
+// racine, et les fichiers importés par la mémoire du niveau projet hors de .claude/. Puis (second bloc) les
+// cibles HORS de l'espace : fichiers de mémoire des parents, imports extérieurs, CLAUDE.md global et ses
+// imports, MEMORY.md à l'emplacement calculé et settings.json du profil, sous le même plafond.
 //
 // Le scan se fait dans un dossier temporaire au nom fixe, protégé par un fichier témoin, remontée arrêtée
 // à la racine du dossier temporaire. vscode.workspace.createFileSystemWatcher est un faux qui note chaque
@@ -80,6 +81,8 @@ require.cache['vscode'] = {
 } as any;
 
 import { LocalScanner } from '../src/services/LocalScanner';
+import { GlobalScanner } from '../src/services/GlobalScanner';
+import { scanClaudeAutoMemory } from '../src/services/claudeAutoMemory';
 import { StateManager } from '../src/services/StateManager';
 import { ManagerFullState, ResourceItem, WorkspaceContext } from '../src/types';
 
@@ -290,5 +293,253 @@ describe('Observateurs de Claude Code dans l\'espace de travail : cibles, enregi
       configFolders: '**/{.agents,.agent,.claude}/**',
       soulFiles: '**/{CLAUDE.md,GEMINI.md,AGENTS.md}',
     });
+  });
+});
+
+// --- a8.2 : les cibles hors de l'espace de travail ---
+//
+// Le profil est le faux profil du dossier temporaire (réglage claudeGlobalPath du faux vscode) ; la racine Git
+// est cherchée en remontant jusqu'à RACINE seulement (stopAt) ; l'environnement de la mémoire automatique est
+// vide. Aucun fichier du vrai profil n'est lu.
+
+/** Le nom du dossier de mémoire d'une racine (même transformation que src/claude/autoMemory.ts). */
+const nomMemoire = (racine: string) => racine.replace(/[^A-Za-z0-9]/g, '-');
+const MEMOIRE_PROJET = `claude/projects/${nomMemoire(PROJET)}/memory/MEMORY.md`;
+
+/** L'arbre complet : un parent (trois fichiers de mémoire, un import), un projet, un import extérieur et un faux profil. */
+const ARBRE_COMPLET: Record<string, string> = {
+  'racine/CLAUDE.md': '# Parent\n\n@cible-parent.md\n',
+  'racine/.claude/CLAUDE.md': '# Parent, sous .claude\n',
+  'racine/AGENTS.md': '# AGENTS.md du parent, ignoré : un CLAUDE.md est présent\n',
+  'racine/cible-parent.md': '# Importé par le parent, hors de l\'espace\n',
+  'racine/exterieur.md': '# Import extérieur\n',
+  'racine/projet/CLAUDE.md': '# Projet\n\n@docs/regles.md\n@../exterieur.md\n',
+  'racine/projet/CLAUDE.local.md': '# Local\n',
+  'racine/projet/docs/regles.md': '# Règles\n',
+  'claude/CLAUDE.md': '# Global\n\n@regles-globales.md\n',
+  'claude/regles-globales.md': '# Importé par le CLAUDE.md global\n',
+  [MEMOIRE_PROJET]: '# Mémoire\n',
+};
+
+/** Un état complet de Claude Code : scan local, scan global du faux profil, mémoire automatique. */
+async function etatComplet(env: Record<string, string | undefined> = {}): Promise<ManagerFullState> {
+  const local = await LocalScanner.scan(espace(), undefined, { claudeMemoryStopAt: RACINE });
+  const global = await GlobalScanner.scan(path.join(DOSSIER, 'gemini'), 'claude-code');
+  const memoire = scanClaudeAutoMemory({ cwd: PROJET, globalPath: CLAUDE_GLOBAL, stopAt: RACINE, env });
+  return {
+    workspace: espace(),
+    localResources: local.items,
+    globalResources: [...global.items, ...(memoire.item ? [memoire.item] : [])],
+    nasResources: [],
+    stats: { claudeAutoMemory: memoire.stat },
+  } as unknown as ManagerFullState;
+}
+
+/** Le contexte du calcul des cibles : faux profil, accès réel au .git, remontée arrêtée à RACINE. */
+function contexteCibles(): any {
+  const { claudeGitEntry } = enregistrement();
+  if (typeof claudeGitEntry !== 'function') throw new Error('claudeGitEntry est absent de src/ui/claudeWatchers.ts');
+  return { globalPath: CLAUDE_GLOBAL, gitEntry: claudeGitEntry, stopAt: RACINE };
+}
+
+function fonction(nom: string): (...args: any[]) => any {
+  const f = cibles()[nom];
+  if (typeof f !== 'function') throw new Error(`${nom} est absent de src/claude/claudeWatchTargets.ts`);
+  return f;
+}
+
+const CIBLES_ESPACE = ['racine/projet/CLAUDE.local.md', 'racine/projet/docs/regles.md'];
+const CIBLES_DEHORS = [
+  'claude/CLAUDE.md',
+  MEMOIRE_PROJET,
+  'claude/regles-globales.md',
+  'claude/settings.json',
+  'racine/.claude/CLAUDE.md',
+  'racine/AGENTS.md',
+  'racine/CLAUDE.md',
+  'racine/cible-parent.md',
+  'racine/exterieur.md',
+];
+
+describe('Observateurs de Claude Code hors de l\'espace de travail : cibles, plafond partagé, enregistrement et libération', () => {
+  const rechargements: number[] = [];
+  const origReload = StateManager.requestDebouncedReload;
+
+  before(() => {
+    preparerDossier();
+    (StateManager as any).requestDebouncedReload = (delai: number) => { rechargements.push(delai); };
+  });
+
+  after(() => {
+    (StateManager as any).requestDebouncedReload = origReload;
+    if (fs.existsSync(DOSSIER)) viderSaufTemoin();
+  });
+
+  test('7. Les cibles du dehors, calculées d\'un état scanné : parents, imports extérieurs, CLAUDE.md global et ses imports, MEMORY.md, settings.json du profil ; l\'espace d\'abord', async () => {
+    const claudeOutsideWatchTargets = fonction('claudeOutsideWatchTargets');
+    const claudeWatchTargets = fonction('claudeWatchTargets');
+    arborescence(ARBRE_COMPLET);
+    const etat = await etatComplet();
+    assert.strictEqual(etat.stats.claudeAutoMemory?.etat, 'present');
+    assert.deepStrictEqual(relatifs(claudeOutsideWatchTargets(etat, contexteCibles())), CIBLES_DEHORS);
+    assert.deepStrictEqual([...CIBLES_DEHORS].sort(), CIBLES_DEHORS, 'ordre alphabétique');
+    // L'ensemble : les cibles de l'espace d'abord (a8.1, inchangées), puis celles du dehors
+    assert.deepStrictEqual(relatifs(claudeWatchTargets(etat, contexteCibles())), [...CIBLES_ESPACE, ...CIBLES_DEHORS]);
+
+    // MEMORY.md absent : observé quand même, à l'emplacement calculé
+    fs.rmSync(path.join(DOSSIER, ...MEMOIRE_PROJET.split('/')));
+    const sansMemoire = await etatComplet();
+    assert.strictEqual(sansMemoire.stats.claudeAutoMemory?.etat, 'absent');
+    assert.ok(relatifs(claudeOutsideWatchTargets(sansMemoire, contexteCibles())).includes(MEMOIRE_PROJET), 'MEMORY.md absent, observé');
+
+    // Une racine Git au-dessus du projet : l'emplacement suit la racine Git, comme la mémoire automatique
+    fs.mkdirSync(path.join(RACINE, '.git'));
+    const avecGit = await etatComplet();
+    assert.strictEqual(avecGit.stats.claudeAutoMemory?.etat, 'absent');
+    const dehorsGit = relatifs(claudeOutsideWatchTargets(avecGit, contexteCibles()));
+    assert.ok(dehorsGit.includes(`claude/projects/${nomMemoire(RACINE)}/memory/MEMORY.md`), 'emplacement de la racine Git');
+    assert.ok(!dehorsGit.includes(MEMOIRE_PROJET), 'plus celui du dossier de travail');
+  });
+
+  test('8. Les exclusions : parent absent, emplacement non déterminé, mémoire désactivée, état sans mémoire automatique', async () => {
+    const claudeOutsideWatchTargets = fonction('claudeOutsideWatchTargets');
+    // Aucun fichier dans les parents, aucun CLAUDE.md global : seuls MEMORY.md (absent) et settings.json restent
+    arborescence({ 'racine/projet/CLAUDE.md': '# Projet\n' });
+    assert.deepStrictEqual(relatifs(claudeOutsideWatchTargets(await etatComplet(), contexteCibles())), [MEMOIRE_PROJET, 'claude/settings.json']);
+
+    // Emplacement non déterminé (variable qui déplace la mémoire) : aucune cible MEMORY.md
+    arborescence(ARBRE_COMPLET);
+    const nonDetermine = await etatComplet({ CLAUDE_CODE_PROJECT_DIR_NAME: 'ailleurs' });
+    assert.strictEqual(nonDetermine.stats.claudeAutoMemory?.etat, 'non-determine');
+    assert.deepStrictEqual(relatifs(claudeOutsideWatchTargets(nonDetermine, contexteCibles())), CIBLES_DEHORS.filter((c) => c !== MEMOIRE_PROJET));
+
+    // Un .git qui est un fichier (worktree) : non déterminé, aucune cible MEMORY.md
+    fs.writeFileSync(path.join(PROJET, '.git'), 'gitdir: ailleurs\n', 'utf8');
+    const worktree = await etatComplet();
+    assert.strictEqual(worktree.stats.claudeAutoMemory?.etat, 'non-determine');
+    assert.ok(!relatifs(claudeOutsideWatchTargets(worktree, contexteCibles())).some((c) => c.endsWith('MEMORY.md')), 'worktree : aucun MEMORY.md');
+    fs.rmSync(path.join(PROJET, '.git'));
+
+    // Mémoire désactivée par le settings.json du profil : aucune cible MEMORY.md, mais settings.json reste observé
+    fs.writeFileSync(path.join(CLAUDE_GLOBAL, 'settings.json'), '{ "autoMemoryEnabled": false }\n', 'utf8');
+    const desactivee = await etatComplet();
+    assert.strictEqual(desactivee.stats.claudeAutoMemory?.etat, 'desactivee');
+    assert.deepStrictEqual(relatifs(claudeOutsideWatchTargets(desactivee, contexteCibles())), CIBLES_DEHORS.filter((c) => c !== MEMOIRE_PROJET));
+
+    // Mémoire désactivée par la variable : de même
+    fs.rmSync(path.join(CLAUDE_GLOBAL, 'settings.json'));
+    const parVariable = await etatComplet({ CLAUDE_CODE_DISABLE_AUTO_MEMORY: '1' });
+    assert.strictEqual(parVariable.stats.claudeAutoMemory?.etat, 'desactivee');
+    assert.ok(!relatifs(claudeOutsideWatchTargets(parVariable, contexteCibles())).includes(MEMOIRE_PROJET));
+
+    // Un état sans ligne de mémoire automatique (le profil n'a pas été lu pour cet espace) : ni MEMORY.md ni settings.json
+    const sansStat = { ...(await etatComplet()), stats: {} } as unknown as ManagerFullState;
+    assert.deepStrictEqual(relatifs(claudeOutsideWatchTargets(sansStat, contexteCibles())), CIBLES_DEHORS.filter((c) => c !== MEMOIRE_PROJET && c !== 'claude/settings.json'));
+  });
+
+  test('9. Un seul plafond de 100 pour toutes les cibles : l\'espace d\'abord, puis le dehors, chacun dans l\'ordre alphabétique', () => {
+    const claudeWatchTargets = fonction('claudeWatchTargets');
+    const carte = (fichier: string): ResourceItem => ({
+      id: path.basename(fichier), name: path.basename(fichier), description: '', type: 'soul', scope: 'local', enabled: true,
+      path: fichier, targetTool: 'claude-code', isFolder: false,
+      metadata: { claudeImport: { par: 'CLAUDE.md', niveau: 1, externe: !fichier.startsWith(PROJET) } },
+    });
+    const dedans = (n: number) => Array.from({ length: n }, (_, i) => carte(path.join(PROJET, 'docs', `d${String(i).padStart(3, '0')}.md`)));
+    const dehors = (n: number) => Array.from({ length: n }, (_, i) => carte(path.join(RACINE, 'ext', `e${String(i).padStart(3, '0')}.md`)));
+    const etat = (cartes: ResourceItem[]) => ({ workspace: espace(), localResources: cartes.reverse(), globalResources: [], nasResources: [], stats: {} }) as unknown as ManagerFullState;
+
+    // 70 dans l'espace (CLAUDE.local.md, toujours visé, et 69 imports), 70 au dehors (mélangés) : les 70 de
+    // l'espace, puis les 30 premières du dehors
+    const liste = relatifs(claudeWatchTargets(etat([...dehors(70), ...dedans(69)]), contexteCibles()));
+    assert.strictEqual(liste.length, 100);
+    const espaceAttendu = [path.join(PROJET, 'CLAUDE.local.md'), ...dedans(69).map((c) => c.path)].sort();
+    assert.deepStrictEqual(liste.slice(0, 70), relatifs(espaceAttendu), 'l\'espace d\'abord, trié');
+    assert.deepStrictEqual(liste.slice(70), relatifs(dehors(70).map((c) => c.path)).sort().slice(0, 30), 'puis les premières du dehors');
+
+    // 120 dans l'espace : aucune place pour le dehors
+    const plein = relatifs(claudeWatchTargets(etat([...dehors(10), ...dedans(120)]), contexteCibles()));
+    assert.strictEqual(plein.length, 100);
+    assert.ok(plein.every((c) => c.startsWith('racine/projet/')), 'aucune cible du dehors au-delà du plafond');
+  });
+
+  test('10. L\'enregistrement : un observateur par fichier visé, motif relatif (dossier, nom), aucun motif récursif sur le profil', async () => {
+    const { registerClaudeWatchers } = enregistrement();
+    arborescence(ARBRE_COMPLET);
+    const contexte = { subscriptions: [] as Array<{ dispose: () => void }> };
+    observateurs.length = 0;
+    registerClaudeWatchers(contexte, { stopAt: RACINE });
+    StateManager.broadcastState(await etatComplet());
+    const paires = vivants().map((o) => [path.relative(DOSSIER, o.motif.base).split(path.sep).join('/'), o.motif.pattern]);
+    assert.deepStrictEqual(paires, [...CIBLES_ESPACE, ...CIBLES_DEHORS].map((c) => [path.posix.dirname(c), path.posix.basename(c)]));
+    for (const o of vivants()) {
+      assert.ok(typeof o.motif.base === 'string' && path.isAbsolute(o.motif.base), 'motif relatif, base absolue');
+      assert.ok(!/[*?{}[\]\\/]/.test(o.motif.pattern), `nom seul, sans joker ni sous-dossier : ${o.motif.pattern}`);
+    }
+    const profil = vivants().filter((o) => o.motif.base === CLAUDE_GLOBAL || o.motif.base.startsWith(CLAUDE_GLOBAL + path.sep));
+    assert.ok(profil.length > 0);
+    assert.ok(!profil.some((o) => o.motif.base === path.join(CLAUDE_GLOBAL, 'projects', nomMemoire(PROJET))), 'projects/<nom>/ n\'est pas une base');
+
+    // Une modification d'un fichier du dehors lance le même rafraîchissement de 350 ms
+    rechargements.length = 0;
+    for (const o of vivants().filter((v) => !v.motif.base.startsWith(PROJET))) {
+      o.rappels.change.forEach((f) => f());
+      o.rappels.create.forEach((f) => f());
+      o.rappels.delete.forEach((f) => f());
+    }
+    assert.strictEqual(rechargements.length, CIBLES_DEHORS.length * 3);
+    assert.ok(rechargements.every((d) => d === 350));
+    contexte.subscriptions.forEach((d) => d.dispose());
+    assert.strictEqual(vivants().length, 0, 'tous libérés à l\'arrêt');
+  });
+
+  test('11. La libération : une cible du dehors qui disparaît libère son observateur ; les autres gardent le leur', async () => {
+    const { registerClaudeWatchers } = enregistrement();
+    arborescence(ARBRE_COMPLET);
+    const contexte = { subscriptions: [] as Array<{ dispose: () => void }> };
+    observateurs.length = 0;
+    registerClaudeWatchers(contexte, { stopAt: RACINE });
+    StateManager.broadcastState(await etatComplet());
+    const trouver = (rel: string) => observateurs.find((o) => path.join(o.motif.base, o.motif.pattern) === path.join(DOSSIER, ...rel.split('/')))!;
+    const reglages = trouver('claude/settings.json');
+    const memoire = trouver(MEMOIRE_PROJET);
+    assert.ok(reglages && memoire, 'settings.json et MEMORY.md observés');
+    const crees = observateurs.length;
+
+    // Le CLAUDE.md du parent disparaît : son observateur et celui de son import sont libérés
+    fs.rmSync(path.join(RACINE, 'CLAUDE.md'));
+    StateManager.broadcastState(await etatComplet());
+    assert.ok(trouver('racine/CLAUDE.md').libere, 'parent libéré');
+    assert.ok(trouver('racine/cible-parent.md').libere, 'son import libéré');
+    assert.ok(!reglages.libere && !memoire.libere, 'les autres gardent le leur');
+    assert.strictEqual(observateurs.length, crees, 'rien de recréé');
+
+    // La mémoire automatique est désactivée : l'observateur de MEMORY.md est libéré, celui de settings.json reste
+    fs.writeFileSync(path.join(CLAUDE_GLOBAL, 'settings.json'), '{ "autoMemoryEnabled": false }\n', 'utf8');
+    StateManager.broadcastState(await etatComplet());
+    assert.ok(memoire.libere, 'MEMORY.md libéré');
+    assert.ok(!reglages.libere, 'settings.json toujours observé');
+
+    contexte.subscriptions.forEach((d) => d.dispose());
+    assert.strictEqual(vivants().length, 0, 'aucune fuite');
+  });
+
+  test('12. Aucun observateur sous Antigravity, et aucun accès au .git', async () => {
+    const claudeWatchTargets = fonction('claudeWatchTargets');
+    const claudeOutsideWatchTargets = fonction('claudeOutsideWatchTargets');
+    const { registerClaudeWatchers } = enregistrement();
+    arborescence(ARBRE_COMPLET);
+    const etat = { ...(await etatComplet()), workspace: espace('antigravity') } as ManagerFullState;
+    let acces = 0;
+    const contexteEspion = { ...contexteCibles(), gitEntry: () => { acces++; return null; } };
+    assert.deepStrictEqual(claudeOutsideWatchTargets(etat, contexteEspion), []);
+    assert.deepStrictEqual(claudeWatchTargets(etat, contexteEspion), []);
+    assert.strictEqual(acces, 0, 'aucun accès au .git sous Antigravity');
+
+    const contexte = { subscriptions: [] as Array<{ dispose: () => void }> };
+    observateurs.length = 0;
+    registerClaudeWatchers(contexte, { stopAt: RACINE });
+    StateManager.broadcastState(etat);
+    assert.strictEqual(observateurs.length, 0, 'aucun observateur créé sous Antigravity');
+    contexte.subscriptions.forEach((d) => d.dispose());
   });
 });
