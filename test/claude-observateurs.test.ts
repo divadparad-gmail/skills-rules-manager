@@ -48,6 +48,9 @@ Module._resolveFilename = function (request: string, ...args: any[]) {
   return origResolve.call(this, request, ...args);
 };
 const REGLAGES: Record<string, string> = { claudeGlobalPath: CLAUDE_GLOBAL };
+/** Les écouteurs passés au faux onDidChangeConfiguration, retirés à leur libération. */
+type EvenementReglages = { affectsConfiguration: (section: string) => boolean };
+const ecouteursReglages: Array<(e: EvenementReglages) => void> = [];
 require.cache['vscode'] = {
   id: 'vscode',
   filename: 'vscode',
@@ -62,6 +65,10 @@ require.cache['vscode'] = {
     workspace: {
       workspaceFolders: [{ uri: { fsPath: PROJET } }],
       getConfiguration: () => ({ get: (key: string, def: any) => (key in REGLAGES ? REGLAGES[key] : def) }),
+      onDidChangeConfiguration: (f: (e: EvenementReglages) => void) => {
+        ecouteursReglages.push(f);
+        return { dispose: () => { const i = ecouteursReglages.indexOf(f); if (i >= 0) ecouteursReglages.splice(i, 1); } };
+      },
       createFileSystemWatcher: (motif: FauxRelativePattern) => {
         const o: FauxObservateur = { motif: { base: motif.base, pattern: motif.pattern }, rappels: { change: [], create: [], delete: [] }, libere: false };
         observateurs.push(o);
@@ -541,5 +548,47 @@ describe('Observateurs de Claude Code hors de l\'espace de travail : cibles, pla
     StateManager.broadcastState(etat);
     assert.strictEqual(observateurs.length, 0, 'aucun observateur créé sous Antigravity');
     contexte.subscriptions.forEach((d) => d.dispose());
+  });
+});
+
+// --- Le rechargement sur les réglages du scan (revue d'avant le push) ---
+//
+// Depuis a8.2, des observateurs visent des fichiers du profil de Claude Code : un changement de
+// skillsManager.claudeGlobalPath doit relancer le scan, comme le dossier global et le profil d'Antigravity.
+
+describe('Rechargement sur les réglages qui changent le scan', () => {
+  /** Un faux événement : comme VS Code, une section est touchée si c'est le réglage ou l'un de ses parents. */
+  const evenement = (reglage: string): EvenementReglages => ({
+    affectsConfiguration: (section: string) => reglage === section || reglage.startsWith(`${section}.`),
+  });
+
+  test('13. Un changement de skillsManager.claudeGlobalPath demande le rechargement différé, comme globalPath et le profil d\'Antigravity', async () => {
+    const extension: any = await import('../src/extension');
+    assert.strictEqual(typeof extension.registerScanSettingsReload, 'function', 'registerScanSettingsReload est absent de src/extension.ts');
+    const contexte = { subscriptions: [] as Array<{ dispose: () => void }> };
+    const avant = ecouteursReglages.length;
+    extension.registerScanSettingsReload(contexte);
+    assert.strictEqual(ecouteursReglages.length, avant + 1, 'un écouteur, par le faux onDidChangeConfiguration');
+    const ecouteur = ecouteursReglages[ecouteursReglages.length - 1];
+
+    const demandes: Array<number | undefined> = [];
+    const origine = StateManager.requestDebouncedReload;
+    (StateManager as any).requestDebouncedReload = (delai?: number) => { demandes.push(delai); };
+    try {
+      for (const reglage of ['skillsManager.claudeGlobalPath', 'skillsManager.globalPath', 'skillsManager.antigravityProfile']) {
+        demandes.length = 0;
+        ecouteur(evenement(reglage));
+        assert.deepStrictEqual(demandes, [350], `${reglage} demande un rechargement différé de 350 ms`);
+      }
+      for (const reglage of ['antigravity.discovery.enabled', 'editor.fontSize']) {
+        demandes.length = 0;
+        ecouteur(evenement(reglage));
+        assert.deepStrictEqual(demandes, [], `${reglage} ne relance pas le scan`);
+      }
+    } finally {
+      (StateManager as any).requestDebouncedReload = origine;
+      contexte.subscriptions.forEach((d) => d.dispose());
+    }
+    assert.strictEqual(ecouteursReglages.length, avant, 'l\'écouteur est retiré à l\'arrêt');
   });
 });

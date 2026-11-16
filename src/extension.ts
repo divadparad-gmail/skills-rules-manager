@@ -28,6 +28,23 @@ export const WATCHER_PATTERNS = {
   soulFiles: '**/{CLAUDE.md,GEMINI.md,AGENTS.md}',
 };
 
+/** Relance le scan, après le délai des observateurs, quand change un réglage qui modifie ce qu'il compte. */
+export function registerScanSettingsReload(context: Pick<vscode.ExtensionContext, 'subscriptions'>): void {
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeConfiguration((event) => {
+      // Le profil de comportement d'Antigravity, le dossier global et le profil de Claude Code (lu et observé
+      // par les observateurs du dehors) changent ce que compte le scan
+      if (
+        event.affectsConfiguration(ANTIGRAVITY_PROFILE_SETTING)
+        || event.affectsConfiguration('skillsManager.globalPath')
+        || event.affectsConfiguration('skillsManager.claudeGlobalPath')
+      ) {
+        StateManager.requestDebouncedReload(350);
+      }
+    })
+  );
+}
+
 export function activate(context: vscode.ExtensionContext): void {
   // 0. Sondage d'environnement avant tout enregistrement lourd : le verdict
   // conditionne le routage des déploiements et l'affichage de la barre d'état.
@@ -152,12 +169,9 @@ export function activate(context: vscode.ExtensionContext): void {
       if (event.affectsConfiguration(DISCOVERY_ENABLED_SETTING)) {
         environmentStatusBar.setVisible(isDiscoveryEnabled());
       }
-      // Le profil de comportement d'Antigravity et le dossier global changent ce que compte le scan
-      if (event.affectsConfiguration(ANTIGRAVITY_PROFILE_SETTING) || event.affectsConfiguration('skillsManager.globalPath')) {
-        StateManager.requestDebouncedReload(350);
-      }
     })
   );
+  registerScanSettingsReload(context);
 
   registerDiscoveryCommands(context, container, discoveryProvider, environmentStatusBar);
   // Aperçu en lecture seule des manifestes, montré avant toute installation.
