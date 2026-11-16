@@ -112,7 +112,7 @@ export function buildClaudeImportItems(
   });
 }
 
-/** Vrai pour une carte de Claude Code présente mais non chargée (cinquième saut, plus de 4 Mio). */
+/** Vrai pour une carte de Claude Code présente mais non chargée (cinquième saut, plus de 4 Mio, chemin réseau…). */
 export function isClaudeMemoryNotLoaded(item: ResourceItem): boolean {
   return item.targetTool === 'claude-code' && !!item.metadata?.claudeMemoryNotLoaded;
 }

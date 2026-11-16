@@ -73,8 +73,10 @@ import { DuplicateService } from '../src/services/DuplicateService';
 import { DeleteService } from '../src/services/DeleteService';
 import { getProtectedResourceRefusal, isBulkToggleable, ToggleManager } from '../src/services/ToggleManager';
 import { claudeInjectedText } from '../src/claude/injectedText';
+import { claudeWatchTargets } from '../src/claude/claudeWatchTargets';
+import { buildClaudeImportItems, isClaudeMemoryNotLoaded } from '../src/services/claudeMemoryItems';
 import { countTokens } from '../src/utils/tokenizer';
-import { ResourceItem, WorkspaceContext } from '../src/types';
+import { ManagerFullState, ResourceItem, WorkspaceContext } from '../src/types';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const main = require(path.resolve(__dirname, '../../src/webview/main.js'));
@@ -230,6 +232,13 @@ function sousOuEgal(chemin: string, racine: string): boolean {
   return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
 }
 
+/** Vrai pour un chemin réseau, ou un chemin qui en a la forme : « \\ » ou « // » en tête (\\?\ et \\.\ compris). */
+function estCheminReseau(p: unknown): boolean {
+  if (typeof p !== 'string' && !(p instanceof URL) && !Buffer.isBuffer(p)) return false;
+  const chemin = String(p instanceof URL ? p.pathname : p);
+  return /^[\\/]{2}/.test(chemin);
+}
+
 async function sousEspion<T>(autorises: string[], action: () => Promise<T>): Promise<{ resultat: T; horsDossier: string[]; contenusLus: string[] }> {
   const horsDossier: string[] = [];
   const contenusLus: string[] = [];
@@ -241,18 +250,31 @@ async function sousEspion<T>(autorises: string[], action: () => Promise<T>): Pro
     if (LECTURES_DE_CONTENU.has(nom)) contenusLus.push(path.resolve(chemin));
   };
   const origines: Array<() => void> = [];
-  const espionner = (cible: any, nom: string) => {
+  // Un chemin réseau est noté, puis refusé par une erreur ENOENT, sans appel réel : aucun test n'ouvre de
+  // connexion vers un hôte, même quand le code testé tente d'y accéder
+  const refusReseau = (p: unknown) => {
+    const err: NodeJS.ErrnoException = new Error(`ENOENT: chemin réseau refusé par l'espion du test, '${String(p)}'`);
+    err.code = 'ENOENT';
+    return err;
+  };
+  const espionner = (cible: any, nom: string, promesse: boolean) => {
     const orig = cible[nom];
     if (typeof orig !== 'function') return;
+    const appeler = (fn: any, libelle: string, self: unknown, p: unknown, reste: unknown[]) => {
+      noter(libelle, p);
+      if (estCheminReseau(p)) {
+        if (promesse) return Promise.reject(refusReseau(p));
+        throw refusReseau(p);
+      }
+      return fn.call(self, p, ...reste);
+    };
     const espion = function (this: unknown, p: unknown, ...reste: unknown[]) {
-      noter(nom, p);
-      return orig.call(this, p, ...reste);
+      return appeler(orig, nom, this, p, reste);
     };
     if (typeof orig.native === 'function') {
       const origNative = orig.native;
       (espion as any).native = function (this: unknown, p: unknown, ...reste: unknown[]) {
-        noter(`${nom}.native`, p);
-        return origNative.call(this, p, ...reste);
+        return appeler(origNative, `${nom}.native`, this, p, reste);
       };
     }
     cible[nom] = espion;
@@ -261,8 +283,8 @@ async function sousEspion<T>(autorises: string[], action: () => Promise<T>): Pro
   // Le module réel : les modules de src/ lisent le module réel
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   const fsReel = require('fs');
-  FONCTIONS_SYNC.forEach((n) => espionner(fsReel, n));
-  FONCTIONS_PROMESSES.forEach((n) => espionner(fsReel.promises, n));
+  FONCTIONS_SYNC.forEach((n) => espionner(fsReel, n, false));
+  FONCTIONS_PROMESSES.forEach((n) => espionner(fsReel.promises, n, true));
   try {
     return { resultat: await action(), horsDossier, contenusLus };
   } finally {
@@ -756,5 +778,154 @@ describe('Imports de la mémoire de Claude Code : cartes, jauge et lecture seule
     assert.deepStrictEqual(cartes.map((c) => c.id), ['GEMINI.md']);
     assert.strictEqual(meta(cartes[0]).claudeImport, undefined);
     assert.strictEqual(meta(cartes[0]).claudeMemoryNotLoaded, undefined);
+  });
+});
+
+// ====================================================================================================
+// 3. Les imports vers un chemin réseau (revue d'avant le push) : ni stat ni lecture, carte à 0
+// ====================================================================================================
+//
+// Un fichier de mémoire du niveau projet est choisi par le dépôt, qui n'est pas fiable : un import
+// « @\\hôte\partage\x.md » ou « @//hôte/partage/x.md » ferait, au premier stat, une connexion vers l'hôte
+// nommé (SMB ou WebDAV, avec une authentification automatique du compte : déduit, non vérifié), alors que
+// Claude Code ne charge un import extérieur qu'après approbation (documentation ; non chargé en -p, mesuré).
+// Sous Windows, un import extérieur dont le chemin résolu commence par « \\ » ou « // » (\\?\ et \\.\
+// compris) a donc une carte « chemin réseau » à 0, sans aucun accès. Les imports du CLAUDE.md global, choisis
+// par l'utilisateur, ne sont pas concernés, ni un import situé dans un espace ouvert sur un partage.
+
+/** Les trois formes de l'attaque, telles qu'écrites dans un CLAUDE.md. */
+const IMPORTS_RESEAU = [String.raw`@\\hote\partage\a.md`, '@//hote/partage/b.md', String.raw`@\\?\UNC\hote\partage\c.md`];
+
+describe('Imports de la mémoire de Claude Code : chemins réseau', () => {
+  /** Un port qui note chaque appel, avec son chemin ; aucun accès au disque ni au réseau. */
+  const portEspion = (fichiers: Record<string, string>) => {
+    const appels: string[] = [];
+    return {
+      appels,
+      port: {
+        fileSize: (p: string) => { appels.push(`fileSize ${p}`); return p in fichiers ? Buffer.byteLength(fichiers[p]) : null; },
+        readText: (p: string) => { appels.push(`readText ${p}`); return p in fichiers ? fichiers[p] : null; },
+        key: (p: string) => { appels.push(`key ${p}`); return p.toLowerCase(); },
+      },
+    };
+  };
+  const reseau = (appels: string[]) => appels.filter((a) => estCheminReseau(a.slice(a.indexOf(' ') + 1)));
+
+  test('22. Sous Windows, un import extérieur vers un chemin réseau n\'est ni stat ni lu : entrée « chemin-reseau » à 0', () => {
+    const { expandClaudeImports } = imports();
+    const w = path.win32;
+    const global = String.raw`C:\Users\moi\.claude\CLAUDE.md`;
+    const projet = String.raw`C:\espace\projet\CLAUDE.md`;
+    const importGlobal = String.raw`\\hote\global\g.md`;
+    const { port: p, appels } = portEspion({
+      [importGlobal]: 'Choisi par l\'utilisateur.\n',
+      [String.raw`C:\espace\projet\commun.md`]: 'Commun.\n',
+    });
+    const entrees = expandClaudeImports([
+      { path: global, text: `@${importGlobal}\n`, projectLevel: false },
+      { path: projet, text: [...IMPORTS_RESEAU, String.raw`@\\hote\partage\a.md`, '@commun.md', ''].join('\n'), projectLevel: true },
+    ], { cwd: String.raw`C:\espace\projet`, home: String.raw`C:\Users\moi`, seen: new Set([global.toLowerCase(), projet.toLowerCase()]), pathApi: w }, p);
+
+    assert.deepStrictEqual(entrees.map((e: any) => [e.path, e.etat, e.externe, e.niveau, e.size, e.raw === null, e.text === null]), [
+      [importGlobal, 'charge', false, 1, Buffer.byteLength('Choisi par l\'utilisateur.\n'), false, false],
+      [String.raw`\\hote\partage\a.md`, 'chemin-reseau', true, 1, 0, true, true],
+      [String.raw`\\hote\partage\b.md`, 'chemin-reseau', true, 1, 0, true, true],
+      [String.raw`\\?\UNC\hote\partage\c.md`, 'chemin-reseau', true, 1, 0, true, true],
+      [String.raw`C:\espace\projet\commun.md`, 'charge', false, 1, Buffer.byteLength('Commun.\n'), false, false],
+    ], 'une seule entrée par chemin réseau, au premier rencontré');
+    assert.deepStrictEqual(reseau(appels), [`fileSize ${importGlobal}`, `key ${importGlobal}`, `readText ${importGlobal}`],
+      'seul l\'import du CLAUDE.md global, choisi par l\'utilisateur, est consulté');
+
+    // Un espace ouvert sur un partage réseau : ses imports internes restent lus ; un autre hôte, non
+    const cwdReseau = String.raw`\\serveur\equipe\projet`;
+    const racineReseau = String.raw`\\serveur\equipe\projet\CLAUDE.md`;
+    const notes = String.raw`\\serveur\equipe\projet\notes.md`;
+    const espion2 = portEspion({ [notes]: 'Notes.\n' });
+    const entrees2 = expandClaudeImports(
+      [{ path: racineReseau, text: '@notes.md\n@//hote/partage/b.md\n', projectLevel: true }],
+      { cwd: cwdReseau, home: String.raw`C:\Users\moi`, seen: new Set([racineReseau.toLowerCase()]), pathApi: w },
+      espion2.port,
+    );
+    assert.deepStrictEqual(entrees2.map((e: any) => [e.path, e.etat, e.externe]), [
+      [notes, 'charge', false],
+      [String.raw`\\hote\partage\b.md`, 'chemin-reseau', true],
+    ]);
+    assert.ok(!espion2.appels.some((a) => a.toLowerCase().includes(String.raw`\\hote\partage`)), 'l\'autre hôte n\'est pas consulté');
+  });
+
+  test('23. La carte « 🌐 Chemin réseau : non lu » : 0 token, lecture seule, non active, avec la mention de l\'approbation', async () => {
+    const entree = {
+      path: String.raw`\\hote\partage\a.md`, key: String.raw`\\hote\partage\a.md`, importer: path.join(PROJET, 'CLAUDE.md'),
+      niveau: 1, externe: true, etat: 'chemin-reseau', size: 0, raw: null, text: null,
+    };
+    const { resultat: cartes, horsDossier } = await sousEspion([], async () =>
+      buildClaudeImportItems([entree as any], { scope: 'local', claudeMemoryType: 'Project', labelBase: { cwd: PROJET }, cwdKey: PROJET.toLowerCase() }));
+    assert.deepStrictEqual(horsDossier, [], 'la carte est construite sans aucun accès');
+    const carte = cartes[0];
+    assert.deepStrictEqual([carte.tokenCount, carte.charCount, carte.lineCount], [0, 0, 0]);
+    assert.strictEqual(meta(carte).claudeMemoryNotLoaded, 'chemin-reseau');
+    assert.strictEqual(meta(carte).locked, true);
+    assert.deepStrictEqual(meta(carte).claudeReadOnly, { raison: 'Fichier hors du projet' });
+    assert.deepStrictEqual(meta(carte).claudeImport, { par: 'CLAUDE.md', niveau: 1, externe: true });
+    assert.strictEqual(isClaudeMemoryNotLoaded(carte), true, 'non active : hors du total de l\'Âme');
+
+    const tous = rendu(carte);
+    assert.deepStrictEqual(pastilles(tous), ['🌐 Chemin réseau : non lu']);
+    const badge = tous.find((el) => el.textContent === '🌐 Chemin réseau : non lu')!;
+    assert.ok(badge.title.includes('chargé par Claude Code seulement après approbation'), `infobulle : ${badge.title}`);
+    assert.ok(tous.some((el) => el.innerHTML.includes('0 tok au boot')), 'métrique à 0 au démarrage');
+    assert.ok(tous.some((el) => el.title.includes('chemin réseau')), 'l\'infobulle de la métrique nomme le chemin réseau');
+
+    // Le bandeau compte la carte réseau, chargée par Claude Code après approbation ; les cartes extérieures
+    // du cinquième saut et de plus de 4 Mio restent hors du compte
+    const autres = buildClaudeImportItems([
+      { ...entree, path: path.join(DOSSIER, 'cinq.md'), key: 'cinq', niveau: 5, etat: 'niveau-5' },
+      { ...entree, path: path.join(DOSSIER, 'gros.md'), key: 'gros', etat: 'plus-de-4-mio', size: 4194305 },
+    ] as any[], { scope: 'local', claudeMemoryType: 'Project', labelBase: { cwd: PROJET }, cwdKey: PROJET.toLowerCase() });
+    const etat = { workspace: { tool: 'claude-code' }, globalResources: [], localResources: [carte, ...autres] };
+    const { doc } = documentMinimal();
+    main.renderClaudeImportsBanner(etat, doc);
+    const bandeau = doc.getElementById('claudeImportsBanner');
+    assert.ok(bandeau, 'bandeau créé pour la seule carte réseau');
+    assert.strictEqual(bandeau.textContent, '🔐 1 import hors du projet : chargé seulement après approbation dans Claude Code');
+    main.renderClaudeImportsBanner({ ...etat, localResources: autres }, doc);
+    assert.strictEqual(doc.getElementById('claudeImportsBanner'), null, 'cinquième saut et plus de 4 Mio hors du compte');
+  });
+
+  test('24. Le scan d\'un CLAUDE.md du projet qui importe trois chemins réseau : aucun accès, trois cartes à 0, aucun observateur', {
+    skip: process.platform !== 'win32' ? 'la règle des chemins réseau ne vaut que sous Windows (les tests 22 et 23 la couvrent ailleurs)' : false,
+  }, async () => {
+    preparerDossier();
+    try {
+      arborescence({
+        'racine/projet/CLAUDE.md': ['# Projet', '', ...IMPORTS_RESEAU, '@commun.md', ''].join('\n'),
+        'racine/projet/commun.md': TEXTE_COMMUN,
+      });
+      const { resultat, horsDossier } = await sousEspion([RACINE, CLAUDE_GLOBAL, AG_GLOBAL], async () => ({
+        local: await LocalScanner.scan(espace(), undefined, { claudeMemoryStopAt: RACINE }),
+        global: await GlobalScanner.scan(AG_GLOBAL, 'claude-code'),
+      }));
+      assert.deepStrictEqual(reseau(horsDossier), [], 'aucun appel de fs sur un chemin qui commence par \\\\ ou //');
+      assert.deepStrictEqual(horsDossier, [], 'aucune lecture hors du dossier d\'arrêt et des profils simulés');
+
+      const cartes = ames(resultat.local.items);
+      const cartesReseau = cartes.filter((c) => meta(c).claudeMemoryNotLoaded === 'chemin-reseau');
+      assert.deepStrictEqual(cartesReseau.map((c) => [c.id, c.tokenCount, meta(c).claudeImport?.externe]), [
+        ['//hote/partage/a.md', 0, true],
+        ['//hote/partage/b.md', 0, true],
+        ['//?/UNC/hote/partage/c.md', 0, true],
+      ]);
+      assert.strictEqual(resultat.local.soulStat.activeCount, 2, 'CLAUDE.md et commun.md seulement');
+      assert.strictEqual(resultat.local.soulStat.tokenCount, somme(cartes.filter((c) => !isClaudeMemoryNotLoaded(c))));
+
+      const etat = {
+        workspace: espace(), localResources: resultat.local.items, globalResources: resultat.global.items, nasResources: [], stats: {},
+      } as unknown as ManagerFullState;
+      const cibles = claudeWatchTargets(etat, { globalPath: CLAUDE_GLOBAL, gitEntry: () => null, stopAt: RACINE });
+      assert.deepStrictEqual(cibles.filter((c) => estCheminReseau(c)), [], 'aucun observateur pour un chemin réseau');
+      assert.ok(cibles.includes(path.join(PROJET, 'commun.md')), 'l\'import ordinaire reste observé');
+    } finally {
+      if (fs.existsSync(DOSSIER)) viderSaufTemoin();
+    }
   });
 });

@@ -22,9 +22,10 @@ export type ClaudeMemoryType = 'User' | 'Project' | 'Local' | 'AutoMem';
 
 /**
  * Raison pour laquelle un fichier de mémoire de Claude Code présent n'est pas chargé : cinquième saut
- * d'import, plus de 4 Mio, ou AGENTS.md ignoré parce qu'un CLAUDE.md est présent.
+ * d'import, plus de 4 Mio, AGENTS.md ignoré parce qu'un CLAUDE.md est présent, ou import extérieur vers
+ * un chemin réseau (non lu par l'extension).
  */
-export type ClaudeMemoryNotLoaded = 'niveau-5' | 'plus-de-4-mio' | 'agents-ignore';
+export type ClaudeMemoryNotLoaded = 'niveau-5' | 'plus-de-4-mio' | 'agents-ignore' | 'chemin-reseau';
 
 /** Portée d'un fichier de réglages de Claude Code : le profil, le projet partagé ou le projet local. */
 export type ClaudeSettingsScope = 'utilisateur' | 'projet' | 'local';

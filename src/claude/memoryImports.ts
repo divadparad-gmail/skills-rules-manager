@@ -28,7 +28,11 @@ import { CLAUDE_CODE_FENCE, claudeInjectedText } from './injectedText';
  *   première espace non échappée (une ponctuation collée au chemin en fait partie) ;
  * - un segment de code se ferme sur sa ligne ; un segment qui court sur plusieurs lignes n'est pas vu ;
  * - l'ordre est celui de la lecture : chaque import est développé à sa place, avant le suivant ;
- * - un fichier vu d'abord au cinquième saut, puis atteint plus tôt par un autre chemin, est chargé.
+ * - un fichier vu d'abord au cinquième saut, puis atteint plus tôt par un autre chemin, est chargé ;
+ * - sous Windows, un import extérieur dont le chemin résolu commence par « \\ » ou « // » (\\?\ et \\.\
+ *   compris) n'est ni consulté ni lu : son accès ouvrirait une connexion vers l'hôte nommé par le dépôt, que
+ *   Claude Code ne fait qu'après approbation. Il a une entrée « chemin-reseau » à 0, sans développement. Les
+ *   imports du CLAUDE.md global, et ceux d'un espace ouvert sur un partage, restent lus.
  *
  * Ce module est pur : il ne lit aucun fichier. Le développement passe par un port (taille, texte, clé de
  * chemin résolu) que le scanner fournit, et que les tests remplacent.
@@ -125,6 +129,14 @@ export function resolveClaudeImport(raw: string, importerDir: string, home: stri
   return pathApi.resolve(importerDir, raw);
 }
 
+/**
+ * Vrai sous Windows pour un chemin réseau, ou qui en a la forme : « \\ » ou « // » en tête, ce qui couvre
+ * \\hôte\partage, \\?\UNC\… et \\.\… Toujours faux ailleurs.
+ */
+export function isClaudeNetworkPath(file: string, pathApi: ClaudePathApi = path): boolean {
+  return pathApi.sep === '\\' && /^[\\/]{2}/.test(file);
+}
+
 /** Vrai si `target` est `dir` lui-même ou se trouve dessous. */
 export function isClaudePathInside(target: string, dir: string, pathApi: ClaudePathApi = path): boolean {
   const rel = pathApi.relative(dir, target);
@@ -177,8 +189,11 @@ export interface ClaudeImportRoot {
   projectLevel: boolean;
 }
 
-/** L'état d'un fichier importé : chargé, cinquième saut (non chargé), ou plus de 4 Mio (ignoré, non lu). */
-export type ClaudeImportState = 'charge' | 'niveau-5' | 'plus-de-4-mio';
+/**
+ * L'état d'un fichier importé : chargé, cinquième saut (non chargé), plus de 4 Mio (ignoré, non lu), ou
+ * chemin réseau extérieur (non consulté, non lu).
+ */
+export type ClaudeImportState = 'charge' | 'niveau-5' | 'plus-de-4-mio' | 'chemin-reseau';
 
 export interface ClaudeImportEntry {
   path: string;
@@ -201,7 +216,8 @@ export interface ClaudeImportEntry {
  * Développe les imports des fichiers de mémoire, dans l'ordre des racines puis de la lecture. `seen`
  * contient les clés déjà comptées (fichiers de mémoire et imports précédents) ; il reçoit celles des
  * fichiers chargés ou ignorés pour leur taille. Un fichier absent, déjà vu ou illisible n'a pas d'entrée.
- * Le fichier du cinquième saut a une entrée « niveau-5 », sans être lu.
+ * Le fichier du cinquième saut a une entrée « niveau-5 », sans être lu. Un import extérieur vers un chemin
+ * réseau a une entrée « chemin-reseau », sans qu'aucune fonction du port ne soit appelée sur son chemin.
  */
 export function expandClaudeImports(
   roots: ClaudeImportRoot[],
@@ -218,6 +234,19 @@ export function expandClaudeImports(
     for (const raw of parseClaudeImports(text)) {
       const file = resolveClaudeImport(raw, pathApi.dirname(importer), context.home, pathApi);
       if (file === null) continue;
+      if (isClaudeNetworkPath(file, pathApi)) {
+        // Clé sans résolution des liens (elle consulterait l'hôte), en minuscules comme sous Windows
+        const networkKey = file.toLowerCase();
+        if (isClaudeImportExternal(networkKey, cwdKey, projectLevel, pathApi)) {
+          if (context.seen.has(networkKey)) continue;
+          context.seen.add(networkKey);
+          entries.push({
+            path: file, key: networkKey, importer, niveau: depth + 1, externe: true,
+            etat: 'chemin-reseau', size: 0, raw: null, text: null,
+          });
+          continue;
+        }
+      }
       const size = port.fileSize(file);
       if (size === null) continue;
       const key = port.key(file);
