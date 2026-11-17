@@ -22,8 +22,9 @@ export type ClaudeMemoryType = 'User' | 'Project' | 'Local' | 'AutoMem';
 
 /**
  * Raison pour laquelle un fichier de mémoire de Claude Code présent n'est pas chargé : cinquième saut
- * d'import, plus de 4 Mio, AGENTS.md ignoré parce qu'un CLAUDE.md est présent, ou import extérieur vers
- * un chemin réseau (non lu par l'extension).
+ * d'import, plus de 4 Mio, AGENTS.md ignoré parce qu'un CLAUDE.md est présent, import extérieur vers
+ * un chemin réseau (« chemin-reseau »), ou import hors des dossiers admis (« hors-perimetre ») ; ces deux
+ * derniers ne sont pas lus par l'extension.
  */
 export type ClaudeMemoryNotLoaded = 'niveau-5' | 'plus-de-4-mio' | 'agents-ignore' | 'chemin-reseau' | 'hors-perimetre';
 

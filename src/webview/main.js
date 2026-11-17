@@ -2488,7 +2488,7 @@
         'L\'extension ne le consulte pas, pour ne pas ouvrir de connexion vers l\'hôte nommé par le dépôt : il compte 0, et ses propres imports ne sont pas développés.');
     } else if (claudeNotLoaded === 'hors-perimetre') {
       addBadge('pill-warn-amber', '💽 Hors des dossiers admis : non lu',
-        'L\'extension ne lit pas ce fichier : il est hors du dossier de travail, du dossier personnel et de leurs dossiers admis. ' +
+        'L\'extension ne lit pas ce fichier : il est hors du dossier de travail, des dossiers admis autour de l\'espace et du dossier personnel. ' +
         'Claude Code le charge seulement après approbation (en -p, non chargé tant qu\'il n\'est pas approuvé, mesuré). ' +
         'Compté 0 ; ses imports ne sont pas développés.');
     } else if (claudeNotLoaded === 'agents-ignore') {

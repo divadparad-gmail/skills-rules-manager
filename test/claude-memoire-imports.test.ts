@@ -1069,11 +1069,15 @@ describe('Imports de la mémoire de Claude Code : imports hors des dossiers admi
     }], { cwd: ESPACE, home: MOI, seen: new Set([projet.toLowerCase()]), pathApi: w }, p);
 
     assert.deepStrictEqual(chemins(appels).filter((c) => estFormeInterditeWin32(c, 'c')), [], 'aucune fonction du port n\'est appelée sur un autre lecteur');
-    assert.deepStrictEqual(resume(entrees), [
+    // « z:h.md » et « Z: » sont relatifs au lecteur Z: : leur chemin complet dépend du dossier courant du
+    // processus. Seuls leur racine, leur état, leur niveau et leur taille sont vérifiés.
+    assert.deepStrictEqual(entrees.slice(2, 4).map((e: any) => [w.parse(e.path).root.toLowerCase(), e.etat, e.externe, e.niveau, e.size]), [
+      ['z:\\', 'hors-perimetre', true, 1, 0],
+      ['z:\\', 'hors-perimetre', true, 1, 0],
+    ], 'les deux formes relatives au lecteur Z: restent sur Z:, non consultées');
+    assert.deepStrictEqual(resume([...entrees.slice(0, 2), ...entrees.slice(4)]), [
       [String.raw`Z:\f.md`, 'hors-perimetre', true, 1, 0],
       [String.raw`Z:\g.md`, 'hors-perimetre', true, 1, 0],
-      [String.raw`z:\h.md`, 'hors-perimetre', true, 1, 0],
-      ['Z:\\', 'hors-perimetre', true, 1, 0],
       [String.raw`C:\Users\moi\i.md`, 'charge', true, 1, Buffer.byteLength('Personnel.\n')],
       [String.raw`C:\espace\p.md`, 'charge', true, 1, Buffer.byteLength('Parent.\n')],
       [String.raw`C:\l.md`, 'charge', true, 1, Buffer.byteLength('Racine du lecteur.\n')],
@@ -1183,7 +1187,7 @@ describe('Imports de la mémoire de Claude Code : imports hors des dossiers admi
     assert.deepStrictEqual(pastilles(tous), ['💽 Hors des dossiers admis : non lu']);
     const badge = tous.find((el) => el.textContent === '💽 Hors des dossiers admis : non lu')!;
     assert.strictEqual(badge.title,
-      'L\'extension ne lit pas ce fichier : il est hors du dossier de travail, du dossier personnel et de leurs dossiers admis. ' +
+      'L\'extension ne lit pas ce fichier : il est hors du dossier de travail, des dossiers admis autour de l\'espace et du dossier personnel. ' +
       'Claude Code le charge seulement après approbation (en -p, non chargé tant qu\'il n\'est pas approuvé, mesuré). ' +
       'Compté 0 ; ses imports ne sont pas développés.');
     assert.ok(tous.some((el) => el.innerHTML.includes('0 tok au boot')), 'métrique à 0 au démarrage');
