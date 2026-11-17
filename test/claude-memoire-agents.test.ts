@@ -55,6 +55,8 @@ require.cache['vscode'] = {
       workspaceFolders: [{ uri: { fsPath: PROJET } }],
       getConfiguration: (section?: string) => ({
         get: (key: string, def: any) => (section === 'skillsManager' && key in REGLAGES ? REGLAGES[key] : def),
+        // Les chemins ne sont lus que dans les réglages utilisateur (inspect().globalValue)
+        inspect: (key: string) => (section === 'skillsManager' && key in REGLAGES ? { key, globalValue: REGLAGES[key] } : undefined),
       }),
     },
     env: { appName: 'Visual Studio Code' },

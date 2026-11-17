@@ -64,7 +64,11 @@ require.cache['vscode'] = {
     },
     workspace: {
       workspaceFolders: [{ uri: { fsPath: PROJET } }],
-      getConfiguration: () => ({ get: (key: string, def: any) => (key in REGLAGES ? REGLAGES[key] : def) }),
+      getConfiguration: () => ({
+        get: (key: string, def: any) => (key in REGLAGES ? REGLAGES[key] : def),
+        // Les chemins ne sont lus que dans les réglages utilisateur (inspect().globalValue)
+        inspect: (key: string) => (key in REGLAGES ? { key, globalValue: REGLAGES[key] } : undefined),
+      }),
       onDidChangeConfiguration: (f: (e: EvenementReglages) => void) => {
         ecouteursReglages.push(f);
         return { dispose: () => { const i = ecouteursReglages.indexOf(f); if (i >= 0) ecouteursReglages.splice(i, 1); } };

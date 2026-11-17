@@ -31,6 +31,8 @@ require.cache['vscode'] = {
       workspaceFolders: [] as any[],
       getConfiguration: () => ({
         get: (key: string, def: any) => (key === 'claudeGlobalPath' && claudeGlobalPath ? claudeGlobalPath : def),
+        // Les chemins ne sont lus que dans les réglages utilisateur (inspect().globalValue)
+        inspect: (key: string) => (key === 'claudeGlobalPath' && claudeGlobalPath ? { key, globalValue: claudeGlobalPath } : undefined),
       }),
     },
     env: { appName: 'Visual Studio Code' },
