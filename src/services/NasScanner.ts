@@ -6,6 +6,7 @@ import { measureAntigravitySoul } from '../utils/antigravityRules';
 import { extractFrontmatter, extractMarkdownTitleAndSummary } from '../utils/frontmatter';
 import { countTokens, countTokensForFile } from '../utils/tokenizer';
 import { buildAntigravityRuleItem, soulSizeAdvice } from './antigravityRuleItem';
+import { getUserNasPath } from './nasPathSetting';
 
 let vscodeModule: any = null;
 try {
@@ -26,8 +27,10 @@ export class NasScanner {
   }
 
   /**
-   * Vérifie et autorise automatiquement l'hôte UNC dans la configuration
-   * de sécurité VS Code `security.allowedUNCHosts` pour éviter le blocage.
+   * Ajoute l'hôte UNC de `targetPath` au réglage utilisateur `security.allowedUNCHosts`.
+   * N'est appelée que par le parcours de confirmation (`confirmAndAllowNasHost`), après l'accord
+   * explicite de l'utilisateur : jamais pendant un scan. La liste de départ est la seule liste
+   * utilisateur, pour ne recopier aucune valeur d'une autre portée.
    */
   public static async ensureAllowedUNCHost(targetPath: string): Promise<boolean> {
     const host = this.getUncHost(targetPath);
@@ -36,7 +39,7 @@ export class NasScanner {
     try {
       if (!vscodeModule || !vscodeModule.workspace) return false;
       const securityConfig = vscodeModule.workspace.getConfiguration('security');
-      const allowedHosts = securityConfig.get('allowedUNCHosts') || [];
+      const allowedHosts = securityConfig.inspect('allowedUNCHosts')?.globalValue || [];
       const isAlreadyAllowed = Array.isArray(allowedHosts) && allowedHosts.some((h: string) => h.toLowerCase() === host.toLowerCase());
 
       if (!isAlreadyAllowed) {
@@ -60,9 +63,9 @@ export class NasScanner {
 
     const cleanPath = nasPath.trim().replace(/[\/\\]+$/, '');
 
-    // 1. Autoriser proactivement l'hôte UNC dans la sécurité VS Code
-    await this.ensureAllowedUNCHost(cleanPath);
-
+    // Aucune configuration n'est modifiée ici. Un hôte bloqué par VS Code (« UNC host … not allowed »)
+    // remonte dans le message d'erreur : la vue affiche alors le bouton « Débloquer », qui demande
+    // l'accord de l'utilisateur.
     const checkPromise = (async () => {
       try {
         const stat = await fs.promises.stat(cleanPath);
@@ -74,23 +77,6 @@ export class NasScanner {
         return { available: true };
       } catch (err: any) {
         const msg = err && err.message ? err.message : 'Inaccessible';
-
-        // Si l'erreur est spécifiquement le blocage UNC de VS Code, tenter une réautorisation immédiate
-        if (msg.includes('UNC host') || msg.includes('not allowed')) {
-          const added = await this.ensureAllowedUNCHost(cleanPath);
-          if (added) {
-            try {
-              const stat2 = await fs.promises.stat(cleanPath);
-              if (stat2.isDirectory()) {
-                await fs.promises.readdir(cleanPath);
-                return { available: true };
-              }
-            } catch {
-              // Continuer vers l'erreur
-            }
-          }
-        }
-
         return { available: false, error: msg };
       }
     })();
@@ -118,8 +104,8 @@ export class NasScanner {
     targetTool: 'antigravity' | 'claude-code' = 'antigravity',
     profile: AntigravityBehaviorProfile = ANTIGRAVITY_PROFILES['2.5.5']
   ): Promise<{ status: NasStatus; items: ResourceItem[] }> {
-    const config = vscodeModule && vscodeModule.workspace ? vscodeModule.workspace.getConfiguration('skillsManager') : null;
-    const rawNasPath = customNasPath || (config ? config.get('nasPath', '') : '');
+    // Réglage utilisateur seulement : une valeur posée par l'espace de travail est ignorée
+    const rawNasPath = customNasPath || getUserNasPath();
     const nasPath = (rawNasPath || '').trim().replace(/[\/\\]+$/, '');
 
     // Aucun catalogue configuré : ce n'est pas une panne, le catalogue est simplement absent.

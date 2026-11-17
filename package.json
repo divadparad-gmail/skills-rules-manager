@@ -177,6 +177,7 @@
       "properties": {
         "skillsManager.nasPath": {
           "type": "string",
+          "scope": "machine",
           "default": "",
           "description": "Chemin UNC ou local du catalogue maître NAS (skills, rules, workflows), par exemple \\\\serveur\\partage\\catalogue. Laisser vide si vous n'utilisez pas de catalogue."
         },
