@@ -756,8 +756,19 @@ describe('Suite de Tests : comptage des tokens au démarrage d\'Antigravity (lot
     const origGetConfig = vscodeMock.workspace.getConfiguration;
     const origAppName = vscodeMock.env.appName;
     const indicesVides = { newStructure: false, migrationMarker: false, oldStructure: false };
+    // Dossier personnel redirigé vers le dossier temporaire : en mode Claude Code, le scan des serveurs
+    // MCP lit <home>/.claude.json ; le vrai fichier de l'utilisateur ne doit jamais être lu par un test
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const osReel = require('os');
+    const origHomedir = osReel.homedir;
+    const origEnvHome = { USERPROFILE: process.env.USERPROFILE, HOME: process.env.HOME };
+    const maison = path.join(tempBaseDir, 'd10-budget', 'maison');
+    await fs.promises.mkdir(maison, { recursive: true });
 
     try {
+      osReel.homedir = () => maison;
+      process.env.USERPROFILE = maison;
+      process.env.HOME = maison;
       vscodeMock.workspace.workspaceFolders = [{ uri: { fsPath: projet } }];
       vscodeMock.workspace.getConfiguration = () => ({
         get: (key: string, def: any) => {
@@ -825,6 +836,11 @@ describe('Suite de Tests : comptage des tokens au démarrage d\'Antigravity (lot
       vscodeMock.workspace.workspaceFolders = origFolders;
       vscodeMock.workspace.getConfiguration = origGetConfig;
       vscodeMock.env.appName = origAppName;
+      osReel.homedir = origHomedir;
+      for (const [cle, valeur] of Object.entries(origEnvHome)) {
+        if (valeur === undefined) delete process.env[cle];
+        else process.env[cle] = valeur;
+      }
     }
   });
 
