@@ -17,6 +17,7 @@ import { EnvironmentStatusBar } from './EnvironmentStatusBar';
 import { GEMINI_API_KEY_SECRET } from '../search/GeminiClient';
 import { ReviewableResource, reviewAndDeploy } from '../deploy/deployReview';
 import { createVsCodeDeployReview, currentDeployEnvironment } from './vscodeDeployReview';
+import { readUserSettingValue } from '../settings/userSettingValue';
 
 /**
  * Réglage expérimental qui active la vue Découverte. Désactivé, il masque la vue et le badge
@@ -25,8 +26,9 @@ import { createVsCodeDeployReview, currentDeployEnvironment } from './vscodeDepl
  */
 export const DISCOVERY_ENABLED_SETTING = 'antigravity.discovery.enabled';
 
+/** Valeur utilisateur seulement : un dépôt ne peut pas activer la vue par ses réglages d'espace. */
 export function isDiscoveryEnabled(): boolean {
-  return vscode.workspace.getConfiguration().get<boolean>(DISCOVERY_ENABLED_SETTING, false) === true;
+  return readUserSettingValue<boolean>(DISCOVERY_ENABLED_SETTING) === true;
 }
 
 const TARGET_LABELS: Array<{ target: DeployTarget; label: string; detail: string }> = [

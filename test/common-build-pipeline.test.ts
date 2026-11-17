@@ -120,7 +120,7 @@ describe('Suite de Tests : Chaîne de construction et contributions du manifeste
     assert.strictEqual(properties['antigravity.skills.requestTimeoutMs'].default, 5000);
     assert.strictEqual(properties['antigravity.skills.maxParallelRegistryQueries'].default, 5);
     assert.strictEqual(properties['antigravity.skills.nasDirectoryPath'].default, '');
-    assert.strictEqual(properties['antigravity.skills.nasDirectoryPath'].scope, 'resource');
+    assert.strictEqual(properties['antigravity.skills.nasDirectoryPath'].scope, 'machine');
 
     const recent = properties['antigravity.search.recentSearchesLimit'];
     assert.strictEqual(recent.default, 10);
