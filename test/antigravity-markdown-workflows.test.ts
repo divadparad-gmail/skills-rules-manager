@@ -287,6 +287,12 @@ describe('Suite de Tests : workflows Markdown d\'Antigravity IDE 2.6.0 (lot LW-2
           if (key === 'claudeGlobalPath') return path.join(base, 'claude-home');
           return def;
         },
+        // Les chemins ne sont lus que dans les réglages utilisateur (inspect().globalValue)
+        inspect: (key: string) => {
+          if (key === 'globalPath') return { key, globalValue: config };
+          if (key === 'claudeGlobalPath') return { key, globalValue: path.join(base, 'claude-home') };
+          return undefined;
+        },
       });
 
       StateManager.setAntigravityProfileForTesting(resolveAntigravityProfile('2.6.0', indicesVides));

@@ -399,6 +399,8 @@ describe('Suite de Tests : profil de comportement d\'Antigravity (chantier 2.6.0
           if (key === ANTIGRAVITY_PROFILE_SETTING) return profil;
           return def;
         },
+        // Les chemins ne sont lus que dans les réglages utilisateur (inspect().globalValue)
+        inspect: (key: string) => (key === 'globalPath' ? { key, globalValue: globalPath } : undefined),
       });
     };
     const cas = [
