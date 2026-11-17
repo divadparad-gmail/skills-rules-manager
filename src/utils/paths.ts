@@ -33,21 +33,34 @@ export function getDefaultGlobalClaudePath(): string {
 }
 
 /**
+ * Valeur utilisateur d'un réglage de chemin de `skillsManager` (`inspect().globalValue`), sans
+ * espaces autour ; chaîne vide si elle est absente. Une valeur posée par l'espace de travail (par
+ * exemple le `.vscode/settings.json` d'un dépôt ouvert) est ignorée, en mode restreint comme après
+ * l'accord de confiance : un profil global n'est jamais désigné par le dépôt. La portée « machine »
+ * de package.json retire déjà ces réglages de l'espace ; cette lecture vaut aussi pour un éditeur
+ * dérivé qui ne respecterait pas la portée. Sans `inspect` (hôte simulé incomplet), rien n'est retenu.
+ */
+function readUserPathSetting(key: 'globalPath' | 'claudeGlobalPath'): string {
+  if (!vscodeModule || !vscodeModule.workspace) return '';
+  const config = vscodeModule.workspace.getConfiguration('skillsManager');
+  if (!config || typeof config.inspect !== 'function') return '';
+  const value = config.inspect(key)?.globalValue;
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+/**
  * Résout le chemin effectif d'Antigravity global :
  * 1. Priorité au chemin personnalisé passé en paramètre direct
- * 2. Sinon, lecture de la configuration VS Code 'skillsManager.globalPath' (si non vide)
+ * 2. Sinon, la valeur utilisateur de 'skillsManager.globalPath' (si non vide)
  * 3. Sinon, fallback automatique sur le répertoire utilisateur de la machine hôte (~/.gemini/config)
  */
 export function getEffectiveGlobalAntigravityPath(customGlobalPath?: string): string {
   if (customGlobalPath && customGlobalPath.trim().length > 0) {
     return customGlobalPath.trim();
   }
-  if (vscodeModule && vscodeModule.workspace) {
-    const config = vscodeModule.workspace.getConfiguration('skillsManager');
-    const configured = config ? config.get('globalPath') : null;
-    if (configured && typeof configured === 'string' && configured.trim().length > 0) {
-      return configured.trim();
-    }
+  const configured = readUserPathSetting('globalPath');
+  if (configured) {
+    return configured;
   }
   return getDefaultGlobalAntigravityPath();
 }
@@ -55,19 +68,16 @@ export function getEffectiveGlobalAntigravityPath(customGlobalPath?: string): st
 /**
  * Résout le chemin effectif de Claude Code global :
  * 1. Priorité au chemin personnalisé passé en paramètre direct
- * 2. Sinon, lecture de la configuration VS Code 'skillsManager.claudeGlobalPath' (si non vide)
+ * 2. Sinon, la valeur utilisateur de 'skillsManager.claudeGlobalPath' (si non vide)
  * 3. Sinon, fallback automatique sur le répertoire utilisateur de la machine hôte (~/.claude)
  */
 export function getEffectiveGlobalClaudePath(customClaudePath?: string): string {
   if (customClaudePath && customClaudePath.trim().length > 0) {
     return customClaudePath.trim();
   }
-  if (vscodeModule && vscodeModule.workspace) {
-    const config = vscodeModule.workspace.getConfiguration('skillsManager');
-    const configured = config ? config.get('claudeGlobalPath') : null;
-    if (configured && typeof configured === 'string' && configured.trim().length > 0) {
-      return configured.trim();
-    }
+  const configured = readUserPathSetting('claudeGlobalPath');
+  if (configured) {
+    return configured;
   }
   return getDefaultGlobalClaudePath();
 }

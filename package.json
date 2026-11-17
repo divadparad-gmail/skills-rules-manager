@@ -183,6 +183,7 @@
         },
         "skillsManager.globalPath": {
           "type": "string",
+          "scope": "machine",
           "default": "",
           "description": "Chemin global de configuration Antigravity (laisser vide pour détection automatique : ~/.gemini/config)"
         },
@@ -204,6 +205,7 @@
         },
         "skillsManager.claudeGlobalPath": {
           "type": "string",
+          "scope": "machine",
           "default": "",
           "description": "Chemin global de configuration Claude Code (laisser vide pour détection automatique : ~/.claude)"
         },
