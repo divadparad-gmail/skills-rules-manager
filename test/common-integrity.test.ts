@@ -59,6 +59,25 @@ describe('Suite de Tests : Intégrité & Synchronisation NAS vs Local', () => {
   let nasDir: string;
   let localDir: string;
 
+  // Dossier personnel redirigé pendant un test : le scan des serveurs MCP lit <home>/.claude.json en
+  // mode Claude Code ; le vrai fichier de l'utilisateur ne doit jamais être lu par un test
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const osReel = require('os');
+  const dossierPersonnelOrigine = { homedir: osReel.homedir, USERPROFILE: process.env.USERPROFILE, HOME: process.env.HOME };
+  const redirigerDossierPersonnel = (dossier: string): void => {
+    osReel.homedir = () => dossier;
+    process.env.USERPROFILE = dossier;
+    process.env.HOME = dossier;
+  };
+  const retablirDossierPersonnel = (): void => {
+    osReel.homedir = dossierPersonnelOrigine.homedir;
+    for (const cle of ['USERPROFILE', 'HOME'] as const) {
+      const valeur = dossierPersonnelOrigine[cle];
+      if (valeur === undefined) delete process.env[cle];
+      else process.env[cle] = valeur;
+    }
+  };
+
   before(async () => {
     // Création d'un environnement de simulation temporaire
     tempBaseDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'test-rules-manager-'));
@@ -73,6 +92,7 @@ describe('Suite de Tests : Intégrité & Synchronisation NAS vs Local', () => {
 
   after(async () => {
     // Nettoyage de l'environnement de test
+    retablirDossierPersonnel();
     await fs.promises.rm(tempBaseDir, { recursive: true, force: true });
   });
 
@@ -312,8 +332,12 @@ describe('Suite de Tests : Intégrité & Synchronisation NAS vs Local', () => {
 
   test('14. MCP Scanner : étanchéité Claude Code (~/.claude.json) vs Antigravity', async () => {
     const { McpScanner } = await import('../src/services/McpScanner');
+    const maison = path.join(tempBaseDir, 'maison-mcp');
+    await fs.promises.mkdir(maison, { recursive: true });
+    redirigerDossierPersonnel(maison);
     const claudeMcpStat = await McpScanner.scanGlobal(undefined, 'claude-code');
     const agyMcpStat = await McpScanner.scanGlobal(undefined, 'antigravity');
+    retablirDossierPersonnel();
 
     assert.strictEqual(claudeMcpStat.scope, 'global');
     assert.ok(claudeMcpStat.directoryPath.includes('.claude.json'), 'Claude MCP doit inspecter .claude.json');
