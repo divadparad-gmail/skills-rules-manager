@@ -4,7 +4,7 @@ import { DashboardPanel } from './providers/DashboardPanel';
 import { CheatSheetPanel } from './providers/CheatSheetPanel';
 import { StateManager } from './services/StateManager';
 import { WorkspaceDetector } from './services/WorkspaceDetector';
-import { NasScanner } from './services/NasScanner';
+import { confirmAndAllowNasHost } from './ui/nasHostAuthorization';
 import { warmupTokenizer } from './utils/tokenizer';
 import { ANTIGRAVITY_PROFILE_SETTING } from './antigravity/behaviorProfile';
 import { createDiscoveryContainer } from './common/container';
@@ -84,14 +84,12 @@ export function activate(context: vscode.ExtensionContext): void {
     })
   );
 
-  // 6. Commande pour autoriser l'hôte NAS dans la sécurité VS Code
+  // 6. Commande pour autoriser l'hôte NAS dans la sécurité VS Code (après confirmation, même parcours que le bouton)
   context.subscriptions.push(
     vscode.commands.registerCommand('skillsRulesManager.allowNasUncHost', async () => {
-      const config = vscode.workspace.getConfiguration('skillsManager');
-      const nasPath = config.get<string>('nasPath', '');
-      await NasScanner.ensureAllowedUNCHost(nasPath);
-      await StateManager.loadFullState(true);
-      vscode.window.showInformationMessage('Hôte UNC autorisé dans les paramètres de sécurité VS Code.');
+      if (await confirmAndAllowNasHost()) {
+        await StateManager.loadFullState(true);
+      }
     })
   );
 

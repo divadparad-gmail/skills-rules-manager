@@ -979,6 +979,8 @@ describe('Suite de Tests : comptage des tokens au démarrage d\'Antigravity (lot
           if (key === 'nasPath') return nasDir;
           return def;
         },
+        // Le catalogue n'est lu que dans les réglages utilisateur (inspect().globalValue)
+        inspect: (key: string) => (key === 'nasPath' ? { key, globalValue: nasDir } : undefined),
       });
       vscodeMock.env.appName = 'Antigravity IDE';
 

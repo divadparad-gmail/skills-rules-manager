@@ -6,6 +6,7 @@ import { StateManager } from './StateManager';
 import { WorkspaceDetector } from './WorkspaceDetector';
 import { ScenarioManager } from './ScenarioManager';
 import { getProtectedResourceRefusal } from './ToggleManager';
+import { getUserNasPath } from './nasPathSetting';
 
 export class DeleteService {
   /**
@@ -36,8 +37,8 @@ export class DeleteService {
         } else if (item.syncStatus === 'local_only') {
           reason = 'Ce fichier n\'existe pas dans le Catalogue NAS. Suppression bloquée car il n\'y a aucune copie de secours.';
         } else if (item.syncStatus === 'nas_offline') {
-          const nasPath = vscode.workspace.getConfiguration('skillsManager').get<string>('nasPath', '');
-          reason = nasPath.trim()
+          const nasPath = getUserNasPath();
+          reason = nasPath
             ? 'Le Catalogue NAS est hors ligne. Impossible de vérifier l\'intégrité de la ressource.'
             : 'Aucun catalogue NAS n\'est configuré (réglage skillsManager.nasPath) : la suppression exige une copie de secours dans le catalogue.';
         }

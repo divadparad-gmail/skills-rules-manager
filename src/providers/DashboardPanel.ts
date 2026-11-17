@@ -4,7 +4,8 @@ import * as path from 'path';
 import { WebviewMessage } from '../types';
 import { StateManager } from '../services/StateManager';
 import { WorkspaceDetector } from '../services/WorkspaceDetector';
-import { NasScanner } from '../services/NasScanner';
+import { getUserNasPath } from '../services/nasPathSetting';
+import { confirmAndAllowNasHost } from '../ui/nasHostAuthorization';
 import { COMMANDE_VIDER_BANC } from '../ui/bancEssaiVsCode';
 import { CheatSheetPanel } from './CheatSheetPanel';
 
@@ -167,12 +168,10 @@ export class DashboardPanel {
           }
 
           case 'allowUncHost': {
-            const config = vscode.workspace.getConfiguration('skillsManager');
-            const targetPath = message.payload?.path || config.get<string>('nasPath', '');
-            const host = NasScanner.getUncHost(targetPath);
-            await NasScanner.ensureAllowedUNCHost(targetPath);
-            vscode.window.showInformationMessage(`Hôte UNC "${host || targetPath}" autorisé dans VS Code.`);
-            await StateManager.loadFullState(true);
+            // Le chemin envoyé par la vue est ignoré : seul le réglage utilisateur désigne l'hôte
+            if (await confirmAndAllowNasHost()) {
+              await StateManager.loadFullState(true);
+            }
             break;
           }
 
@@ -197,8 +196,8 @@ export class DashboardPanel {
 
           case 'browseNasPath': {
             const config = vscode.workspace.getConfiguration('skillsManager');
-            const currentPath = config.get<string>('nasPath', '');
-            const defaultUri = fs.existsSync(currentPath) ? vscode.Uri.file(currentPath) : undefined;
+            const currentPath = getUserNasPath();
+            const defaultUri = currentPath && fs.existsSync(currentPath) ? vscode.Uri.file(currentPath) : undefined;
             const uris = await vscode.window.showOpenDialog({
               canSelectFiles: false,
               canSelectFolders: true,
@@ -219,7 +218,7 @@ export class DashboardPanel {
 
           case 'editNasPath': {
             const config = vscode.workspace.getConfiguration('skillsManager');
-            const currentPath = config.get<string>('nasPath', '');
+            const currentPath = getUserNasPath();
             const input = await vscode.window.showInputBox({
               prompt: 'Entrez le chemin réseau (UNC) ou local du Catalogue Source (NAS / Templates)',
               value: currentPath,
