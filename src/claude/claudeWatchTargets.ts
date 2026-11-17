@@ -15,7 +15,8 @@ export type { ClaudeGitEntry };
  * - le CLAUDE.local.md du dossier de travail, observé même absent (sa création change le compte, et exclut
  *   AGENTS.md) ;
  * - les fichiers importés par la mémoire du niveau projet (projet, CLAUDE.local.md, parents, AGENTS.md),
- *   situés dans le dossier de travail, chargés ou non (cinquième saut, plus de 4 Mio).
+ *   situés dans le dossier de travail, chargés ou non (cinquième saut, plus de 4 Mio), sauf un import non
+ *   consulté.
  * Ce que les motifs communs couvrent déjà n'en est pas (CLAUDE.md, AGENTS.md, GEMINI.md et tout ce qui est
  * sous .claude/, .agents/ ou .agent/, réglages du projet compris).
  *
@@ -74,7 +75,8 @@ export function claudeWorkspaceWatchTargets(state: ManagerFullState | null | und
   const candidates = [
     path.join(cwd, 'CLAUDE.local.md'),
     ...(state.localResources ?? [])
-      .filter((item) => item.targetTool === 'claude-code' && item.scope === 'local' && item.metadata?.claudeImport)
+      .filter((item) => item.targetTool === 'claude-code' && item.scope === 'local' && item.metadata?.claudeImport
+        && !isNotConsultedCard(item))
       .map((item) => path.resolve(item.path)),
   ];
   const seen = new Set<string>();
@@ -90,6 +92,12 @@ export function claudeWorkspaceWatchTargets(state: ManagerFullState | null | und
     targets.push(file);
   }
   return targets.sort().slice(0, CLAUDE_WATCH_MAX_TARGETS);
+}
+
+/** Une carte d'import non consultée (chemin réseau, hors des dossiers admis) : jamais observée, où qu'elle soit. */
+function isNotConsultedCard(item: ResourceItem): boolean {
+  const etat = item.metadata?.claudeMemoryNotLoaded;
+  return etat !== undefined && CLAUDE_IMPORT_NOT_CONSULTED.has(etat);
 }
 
 /** Vrai si le chemin est hors du dossier de travail (autre lecteur compris). */
@@ -117,7 +125,7 @@ function autoMemoryTarget(state: ManagerFullState, cwd: string, globalPath: stri
 function isOutsideMemoryCard(item: ResourceItem): boolean {
   if (item.targetTool !== 'claude-code' || item.type !== 'soul' || item.isFolder || !item.path) return false;
   const meta = item.metadata ?? {};
-  if (meta.claudeMemoryNotLoaded && CLAUDE_IMPORT_NOT_CONSULTED.has(meta.claudeMemoryNotLoaded)) return false;
+  if (isNotConsultedCard(item)) return false;
   if (meta.claudeImport) return true; // imports du projet, d'un parent ou du CLAUDE.md global
   if (item.scope === 'local') return meta.inheritedFrom !== undefined; // fichiers de mémoire des parents
   return meta.claudeMemoryType !== 'AutoMem'; // le CLAUDE.md global (MEMORY.md a sa propre règle)

@@ -376,6 +376,15 @@
   }
 
   /**
+   * Claude Code : une carte d'import que l'extension ne consulte pas (chemin réseau, hors des dossiers admis),
+   * comme CLAUDE_IMPORT_NOT_CONSULTED dans src/claude/memoryImports.ts. Toujours faux pour Antigravity.
+   */
+  function isClaudeImportNotConsulted(item) {
+    const etat = item && item.targetTool === 'claude-code' && item.metadata && item.metadata.claudeMemoryNotLoaded;
+    return etat === 'chemin-reseau' || etat === 'hors-perimetre';
+  }
+
+  /**
    * Claude Code : bandeau des imports hors du dossier de travail (src/claude/memoryImports.ts), créé par le
    * JavaScript juste après le bandeau du banc d'essai, et retiré sans import extérieur ou sous Antigravity :
    * le document d'Antigravity reste celui des fichiers HTML. Texte posé par textContent.
@@ -389,8 +398,7 @@
     // approbation : il est compté ; le cinquième saut et plus de 4 Mio ne sont jamais chargés
     const count = items.filter((i) => i.targetTool === 'claude-code' && i.metadata && i.metadata.claudeImport
       && i.metadata.claudeImport.externe
-      && (!i.metadata.claudeMemoryNotLoaded || i.metadata.claudeMemoryNotLoaded === 'chemin-reseau'
-        || i.metadata.claudeMemoryNotLoaded === 'hors-perimetre')).length;
+      && (!i.metadata.claudeMemoryNotLoaded || isClaudeImportNotConsulted(i))).length;
     const existing = targetDoc.getElementById('claudeImportsBanner');
     if (count === 0) {
       if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
@@ -3090,19 +3098,21 @@
       rightActions.appendChild(btnCompare);
     }
 
-    // Bouton ouvrir fichier
-    const btnOpenFile = targetDoc.createElement('button');
-    btnOpenFile.className = 'btn btn-secondary btn-sm';
-    btnOpenFile.innerHTML = '📄';
-    btnOpenFile.title = 'Ouvrir le fichier dans l\'éditeur';
-    btnOpenFile.addEventListener('click', (e) => {
-      e.stopPropagation();
-      vscode.postMessage({
-        type: 'openFile',
-        payload: { path: item.path },
+    // Bouton ouvrir fichier ; aucun pour un import que l'extension ne consulte pas
+    if (!isClaudeImportNotConsulted(item)) {
+      const btnOpenFile = targetDoc.createElement('button');
+      btnOpenFile.className = 'btn btn-secondary btn-sm';
+      btnOpenFile.innerHTML = '📄';
+      btnOpenFile.title = 'Ouvrir le fichier dans l\'éditeur';
+      btnOpenFile.addEventListener('click', (e) => {
+        e.stopPropagation();
+        vscode.postMessage({
+          type: 'openFile',
+          payload: { path: item.path },
+        });
       });
-    });
-    rightActions.appendChild(btnOpenFile);
+      rightActions.appendChild(btnOpenFile);
+    }
 
     footer.appendChild(rightActions);
     card.appendChild(footer);

@@ -1198,6 +1198,12 @@ describe('Imports de la mémoire de Claude Code : imports hors des dossiers admi
     // Aucune des deux n'a d'observateur
     const cibles = claudeWatchTargets(etat as unknown as ManagerFullState, { globalPath: CLAUDE_GLOBAL, gitEntry: () => null });
     assert.deepStrictEqual(cibles.filter((c) => c.includes('f.md') || c.includes('??')), [], 'aucun observateur pour une carte non consultée');
+
+    // Aucune des deux n'a de bouton pour ouvrir le fichier ; la carte du cinquième saut garde le sien
+    const boutonOuvrir = (el: MockEl) => el.tagName === 'BUTTON' && el.innerHTML === '📄';
+    assert.deepStrictEqual([hors, reseauNt].map((c) => rendu(c).filter(boutonOuvrir).length), [0, 0],
+      'aucun bouton 📄 sur une carte non consultée');
+    assert.strictEqual(rendu(cartes[2]).filter(boutonOuvrir).length, 1, 'une carte consultée garde son bouton 📄');
   });
 
   test('32. Le scan d\'un CLAUDE.md du projet qui importe un autre lecteur et un chemin à préfixe NT : aucun accès, deux cartes à 0, aucun observateur', {
@@ -1285,5 +1291,64 @@ describe('Imports de la mémoire de Claude Code : imports hors des dossiers admi
     const entrees = expandClaudeImports([{ path: parent, text: lignes(String.raw`@\r.md`), projectLevel: true }],
       { cwd: d, home: MOI, seen: new Set([parent.toLowerCase()]), pathApi: w }, p);
     assert.deepStrictEqual(entrees.map((e: any) => [e.path, e.etat, e.externe]), [[String.raw`D:\r.md`, 'charge', true]]);
+  });
+
+  test('35. Une carte non consultée ne forme aucune paire de doublon avec une carte du global : son chemin n\'est jamais touché', async () => {
+    const importeur = path.join(PROJET, 'CLAUDE.md');
+    const base = { importer: importeur, niveau: 1, externe: true, size: 0, raw: null, text: null };
+    const nonLus = [String.raw`Z:\f.md`, String.raw`Z:\g.md`, String.raw`\??\UNC\hote\t.md`];
+    const locales = buildClaudeImportItems([
+      { ...base, path: nonLus[0], key: nonLus[0].toLowerCase(), etat: 'hors-perimetre' },
+      { ...base, path: nonLus[1], key: nonLus[1].toLowerCase(), etat: 'hors-perimetre' },
+      { ...base, path: nonLus[2], key: nonLus[2].toLowerCase(), etat: 'chemin-reseau' },
+    ] as any[], { scope: 'local', claudeMemoryType: 'Project', labelBase: { cwd: PROJET }, cwdKey: PROJET.toLowerCase() });
+    // Témoin : une carte ordinaire du projet, au même identifiant qu'une carte du global, forme toujours sa paire
+    const ordinaire = { ...locales[0], id: 'commun.md', name: 'commun.md', path: path.join(PROJET, 'commun.md'), tokenCount: 7, metadata: { isSoul: true } };
+    // Les cartes du global : mêmes identifiants (« Z:/g » rejoint « Z:/g.md », la clé de paire ôtant « .md »)
+    const globale = (id: string, chemin: string): ResourceItem => ({
+      id, name: id, type: 'soul', scope: 'global', enabled: true, path: chemin, targetTool: 'claude-code', isFolder: false,
+      charCount: 40, tokenCount: 12, lineCount: 1,
+      metadata: { isSoul: true, locked: true, claudeMemoryType: 'User', claudeImport: { par: '~/.claude/CLAUDE.md', niveau: 1, externe: false } },
+    } as ResourceItem);
+    const globales = [
+      globale('Z:/f.md', String.raw`Z:\f.md`), globale('Z:/g', String.raw`Z:\g`), globale('/??/UNC/hote/t.md', String.raw`\??\UNC\hote\t.md`),
+      globale('commun.md', path.join(CLAUDE_GLOBAL, 'commun.md')),
+    ];
+
+    const { resultat, horsDossier } = await sousEspion([DOSSIER], async () =>
+      DuplicateService.detectDuplicates(globales, [...locales, ordinaire as ResourceItem]));
+    const surNonLu = (a: string) => nonLus.some((n) => a.slice(a.indexOf(' ') + 1).toLowerCase() === n.toLowerCase());
+    assert.deepStrictEqual(horsDossier.filter(surNonLu), [], 'ni existsSync, ni statSync, ni readFileSync sur un chemin non lu');
+    assert.deepStrictEqual(horsDossier.filter((a) => /^Z:|\?\?/i.test(a.slice(a.indexOf(' ') + 1))), [], 'ni sur le chemin global de même identifiant');
+
+    const [hf, hg, rt] = resultat.enrichedLocal;
+    assert.deepStrictEqual([hf, hg, rt].map((c) => meta(c).duplicateInfo), [undefined, undefined, undefined], 'aucune paire pour une carte non consultée');
+    assert.deepStrictEqual(resultat.enrichedGlobal.slice(0, 3).map((c) => meta(c).duplicateInfo), [undefined, undefined, undefined]);
+    assert.deepStrictEqual(resultat.stats, { totalDuplicates: 1, activeDuplicates: 1, totalWastedTokens: 12 }, 'seule la paire ordinaire compte');
+    assert.strictEqual(meta(resultat.enrichedLocal[3]).duplicateInfo?.hasDuplicate, true, 'la paire ordinaire est toujours formée');
+
+    const libelles = (c: ResourceItem) => rendu(c).map((el) => el.innerHTML + ' ' + el.textContent).join(' | ');
+    for (const c of [hf, hg, rt]) {
+      assert.ok(!libelles(c).includes('Comparer'), `pas de bouton « Comparer » sur ${c.id}`);
+      assert.ok(!/Doublon|Surchargé/.test(libelles(c)), `pas de badge de doublon sur ${c.id}`);
+    }
+  });
+
+  test('36. L\'observateur de l\'espace ne vise jamais une carte non consultée, même sous le chemin écrit de l\'espace', () => {
+    // Un état construit : des cartes non consultées sous le chemin écrit de l'espace (fonction pure, aucun accès)
+    const ecrit = process.platform === 'win32' ? String.raw`\\serveur\equipe\projet` : '/srv/equipe/projet';
+    const carte = (nom: string, etat?: string): ResourceItem => ({
+      id: nom, name: nom, type: 'soul', scope: 'local', enabled: true, path: path.join(ecrit, nom), targetTool: 'claude-code', isFolder: false,
+      charCount: 0, tokenCount: 0, lineCount: 0,
+      metadata: { isSoul: true, locked: true, claudeImport: { par: 'CLAUDE.md', niveau: 1, externe: true }, ...(etat ? { claudeMemoryNotLoaded: etat } : {}) },
+    } as ResourceItem);
+    const etat = {
+      workspace: { tool: 'claude-code', workspacePath: ecrit },
+      localResources: [carte('reseau.md', 'chemin-reseau'), carte('hors.md', 'hors-perimetre'), carte('ordinaire.md')],
+      globalResources: [], nasResources: [], stats: {},
+    } as unknown as ManagerFullState;
+    const cibles = claudeWatchTargets(etat, { globalPath: CLAUDE_GLOBAL, gitEntry: () => null });
+    assert.deepStrictEqual(cibles.filter((c) => /reseau\.md|hors\.md/.test(c)), [], 'aucune cible pour une carte non consultée');
+    assert.ok(cibles.includes(path.join(ecrit, 'ordinaire.md')), 'une carte ordinaire reste observée');
   });
 });

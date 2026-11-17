@@ -3,6 +3,13 @@ import * as path from 'path';
 import { DuplicateInfo, DuplicateStats, ResourceItem } from '../types';
 import { areContentsIdentical } from './IntegrityService';
 import { appliesInAntigravity } from './antigravityRuleItem';
+import { CLAUDE_IMPORT_NOT_CONSULTED } from '../claude/memoryImports';
+
+/** Claude Code : une carte d'import que l'extension ne consulte pas (chemin réseau, hors des dossiers admis). */
+function isClaudeImportNotConsulted(item: ResourceItem): boolean {
+  const etat = item.targetTool === 'claude-code' ? item.metadata?.claudeMemoryNotLoaded : undefined;
+  return etat !== undefined && CLAUDE_IMPORT_NOT_CONSULTED.has(etat);
+}
 
 export class DuplicateService {
   /**
@@ -55,6 +62,8 @@ export class DuplicateService {
         const isClaudeSkillPair = lItem.targetTool === 'claude-code' && gItem.targetTool === 'claude-code'
           && lItem.type === 'skill' && gItem.type === 'skill';
         if (isClaudeSkillPair) continue;
+        // Claude Code : un import non consulté ne forme aucune paire ; la comparer ferait lire son fichier
+        if (isClaudeImportNotConsulted(lItem) || isClaudeImportNotConsulted(gItem)) continue;
 
         const isAntigravityPair = lItem.targetTool === 'antigravity' && gItem.targetTool === 'antigravity';
         const isIdentical = this.checkIfIdentical(lItem, gItem);
