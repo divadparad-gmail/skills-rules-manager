@@ -146,17 +146,17 @@ code --install-extension skills-rules-manager-<version>.vsix
 
 | Paramètre | Type | Valeur par défaut | Description |
 | :--- | :--- | :--- | :--- |
-| `skillsManager.nasPath` | `string` | `""` | Chemin UNC ou local du catalogue maître NAS, par exemple `\\serveur\partage\catalogue`. Laisser vide sans catalogue |
-| `skillsManager.globalPath` | `string` | `""` (auto-détecté `~/.gemini/config`) | Dossier de configuration global d'Antigravity, `~/.gemini/config` par défaut. L'extension y lit `skills/`, `skills.json`, `rules/`, `plugins/`, `mcp_config.json`, `hooks.json` et, avec le profil Antigravity IDE 2.6.0, `global_workflows/`. Son dossier parent (`~/.gemini`) porte les âmes globales et sert à détecter le profil |
+| `skillsManager.nasPath` | `string` | `""` | Chemin UNC ou local du catalogue maître NAS, par exemple `\\serveur\partage\catalogue`. Laisser vide sans catalogue. Portée `machine` : à régler dans les paramètres utilisateur ; une valeur d'espace de travail est ignorée |
+| `skillsManager.globalPath` | `string` | `""` (auto-détecté `~/.gemini/config`) | Dossier de configuration global d'Antigravity, `~/.gemini/config` par défaut. L'extension y lit `skills/`, `skills.json`, `rules/`, `plugins/`, `mcp_config.json`, `hooks.json` et, avec le profil Antigravity IDE 2.6.0, `global_workflows/`. Son dossier parent (`~/.gemini`) porte les âmes globales et sert à détecter le profil. Portée `machine` : à régler dans les paramètres utilisateur ; une valeur d'espace de travail est ignorée |
 | `skillsManager.antigravityProfile` | `enum` | `"auto"` | Profil de comportement d'Antigravity : ce que l'agent charge réellement et ce que coûte chaque fichier. `auto` le déduit de la structure de `~/.gemini`, qui indique une génération et non une version exacte, avec un repli sur Antigravity IDE 2.6.0 ; `2.5.5` et `2.6.0` le forcent. Portée `machine` : à régler dans les réglages utilisateur, et non dans ceux d'un dépôt |
-| `skillsManager.claudeGlobalPath` | `string` | `""` (auto-détecté `~/.claude`) | Dossier de configuration global de Claude Code, `~/.claude` par défaut |
+| `skillsManager.claudeGlobalPath` | `string` | `""` (auto-détecté `~/.claude`) | Dossier de configuration global de Claude Code, `~/.claude` par défaut. Portée `machine` : à régler dans les paramètres utilisateur ; une valeur d'espace de travail est ignorée |
 | `skillsManager.defaultProjectTool` | `enum` | `"auto-detect"` | Outil cible local (`auto-detect`, `antigravity`, `claude-code`) |
 | `skillsManager.debugTiming` | `boolean` | `false` | Mesure et journal de performance des scans et de la tokenisation |
-| `antigravity.discovery.enabled` | `boolean` | `false` | **Expérimental.** Active la vue « Découverte & Intégration » ; les réglages `antigravity.*` suivants ne servent qu'à elle |
+| `antigravity.discovery.enabled` | `boolean` | `false` | **Expérimental.** Active la vue « Découverte & Intégration » ; les réglages `antigravity.*` suivants ne servent qu'à elle. Portée `machine` : à régler dans les paramètres utilisateur ; une valeur d'espace de travail est ignorée |
 | `antigravity.skills.searchUrls` | `array` | `[]` | Registres interrogés lors de la recherche fédérée (identifiant, nom, URL, priorité, authentification, délai, catégories servies). C'est la seule source de la recherche : aucun registre par défaut n'est interrogé |
 | `antigravity.skills.requestTimeoutMs` | `number` | `5000` | Délai d'attente de repli des requêtes de registres (1 000 à 30 000 ms) |
 | `antigravity.skills.maxParallelRegistryQueries` | `number` | `5` | Nombre maximal de registres interrogés simultanément |
-| `antigravity.skills.nasDirectoryPath` | `string` | `""` | Répertoire NAS d'intégration : chemins UNC, lecteurs mappés, montages POSIX et variables `${env:NOM}` |
+| `antigravity.skills.nasDirectoryPath` | `string` | `""` | Répertoire NAS d'intégration : chemins UNC, lecteurs mappés, montages POSIX et variables `${env:NOM}`. Portée `machine` : à régler dans les paramètres utilisateur ; une valeur d'espace de travail est ignorée |
 | `antigravity.skills.conflictPolicy` | `enum` | `"prompt"` | Conduite à tenir si la ressource existe déjà (`prompt`, `overwrite`, `increment`) |
 | `antigravity.search.recentSearchesLimit` | `number` | `10` | Nombre de recherches conservées dans l'historique (jusqu'à 50) |
 | `antigravity.environment.hostOverride` | `enum` | `"auto"` | Force l'hôte (`auto`, `antigravity-native`, `vscode-standalone`) |
@@ -182,7 +182,7 @@ Un dépôt cloné peut déclarer ses propres registres dans son `.vscode/setting
 - **Pas d'usurpation.** Les identifiants en double sont écartés, et un registre de dépôt ne peut pas reprendre l'identifiant d'un de vos registres.
 - **Internet public uniquement.** Un registre de dépôt ne peut viser ni votre poste (`localhost`, `127.0.0.0/8`, `0.0.0.0`, `::1`), ni votre réseau local ou d'entreprise (`10/8`, `172.16/12`, `192.168/16`, `169.254/16`, `100.64/10`, `fc00::/7`, `fe80::/10`). Les formes détournées (`http://2130706433`, `[::ffff:127.0.0.1]`…) sont reconnues. Un nom de domaine qui *pointe* vers une adresse interne est arrêté au moment de la connexion, sur l'adresse réellement résolue. Vos propres registres, déclarés dans vos réglages utilisateur, peuvent viser une adresse interne (NAS, registre d'entreprise), et la tolérance HTTP de `localhost` leur reste réservée.
 - **Signalement visuel.** La vue Découverte affiche un badge « défini par ce dépôt » sur ces registres.
-- **Mode restreint.** Dans un espace de travail non approuvé, VS Code ignore les valeurs de dépôt de `antigravity.skills.searchUrls` et `antigravity.skills.nasDirectoryPath`.
+- **Mode restreint.** Dans un espace de travail non approuvé, VS Code ignore les valeurs de dépôt de `antigravity.skills.searchUrls`. Le répertoire `antigravity.skills.nasDirectoryPath` n'est lu que dans vos paramètres utilisateur, que l'espace soit approuvé ou non.
 
 ### Installation d'un manifeste distant
 
