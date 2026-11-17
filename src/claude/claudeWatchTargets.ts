@@ -1,6 +1,7 @@
 import * as path from 'path';
 import type { ManagerFullState, ResourceItem } from '../types';
 import { claudeAutoMemoryLocation, ClaudeGitEntry } from '../services/claudeAutoMemory';
+import { CLAUDE_IMPORT_NOT_CONSULTED } from './memoryImports';
 
 export type { ClaudeGitEntry };
 
@@ -22,7 +23,7 @@ export type { ClaudeGitEntry };
  * - les fichiers de mémoire des dossiers parents (CLAUDE.md, .claude/CLAUDE.md, CLAUDE.local.md, AGENTS.md,
  *   .claude/AGENTS.md), seulement s'ils existent (une carte), AGENTS.md ignoré compris ;
  * - les fichiers importés situés hors de l'espace, d'un parent ou du projet, chargés ou non, s'ils existent,
- *   sauf un import vers un chemin réseau (carte « chemin-reseau », jamais consultée) ;
+ *   sauf un import non consulté (cartes « chemin-reseau » et « hors-perimetre ») ;
  * - le CLAUDE.md global et ses imports, s'ils existent ;
  * - MEMORY.md, à l'emplacement calculé comme la mémoire automatique (racine Git trouvée en remontant, sinon
  *   le dossier de travail), même absent ; aucune cible quand l'emplacement n'est pas déterminé ou que la
@@ -111,12 +112,12 @@ function autoMemoryTarget(state: ManagerFullState, cwd: string, globalPath: stri
 
 /**
  * Une carte de fichier de mémoire de Claude Code qui vise un fichier existant hors de l'espace (famille 1 à 3).
- * Un import vers un chemin réseau n'en est pas : l'observer consulterait l'hôte nommé par le dépôt.
+ * Un import non consulté (chemin réseau, hors des dossiers admis) n'en est pas : il n'est jamais observé.
  */
 function isOutsideMemoryCard(item: ResourceItem): boolean {
   if (item.targetTool !== 'claude-code' || item.type !== 'soul' || item.isFolder || !item.path) return false;
   const meta = item.metadata ?? {};
-  if (meta.claudeMemoryNotLoaded === 'chemin-reseau') return false;
+  if (meta.claudeMemoryNotLoaded && CLAUDE_IMPORT_NOT_CONSULTED.has(meta.claudeMemoryNotLoaded)) return false;
   if (meta.claudeImport) return true; // imports du projet, d'un parent ou du CLAUDE.md global
   if (item.scope === 'local') return meta.inheritedFrom !== undefined; // fichiers de mémoire des parents
   return meta.claudeMemoryType !== 'AutoMem'; // le CLAUDE.md global (MEMORY.md a sa propre règle)

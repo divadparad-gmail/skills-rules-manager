@@ -5,6 +5,7 @@ import { countTokensForFile } from '../utils/tokenizer';
 import { claudeInjectedText, CLAUDE_INJECTED_TEXT_VARIANT } from '../claude/injectedText';
 import { claudeResolvedPathKey } from '../claude/memorySources';
 import {
+  CLAUDE_IMPORT_NOT_CONSULTED,
   CLAUDE_MEMORY_MAX_BYTES,
   ClaudeImportEntry,
   ClaudeImportPort,
@@ -52,7 +53,11 @@ export function claudeMemoryRootText(file: string, port: ClaudeImportPort): stri
   return raw === null ? null : claudeInjectedText(raw);
 }
 
-/** Les cartes des fichiers importés, une par entrée, dans l'ordre du développement. Toutes en lecture seule. */
+/**
+ * Les cartes des fichiers importés, une par entrée, dans l'ordre du développement. Toutes en lecture seule.
+ * Une carte non consultée (chemin réseau, hors des dossiers admis) a pour libellé son chemin résolu absolu, en
+ * barres obliques.
+ */
 export function buildClaudeImportItems(
   entries: ClaudeImportEntry[],
   options: {
@@ -65,7 +70,9 @@ export function buildClaudeImportItems(
   }
 ): ResourceItem[] {
   return entries.map((entry): ResourceItem => {
-    const label = claudeImportLabel(entry.path, options.labelBase);
+    const label = CLAUDE_IMPORT_NOT_CONSULTED.has(entry.etat)
+      ? entry.path.replace(/\\/g, '/')
+      : claudeImportLabel(entry.path, options.labelBase);
     const id = 'cwd' in options.labelBase ? claudeImportCardId(label) : label;
     const par = claudeImportLabel(entry.importer, options.labelBase);
     const loaded = entry.etat === 'charge' && entry.raw !== null && entry.text !== null;

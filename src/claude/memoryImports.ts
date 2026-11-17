@@ -33,7 +33,14 @@ import { CLAUDE_CODE_FENCE, claudeInjectedText } from './injectedText';
  *   compris), ou par le préfixe « \??\ », n'est ni consulté ni lu : son accès ouvrirait une connexion vers
  *   l'hôte nommé par le dépôt, que Claude Code ne fait qu'après approbation. Il a une entrée « chemin-reseau »
  *   à 0, sans développement. Les imports du CLAUDE.md global, et ceux d'un espace ouvert sur un partage,
- *   restent lus.
+ *   restent lus ;
+ * - un import extérieur d'un fichier du niveau projet n'est consulté que s'il est dans le dossier de travail,
+ *   sous le dossier personnel, ou dans un dossier admis : sous Windows, sur le même lecteur que le dossier de
+ *   travail ; ailleurs, sous un dossier parent du dossier de travail autre que « / ». Sinon, il a une entrée
+ *   « hors-perimetre » à 0, sans aucun accès ni développement. La règle vaut à chaque saut, avec la même
+ *   référence ; les imports du CLAUDE.md global ne sont pas concernés ;
+ * - sous Windows, un chemin enraciné sans lettre de lecteur (« \x.md », « /x.md ») se résout sur la lettre du
+ *   fichier qui importe, comme le ferait Claude Code lancé dans le dossier de travail.
  *
  * Ce module est pur : il ne lit aucun fichier. Le développement passe par un port (taille, texte, clé de
  * chemin résolu) que le scanner fournit, et que les tests remplacent.
@@ -46,7 +53,7 @@ export const CLAUDE_IMPORT_MAX_HOPS = 4;
 export const CLAUDE_MEMORY_MAX_BYTES = 4 * 1024 * 1024;
 
 /** Les fonctions de chemin utilisées (path, path.posix ou path.win32), pour tester les deux plateformes. */
-export type ClaudePathApi = Pick<typeof path, 'join' | 'resolve' | 'normalize' | 'isAbsolute' | 'relative' | 'dirname' | 'sep'>;
+export type ClaudePathApi = Pick<typeof path, 'join' | 'resolve' | 'normalize' | 'isAbsolute' | 'relative' | 'dirname' | 'sep' | 'parse'>;
 
 /** Remplace les segments de code d'une ligne (`…`, ``…``) par des espaces ; un accent grave sans fermeture reste. */
 function blankCodeSpans(line: string): string {
@@ -120,13 +127,19 @@ export function parseClaudeImports(text: string): string[] {
 
 /**
  * Le chemin absolu d'un import : « ~/ » sous le dossier personnel, un chemin absolu tel quel, un chemin
- * relatif depuis le dossier du fichier qui importe. `null` pour une forme non prise en charge (« ~user »).
+ * relatif depuis le dossier du fichier qui importe. Sous Windows, un chemin enraciné sans lettre de lecteur
+ * prend celle du fichier qui importe. `null` pour une forme non prise en charge (« ~user »).
  */
 export function resolveClaudeImport(raw: string, importerDir: string, home: string, pathApi: ClaudePathApi = path): string | null {
   if (raw === '') return null;
   if (raw.startsWith('~/') || (pathApi.sep === '\\' && raw.startsWith('~\\'))) return pathApi.join(home, raw.slice(2));
   if (raw.startsWith('~')) return null;
-  if (pathApi.isAbsolute(raw)) return pathApi.normalize(raw);
+  if (pathApi.isAbsolute(raw)) {
+    const normalized = pathApi.normalize(raw);
+    // « \x.md » : une seule barre en tête, sans lettre ; « \\… » et « \??\… » gardent leur forme
+    if (pathApi.sep === '\\' && /^\\(?!\\|\?\?\\)/.test(normalized)) return pathApi.resolve(importerDir, normalized);
+    return normalized;
+  }
   return pathApi.resolve(importerDir, raw);
 }
 
@@ -152,6 +165,34 @@ export function isClaudePathInside(target: string, dir: string, pathApi: ClaudeP
 export function isClaudeImportExternal(resolvedKey: string, cwdKey: string, projectLevel: boolean, pathApi: ClaudePathApi = path): boolean {
   return projectLevel && !isClaudePathInside(resolvedKey, cwdKey, pathApi);
 }
+
+/**
+ * Vrai si un import d'un fichier du niveau projet peut être consulté, d'après son seul chemin résolu, sans
+ * aucun accès : dans le dossier de travail (chemin écrit ou clé), sous le dossier personnel, ou dans un
+ * dossier admis. Sous Windows, un dossier admis est sur le même lecteur (ou le même partage) que le chemin
+ * écrit du dossier de travail ; ailleurs, sous un dossier parent du dossier de travail autre que la racine.
+ */
+export function isClaudeImportAdmitted(
+  file: string,
+  context: { cwd: string; cwdKey: string; home: string },
+  pathApi: ClaudePathApi = path
+): boolean {
+  if (isClaudePathInside(file, context.cwd, pathApi) || isClaudePathInside(file, context.cwdKey, pathApi)) return true;
+  if (isClaudePathInside(file, context.home, pathApi)) return true;
+  if (pathApi.sep === '\\') {
+    const root = (p: string) => pathApi.parse(p).root.toLowerCase();
+    const fileRoot = root(file);
+    return /^[a-z]:\\$|^\\\\[^\\]+\\[^\\]+\\$/.test(fileRoot) && fileRoot === root(context.cwd);
+  }
+  const cwd = pathApi.resolve(context.cwd);
+  for (let dir = pathApi.dirname(cwd); dir !== pathApi.dirname(dir); dir = pathApi.dirname(dir)) {
+    if (isClaudePathInside(file, dir, pathApi)) return true;
+  }
+  return false;
+}
+
+/** Les états d'un import qui n'est pas consulté : ni stat, ni lecture, ni observateur. */
+export const CLAUDE_IMPORT_NOT_CONSULTED: ReadonlySet<string> = new Set<ClaudeImportState>(['chemin-reseau', 'hors-perimetre']);
 
 /**
  * Le libellé d'un fichier de mémoire ou d'un import, qui sert aussi d'identifiant de sa carte : relatif au
@@ -192,10 +233,10 @@ export interface ClaudeImportRoot {
 }
 
 /**
- * L'état d'un fichier importé : chargé, cinquième saut (non chargé), plus de 4 Mio (ignoré, non lu), ou
- * chemin réseau extérieur (non consulté, non lu).
+ * L'état d'un fichier importé : chargé, cinquième saut (non chargé), plus de 4 Mio (ignoré, non lu), chemin
+ * réseau extérieur, ou hors des dossiers admis (ces deux derniers : non consultés, non lus).
  */
-export type ClaudeImportState = 'charge' | 'niveau-5' | 'plus-de-4-mio' | 'chemin-reseau';
+export type ClaudeImportState = 'charge' | 'niveau-5' | 'plus-de-4-mio' | 'chemin-reseau' | 'hors-perimetre';
 
 export interface ClaudeImportEntry {
   path: string;
@@ -219,7 +260,8 @@ export interface ClaudeImportEntry {
  * contient les clés déjà comptées (fichiers de mémoire et imports précédents) ; il reçoit celles des
  * fichiers chargés ou ignorés pour leur taille. Un fichier absent, déjà vu ou illisible n'a pas d'entrée.
  * Le fichier du cinquième saut a une entrée « niveau-5 », sans être lu. Un import extérieur vers un chemin
- * réseau a une entrée « chemin-reseau », sans qu'aucune fonction du port ne soit appelée sur son chemin.
+ * réseau a une entrée « chemin-reseau », et un import du niveau projet hors des dossiers admis une entrée
+ * « hors-perimetre », sans qu'aucune fonction du port ne soit appelée sur leur chemin.
  */
 export function expandClaudeImports(
   roots: ClaudeImportRoot[],
@@ -248,6 +290,17 @@ export function expandClaudeImports(
           });
           continue;
         }
+      }
+      // Hors des dossiers admis : décidé sur le chemin résolu, avant tout appel du port
+      if (projectLevel && !isClaudeImportAdmitted(file, { cwd: context.cwd, cwdKey, home: context.home }, pathApi)) {
+        const outsideKey = pathApi.sep === '\\' ? file.toLowerCase() : file;
+        if (context.seen.has(outsideKey)) continue;
+        context.seen.add(outsideKey);
+        entries.push({
+          path: file, key: outsideKey, importer, niveau: depth + 1, externe: true,
+          etat: 'hors-perimetre', size: 0, raw: null, text: null,
+        });
+        continue;
       }
       const size = port.fileSize(file);
       if (size === null) continue;

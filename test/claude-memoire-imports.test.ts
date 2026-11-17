@@ -676,7 +676,7 @@ describe('Imports de la mémoire de Claude Code : cartes, jauge et lecture seule
     assert.strictEqual(local.soulStat.tokenCount, somme(cartes.slice(0, 5)));
   });
 
-  test('17. Le rendu : cadenas qui nomme le fichier qui importe et le niveau ; seuls les trois états qui changent le compte ont un badge', async () => {
+  test('17. Le rendu : cadenas qui nomme le fichier qui importe et le niveau ; aucun badge pour un import ordinaire, un badge pour l\'import extérieur et le cinquième saut', async () => {
     arborescence({
       'racine/projet/CLAUDE.md': '# Projet\n\n@commun.md\n@../ext.md\n@import-1.md\n',
       'racine/projet/commun.md': TEXTE_COMMUN,
@@ -1019,5 +1019,271 @@ describe('Imports de la mémoire de Claude Code : chemins réseau', () => {
     } finally {
       if (fs.existsSync(DOSSIER)) viderSaufTemoin();
     }
+  });
+});
+
+// ====================================================================================================
+// 4. Les imports hors des dossiers admis : ni stat ni lecture, carte « non lu » à 0
+// ====================================================================================================
+//
+// Un import extérieur d'un fichier de mémoire du projet ou d'un dossier parent n'est consulté que s'il est
+// dans le dossier de travail, sous le dossier personnel, ou dans un dossier admis : sous Windows, sur le même
+// lecteur que le dossier de travail ; ailleurs, sous un dossier parent du dossier de travail autre que « / ».
+// Sinon, il a une entrée « hors-perimetre » à 0, sans aucun accès ni développement. Un chemin enraciné sans
+// lettre de lecteur se résout sur la lettre du fichier qui importe. Les imports du CLAUDE.md global ne sont pas
+// concernés.
+
+describe('Imports de la mémoire de Claude Code : imports hors des dossiers admis', () => {
+  /** Un port qui note chaque appel, avec son chemin ; aucun accès au disque ni au réseau. */
+  const portEspion = (fichiers: Record<string, string>) => {
+    const appels: string[] = [];
+    return {
+      appels,
+      port: {
+        fileSize: (p: string) => { appels.push(`fileSize ${p}`); return p in fichiers ? Buffer.byteLength(fichiers[p]) : null; },
+        readText: (p: string) => { appels.push(`readText ${p}`); return p in fichiers ? fichiers[p] : null; },
+        key: (p: string) => { appels.push(`key ${p}`); return p.toLowerCase(); },
+      },
+    };
+  };
+  const chemins = (appels: string[]) => appels.map((a) => a.slice(a.indexOf(' ') + 1));
+  const w = path.win32;
+  const MOI = String.raw`C:\Users\moi`;
+  const ESPACE = String.raw`C:\espace\projet`;
+  const lignes = (...liste: string[]) => [...liste, ''].join('\n');
+  const resume = (entrees: any[]) => entrees.map((e) => [e.path, e.etat, e.externe, e.niveau, e.size]);
+
+  test('27. Sous Windows, un import extérieur vers un autre lecteur, hors du dossier personnel, n\'est ni consulté ni lu : entrée « hors-perimetre » à 0', () => {
+    const { expandClaudeImports } = imports();
+    const projet = w.join(ESPACE, 'CLAUDE.md');
+    const { port: p, appels } = portEspion({
+      [String.raw`C:\Users\moi\i.md`]: 'Personnel.\n',
+      [String.raw`C:\espace\p.md`]: 'Parent.\n',
+      [String.raw`C:\l.md`]: 'Racine du lecteur.\n',
+      [String.raw`c:\ESPACE\Projet\interne.md`]: 'Interne.\n',
+      [String.raw`C:\espace\projet\commun.md`]: 'Commun.\n',
+    });
+    const entrees = expandClaudeImports([{
+      path: projet, projectLevel: true,
+      text: lignes(String.raw`@Z:\f.md`, '@Z:/g.md', '@z:h.md', '@Z:', '@~/i.md', '@../p.md', '@../../l.md', String.raw`@c:\ESPACE\Projet\interne.md`, '@commun.md'),
+    }], { cwd: ESPACE, home: MOI, seen: new Set([projet.toLowerCase()]), pathApi: w }, p);
+
+    assert.deepStrictEqual(chemins(appels).filter((c) => estFormeInterditeWin32(c, 'c')), [], 'aucune fonction du port n\'est appelée sur un autre lecteur');
+    assert.deepStrictEqual(resume(entrees), [
+      [String.raw`Z:\f.md`, 'hors-perimetre', true, 1, 0],
+      [String.raw`Z:\g.md`, 'hors-perimetre', true, 1, 0],
+      [String.raw`z:\h.md`, 'hors-perimetre', true, 1, 0],
+      ['Z:\\', 'hors-perimetre', true, 1, 0],
+      [String.raw`C:\Users\moi\i.md`, 'charge', true, 1, Buffer.byteLength('Personnel.\n')],
+      [String.raw`C:\espace\p.md`, 'charge', true, 1, Buffer.byteLength('Parent.\n')],
+      [String.raw`C:\l.md`, 'charge', true, 1, Buffer.byteLength('Racine du lecteur.\n')],
+      [String.raw`c:\ESPACE\Projet\interne.md`, 'charge', false, 1, Buffer.byteLength('Interne.\n')],
+      [String.raw`C:\espace\projet\commun.md`, 'charge', false, 1, Buffer.byteLength('Commun.\n')],
+    ], 'le dossier personnel, un parent et la racine du même lecteur restent lus, sans tenir compte de la casse');
+    assert.ok(entrees.filter((e: any) => e.etat === 'hors-perimetre').every((e: any) => e.raw === null && e.text === null), 'rien n\'est lu');
+  });
+
+  test('28. La règle vaut à chaque saut : un fichier lu sous le dossier personnel n\'en fait consulter aucun autre hors des dossiers admis', () => {
+    const { expandClaudeImports } = imports();
+    const projet = w.join(ESPACE, 'CLAUDE.md');
+    const admis = String.raw`C:\Users\moi\admis.md`;
+    const { port: p, appels } = portEspion({
+      [admis]: lignes(String.raw`@Z:\f3.md`, String.raw`@\??\UNC\hote\t3.md`, '@../../../racine.md'),
+      [String.raw`C:\racine.md`]: 'Racine.\n',
+    });
+    const entrees = expandClaudeImports([{ path: projet, text: lignes('@~/admis.md'), projectLevel: true }],
+      { cwd: ESPACE, home: MOI, seen: new Set([projet.toLowerCase()]), pathApi: w }, p);
+    assert.deepStrictEqual(chemins(appels).filter((c) => estFormeInterditeWin32(c, 'c')), []);
+    assert.deepStrictEqual(entrees.map((e: any) => [e.path, e.niveau, e.etat, e.externe]), [
+      [admis, 1, 'charge', true],
+      [String.raw`Z:\f3.md`, 2, 'hors-perimetre', true],
+      [String.raw`\??\UNC\hote\t3.md`, 2, 'chemin-reseau', true],
+      [String.raw`C:\racine.md`, 2, 'charge', true],
+    ]);
+  });
+
+  test('29. Un espace sur un autre lecteur ou sur un partage : le dossier personnel reste lu ; un autre lecteur ne l\'est pas', () => {
+    const { expandClaudeImports } = imports();
+    // Espace sur D:, dossier personnel sur C:
+    const cwdD = String.raw`D:\espace\projet`;
+    const projetD = w.join(cwdD, 'CLAUDE.md');
+    const espionD = portEspion({
+      [String.raw`C:\Users\moi\i.md`]: 'Personnel.\n',
+      [String.raw`D:\l.md`]: 'Racine de D.\n',
+    });
+    const entreesD = expandClaudeImports([{
+      path: projetD, projectLevel: true,
+      text: lignes('@~/i.md', String.raw`@C:\autre\y.md`, '@../../l.md', String.raw`@Z:\f.md`, String.raw`@C:\espace\projet\interne.md`),
+    }], { cwd: cwdD, home: MOI, seen: new Set([projetD.toLowerCase()]), pathApi: w }, espionD.port);
+    assert.deepStrictEqual(chemins(espionD.appels).filter((c) => estFormeInterditeWin32(c, 'd') && !c.toLowerCase().startsWith(MOI.toLowerCase())), [],
+      'seuls D: et le dossier personnel sont consultés');
+    assert.deepStrictEqual(entreesD.map((e: any) => [e.path, e.etat]), [
+      [String.raw`C:\Users\moi\i.md`, 'charge'],
+      [String.raw`C:\autre\y.md`, 'hors-perimetre'],
+      [String.raw`D:\l.md`, 'charge'],
+      [String.raw`Z:\f.md`, 'hors-perimetre'],
+      [String.raw`C:\espace\projet\interne.md`, 'hors-perimetre'],
+    ]);
+
+    // Espace sur un partage : ses imports internes restent lus, le dossier personnel aussi ; un lecteur, non
+    const cwdP = String.raw`\\serveur\equipe\projet`;
+    const projetP = w.join(cwdP, 'CLAUDE.md');
+    const espionP = portEspion({
+      [String.raw`\\serveur\equipe\projet\notes.md`]: 'Notes.\n',
+      [String.raw`C:\Users\moi\i.md`]: 'Personnel.\n',
+    });
+    const entreesP = expandClaudeImports([{
+      path: projetP, projectLevel: true, text: lignes('@notes.md', '@~/i.md', String.raw`@C:\autre\y.md`, '@../p.md'),
+    }], { cwd: cwdP, home: MOI, seen: new Set([projetP.toLowerCase()]), pathApi: w }, espionP.port);
+    assert.deepStrictEqual(entreesP.map((e: any) => [e.path, e.etat]), [
+      [String.raw`\\serveur\equipe\projet\notes.md`, 'charge'],
+      [String.raw`C:\Users\moi\i.md`, 'charge'],
+      [String.raw`C:\autre\y.md`, 'hors-perimetre'],
+      [String.raw`\\serveur\equipe\p.md`, 'chemin-reseau'],
+    ]);
+    assert.ok(!chemins(espionP.appels).some((c) => /^c:\\autre/i.test(c) || /^\\\\serveur\\equipe\\p\.md$/i.test(c)),
+      'ni l\'autre lecteur ni le chemin réseau extérieur ne sont consultés');
+  });
+
+  test('30. Les imports du CLAUDE.md global restent lus, sur tout lecteur et sous toute forme', () => {
+    const { expandClaudeImports } = imports();
+    const globalMd = String.raw`C:\Users\moi\.claude\CLAUDE.md`;
+    const { port: p, appels } = portEspion({ [String.raw`Z:\g.md`]: 'Global.\n', [String.raw`\??\UNC\hote\g2.md`]: 'Global 2.\n' });
+    const entrees = expandClaudeImports([{ path: globalMd, text: lignes(String.raw`@Z:\g.md`, String.raw`@\??\UNC\hote\g2.md`), projectLevel: false }],
+      { cwd: ESPACE, home: MOI, seen: new Set([globalMd.toLowerCase()]), pathApi: w }, p);
+    assert.deepStrictEqual(entrees.map((e: any) => [e.path, e.etat, e.externe]), [
+      [String.raw`Z:\g.md`, 'charge', false],
+      [String.raw`\??\UNC\hote\g2.md`, 'charge', false],
+    ]);
+    assert.ok(appels.includes(String.raw`fileSize Z:\g.md`), 'le fichier choisi par l\'utilisateur est consulté');
+  });
+
+  test('31. La carte « 💽 Hors des dossiers admis : non lu » : 0 token, lecture seule, non active, libellé absolu, sans observateur, comptée au bandeau', async () => {
+    const importeur = path.join(PROJET, 'CLAUDE.md');
+    const base = { importer: importeur, niveau: 1, externe: true, size: 0, raw: null, text: null };
+    const entrees = [
+      { ...base, path: String.raw`Z:\f.md`, key: String.raw`z:\f.md`, etat: 'hors-perimetre' },
+      { ...base, path: String.raw`\??\UNC\hote\partage\t.md`, key: String.raw`\??\unc\hote\partage\t.md`, etat: 'chemin-reseau' },
+      { ...base, path: path.join(DOSSIER, 'cinq.md'), key: 'cinq', niveau: 5, externe: false, etat: 'niveau-5' },
+    ];
+    const { resultat: cartes, horsDossier } = await sousEspion([], async () =>
+      buildClaudeImportItems(entrees as any[], { scope: 'local', claudeMemoryType: 'Project', labelBase: { cwd: PROJET }, cwdKey: PROJET.toLowerCase() }));
+    assert.deepStrictEqual(horsDossier, [], 'les cartes sont construites sans aucun accès');
+    const [hors, reseauNt] = cartes;
+    assert.deepStrictEqual([hors.id, hors.name, reseauNt.id], ['Z:/f.md', 'Z:/f.md', '/??/UNC/hote/partage/t.md'],
+      'le libellé d\'une carte non consultée est son chemin absolu, en barres obliques, quel que soit le dossier de travail');
+    assert.deepStrictEqual([hors.tokenCount, hors.charCount, hors.lineCount], [0, 0, 0]);
+    assert.strictEqual(meta(hors).claudeMemoryNotLoaded, 'hors-perimetre');
+    assert.strictEqual(meta(hors).locked, true);
+    assert.deepStrictEqual(meta(hors).claudeReadOnly, { raison: 'Fichier hors du projet' });
+    assert.deepStrictEqual(meta(hors).claudeImport, { par: 'CLAUDE.md', niveau: 1, externe: true });
+    assert.strictEqual(isClaudeMemoryNotLoaded(hors), true, 'non active : hors du total de l\'Âme');
+
+    const tous = rendu(hors);
+    assert.deepStrictEqual(pastilles(tous), ['💽 Hors des dossiers admis : non lu']);
+    const badge = tous.find((el) => el.textContent === '💽 Hors des dossiers admis : non lu')!;
+    assert.strictEqual(badge.title,
+      'L\'extension ne lit pas ce fichier : il est hors du dossier de travail, du dossier personnel et de leurs dossiers admis. ' +
+      'Claude Code le charge seulement après approbation (en -p, non chargé tant qu\'il n\'est pas approuvé, mesuré). ' +
+      'Compté 0 ; ses imports ne sont pas développés.');
+    assert.ok(tous.some((el) => el.innerHTML.includes('0 tok au boot')), 'métrique à 0 au démarrage');
+    assert.ok(tous.some((el) => el.title.startsWith('Coût au démarrage : 0 token') && el.title.includes('hors des dossiers admis')), 'infobulle de la métrique');
+
+    // Le bandeau compte la carte « non lu » et la carte réseau ; le cinquième saut reste hors du compte
+    const etat = { workspace: { tool: 'claude-code', workspacePath: PROJET }, globalResources: [], localResources: cartes, stats: {} };
+    const { doc } = documentMinimal();
+    main.renderClaudeImportsBanner(etat, doc);
+    assert.strictEqual(doc.getElementById('claudeImportsBanner').textContent, '🔐 2 imports hors du projet : chargés seulement après approbation dans Claude Code');
+
+    // Aucune des deux n'a d'observateur
+    const cibles = claudeWatchTargets(etat as unknown as ManagerFullState, { globalPath: CLAUDE_GLOBAL, gitEntry: () => null });
+    assert.deepStrictEqual(cibles.filter((c) => c.includes('f.md') || c.includes('??')), [], 'aucun observateur pour une carte non consultée');
+  });
+
+  test('32. Le scan d\'un CLAUDE.md du projet qui importe un autre lecteur et un chemin à préfixe NT : aucun accès, deux cartes à 0, aucun observateur', {
+    skip: process.platform !== 'win32' ? 'la règle des lecteurs ne vaut que sous Windows (les tests 27 à 31 la couvrent ailleurs)' : false,
+  }, async () => {
+    const lettre = [...'QRSTUVWXY'].find((l) => !LETTRES_ADMISES.has(l.toLowerCase()))!;
+    const autre = `${lettre}:\\f.md`;
+    preparerDossier();
+    try {
+      arborescence({
+        'racine/projet/CLAUDE.md': ['# Projet', '', `@${autre}`, String.raw`@\??\UNC\hote\t.md`, '@commun.md', ''].join('\n'),
+        'racine/projet/commun.md': TEXTE_COMMUN,
+      });
+      const { resultat, horsDossier } = await sousEspion([RACINE, CLAUDE_GLOBAL, AG_GLOBAL], async () => ({
+        local: await LocalScanner.scan(espace(), undefined, { claudeMemoryStopAt: RACINE }),
+        global: await GlobalScanner.scan(AG_GLOBAL, 'claude-code'),
+      }));
+      assert.deepStrictEqual(horsDossier, [], 'aucun appel de fs hors du dossier d\'arrêt et des profils simulés');
+
+      const cartes = ames(resultat.local.items);
+      const nonLues = cartes.filter((c) => isClaudeMemoryNotLoaded(c));
+      assert.deepStrictEqual(nonLues.map((c) => [c.id, c.path, c.tokenCount, meta(c).claudeMemoryNotLoaded, meta(c).claudeImport?.externe]), [
+        [`${lettre}:/f.md`, autre, 0, 'hors-perimetre', true],
+        ['/??/UNC/hote/t.md', String.raw`\??\UNC\hote\t.md`, 0, 'chemin-reseau', true],
+      ]);
+      assert.strictEqual(resultat.local.soulStat.activeCount, 2, 'CLAUDE.md et commun.md seulement');
+      assert.strictEqual(resultat.local.soulStat.tokenCount, somme(cartes.filter((c) => !isClaudeMemoryNotLoaded(c))));
+
+      const etat = {
+        workspace: espace(), localResources: resultat.local.items, globalResources: resultat.global.items, nasResources: [], stats: {},
+      } as unknown as ManagerFullState;
+      const cibles = claudeWatchTargets(etat, { globalPath: CLAUDE_GLOBAL, gitEntry: () => null, stopAt: RACINE });
+      assert.deepStrictEqual(cibles.filter((c) => c.includes('f.md') || c.includes('??')), [], 'aucun observateur pour une carte non consultée');
+      assert.ok(cibles.includes(path.join(PROJET, 'commun.md')), 'l\'import ordinaire reste observé');
+      const { doc } = documentMinimal();
+      main.renderClaudeImportsBanner(etat, doc);
+      assert.strictEqual(doc.getElementById('claudeImportsBanner').textContent, '🔐 2 imports hors du projet : chargés seulement après approbation dans Claude Code');
+    } finally {
+      if (fs.existsSync(DOSSIER)) viderSaufTemoin();
+    }
+  });
+
+  test('33. Hors de Windows, un import extérieur n\'est consulté que dans l\'espace, sous le dossier personnel ou sous un parent autre que « / »', () => {
+    const { expandClaudeImports } = imports();
+    const x = path.posix;
+    const cwd = '/srv/espace/projet';
+    const projet = x.join(cwd, 'CLAUDE.md');
+    const { port: p, appels } = portEspion({
+      '/home/moi/i.md': 'Personnel.\n',
+      '/srv/espace/p.md': 'Parent.\n',
+      '/srv/q.md': 'Parent le plus haut.\n',
+      '/srv/espace/projet/commun.md': 'Commun.\n',
+    });
+    const entrees = expandClaudeImports([{
+      path: projet, projectLevel: true,
+      text: lignes('@/net/hote/x.md', '@/Volumes/NAS/x.md', '@/mnt/nas/x.md', '@//hote/y.md', '@~/i.md', '@../p.md', '@../../q.md', '@../../../r.md', '@commun.md'),
+    }], { cwd, home: '/home/moi', seen: new Set([projet.toLowerCase()]), pathApi: x }, p);
+    const nonLus = ['/net/hote/x.md', '/Volumes/NAS/x.md', '/mnt/nas/x.md', '/hote/y.md', '/r.md'];
+    assert.deepStrictEqual(chemins(appels).filter((c) => nonLus.includes(c)), [], 'aucune fonction du port n\'est appelée sur eux');
+    assert.deepStrictEqual(resume(entrees), [
+      ['/net/hote/x.md', 'hors-perimetre', true, 1, 0],
+      ['/Volumes/NAS/x.md', 'hors-perimetre', true, 1, 0],
+      ['/mnt/nas/x.md', 'hors-perimetre', true, 1, 0],
+      ['/hote/y.md', 'hors-perimetre', true, 1, 0],
+      ['/home/moi/i.md', 'charge', true, 1, Buffer.byteLength('Personnel.\n')],
+      ['/srv/espace/p.md', 'charge', true, 1, Buffer.byteLength('Parent.\n')],
+      ['/srv/q.md', 'charge', true, 1, Buffer.byteLength('Parent le plus haut.\n')],
+      ['/r.md', 'hors-perimetre', true, 1, 0],
+      ['/srv/espace/projet/commun.md', 'charge', false, 1, Buffer.byteLength('Commun.\n')],
+    ], '« / » seul n\'admet rien');
+  });
+
+  test('34. Sous Windows, un chemin enraciné sans lettre se résout sur la lettre du fichier qui importe', () => {
+    const { resolveClaudeImport, expandClaudeImports } = imports();
+    const d = String.raw`D:\espace\projet`;
+    assert.strictEqual(resolveClaudeImport(String.raw`\n.md`, d, MOI, w), String.raw`D:\n.md`);
+    assert.strictEqual(resolveClaudeImport('/o.md', d, MOI, w), String.raw`D:\o.md`);
+    assert.strictEqual(resolveClaudeImport(String.raw`\??\UNC\hote\t.md`, d, MOI, w), String.raw`\??\UNC\hote\t.md`, 'le préfixe NT reste tel quel');
+    assert.strictEqual(resolveClaudeImport('//hote/partage/x.md', d, MOI, w), String.raw`\\hote\partage\x.md`, 'un chemin réseau reste tel quel');
+    assert.strictEqual(resolveClaudeImport('/n.md', '/srv/espace', '/home/moi', path.posix), '/n.md', 'inchangé hors de Windows');
+
+    // Depuis un fichier de mémoire parent : la racine de son lecteur, qui est celui de l'espace
+    const parent = String.raw`D:\espace\CLAUDE.md`;
+    const { port: p } = portEspion({ [String.raw`D:\r.md`]: 'Racine.\n' });
+    const entrees = expandClaudeImports([{ path: parent, text: lignes(String.raw`@\r.md`), projectLevel: true }],
+      { cwd: d, home: MOI, seen: new Set([parent.toLowerCase()]), pathApi: w }, p);
+    assert.deepStrictEqual(entrees.map((e: any) => [e.path, e.etat, e.externe]), [[String.raw`D:\r.md`, 'charge', true]]);
   });
 });

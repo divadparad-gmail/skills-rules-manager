@@ -385,11 +385,12 @@
     if (!targetDoc) return;
     const isClaude = !!(state && state.workspace && state.workspace.tool === 'claude-code');
     const items = isClaude ? [...(state.globalResources || []), ...(state.localResources || [])] : [];
-    // Un import vers un chemin réseau, non lu par l'extension, est chargé par Claude Code après approbation :
-    // il est compté ; le cinquième saut et plus de 4 Mio ne sont jamais chargés
+    // Un import non lu par l'extension (chemin réseau, hors des dossiers admis) est chargé par Claude Code après
+    // approbation : il est compté ; le cinquième saut et plus de 4 Mio ne sont jamais chargés
     const count = items.filter((i) => i.targetTool === 'claude-code' && i.metadata && i.metadata.claudeImport
       && i.metadata.claudeImport.externe
-      && (!i.metadata.claudeMemoryNotLoaded || i.metadata.claudeMemoryNotLoaded === 'chemin-reseau')).length;
+      && (!i.metadata.claudeMemoryNotLoaded || i.metadata.claudeMemoryNotLoaded === 'chemin-reseau'
+        || i.metadata.claudeMemoryNotLoaded === 'hors-perimetre')).length;
     const existing = targetDoc.getElementById('claudeImportsBanner');
     if (count === 0) {
       if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
@@ -2477,6 +2478,11 @@
       addBadge('pill-warn-amber', '🌐 Chemin réseau : non lu',
         'Import hors du dossier de travail vers un chemin réseau (« \\\\hôte\\… », « //hôte/… » ou une forme équivalente), depuis un fichier de mémoire du projet ou d\'un dossier parent : chargé par Claude Code seulement après approbation (documentation ; en -p, non chargé tant qu\'il n\'est pas approuvé, mesuré).\n' +
         'L\'extension ne le consulte pas, pour ne pas ouvrir de connexion vers l\'hôte nommé par le dépôt : il compte 0, et ses propres imports ne sont pas développés.');
+    } else if (claudeNotLoaded === 'hors-perimetre') {
+      addBadge('pill-warn-amber', '💽 Hors des dossiers admis : non lu',
+        'L\'extension ne lit pas ce fichier : il est hors du dossier de travail, du dossier personnel et de leurs dossiers admis. ' +
+        'Claude Code le charge seulement après approbation (en -p, non chargé tant qu\'il n\'est pas approuvé, mesuré). ' +
+        'Compté 0 ; ses imports ne sont pas développés.');
     } else if (claudeNotLoaded === 'agents-ignore') {
       const excluant = String((item.metadata.claudeAgentsMd && item.metadata.claudeAgentsMd.ignorePar) || 'CLAUDE.md');
       addBadge('pill-info', '⏭️ Ignoré : un CLAUDE.md est présent',
@@ -2791,7 +2797,9 @@
           ? 'Coût au démarrage : 0 token (AGENTS.md ignoré par Claude Code, un CLAUDE.md étant présent ; non lu par l\'extension).'
           : claudeNotLoaded === 'chemin-reseau'
             ? 'Coût au démarrage : 0 token (import vers un chemin réseau, chargé par Claude Code seulement après approbation ; non lu par l\'extension).'
-            : 'Coût au démarrage : 0 token (fichier de plus de 4 Mio, ignoré par Claude Code ; non lu par l\'extension).';
+            : claudeNotLoaded === 'hors-perimetre'
+              ? 'Coût au démarrage : 0 token (import hors des dossiers admis, chargé par Claude Code seulement après approbation ; non lu par l\'extension).'
+              : 'Coût au démarrage : 0 token (fichier de plus de 4 Mio, ignoré par Claude Code ; non lu par l\'extension).';
     } else {
       metricsEl.innerHTML = `<span>${charStr} car.</span> <span class="tok-highlight">(${tokStr} tokens)</span>`;
       let metricsTitle = `Taille réelle : ${charStr} caractères (${tokStr} tokens)\nEstimation : BPE o200k (repli 1 token ≈ 4 car.)`;
