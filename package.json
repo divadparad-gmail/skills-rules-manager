@@ -226,6 +226,7 @@
         },
         "antigravity.discovery.enabled": {
           "type": "boolean",
+          "scope": "machine",
           "default": false,
           "tags": [
             "experimental"
@@ -340,7 +341,7 @@
         "antigravity.skills.nasDirectoryPath": {
           "type": "string",
           "default": "",
-          "scope": "resource",
+          "scope": "machine",
           "markdownDescription": "Chemin du répertoire NAS centralisé utilisé par l'action « Intégrer au NAS ». Les chemins UNC (`\\\\\\\\serveur\\\\partage\\\\skills`), les lecteurs mappés (`Z:\\\\skills`), les points de montage POSIX (`/mnt/nas/skills`) et les variables d'environnement (`${env:NAS_ROOT}/skills`) sont pris en charge."
         },
         "antigravity.skills.conflictPolicy": {

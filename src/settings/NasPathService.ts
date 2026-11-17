@@ -1,8 +1,8 @@
 /**
  * Configuration et validation du répertoire NAS d'intégration (§3.5 du PRD).
  *
- * Le service résout la valeur du réglage `antigravity.skills.nasDirectoryPath`
- * en tenant compte des deux portées, normalise les syntaxes de chemins propres
+ * Le service résout la valeur utilisateur du réglage `antigravity.skills.nasDirectoryPath`
+ * (une valeur de l'espace de travail est ignorée), normalise les syntaxes de chemins propres
  * à chaque plateforme (UNC Windows, lecteurs réseau mappés, points de montage
  * SMB/NFS) et développe les variables d'environnement. Il vérifie enfin que le
  * partage est réellement joignable et inscriptible avant tout déploiement.
@@ -52,14 +52,13 @@ export class NasPathService {
   ) {}
 
   /**
-   * Retourne le chemin NAS effectif, déjà normalisé et développé. La portée
-   * espace de travail l'emporte sur la portée utilisateur.
+   * Retourne le chemin NAS effectif, déjà normalisé et développé. Seule la
+   * valeur utilisateur est retenue : une valeur posée par l'espace de travail
+   * (le `.vscode/settings.json` d'un dépôt ouvert) est ignorée, et ses
+   * variables d'environnement ne sont donc jamais développées.
    */
   public getEffectivePath(): string {
-    const inspected = this.config.inspect<string>(NAS_DIRECTORY_SETTING);
-    const raw =
-      firstNonEmpty(inspected?.workspaceValue, inspected?.userValue) ??
-      this.config.get<string>(NAS_DIRECTORY_SETTING, '');
+    const raw = firstNonEmpty(this.config.inspect<string>(NAS_DIRECTORY_SETTING)?.userValue);
     return this.resolvePath(raw);
   }
 

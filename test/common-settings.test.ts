@@ -364,14 +364,14 @@ describe('Suite de Tests : Réglages des registres et du répertoire NAS', () =>
     );
   });
 
-  test("19. Précédence du chemin NAS : l'espace de travail prime sur l'utilisateur", () => {
+  test("19. Précédence du chemin NAS : seule la valeur utilisateur est retenue, celle de l'espace de travail est ignorée", () => {
     const config = new FakeConfiguration();
     config.user.set(NAS_DIRECTORY_SETTING, '\\\\serveur\\partage\\skills');
     const service = new NasPathService(config, undefined, {} as NodeJS.ProcessEnv);
     assert.strictEqual(service.getEffectivePath(), '\\\\serveur\\partage\\skills');
 
     config.workspace.set(NAS_DIRECTORY_SETTING, 'Z:\\equipe\\skills');
-    assert.strictEqual(service.getEffectivePath(), 'Z:\\equipe\\skills');
+    assert.strictEqual(service.getEffectivePath(), '\\\\serveur\\partage\\skills');
     assert.strictEqual(service.isConfigured(), true);
   });
 
