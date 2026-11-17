@@ -30,9 +30,10 @@ import { CLAUDE_CODE_FENCE, claudeInjectedText } from './injectedText';
  * - l'ordre est celui de la lecture : chaque import est développé à sa place, avant le suivant ;
  * - un fichier vu d'abord au cinquième saut, puis atteint plus tôt par un autre chemin, est chargé ;
  * - sous Windows, un import extérieur dont le chemin résolu commence par « \\ » ou « // » (\\?\ et \\.\
- *   compris) n'est ni consulté ni lu : son accès ouvrirait une connexion vers l'hôte nommé par le dépôt, que
- *   Claude Code ne fait qu'après approbation. Il a une entrée « chemin-reseau » à 0, sans développement. Les
- *   imports du CLAUDE.md global, et ceux d'un espace ouvert sur un partage, restent lus.
+ *   compris), ou par le préfixe « \??\ », n'est ni consulté ni lu : son accès ouvrirait une connexion vers
+ *   l'hôte nommé par le dépôt, que Claude Code ne fait qu'après approbation. Il a une entrée « chemin-reseau »
+ *   à 0, sans développement. Les imports du CLAUDE.md global, et ceux d'un espace ouvert sur un partage,
+ *   restent lus.
  *
  * Ce module est pur : il ne lit aucun fichier. Le développement passe par un port (taille, texte, clé de
  * chemin résolu) que le scanner fournit, et que les tests remplacent.
@@ -131,10 +132,11 @@ export function resolveClaudeImport(raw: string, importerDir: string, home: stri
 
 /**
  * Vrai sous Windows pour un chemin réseau, ou qui en a la forme : « \\ » ou « // » en tête, ce qui couvre
- * \\hôte\partage, \\?\UNC\… et \\.\… Toujours faux ailleurs.
+ * \\hôte\partage, \\?\UNC\… et \\.\…, ou le préfixe « \??\ », toutes barres, quel que soit ce qui le suit.
+ * Toujours faux ailleurs.
  */
 export function isClaudeNetworkPath(file: string, pathApi: ClaudePathApi = path): boolean {
-  return pathApi.sep === '\\' && /^[\\/]{2}/.test(file);
+  return pathApi.sep === '\\' && (/^[\\/]{2}/.test(file) || /^[\\/]\?\?[\\/]/.test(file));
 }
 
 /** Vrai si `target` est `dir` lui-même ou se trouve dessous. */

@@ -2475,7 +2475,7 @@
         `Taille : ${octets} octets. Il compte 0, et ses imports ne sont pas développés. L'extension ne le lit pas.`);
     } else if (claudeNotLoaded === 'chemin-reseau') {
       addBadge('pill-warn-amber', '🌐 Chemin réseau : non lu',
-        'Import hors du dossier de travail vers un chemin réseau (« \\\\hôte\\… » ou « //hôte/… »), depuis un fichier de mémoire du projet ou d\'un dossier parent : chargé par Claude Code seulement après approbation (documentation ; en -p, non chargé tant qu\'il n\'est pas approuvé, mesuré).\n' +
+        'Import hors du dossier de travail vers un chemin réseau (« \\\\hôte\\… », « //hôte/… » ou une forme équivalente), depuis un fichier de mémoire du projet ou d\'un dossier parent : chargé par Claude Code seulement après approbation (documentation ; en -p, non chargé tant qu\'il n\'est pas approuvé, mesuré).\n' +
         'L\'extension ne le consulte pas, pour ne pas ouvrir de connexion vers l\'hôte nommé par le dépôt : il compte 0, et ses propres imports ne sont pas développés.');
     } else if (claudeNotLoaded === 'agents-ignore') {
       const excluant = String((item.metadata.claudeAgentsMd && item.metadata.claudeAgentsMd.ignorePar) || 'CLAUDE.md');
