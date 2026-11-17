@@ -5,6 +5,18 @@ Le format s'inspire de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) 
 
 ## [Non publié]
 
+## [0.5.1] — 2026-11-17
+
+### Sécurité
+
+- Les chemins du catalogue NAS (`skillsManager.nasPath`), du dossier de profil d'Antigravity (`skillsManager.globalPath`), du dossier de profil de Claude Code (`skillsManager.claudeGlobalPath`) et du répertoire NAS de la vue Découverte (`antigravity.skills.nasDirectoryPath`), ainsi que l'activation de cette vue (`antigravity.discovery.enabled`), ne sont plus lus que dans les paramètres utilisateur. Une valeur posée dans les réglages d'un espace de travail, par exemple dans le `.vscode/settings.json` d'un dépôt ouvert, est ignorée. Ces cinq réglages sont désormais de portée `machine`.
+- L'extension ne modifie plus d'elle-même le réglage `security.allowedUNCHosts`. Elle ne le fait plus qu'au clic, sur le bouton « Débloquer dans VS Code » ou par la commande associée, après une confirmation qui nomme le serveur du catalogue.
+- Vérifiez la liste `security.allowedUNCHosts` de vos paramètres utilisateur et retirez-en les serveurs que vous ne reconnaissez pas.
+
+### Modifications
+
+- Si vous définissiez l'un de ces réglages dans les réglages d'un espace de travail, reportez-le dans vos paramètres utilisateur : la valeur de l'espace de travail n'est plus lue.
+
 ## [0.5.0] — 2026-11-04
 
 ### Ajouts
@@ -89,7 +101,8 @@ Le format s'inspire de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) 
 
 Première version publique : prise en charge des profils utilisateurs, suivi des tokens au démarrage, détection des doublons entre les niveaux global et local, alertes du Coach IA et synchronisation avec le catalogue NAS.
 
-[Non publié]: https://github.com/divadparad-gmail/skills-rules-manager/compare/v0.5.0...HEAD
+[Non publié]: https://github.com/divadparad-gmail/skills-rules-manager/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/divadparad-gmail/skills-rules-manager/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/divadparad-gmail/skills-rules-manager/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/divadparad-gmail/skills-rules-manager/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/divadparad-gmail/skills-rules-manager/releases/tag/v0.3.0
