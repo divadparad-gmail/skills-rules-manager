@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import type { ClaudeMemoryType } from '../types';
+import { isClaudePathInside } from './memoryImports';
 
 /**
  * Claude Code : les fichiers de mémoire des dossiers parents du dossier de travail, et la clé de chemin
@@ -50,8 +51,7 @@ export interface ClaudeParentMemoryCandidate {
 
 /** Vrai si `enfant` est `parent` lui-même ou se trouve dessous (path.relative suit la casse de la plateforme). */
 function isSameOrInside(enfant: string, parent: string): boolean {
-  const rel = path.relative(parent, enfant);
-  return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
+  return isClaudePathInside(enfant, parent);
 }
 
 /**

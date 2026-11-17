@@ -1,7 +1,7 @@
 import * as path from 'path';
 import type { ManagerFullState, ResourceItem } from '../types';
 import { claudeAutoMemoryLocation, ClaudeGitEntry } from '../services/claudeAutoMemory';
-import { CLAUDE_IMPORT_NOT_CONSULTED } from './memoryImports';
+import { CLAUDE_IMPORT_NOT_CONSULTED, isClaudePathInside } from './memoryImports';
 
 export type { ClaudeGitEntry };
 
@@ -81,7 +81,8 @@ export function claudeWorkspaceWatchTargets(state: ManagerFullState | null | und
   const targets: string[] = [];
   for (const file of candidates) {
     const rel = path.relative(cwd, file);
-    if (rel === '' || rel.startsWith('..') || path.isAbsolute(rel)) continue;
+    // Le dossier de travail lui-même n'est pas une cible ; un fichier hors de lui non plus
+    if (rel === '' || !isClaudePathInside(file, cwd)) continue;
     if (isCoveredByCommonWatchers(rel)) continue;
     const key = process.platform === 'win32' ? file.toLowerCase() : file;
     if (seen.has(key)) continue;
@@ -93,8 +94,7 @@ export function claudeWorkspaceWatchTargets(state: ManagerFullState | null | und
 
 /** Vrai si le chemin est hors du dossier de travail (autre lecteur compris). */
 function isOutside(cwd: string, file: string): boolean {
-  const rel = path.relative(cwd, file);
-  return rel === '..' || rel.startsWith('..' + path.sep) || path.isAbsolute(rel);
+  return !isClaudePathInside(file, cwd);
 }
 
 /** L'emplacement de MEMORY.md à observer, ou null (non déterminé, désactivée, ou état sans mémoire automatique). */

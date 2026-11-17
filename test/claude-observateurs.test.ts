@@ -596,3 +596,29 @@ describe('Rechargement sur les réglages qui changent le scan', () => {
     assert.strictEqual(ecouteursReglages.length, avant, 'l\'écouteur est retiré à l\'arrêt');
   });
 });
+
+describe('Appartenance à un dossier : un nom qui commence par deux points', () => {
+  test('14. Un import du dossier de travail dont le nom commence par deux points est observé dans l\'espace, et non au dehors ; la remontée l\'accepte aussi', () => {
+    const { claudeWorkspaceWatchTargets, claudeOutsideWatchTargets } = cibles();
+    const notes = path.join(PROJET, '..notes.md');
+    const dossierNotes = path.join(PROJET, '..docs', 'n.md');
+    const carte = (fichier: string): ResourceItem => ({
+      id: path.basename(fichier), name: path.basename(fichier), description: '', type: 'soul', scope: 'local', enabled: true,
+      path: fichier, targetTool: 'claude-code', isFolder: false,
+      metadata: { claudeImport: { par: 'CLAUDE.md', niveau: 1, externe: false } },
+    });
+    const etat = { workspace: espace(), localResources: [carte(notes), carte(dossierNotes)], globalResources: [], nasResources: [], stats: {} } as unknown as ManagerFullState;
+    const dedans = claudeWorkspaceWatchTargets(etat);
+    assert.ok(dedans.includes(notes), `..notes.md observé dans l'espace : ${JSON.stringify(relatifs(dedans))}`);
+    assert.ok(dedans.includes(dossierNotes), 'un fichier sous un dossier « ..docs » aussi');
+    assert.deepStrictEqual(claudeOutsideWatchTargets(etat, { globalPath: CLAUDE_GLOBAL, gitEntry: () => null }), [], 'aucun au dehors');
+
+    // La remontée des dossiers parents : un dossier d'arrêt nommé « ..arret », et un dossier « ..sous » entre lui
+    // et le dossier de travail (chemins fictifs, aucun accès)
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { claudeAncestorDirs } = require('../src/claude/memorySources');
+    const arret = path.resolve(path.sep, 'espace', '..arret');
+    const cwd = path.join(arret, '..sous', 'projet');
+    assert.deepStrictEqual(claudeAncestorDirs(cwd, { stopAt: arret }), [arret, path.join(arret, '..sous')]);
+  });
+});
