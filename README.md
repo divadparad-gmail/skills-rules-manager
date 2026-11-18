@@ -142,6 +142,15 @@ code --install-extension skills-rules-manager-<version>.vsix
 
 ---
 
+## 👣 Premiers pas
+
+1. **Installez le VSIX** en suivant l'une des deux options ci-dessus, puis rechargez la fenêtre si l'éditeur le demande.
+2. **Ouvrez le panneau** par l'icône « Skills & Rules » de la barre d'activité. Pour une vue plus large, lancez la commande `Skills & Rules Manager: Ouvrir le Grand Dashboard`.
+3. **Lisez les deux onglets** : en haut du panneau, les pilules **CLAUDE** et **ANTIGRAVITY** basculent entre les ressources de Claude Code et celles d'Antigravity. Chaque onglet a ses propres jauges de tokens et ses propres cartes.
+4. **Ouvrez le guide** par la commande `Skills & Rules Manager: Ouvrir le Guide & Bonnes Pratiques IA (Cheat Sheet)`. Il a lui aussi un onglet par outil, qui explique ce qui est chargé au démarrage et ce qui l'est à la demande.
+
+---
+
 ## ⚙️ Configuration (`settings.json`)
 
 | Paramètre | Type | Valeur par défaut | Description |
@@ -211,7 +220,7 @@ Accessibles depuis la palette de commandes (`Ctrl+Shift+P` / `Cmd+Shift+P`) :
 - `Skills & Rules Manager: Actualiser les Skills et Règles`
 - `Skills & Rules Manager: Désactiver tous les Workflows (wf-*)`
 - `Skills & Rules Manager: Activer tous les Skills`
-- `Skills & Rules Manager: Autoriser l'hôte NAS (UNC) dans la sécurité de l'éditeur`
+- `Skills & Rules Manager: Autoriser l'hôte NAS (UNC) dans la sécurité de l'éditeur` : ajoute à `security.allowedUNCHosts` l'hôte du catalogue NAS (par exemple `nas-exemple` pour `\\nas-exemple\partage`). L'hôte ne vient que du chemin `skillsManager.nasPath` de vos paramètres utilisateur, jamais d'une valeur posée par l'espace de travail, et une confirmation qui nomme le serveur est demandée à chaque fois ; rien n'est écrit sans votre accord.
 
 Les commandes « Anti-Gravity » suivantes et leurs raccourcis appartiennent à la vue Découverte : ils n'apparaissent que si le réglage expérimental `antigravity.discovery.enabled` est activé.
 
