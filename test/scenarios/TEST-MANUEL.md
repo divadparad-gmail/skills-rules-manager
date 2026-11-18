@@ -303,6 +303,10 @@ git status --short
 
 Attendu : aucune ligne.
 
+**Bouton « 🧹 Vider » (à essayer en 0.6.0).** Ce bouton, en bas de la barre latérale, n'a jamais été essayé dans l'extension installée. Dans l'hôte, redéployez le banc par « ⚡ Tous », puis cliquez sur « 🧹 Vider » et confirmez.
+
+Attendu (déduit : le bouton lance la même commande que « Vider et restaurer ») : la même confirmation qu'à la partie 5, puis une notification « 🧹 Banc d'essai vidé : … » ; le bandeau et la barre d'état disparaissent, et `git status --short` ne donne aucune ligne. Une fois la 0.6.0 installée, la même vérification pourra se rejouer dans la fenêtre principale, qui exécutera alors le même code.
+
 Fermez la fenêtre de l'hôte, puis :
 
 ```powershell
@@ -343,7 +347,7 @@ Attendu :
   - « Profil : Antigravity IDE 2.6.0 (détecté) » si `~/.gemini/antigravity/builtin/` ou `~/.gemini/antigravity-ide/.ide_migration` existe, c'est-à-dire sur un poste où Antigravity IDE 2.6.0 a déjà été lancé ;
   - « Profil : Antigravity IDE 2.5.5 (détecté) » si seul `~/.gemini/antigravity-ide/` existe ;
   - « Profil : Antigravity IDE 2.6.0 (non détecté) » si aucun de ces dossiers n'existe.
-- L'infobulle donne la raison du choix (par exemple « Données de la génération 2.6.0 trouvées dans .gemini (…) »), la date des tests du profil (« testé le 2026-10-28 » pour 2.6.0, « testé le 2026-10-21 » pour 2.5.5) et la ligne « Réglage : skillsManager.antigravityProfile (auto, 2.5.5 ou 2.6.0). ».
+- L'infobulle donne la raison du choix (par exemple « Données de la génération 2.6.0 trouvées dans .gemini (…) »), la ligne « Version de référence : Antigravity IDE 2.6.0, testée le 2026-10-28. » (ou « Version de référence : Antigravity IDE 2.5.5, testée le 2026-10-21. » pour 2.5.5) et la ligne « Réglage : skillsManager.antigravityProfile (auto, 2.5.5 ou 2.6.0). ».
 - La même pastille s'affiche dans la barre latérale.
 
 ### 9.2 — Profil `2.5.5` forcé
@@ -352,7 +356,7 @@ Dans les paramètres utilisateur de l'hôte, cherchez `skillsManager.antigravity
 
 Attendu :
 
-- La pastille affiche « Profil : Antigravity IDE 2.5.5 (forcé) », et son infobulle contient « Profil 2.5.5 imposé par le réglage skillsManager.antigravityProfile. » et « testé le 2026-10-21 ».
+- La pastille affiche « Profil : Antigravity IDE 2.5.5 (forcé) », et son infobulle contient « Profil 2.5.5 imposé par le réglage skillsManager.antigravityProfile. » et « Version de référence : Antigravity IDE 2.5.5, testée le 2026-10-21. ».
 - Dans la colonne Local, la carte de `03-rule-cond-trigger-glob` porte le badge « ⚡ Conditionnel » et la mesure « 0 tok au boot · N tok par fichier correspondant », sans badge « ⛔ Sans effet dans l'IDE 2.6.0 ».
 - Le panneau « ⏱️ Coûts dynamiques », sous la jauge, cite la règle 03 sous ses motifs `*.ts` et `*.tsx`. Ils partagent une seule ligne (`*.ts` · `*.tsx`) si aucune autre règle `glob` active, par exemple une vraie règle globale du poste, ne vise un seul des deux.
 - La carte de `04-rule-cond-trigger-globs-list` garde « ⛔ Ignorée : liste YAML ».
@@ -364,11 +368,11 @@ Dans les paramètres utilisateur de l'hôte, choisissez `2.6.0`. Revenez au Gran
 
 Attendu :
 
-- La pastille affiche « Profil : Antigravity IDE 2.6.0 (forcé) », et son infobulle contient « Profil 2.6.0 imposé par le réglage skillsManager.antigravityProfile. » et « testé le 2026-10-28 ».
-- La carte de `03-rule-cond-trigger-glob` porte le badge « ⛔ Sans effet dans l'IDE 2.6.0 », sans « ⚡ Conditionnel », et la mesure « 0 tok au boot (N plein) », sans « par fichier correspondant ». Son interrupteur reste affiché. L'infobulle du badge propose de passer en `model_decision` ou en `always_on`, et précise que l'extension ne modifie pas la règle d'elle-même.
+- La pastille affiche « Profil : Antigravity IDE 2.6.0 (forcé) », et son infobulle contient « Profil 2.6.0 imposé par le réglage skillsManager.antigravityProfile. » et « Version de référence : Antigravity IDE 2.6.0, testée le 2026-10-28. ».
+- La carte de `03-rule-cond-trigger-glob` porte le badge « ⛔ Sans effet dans l'IDE 2.6.0 », sans « ⚡ Conditionnel », et la mesure « 0 tok au boot (N plein) », sans « par fichier correspondant ». Son interrupteur reste affiché. L'infobulle du badge propose de passer en `model_decision` ou en `always_on`, et précise que l'extension ne modifie pas la règle d'elle-même. Elle date ses mesures par « testé le 2026-10-28 », sans « phase 2b » ni « phase 2c ».
 - Le panneau « ⏱️ Coûts dynamiques » ne contient plus aucune ligne de règle `glob`.
 - La carte de `04-rule-cond-trigger-globs-list` garde « ⛔ Ignorée : liste YAML ».
-- La seconde jauge « 🧩 Budget « Other Customizations » (Skills, Workflows & MCP) » s'affiche sous la jauge des règles, avec la mention « (< 20 000 tokens · 🧪 IDE 2.6.0) », et « 🧩 Other Customizations » s'affiche dans la barre latérale. L'infobulle de la seconde jauge commence par « 📊 Budget "Other Customizations" (skills, workflows et MCP) : … / 20 000 tokens ».
+- La seconde jauge « 🧩 Budget « Other Customizations » (Skills, Workflows & MCP) » s'affiche sous la jauge des règles, avec la mention « (< 20 000 tokens · 🧪 IDE 2.6.0) », et « 🧩 Other Customizations » s'affiche dans la barre latérale. L'infobulle de la seconde jauge commence par « 📊 Budget "Other Customizations" (skills, workflows et MCP) : … / 20 000 tokens », où 20 000 est le budget du profil 2.6.0 et non un plafond écrit en dur.
 
 ### 9.4 — Retour à `auto`
 
