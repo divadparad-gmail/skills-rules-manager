@@ -177,6 +177,17 @@ code --install-extension skills-rules-manager-<version>.vsix
 
 ---
 
+## 🚧 Limites connues
+
+- **Claude Code** : le comportement décrit par l'extension a été mesuré avec Claude Code 2.1.319. Les versions suivantes peuvent charger ou compter les fichiers autrement.
+- **Antigravity 2.7.0** est traitée comme Antigravity IDE 2.6.0 (même profil), sans mesure propre. Ses deux nouveaux skills intégrés, `native_swarm` et `swarm_pane`, ne sont pas pris en compte.
+- **Les jauges donnent une estimation** : le nombre de tokens est calculé par approximation, et peut s'écarter de celui que chaque outil affiche.
+- Avec le profil Antigravity IDE 2.6.0, un serveur MCP dont la liste d'outils n'est pas dans le cache est sous-estimé, et les deux skills intégrés `permissioned-github` et `run-workflow` sont surestimés d'environ 87 tokens au total.
+- Les **hooks** déclarés dans le `.claude/settings.json` de Claude Code ne sont ni lus ni affichés : le panneau des hooks ne couvre qu'Antigravity.
+- La **vue Découverte** est expérimentale et désactivée par défaut : plusieurs défauts y restent ouverts, dont des conflits de raccourcis clavier.
+
+---
+
 ## 🔒 Sécurité
 
 La découverte de ressources (vue expérimentale, désactivée par défaut) fait entrer du contenu tiers dans le contexte de votre agent et envoie vos descriptions de recherche à des serveurs. Les garde-fous suivants s'appliquent.

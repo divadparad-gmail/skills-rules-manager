@@ -5,6 +5,38 @@ Le format s'inspire de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) 
 
 ## [Non publié]
 
+## [0.6.0] — 2026-11-24
+
+### Ajouts
+
+- En mode Claude Code, l'extension lit désormais tous les fichiers de mémoire que Claude Code charge au démarrage : le `.claude/CLAUDE.md` et le `CLAUDE.local.md` du projet après son `CLAUDE.md`, puis ceux des dossiers parents, de la racine du disque vers le projet. Un fichier atteint par plusieurs chemins n'a qu'une carte : le `CLAUDE.md` global n'est jamais compté deux fois.
+- Les imports `@chemin` des fichiers de mémoire (le `CLAUDE.md` global, ceux du projet et ceux des dossiers parents) ont chacun leur carte, comptée jusqu'au quatrième saut. Un fichier importé au cinquième saut a une carte « Non chargé », à 0. Les imports écrits dans un bloc de code, un segment de code ou entre guillemets sont ignorés, comme le fait Claude Code.
+- `AGENTS.md` et `.claude/AGENTS.md`, du projet et des dossiers parents, sont comptés seulement si aucun `CLAUDE.md`, `.claude/CLAUDE.md` ni `CLAUDE.local.md` n'existe dans le dossier de travail ni au-dessus. Sinon, leur carte porte « ⏭️ Ignoré : un CLAUDE.md est présent », à 0.
+- Le `MEMORY.md` de la mémoire automatique de Claude Code est compté sur une ligne à part de la jauge, « Mémoire automatique, écrite par Claude ». Quand son emplacement ne peut pas être déterminé avec certitude, la ligne l'indique et compte 0.
+- Les cartes des fichiers que l'extension ne doit pas modifier (fichiers hors du projet, fichiers écrits par Claude) sont en lecture seule : elles portent un cadenas avec sa raison, sans interrupteur ni bouton de suppression.
+- La jauge se met à jour quand ces fichiers changent, y compris hors de l'espace de travail : `CLAUDE.local.md`, fichiers importés, mémoire des dossiers parents, `CLAUDE.md` global, `MEMORY.md` et `settings.json` du profil de Claude Code.
+
+### Modifications
+
+- **Les imports que l'extension ne lit pas.** Un import d'un fichier de mémoire du projet ou d'un dossier parent qui sort du dossier de travail n'est lu que s'il se trouve sous votre dossier personnel ou, sous Windows, sur le même lecteur que le dossier de travail (sur les autres systèmes, sous l'un des dossiers parents du dossier de travail, sauf la racine du disque). L'extension ne lit pas les autres et ne les surveille pas : ils comptent 0, leurs propres imports ne sont pas développés, et leur carte, en lecture seule, affiche leur chemin complet avec l'un de ces badges :
+  - « 🌐 Chemin réseau : non lu », pour un chemin réseau (`\\hôte\…`, `//hôte/…` ou une forme équivalente) ;
+  - « 💽 Hors des dossiers admis : non lu », pour un autre lecteur ou un dossier extérieur.
+
+  Claude Code ne charge ces fichiers qu'après votre approbation ; l'infobulle de chaque badge le rappelle. Les imports du `CLAUDE.md` global ne sont pas concernés.
+- Les règles et les `CLAUDE.md` de Claude Code sont comptés sans leur frontmatter ni leurs commentaires HTML, que Claude Code retire avant de les injecter. Leur coût affiché baisse quand ils en contiennent.
+- Une règle de Claude Code qui déclare des `paths` coûte 0 au démarrage, puisqu'elle n'est chargée qu'à la lecture ou la modification d'un fichier correspondant. À l'inverse, une règle dont le YAML du frontmatter est invalide est comptée comme permanente, car Claude Code la charge à chaque session.
+- Un skill de Claude Code est compté par sa ligne « - nom: description », sans son chemin, avec la description et `when_to_use` coupées à 1 536 caractères ; le badge « Description coupée » signale la coupe. Un skill déclaré avec `disable-model-invocation: true` ou avec des `paths` coûte 0 au démarrage, avec les badges « Invocation manuelle seulement » ou « Sur fichier correspondant ».
+- Quand un skill personnel et un skill du projet portent le même nom, seule la copie personnelle est comptée si la copie personnelle est listée au démarrage, comme Claude Code le fait : la copie du projet est masquée, sans doublon ni gaspillage signalé.
+- Le guide (onglet Claude Code) indique qu'une règle conditionnelle coûte 0 au démarrage, et qu'un skill à invocation manuelle, limité par `paths` ou masqué par un homonyme n'est pas listé au démarrage.
+- Les infobulles de la pastille du profil d'Antigravity et de la jauge « Other Customizations » sont corrigées : elles citent la version de référence et sa date de test, et la jauge affiche le budget reçu.
+- La commande devient « Autoriser l'hôte NAS (UNC) dans la sécurité de l'éditeur » ; sa confirmation et son message nomment l'éditeur dans lequel elle s'exécute (VS Code ou Antigravity), et le bouton du bandeau devient « Débloquer l'hôte ».
+- Le README gagne une section « Premiers pas », une description de l'autorisation de l'hôte NAS et une section « Limites connues ».
+
+### Corrections
+
+- La bascule d'un skill global de Claude Code n'écrit plus le fichier `skills.json` d'Antigravity : le skill est activé ou désactivé par le seul renommage de son `SKILL.md`.
+- Un changement du réglage `skillsManager.claudeGlobalPath` relance le scan, sans attendre un rafraîchissement manuel.
+
 ## [0.5.1] — 2026-11-17
 
 ### Sécurité
@@ -101,7 +133,8 @@ Le format s'inspire de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) 
 
 Première version publique : prise en charge des profils utilisateurs, suivi des tokens au démarrage, détection des doublons entre les niveaux global et local, alertes du Coach IA et synchronisation avec le catalogue NAS.
 
-[Non publié]: https://github.com/divadparad-gmail/skills-rules-manager/compare/v0.5.1...HEAD
+[Non publié]: https://github.com/divadparad-gmail/skills-rules-manager/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/divadparad-gmail/skills-rules-manager/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/divadparad-gmail/skills-rules-manager/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/divadparad-gmail/skills-rules-manager/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/divadparad-gmail/skills-rules-manager/compare/v0.3.0...v0.4.0
