@@ -245,9 +245,9 @@
             </div>
           </div>
           <ul style="margin: 0; padding-left: 20px; line-height: 1.6; color: var(--fg-color); font-size: 11px;">
-            <li><strong>Au démarrage (Boot) :</strong> Chaque skill coûte sa ligne <code>- nom: description</code> dans la liste des skills, sans son chemin (mesuré) ; la description, avec <code>when_to_use</code>, y est coupée à 1 536 caractères (documentation).</li>
+            <li><strong>Au démarrage (Boot) :</strong> Un skill listé coûte sa ligne <code>- nom: description</code> dans la liste des skills, sans son chemin (mesuré) ; la description, avec <code>when_to_use</code>, y est coupée à 1 536 caractères (documentation). Un skill à invocation manuelle, limité par <code>paths</code> ou masqué par un homonyme n'est pas listé : il coûte 0 au démarrage.</li>
             <li><strong>Mode 1 — Skills sans <code>paths</code> (À la demande) :</strong> Le corps complet du fichier <code>SKILL.md</code> n'est chargé en mémoire que si Claude juge la compétence pertinente pour la tâche courante, ou sur invocation manuelle explicite de l'utilisateur (<code>/nom-du-skill</code>).</li>
-            <li><strong>Mode 2 — Skills avec <code>paths: [...]</code> (Auto-chargement ciblé) :</strong> Dès qu'un fichier correspondant aux motifs glob est manipulé (lecture, écriture, édition), le corps complet du skill est injecté automatiquement en contexte sans attendre d'évaluation de pertinence.</li>
+            <li><strong>Mode 2 — Skills avec <code>paths: [...]</code> (Sur fichier correspondant) :</strong> Absent au démarrage, le skill devient disponible comme commande après la lecture, l'écriture ou l'édition d'un fichier correspondant aux motifs glob (testé). Son entrée dans le contexte du modèle n'est pas mesurée.</li>
           </ul>
 
           <!-- Encadré Règle d'or sur la notion du Path et Fichiers Annexes dans les Skills -->
