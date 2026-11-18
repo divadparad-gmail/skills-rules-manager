@@ -541,7 +541,8 @@ describe('Suite de Tests : alertes et coûts dynamiques d\'Antigravity (lot A3a)
     assert.ok(text.includes('⛔ Sans effet dans l\'IDE 2.6.0'));
     const titles = (el: MockEl): string[] => [el.title, ...el.children.flatMap(titles)];
     const tooltip = titles(card).find((t) => t.includes('ne l\'injecte jamais'))!;
-    assert.match(tooltip, /mesuré, phase 2b/);
+    assert.match(tooltip, /🧪 mesuré, testé le /);
+    assert.doesNotMatch(tooltip, /phase/, 'aucun jargon interne (« phase 2b », « phase 2c »)');
     assert.match(tooltip, /model_decision/);
     // La conversion manuelle : une description qui nomme les fichiers visés, et le corps lu par l'agent
     assert.match(tooltip, /• model_decision, avec une description qui nomme les fichiers visés/);
@@ -666,6 +667,8 @@ describe('Suite de Tests : alertes et coûts dynamiques d\'Antigravity (lot A3a)
       '🧩 Les skills intégrés sont comptés par prudence : le panneau de l\'IDE ne les affiche pas (🧪 observé, sonde du 2026-11-02, Antigravity IDE 2.6.0). Les skills présents à la fois en global et dans le projet sont comptés deux fois : leur traitement par le panneau n\'est pas vérifié (❔).\n' +
       '❔ Au-delà du budget, l\'IDE annonce que les grosses personnalisations sont exclues : annoncé par l\'IDE, non testé.';
     assert.strictEqual(main.formatPersonalizationBudgetTooltip(2717, 20000), expectedTooltip);
+    // F6 : le plafond affiché est le budget reçu, pas un 20 000 écrit en dur
+    assert.ok(main.formatPersonalizationBudgetTooltip(2717, 30000).includes(' / 30 000 tokens (9.1 %).'), 'le plafond affiché suit le budget reçu');
     assert.strictEqual(nodes.personalizationGaugeWrap.title, expectedTooltip);
     assert.strictEqual(nodes.personalizationGaugeWrapSide.title, expectedTooltip);
 

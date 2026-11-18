@@ -482,7 +482,7 @@ describe('Suite de Tests : profil de comportement d\'Antigravity (chantier 2.6.0
       assert.strictEqual(label.text, texte);
       assert.strictEqual(
         label.title,
-        [titreCommun, resolu.reason, `Comportement de ${resolu.profile.testedVersion} testé le ${resolu.profile.testedOn}.`, reglage].join('\n')
+        [titreCommun, resolu.reason, `Version de référence : ${resolu.profile.testedVersion}, testée le ${resolu.profile.testedOn}.`, reglage].join('\n')
       );
       assert.doesNotMatch(label.title, /retour à la 2\.5\.5|laisse cette structure/, 'Phrase non vérifiée absente');
     }

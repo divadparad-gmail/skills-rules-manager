@@ -1004,8 +1004,9 @@
   function formatPersonalizationBudgetTooltip(usedTokens, budgetTokens = 20000, workflowTokens = 0) {
     const used = (usedTokens || 0).toLocaleString('fr-FR');
     const pct = Number((((usedTokens || 0) / (budgetTokens || 20000)) * 100).toFixed(1));
+    const budget = (budgetTokens || 20000).toLocaleString('fr-FR').replace(/\s+/g, ' ');
     return (
-      `📊 Budget "Other Customizations" (skills, workflows et MCP) : ${used} / 20 000 tokens (${pct} %).\n` +
+      `📊 Budget "Other Customizations" (skills, workflows et MCP) : ${used} / ${budget} tokens (${pct} %).\n` +
       `🗂️ Workflows Markdown : ${(workflowTokens || 0).toLocaleString('fr-FR')} tokens, pour leur nom et leur description (🧪 le panneau Settings les compte sans leur corps, sonde du 2026-11-02, Antigravity IDE 2.6.0). Ceux de .agent/, _agent/ et _agents/ sont comptés par prudence (❔ non vérifié).\n` +
       '🧪 Plafond de 20 000 tokens observé dans le panneau Settings d\'Antigravity IDE 2.6.0 (2026-10-28), distinct du budget de 20 000 tokens des règles.\n' +
       '📏 Estimation de l\'extension (tokeniseur o200k_base) : le panneau de l\'IDE peut afficher un autre chiffre.\n' +
@@ -1179,7 +1180,7 @@
       title: [
         'La structure du dossier .gemini indique une génération d\'Antigravity, et non une version exacte.',
         behavior.reason || '',
-        `Comportement de ${behavior.version} testé le ${behavior.testedOn}.`,
+        `Version de référence : ${behavior.version}, testée le ${behavior.testedOn}.`,
         'Réglage : skillsManager.antigravityProfile (auto, 2.5.5 ou 2.6.0).',
       ].filter(Boolean).join('\n'),
     };
@@ -1766,9 +1767,9 @@
         if (isUncBlocked) {
           nasStatusBanner.innerHTML = `
             <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 6px; flex-wrap: wrap;">
-              <span>⚠️ Hôte NAS bloqué par la sécurité VS Code</span>
-              <button id="btnAllowUncHost" class="btn btn-primary btn-xs" style="background: #2563eb; color: #fff; padding: 2px 8px; font-weight: 600; cursor: pointer; border-radius: 4px; border: none;" title="Autoriser l'hôte UNC dans la sécurité VS Code">
-                🔓 Débloquer dans VS Code
+              <span>⚠️ Hôte NAS bloqué par la sécurité de l'éditeur</span>
+              <button id="btnAllowUncHost" class="btn btn-primary btn-xs" style="background: #2563eb; color: #fff; padding: 2px 8px; font-weight: 600; cursor: pointer; border-radius: 4px; border: none;" title="Autoriser l'hôte UNC dans la sécurité de l'éditeur">
+                🔓 Débloquer l'hôte
               </button>
             </div>
           `;
@@ -2414,10 +2415,10 @@
     if (agStatus === 'glob-no-effect') {
       const version = item.metadata.noEffectIn || '';
       addBadge('pill-warn', `⛔ Sans effet dans l'IDE ${version}`,
-        `Antigravity IDE ${version} charge cette règle glob sans erreur et la liste dans le panneau Settings, mais ne l'injecte jamais dans le contexte : ni à la lecture, à la modification, à la création ou au listing d'un fichier, ni par l'onglet actif, ni par une mention @, avec globs: comme avec glob: (🧪 mesuré, phase 2b, testé le ${behavior.testedOn}).\n` +
+        `Antigravity IDE ${version} charge cette règle glob sans erreur et la liste dans le panneau Settings, mais ne l'injecte jamais dans le contexte : ni à la lecture, à la modification, à la création ou au listing d'un fichier, ni par l'onglet actif, ni par une mention @, avec globs: comme avec glob: (🧪 mesuré, testé le ${behavior.testedOn}).\n` +
         'Elle ne coûte rien, ni au démarrage ni en cours de session.\n' +
         'Pour qu\'elle s\'applique, changez son trigger :\n' +
-        '• model_decision, avec une description qui nomme les fichiers visés : l\'agent voit son chemin et sa description au démarrage (🧪 mesuré, phase 2c), et lit le corps (read_file) quand il juge que le sujet correspond (🧪 observé, sonde du 2026-11-02, Antigravity IDE 2.6.0) ;\n' +
+        `• model_decision, avec une description qui nomme les fichiers visés : l'agent voit son chemin et sa description au démarrage (🧪 mesuré, testé le ${behavior.testedOn}), et lit le corps (read_file) quand il juge que le sujet correspond (🧪 observé, sonde du 2026-11-02, Antigravity IDE 2.6.0) ;\n` +
         '• always_on : toujours chargée, elle coûte son corps au démarrage.\n' +
         'L\'extension ne modifie pas la règle d\'elle-même.');
     }
@@ -2604,7 +2605,7 @@
           ? 'la cohabitation de .agents/ avec une variante n\'a pas été vérifiée'
           : 'seul le trigger always_on a été testé dans une variante ; ce trigger n\'a pas été vérifié';
       addBadge('pill-warn-amber', '❔ Non vérifié',
-        `Règle lue dans un dossier de variante (.agent/rules/, _agent/rules/ ou _agents/rules/) : sans .agents/, le chargement et le cumul des règles always_on de ces trois variantes ont été observés dans Antigravity IDE 2.6.0 (🧪 phase 2c, testé le ${behavior.testedOn}). En revanche, ${detail} par les tests (❔ non vérifié). La règle est comptée par prudence.`);
+        `Règle lue dans un dossier de variante (.agent/rules/, _agent/rules/ ou _agents/rules/) : sans .agents/, le chargement et le cumul des règles always_on de ces trois variantes ont été observés dans Antigravity IDE 2.6.0 (🧪 testé le ${behavior.testedOn}). En revanche, ${detail} par les tests (❔ non vérifié). La règle est comptée par prudence.`);
     }
 
     // Workflows Markdown (profil 2.6.0, sonde du 2026-11-02) : emplacement ignoré, variante non

@@ -359,7 +359,7 @@ export function ensureAntigravityTrigger(
 
 /** Avertissement d'une règle `glob` copiée vers une version qui ne l'injecte jamais (2.6.0). */
 function globNoEffectWarning(profile: AntigravityBehaviorProfile): string {
-  return `Cette règle est en « trigger: glob » : ${profile.testedVersion} la charge, mais ne l'injecte jamais dans le contexte (mesuré, phase 2b). Passez-la en model_decision ou en always_on pour qu'elle s'applique.`;
+  return `Cette règle est en « trigger: glob » : ${profile.testedVersion} la charge, mais ne l'injecte jamais dans le contexte (mesuré, testé le ${profile.testedOn}). Passez-la en model_decision ou en always_on pour qu'elle s'applique.`;
 }
 
 /**
@@ -385,8 +385,8 @@ function convertPathsToModelDecision(
     content: source.slice(0, insertAt) + frontmatterLines.join(eol) + eol + source.slice(insertAt),
     addedTrigger: 'model_decision',
     warnings: [
-      `${profile.testedVersion} n'injecte jamais une règle « trigger: glob » (mesuré, phase 2b) : les paths: deviennent « trigger: model_decision », et la description nomme les fichiers visés. La clé paths: est retirée.`,
-      `L'index d'une règle model_decision (chemin et description) est mesuré dans ${profile.testedVersion} (phase 2c). Son corps n'est pas injecté par le moteur : l'agent le lit (read_file) quand il juge que le sujet correspond à la description, et seulement alors (observé dans Antigravity IDE 2.6.0, sonde du 2026-11-02). Cette lecture dépend du jugement du modèle.`,
+      `${profile.testedVersion} n'injecte jamais une règle « trigger: glob » (mesuré, testé le ${profile.testedOn}) : les paths: deviennent « trigger: model_decision », et la description nomme les fichiers visés. La clé paths: est retirée.`,
+      `L'index d'une règle model_decision (chemin et description) est mesuré dans ${profile.testedVersion} (testé le ${profile.testedOn}). Son corps n'est pas injecté par le moteur : l'agent le lit (read_file) quand il juge que le sujet correspond à la description, et seulement alors (observé dans Antigravity IDE 2.6.0, sonde du 2026-11-02). Cette lecture dépend du jugement du modèle.`,
     ],
   };
 }

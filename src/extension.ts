@@ -102,7 +102,7 @@ export function activate(context: vscode.ExtensionContext): void {
     })
   );
 
-  // 6. Commande pour autoriser l'hôte NAS dans la sécurité VS Code (après confirmation, même parcours que le bouton)
+  // 6. Commande pour autoriser l'hôte NAS dans la sécurité de l'éditeur (après confirmation, même parcours que le bouton)
   context.subscriptions.push(
     vscode.commands.registerCommand('skillsRulesManager.allowNasUncHost', async () => {
       if (await confirmAndAllowNasHost()) {

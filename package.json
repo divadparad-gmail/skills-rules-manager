@@ -86,7 +86,7 @@
       },
       {
         "command": "skillsRulesManager.allowNasUncHost",
-        "title": "Autoriser l'hôte NAS (UNC) dans la sécurité VS Code",
+        "title": "Autoriser l'hôte NAS (UNC) dans la sécurité de l'éditeur",
         "category": "Skills & Rules Manager"
       },
       {

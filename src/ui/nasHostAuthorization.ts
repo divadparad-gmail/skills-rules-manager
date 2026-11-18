@@ -5,7 +5,7 @@ import { getUserNasPath } from '../services/nasPathSetting';
 const AUTORISER = 'Autoriser';
 
 /**
- * Parcours unique du bouton « Débloquer dans VS Code » et de la commande
+ * Parcours unique du bouton « Débloquer l'hôte » et de la commande
  * `skillsRulesManager.allowNasUncHost` : autorise l'hôte du catalogue NAS dans le réglage
  * utilisateur `security.allowedUNCHosts`, après une confirmation modale qui nomme l'hôte.
  *
@@ -26,13 +26,14 @@ export async function confirmAndAllowNasHost(): Promise<boolean> {
     return false;
   }
 
+  const editeur = vscode.env.appName || 'l\'éditeur';
   const choix = await vscode.window.showWarningMessage(
-    `Autoriser l'hôte « ${host} » dans VS Code ?`,
+    `Autoriser l'hôte « ${host} » dans ${editeur} ?`,
     {
       modal: true,
       detail:
         `Votre catalogue NAS (réglage utilisateur skillsManager.nasPath) se trouve sur l'hôte « ${host} ». ` +
-        `« ${host} » sera ajouté à votre réglage utilisateur security.allowedUNCHosts : VS Code et ses extensions ` +
+        `« ${host} » sera ajouté à votre réglage utilisateur security.allowedUNCHosts : ${editeur} et ses extensions ` +
         'pourront alors accéder à cet hôte. Vous pourrez le retirer de ce réglage à tout moment.',
     },
     AUTORISER
@@ -41,7 +42,7 @@ export async function confirmAndAllowNasHost(): Promise<boolean> {
 
   const added = await NasScanner.ensureAllowedUNCHost(nasPath);
   vscode.window.showInformationMessage(
-    added ? `Hôte « ${host} » autorisé dans VS Code.` : `L'hôte « ${host} » n'a pas été ajouté : il est déjà autorisé, ou le réglage n'a pas pu être modifié.`
+    added ? `Hôte « ${host} » autorisé dans ${editeur}.` : `L'hôte « ${host} » n'a pas été ajouté : il est déjà autorisé, ou le réglage n'a pas pu être modifié.`
   );
   return added;
 }

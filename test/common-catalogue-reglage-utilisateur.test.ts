@@ -21,6 +21,8 @@ const avertissements: Array<{ message: string; options: any; boutons: string[] }
 const saisies: Array<{ value?: string }> = [];
 const dialogues: Array<{ defaultUri?: unknown }> = [];
 const erreurs: string[] = [];
+const infos: string[] = [];
+const fauxEnv = { appName: 'Visual Studio Code' };
 let reponseConfirmation: 'accepter' | 'refuser' = 'refuser';
 let gestionnaireMessages: ((m: unknown) => Promise<void>) | null = null;
 const evenements: string[] = [];
@@ -52,7 +54,7 @@ require.cache['vscode'] = {
     window: {
       activeTextEditor: undefined,
       createOutputChannel: () => ({ appendLine() {}, dispose() {} }),
-      showInformationMessage: () => Promise.resolve(undefined),
+      showInformationMessage: (m: string) => { infos.push(m); return Promise.resolve(undefined); },
       showErrorMessage: (m: string) => { erreurs.push(m); return Promise.resolve(undefined); },
       showWarningMessage: (message: string, options: any, ...boutons: string[]) => {
         evenements.push('confirmation');
@@ -88,7 +90,7 @@ require.cache['vscode'] = {
         };
       },
     },
-    env: { appName: 'Visual Studio Code' },
+    env: fauxEnv,
     Uri: {
       file: uriFile,
       joinPath: (base: { fsPath: string }, ...parts: string[]) => uriFile(path.join(base.fsPath, ...parts)),
@@ -103,6 +105,7 @@ import { DeleteService } from '../src/services/DeleteService';
 import { SidebarViewProvider } from '../src/providers/SidebarViewProvider';
 import { DashboardPanel } from '../src/providers/DashboardPanel';
 import { ResourceItem } from '../src/types';
+import { confirmAndAllowNasHost } from '../src/ui/nasHostAuthorization';
 
 const RACINE_EXTENSION = path.resolve(__dirname, '../..');
 const CATALOGUE_ESPACE = '\\\\hote\\partage\\catalogue';
@@ -163,6 +166,8 @@ function poser(nasPath: Valeurs, hotesAutorises: string[] = []): void {
   saisies.length = 0;
   dialogues.length = 0;
   erreurs.length = 0;
+  infos.length = 0;
+  fauxEnv.appName = 'Visual Studio Code';
   evenements.length = 0;
   reponseConfirmation = 'refuser';
 }
@@ -315,5 +320,27 @@ describe('Suite de Tests : catalogue NAS, réglage utilisateur seulement', () =>
     const conf = pkg.contributes.configuration;
     const proprietes = (Array.isArray(conf) ? conf : [conf]).reduce((a: any, c: any) => Object.assign(a, c.properties), {});
     assert.strictEqual(proprietes['skillsManager.nasPath'].scope, 'machine');
+  });
+});
+
+describe('Autorisation de l\'hôte NAS : nom de l\'éditeur hôte (R4)', () => {
+  test('9. Dans Antigravity, la confirmation, le message de succès et le bandeau ne disent jamais « VS Code »', async () => {
+    poser({ globalValue: CATALOGUE_UTILISATEUR_RESEAU });
+    fauxEnv.appName = 'Antigravity';
+    reponseConfirmation = 'accepter';
+    await sousEspion(() => confirmAndAllowNasHost());
+    const textes = [...avertissements.map((a) => `${a.message}\n${a.options?.detail || ''}`), ...infos].join('\n');
+    assert.strictEqual(avertissements.length, 1, 'une confirmation est demandée');
+    assert.strictEqual(infos.length, 1, 'un message de succès est affiché');
+    assert.doesNotMatch(textes, /VS Code/, 'aucun « VS Code » dans les textes vus dans Antigravity');
+    assert.match(avertissements[0].message, /Antigravity/, 'la confirmation nomme l\'éditeur hôte');
+    assert.match(infos[0], /Antigravity/, 'le message de succès nomme l\'éditeur hôte');
+
+    // Le bandeau de la vue est commun aux deux éditeurs : il ne nomme pas VS Code
+    const mainJs = fs.readFileSync(path.join(RACINE_EXTENSION, 'src/webview/main.js'), 'utf8');
+    const debut = mainJs.indexOf('if (isUncBlocked)');
+    const bandeau = mainJs.slice(debut, mainJs.indexOf('btnAllowUncHost\')', debut));
+    assert.ok(debut > 0 && bandeau.length > 0, 'bandeau de l\'hôte bloqué trouvé');
+    assert.doesNotMatch(bandeau, /VS Code/, 'le bandeau et son bouton ne disent pas « VS Code »');
   });
 });

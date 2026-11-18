@@ -211,7 +211,7 @@ Accessibles depuis la palette de commandes (`Ctrl+Shift+P` / `Cmd+Shift+P`) :
 - `Skills & Rules Manager: Actualiser les Skills et Règles`
 - `Skills & Rules Manager: Désactiver tous les Workflows (wf-*)`
 - `Skills & Rules Manager: Activer tous les Skills`
-- `Skills & Rules Manager: Autoriser l'hôte NAS (UNC) dans la sécurité VS Code`
+- `Skills & Rules Manager: Autoriser l'hôte NAS (UNC) dans la sécurité de l'éditeur`
 
 Les commandes « Anti-Gravity » suivantes et leurs raccourcis appartiennent à la vue Découverte : ils n'apparaissent que si le réglage expérimental `antigravity.discovery.enabled` est activé.
 
