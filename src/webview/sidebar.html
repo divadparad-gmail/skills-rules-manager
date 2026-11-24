@@ -47,14 +47,17 @@
             <span>⚡ Charge Démarrage</span>
           </span>
           <span class="token-budget-target">(&lt; 20k)</span>
+          <span class="token-gauge-value" style="font-size: 10px;">
+            <span class="gauge-used-label"><span id="tokenUsedPercentSide" class="gauge-pct gauge-used-val">0%</span></span>
+            <span class="gauge-sep">|</span>
+            <span class="gauge-avail-label"><span id="tokenAvailablePercentSide" class="gauge-pct gauge-avail-val">100%</span> dispo</span>
+          </span>
+        </div>
+        <!-- Pastilles poussées à droite ; elles passent à la ligne, alignées à droite, quand la barre est étroite -->
+        <div class="token-gauge-pills">
           <span class="token-pill-context" id="tokenPillContextSide" title="Empreinte fixe rapportée à la fenêtre de session de 1 million de tokens">🌐 1.5% de 1M</span>
           <span class="token-pill-duplicate" id="duplicateWarningPillSide" style="display: none;" title="Doublons actifs détectés entre Global et Local">⚠️ Doublon</span>
           <span class="token-pill-context" id="antigravityProfilePillSide" style="display: none;"></span>
-        </div>
-        <div class="token-gauge-value" style="font-size: 10px;">
-          <span class="gauge-used-label"><span id="tokenUsedPercentSide" class="gauge-pct gauge-used-val">0%</span></span>
-          <span class="gauge-sep">|</span>
-          <span class="gauge-avail-label"><span id="tokenAvailablePercentSide" class="gauge-pct gauge-avail-val">100%</span> dispo</span>
         </div>
       </div>
 
@@ -78,11 +81,11 @@
               <span>🧩 Other Customizations</span>
             </span>
             <span class="token-budget-target">(&lt; 20k)</span>
-          </div>
-          <div class="token-gauge-value" style="font-size: 10px;">
-            <span class="gauge-used-label"><span id="personalizationUsedPercentSide" class="gauge-pct gauge-used-val">0%</span></span>
-            <span class="gauge-sep">|</span>
-            <span class="gauge-avail-label"><span id="personalizationAvailablePercentSide" class="gauge-pct gauge-avail-val">100%</span> dispo</span>
+            <span class="token-gauge-value" style="font-size: 10px;">
+              <span class="gauge-used-label"><span id="personalizationUsedPercentSide" class="gauge-pct gauge-used-val">0%</span></span>
+              <span class="gauge-sep">|</span>
+              <span class="gauge-avail-label"><span id="personalizationAvailablePercentSide" class="gauge-pct gauge-avail-val">100%</span> dispo</span>
+            </span>
           </div>
         </div>
         <div id="personalizationProgressTrackSide" class="stacked-progress-track">
