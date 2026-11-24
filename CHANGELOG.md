@@ -5,6 +5,12 @@ Le format s'inspire de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) 
 
 ## [Non publié]
 
+### Modifications
+
+- Dans le Grand Dashboard et dans la barre latérale, l'en-tête de la jauge de charge de démarrage montre « utilisé | disponible » juste après le budget conseillé, et les pastilles (part de la fenêtre 1M, doublon, profil) sont regroupées à droite. La jauge « Other Customizations » suit la même disposition. Quand la fenêtre est étroite, les pastilles passent proprement à la ligne.
+- Dans le résumé du guide de la barre latérale (onglet Claude Code), la ligne des skills ne dit plus qu'un skill limité par `paths` est chargé automatiquement : elle dit qu'il devient disponible après l'accès à un fichier correspondant, comme le guide complet.
+- Quand `gpt-tokenizer` ne peut pas être chargé, le décompte de repli (1 token pour 4 caractères) n'est plus silencieux : la mention « ⚠️ repli actif : estimation approximative » s'affiche à côté de la note d'estimation, et une ligne est écrite une fois par session dans le journal de sortie « Skills & Rules Manager ».
+
 ## [0.6.0] — 2026-11-24
 
 ### Ajouts
