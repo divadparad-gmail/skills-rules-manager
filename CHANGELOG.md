@@ -5,6 +5,8 @@ Le format s'inspire de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) 
 
 ## [Non publié]
 
+## [0.6.1] — 2026-11-24
+
 ### Modifications
 
 - Dans le Grand Dashboard et dans la barre latérale, l'en-tête de la jauge de charge de démarrage montre « utilisé | disponible » juste après le budget conseillé, et les pastilles (part de la fenêtre 1M, doublon, profil) sont regroupées à droite. La jauge « Other Customizations » suit la même disposition. Quand la fenêtre est étroite, les pastilles passent proprement à la ligne.
@@ -139,7 +141,8 @@ Le format s'inspire de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) 
 
 Première version publique : prise en charge des profils utilisateurs, suivi des tokens au démarrage, détection des doublons entre les niveaux global et local, alertes du Coach IA et synchronisation avec le catalogue NAS.
 
-[Non publié]: https://github.com/divadparad-gmail/skills-rules-manager/compare/v0.6.0...HEAD
+[Non publié]: https://github.com/divadparad-gmail/skills-rules-manager/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/divadparad-gmail/skills-rules-manager/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/divadparad-gmail/skills-rules-manager/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/divadparad-gmail/skills-rules-manager/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/divadparad-gmail/skills-rules-manager/compare/v0.4.0...v0.5.0
