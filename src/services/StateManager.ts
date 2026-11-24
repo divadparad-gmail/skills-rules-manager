@@ -23,7 +23,7 @@ import { DashboardPanel } from '../providers/DashboardPanel';
 import { CheatSheetPanel } from '../providers/CheatSheetPanel';
 import { getEffectiveGlobalAntigravityPath, getEffectiveGlobalClaudePath, getUserHome } from '../utils/paths';
 import { scanClaudeAutoMemory } from './claudeAutoMemory';
-import { resetTokenizerMetrics, getTokenizerMetrics } from '../utils/tokenizer';
+import { resetTokenizerMetrics, getTokenizerMetrics, isTokenizerFallbackUsed } from '../utils/tokenizer';
 import { debounce } from '../utils/debounce';
 import { ResolvedAntigravityProfile, resolveConfiguredAntigravityProfile } from '../antigravity/behaviorProfile';
 
@@ -92,6 +92,8 @@ export class StateManager {
 
   private static debouncedReloadHandler: ReturnType<typeof debounce> | null = null;
   private static outputChannel: vscode.OutputChannel | null = null;
+  /** Le repli du tokenizer n'est signalé qu'une fois par session dans le journal de sortie. */
+  private static tokenizerFallbackLogged = false;
   public static lastTimingLog: string | null = null;
   private static timingHistory: string[] = [];
   private static _debugTimingOverride: boolean | null = null;
@@ -192,7 +194,15 @@ export class StateManager {
       if (!isDebugTiming) {
         return;
       }
+      this.appendOutputLine(message);
+    } catch {
+      // Ignorer silencieusement
+    }
+  }
 
+  /** Écrit une ligne dans le journal de sortie « Skills & Rules Manager », sans jamais lever d'erreur. */
+  private static appendOutputLine(message: string): void {
+    try {
       // eslint-disable-next-line @typescript-eslint/no-var-requires
       const vscodeModule = require('vscode');
       if (vscodeModule && vscodeModule.window && typeof vscodeModule.window.createOutputChannel === 'function') {
@@ -384,6 +394,17 @@ export class StateManager {
     const timingMetrics = getTokenizerMetrics();
     const timingLogMessage = `Scan terminé en ${scanTotalMs} ms — ${timingMetrics.totalFiles} fichiers, ${timingMetrics.encodedCount} encodés, ${timingMetrics.cachedCount} servis du cache, encodage cumulé ${timingMetrics.cumulativeEncodingTimeMs} ms.`;
     this.logTiming(timingLogMessage);
+
+    // Repli du tokenizer : signalé dans l'interface et, une fois par session, dans le journal de sortie
+    if (isTokenizerFallbackUsed()) {
+      state.stats.tokenizerFallbackUsed = true;
+      if (!this.tokenizerFallbackLogged) {
+        this.tokenizerFallbackLogged = true;
+        this.appendOutputLine(
+          '⚠️ gpt-tokenizer indisponible : les tokens sont estimés par repli (1 token ≈ 4 caractères), les décomptes sont approximatifs.'
+        );
+      }
+    }
 
     state.isDebugTiming = this.isDebugTimingActive();
     state.lastTimingLog = this.lastTimingLog;

@@ -495,6 +495,12 @@ body {
   opacity: 0.45;
 }
 
+/* Mention du repli du tokenizer, affichée seulement quand il a servi */
+.tokenizer-fallback-note {
+  color: #fbbf24;
+  font-weight: 600;
+}
+
 /* Note permanente sur le ratio token/caractères */
 .token-helper-note {
   font-size: 10px;

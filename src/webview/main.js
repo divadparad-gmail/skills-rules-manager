@@ -766,6 +766,12 @@
         pillSide.title = `Empreinte de démarrage : ${usedTokens.toLocaleString()} tokens sur 1 000 000 tokens (${windowPct}% de la fenêtre).`;
       }
 
+      // 1.A. Mention du repli du tokenizer (Dashboard & Sidebar), seulement quand il a servi
+      ['tokenizerFallbackNote', 'tokenizerFallbackNoteSide'].forEach((id) => {
+        const note = document.getElementById(id);
+        if (note) note.style.display = stats.tokenizerFallbackUsed ? '' : 'none';
+      });
+
       // 1.B. Pilules d'alerte des doublons actifs (Dashboard & Sidebar)
       const dupStats = stats.duplicateStats;
       const hasActiveDuplicates = dupStats && dupStats.activeDuplicates > 0;

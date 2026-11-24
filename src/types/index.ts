@@ -397,6 +397,11 @@ export interface ManagerStats {
   usedTokensTotal: number;
   availablePercentage: number;
   /**
+   * Vrai si le repli heuristique du tokenizer (1 token ≈ 4 caractères) a servi : `gpt-tokenizer`
+   * n'a pas pu être chargé ou a échoué, et les décomptes affichés sont approximatifs.
+   */
+  tokenizerFallbackUsed?: boolean;
+  /**
    * D-10 (Antigravity IDE 2.6.0) : plafond de 20 000 tokens du budget « Other Customizations »
    * (skills et MCP), observé dans le panneau Settings d'Antigravity IDE 2.6.0 le 2026-10-28 ; les workflows
    * Markdown y figurent aussi (sonde du 2026-11-02, Antigravity IDE 2.6.0).

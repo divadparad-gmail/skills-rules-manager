@@ -15,6 +15,16 @@ export type EncodeFunction = (text: string) => number[] | Uint32Array | { length
 
 let cachedEncoder: EncodeFunction | null = null;
 let encoderFailedPermanently = false;
+/** Vrai dès qu'un décompte a servi le repli Math.ceil(length / 4) au lieu du BPE o200k. */
+let fallbackUsed = false;
+
+/**
+ * Indique si le repli heuristique (1 token ≈ 4 caractères) a servi au moins une fois
+ * depuis le chargement du module : les décomptes affichés sont alors approximatifs.
+ */
+export function isTokenizerFallbackUsed(): boolean {
+  return fallbackUsed;
+}
 
 /**
  * Récupère ou initialise l'encodeur de façon paresseuse (lazy require).
@@ -149,11 +159,13 @@ function encodeAndTrack(text: string): number {
       const elapsed = performance.now() - start;
       scanMetrics.cumulativeEncodingTimeMs += elapsed;
       scanMetrics.encodedCount++;
+      fallbackUsed = true;
       return Math.ceil(text.length / 4);
     }
   } else {
     // Repli immédiat si l'encodeur est indisponible
     scanMetrics.encodedCount++;
+    fallbackUsed = true;
     return Math.ceil(text.length / 4);
   }
 }
@@ -238,4 +250,5 @@ export function _setEncoderForTesting(fn: EncodeFunction | null, failedPermanent
 export function _resetEncoderStateForTesting(): void {
   cachedEncoder = null;
   encoderFailedPermanently = false;
+  fallbackUsed = false;
 }

@@ -1179,6 +1179,26 @@ Corps du texte.`;
     assert.strictEqual(restoredCount, normalCount, 'L\'encodeur normal doit être rétabli');
   });
 
+  test('44b. Tokenizer : le repli met l\'indicateur isTokenizerFallbackUsed à vrai', async () => {
+    const {
+      countTokens,
+      isTokenizerFallbackUsed,
+      _setEncoderForTesting,
+      _resetEncoderStateForTesting,
+    } = await import('../src/utils/tokenizer');
+
+    _resetEncoderStateForTesting();
+    countTokens('Décompte par le vrai BPE o200k.');
+    assert.strictEqual(isTokenizerFallbackUsed(), false, 'Sans repli, l\'indicateur reste faux');
+
+    _setEncoderForTesting(null, true);
+    countTokens('Décompte par le repli heuristique.');
+    assert.strictEqual(isTokenizerFallbackUsed(), true, 'Le repli doit mettre l\'indicateur à vrai');
+
+    _resetEncoderStateForTesting();
+    assert.strictEqual(isTokenizerFallbackUsed(), false);
+  });
+
   // --------------------------------------------------------------------------
   // Test 45 : Utilitaire de Debounce pour rafales de FileSystemWatcher
   // --------------------------------------------------------------------------
