@@ -606,7 +606,7 @@
         <li><span class="cs-icon">📏</span><span><strong>Tailles max :</strong> Âme &amp; Règles &lt; 200 li. • Skills &lt; 500 li. • MCP &le; 2 048 car./outil</span></li>
         <li><span class="cs-icon">⚡</span><span><strong>Âme (CLAUDE.md) :</strong> Injecté au boot (relu si /compact) • Sous-dossiers supportés</span></li>
         <li><span class="cs-icon">🎯</span><span><strong>Règles :</strong> Sans <code>paths</code> = permanent • Avec <code>paths</code> = ciblé à la demande</span></li>
-        <li><span class="cs-icon">🧠</span><span><strong>Skills :</strong> Sans paths = à la demande / slash • Avec paths = auto-chargé sur fichiers</span></li>
+        <li><span class="cs-icon">🧠</span><span><strong>Skills :</strong> Sans paths = à la demande / slash • Avec paths = disponible après un fichier correspondant</span></li>
         <li><span class="cs-icon">🔌</span><span><strong>MCP :</strong> Troncature stricte à 2 048 car. par outil et par instruction</span></li>
       </ul>
     `;
