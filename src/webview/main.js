@@ -2391,6 +2391,12 @@
       badgesLine.appendChild(badge);
     };
 
+    // Lot 0.6.2 : copie Global ou Local dont le fichier principal diffère du catalogue (lecture seule)
+    if ((item.scope === 'global' || item.scope === 'local') && item.catalogDiffFile && item.syncStatus !== 'nas_offline') {
+      addBadge('pill-warn-amber', '≠ Différent du catalogue',
+        `Le contenu diffère du fichier du catalogue de même nom (fins de ligne ignorées) :\n${item.catalogDiffFile}`);
+    }
+
     // R6 : frontmatter absent ou trigger non reconnu ; une règle de sous-dossier ne porte que le
     // badge « ⛔ Jamais chargée », qui reprend ce défaut dans son infobulle
     const ignoredReason = (() => {

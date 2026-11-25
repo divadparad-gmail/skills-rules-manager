@@ -102,6 +102,8 @@ export interface ResourceItem {
   tokenCount?: number;
   lineCount?: number;
   syncStatus?: SyncStatus;
+  /** Fichier du catalogue comparé, quand le fichier principal (règle ou SKILL.md) en diffère. */
+  catalogDiffFile?: string;
   mtimeMs?: number;
   metadata?: {
     tags?: string[];

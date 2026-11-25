@@ -898,9 +898,14 @@ describe('Suite de Tests : comptage des tokens au démarrage d\'Antigravity (lot
     );
     await writeFile(path.join(nasDir, 'rules', 'r-sans-fm.md'), '# Sans frontmatter\nToujours active.\n');
 
+    // Lot 0.6.2 : le coût d'un skill du catalogue dépend du dossier global (ligne F5 une fois déployé),
+    // d'où le même dossier global que le réglage lu plus bas par StateManager
+    const globalGeminiDir = path.join(base, 'global-home', '.gemini');
+    const globalConfigDir = path.join(globalGeminiDir, 'config');
+
     // 1. Profil 2.5.5 : scan sans profil deepStrictEqual au scan avec profil 2.5.5
-    const scanDefaut = await NasScanner.scan(nasDir, 'antigravity');
-    const scan255 = await NasScanner.scan(nasDir, 'antigravity', ANTIGRAVITY_PROFILES['2.5.5']);
+    const scanDefaut = await NasScanner.scan(nasDir, 'antigravity', undefined, globalConfigDir);
+    const scan255 = await NasScanner.scan(nasDir, 'antigravity', ANTIGRAVITY_PROFILES['2.5.5'], globalConfigDir);
     assert.strictEqual(scanDefaut.status.online, true);
     assert.deepStrictEqual(scan255.items, scanDefaut.items, '2.5.5 : scan explicite identique au scan par défaut');
 
@@ -929,7 +934,7 @@ describe('Suite de Tests : comptage des tokens au démarrage d\'Antigravity (lot
     );
 
     // 2. Profil 2.6.0 : coupe line-end, glob-no-effect, et âme mesurée avec <RULE[user_global]>
-    const scan260 = await NasScanner.scan(nasDir, 'antigravity', ANTIGRAVITY_PROFILES['2.6.0']);
+    const scan260 = await NasScanner.scan(nasDir, 'antigravity', ANTIGRAVITY_PROFILES['2.6.0'], globalConfigDir);
 
     const tronque260 = scan260.items.find((i) => i.id === 'r-tronque')!;
     assert.strictEqual(tronque260.metadata?.truncatedBytes, 5960, '2.6.0 : r-tronque coupé sur fin de ligne (5 960)');
@@ -948,8 +953,6 @@ describe('Suite de Tests : comptage des tokens au démarrage d\'Antigravity (lot
     );
 
     // Âme du catalogue en 2.6.0 : bootTokenCount égal à celui de l'âme globale pour un contenu identique
-    const globalGeminiDir = path.join(base, 'global-home', '.gemini');
-    const globalConfigDir = path.join(globalGeminiDir, 'config');
     await writeFile(path.join(globalGeminiDir, 'GEMINI.md'), soulContent);
     const globalScan260 = await GlobalScanner.scan(globalConfigDir, 'antigravity', ANTIGRAVITY_PROFILES['2.6.0']);
     const globalSoul260 = globalScan260.items.find((i) => i.type === 'soul' && i.id === 'GEMINI.md')!;

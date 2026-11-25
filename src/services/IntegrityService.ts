@@ -43,9 +43,11 @@ export class IntegrityService {
     for (const item of items) {
       const nasItem = nasMap.get(item.id);
       const syncStatus = await this.evaluateSyncStatus(item, nasItem);
+      const catalogDiffFile = await this.findCatalogDiffFile(item, nasItem);
       enriched.push({
         ...item,
         syncStatus,
+        ...(catalogDiffFile ? { catalogDiffFile } : {}),
       });
     }
 
@@ -73,6 +75,26 @@ export class IntegrityService {
       }
     } catch {
       return 'modified';
+    }
+  }
+
+  /**
+   * Badge « Différent du catalogue » : renvoie le fichier du catalogue de même nom quand le fichier
+   * principal en diffère (SKILL.md seul pour un skill, annexes ignorées), sinon null.
+   */
+  public static async findCatalogDiffFile(item: ResourceItem, nasItem: ResourceItem | undefined): Promise<string | null> {
+    if (!nasItem) return null;
+    const localFile = item.isFolder ? this.resolveSkillFile(item.path) : item.path;
+    const nasFile = nasItem.isFolder ? this.resolveSkillFile(nasItem.path) : nasItem.path;
+    if (!localFile || !nasFile) return null;
+    try {
+      const [localContent, nasContent] = await Promise.all([
+        fs.promises.readFile(localFile, 'utf8'),
+        fs.promises.readFile(nasFile, 'utf8'),
+      ]);
+      return areContentsIdentical(localContent, nasContent) ? null : nasFile;
+    } catch {
+      return null;
     }
   }
 

@@ -1,12 +1,13 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { ANTIGRAVITY_PROFILES, AntigravityBehaviorProfile, GLOBAL_SOUL_RULE_LABEL } from '../antigravity/behavior';
+import { ANTIGRAVITY_PROFILES, AntigravityBehaviorProfile, GLOBAL_SOUL_RULE_LABEL, formatSkillIndexLine } from '../antigravity/behavior';
 import { NasStatus, ResourceItem, ResourceType } from '../types';
 import { measureAntigravitySoul } from '../utils/antigravityRules';
 import { extractFrontmatter, extractMarkdownTitleAndSummary } from '../utils/frontmatter';
 import { countTokens, countTokensForFile } from '../utils/tokenizer';
 import { buildAntigravityRuleItem, soulSizeAdvice } from './antigravityRuleItem';
 import { getUserNasPath } from './nasPathSetting';
+import { getEffectiveGlobalAntigravityPath } from '../utils/paths';
 
 let vscodeModule: any = null;
 try {
@@ -102,8 +103,14 @@ export class NasScanner {
   public static async scan(
     customNasPath?: string,
     targetTool: 'antigravity' | 'claude-code' = 'antigravity',
-    profile: AntigravityBehaviorProfile = ANTIGRAVITY_PROFILES['2.5.5']
+    profile: AntigravityBehaviorProfile = ANTIGRAVITY_PROFILES['2.5.5'],
+    customGlobalPath?: string
   ): Promise<{ status: NasStatus; items: ResourceItem[] }> {
+    // Dossier global Antigravity où le skill serait déployé (même résolution que GlobalScanner)
+    const globalPath =
+      customGlobalPath !== undefined && customGlobalPath.trim().length === 0
+        ? ''
+        : getEffectiveGlobalAntigravityPath(customGlobalPath);
     // Réglage utilisateur seulement : une valeur posée par l'espace de travail est ignorée
     const rawNasPath = customNasPath || getUserNasPath();
     const nasPath = (rawNasPath || '').trim().replace(/[\/\\]+$/, '');
@@ -261,9 +268,20 @@ export class NasScanner {
           const isWorkflow = entry.name.startsWith('wf-') || name.startsWith('wf-');
           const type: ResourceType = isWorkflow ? 'workflow' : 'skill';
 
-          const discoverySignature = `name: ${name}\ndescription: ${description}\npath: ${activeFile}\n`;
+          // Antigravity : coût de la ligne F5 qu'aurait le skill une fois déployé dans le Global,
+          // calculé comme la carte Global (formatSkillIndexLine). Sans dossier global connu, chemin
+          // du NAS. Claude Code garde l'ancien gabarit (non corrigé dans ce lot).
+          let discoverySignature: string;
+          let tokenCount: number;
+          if (targetTool === 'antigravity') {
+            const deployedSkillMd = globalPath ? path.join(globalPath, 'skills', entry.name, 'SKILL.md') : skillMd;
+            discoverySignature = formatSkillIndexLine(name, deployedSkillMd, description);
+            tokenCount = countTokensForFile(activeFile, fileStat?.size, fileStat?.mtimeMs, discoverySignature, 'f5');
+          } else {
+            discoverySignature = `name: ${name}\ndescription: ${description}\npath: ${activeFile}\n`;
+            tokenCount = countTokensForFile(activeFile, fileStat?.size, fileStat?.mtimeMs, discoverySignature);
+          }
           const charCount = discoverySignature.length;
-          const tokenCount = countTokensForFile(activeFile, fileStat?.size, fileStat?.mtimeMs, discoverySignature);
 
           items.push({
             id: entry.name,
