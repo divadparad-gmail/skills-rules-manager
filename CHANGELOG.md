@@ -5,6 +5,16 @@ Le format s'inspire de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) 
 
 ## [Non publié]
 
+## [0.6.2] — 2026-11-25
+
+### Ajouts
+
+- Une carte Global ou Local dont le fichier principal diffère du fichier du catalogue de même nom porte le badge « ≠ Différent du catalogue », en lecture seule. Pour un skill, seul le `SKILL.md` est comparé ; les différences de fins de ligne sont ignorées, et aucun badge n'apparaît quand le catalogue est hors ligne. L'infobulle donne le chemin du fichier du catalogue.
+
+### Modifications
+
+- Avec le profil Antigravity, le coût d'un skill du catalogue NAS est désormais calculé sur la ligne d'index qu'il aurait une fois déployé dans le Global, chemin de déploiement compris. Il est donc identique au coût affiché pour la copie globale du même skill. Le décompte de Claude Code ne change pas.
+
 ## [0.6.1] — 2026-11-24
 
 ### Modifications
